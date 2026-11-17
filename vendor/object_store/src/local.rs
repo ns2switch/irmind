@@ -30,7 +30,7 @@ use std::{collections::VecDeque, path::PathBuf};
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use chrono::{DateTime, Utc};
+use irmind_calendar::{DateTime, Utc};
 use futures_util::{FutureExt, TryStreamExt};
 use futures_util::{StreamExt, stream::BoxStream};
 use parking_lot::Mutex;

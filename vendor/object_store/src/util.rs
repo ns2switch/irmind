@@ -32,14 +32,14 @@ pub(crate) static RFC1123_FMT: &str = "%a, %d %h %Y %T GMT";
 #[cfg(any(feature = "azure", feature = "http"))]
 pub(crate) fn deserialize_rfc1123<'de, D>(
     deserializer: D,
-) -> Result<chrono::DateTime<chrono::Utc>, D::Error>
+) -> Result<irmind_calendar::DateTime<irmind_calendar::Utc>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     let s: String = serde::Deserialize::deserialize(deserializer)?;
     let naive =
-        chrono::NaiveDateTime::parse_from_str(&s, RFC1123_FMT).map_err(serde::de::Error::custom)?;
-    Ok(chrono::TimeZone::from_utc_datetime(&chrono::Utc, &naive))
+        irmind_calendar::NaiveDateTime::parse_from_str(&s, RFC1123_FMT).map_err(serde::de::Error::custom)?;
+    Ok(irmind_calendar::TimeZone::from_utc_datetime(&irmind_calendar::Utc, &naive))
 }
 
 #[cfg(any(feature = "aws", feature = "azure"))]

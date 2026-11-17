@@ -1,9 +1,7 @@
 use super::{CommonRow, ObservationRow};
 use crate::parquet_store::{AppError, RecordBatch, RecordRow, invalid_source, storage};
-use arrow::{
-    array::{ArrayRef, StringArray, UInt8Array, UInt16Array, UInt32Array, UInt64Array},
-    datatypes::{Field, Schema},
-};
+use arrow_array::{ArrayRef, StringArray, UInt8Array, UInt16Array, UInt32Array, UInt64Array};
+use arrow_schema::{Field, Schema};
 use std::sync::Arc;
 
 type Pair<'a> = (usize, &'a RecordRow, &'a ObservationRow);

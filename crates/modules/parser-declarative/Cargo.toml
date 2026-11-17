@@ -6,9 +6,9 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+irmind-calendar = { path = "../../calendar", version = "0.1.0" }
 irmind-app = { path = "../../app", version = "0.1.0" }
 irmind-domain = { path = "../../domain", version = "0.1.0" }
-chrono = { version = "0.4", default-features = false, features = ["std"] }
 csv = "1.4"
 regex = "1"
 serde = { version = "1", features = ["derive"] }

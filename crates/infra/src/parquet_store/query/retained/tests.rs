@@ -1,11 +1,9 @@
 use super::*;
-use arrow::{
-    array::{
-        ArrayRef, BooleanArray, StringArray, TimestampMicrosecondArray, UInt8Array, UInt16Array,
-        UInt64Array,
-    },
-    datatypes::{Field, Schema},
+use arrow_array::{
+    ArrayRef, BooleanArray, StringArray, TimestampMicrosecondArray, UInt8Array, UInt16Array,
+    UInt64Array,
 };
+use arrow_schema::{Field, Schema};
 use std::sync::Arc;
 fn batch(indices: &[u64], times: &[Option<i64>], precise: bool, label: &str) -> RecordBatch {
     let mut columns: Vec<(&str, ArrayRef)> = vec![
@@ -67,7 +65,7 @@ fn batch(indices: &[u64], times: &[Option<i64>], precise: bool, label: &str) -> 
                     .iter()
                     .map(|t| {
                         t.map_or_else(String::new, |v| {
-                            chrono::DateTime::from_timestamp_micros(v)
+                            irmind_calendar::DateTime::from_timestamp_micros(v)
                                 .unwrap()
                                 .format("%Y-%m-%dT%H:%M:%SZ")
                                 .to_string()
@@ -96,7 +94,7 @@ fn eager(batch: &RecordBatch, hits: &mut Vec<EventHit>, limit: usize, newest: bo
         let mut fields = batch.schema().fields().iter().cloned().collect::<Vec<_>>();
         fields.push(Arc::new(Field::new(
             "event_time",
-            arrow::datatypes::DataType::Utf8,
+            arrow_schema::DataType::Utf8,
             false,
         )));
         let times = (0..batch.num_rows())

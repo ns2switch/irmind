@@ -111,7 +111,7 @@ fn spool_cache_elision_keeps_memory_accounting_and_all_physical_bytes() {
     }
 }
 
-fn parquet_bytes(batch: &arrow::record_batch::RecordBatch) -> Vec<u8> {
+fn parquet_bytes(batch: &arrow_array::RecordBatch) -> Vec<u8> {
     let mut bytes = Vec::new();
     let mut writer =
         parquet::arrow::ArrowWriter::try_new(&mut bytes, batch.schema(), None).unwrap();

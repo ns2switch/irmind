@@ -4,8 +4,8 @@ use super::{
     AppError, Arc, ArrayRef, ArtifactSink, EvidenceHash, RecordBatch, RecordRow, StringArray,
     UInt64Array, invalid_source, storage,
 };
-use arrow::array::{BooleanArray, TimestampMicrosecondArray, UInt8Array, UInt16Array};
-use arrow::datatypes::Schema;
+use arrow_array::{BooleanArray, TimestampMicrosecondArray, UInt8Array, UInt16Array};
+use arrow_schema::Schema;
 use irmind_domain::{ARTIFACT_V2_STABLE_ORDER, ARTIFACT_V2_TIME_SEMANTICS, ParquetArtifactV2};
 
 #[cfg(test)]
@@ -102,7 +102,7 @@ pub(super) fn columns(
     let fields = columns
         .iter()
         .map(|(name, a)| {
-            arrow::datatypes::Field::new(
+            arrow_schema::Field::new(
                 name,
                 a.data_type().clone(),
                 matches!(

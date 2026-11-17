@@ -30,3 +30,9 @@
 skills/** -text
 # Proposed skill wire vectors and their checksums use exact LF bytes.
 docs/development/skills-format-vectors/** text eol=lf
+
+# Retained upstream license bytes are covered by the GUID source manifest.
+helpers/evtx/vendor/winstructs/LICENSE text eol=lf
+
+# Preserve the exact reviewed third-party bytes on every platform, including scripts.
+vendor/** -text

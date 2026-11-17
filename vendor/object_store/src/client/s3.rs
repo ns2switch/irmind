@@ -19,7 +19,7 @@
 use crate::multipart::PartId;
 use crate::path::Path;
 use crate::{ListResult, ObjectMeta, Result};
-use chrono::{DateTime, Utc};
+use irmind_calendar::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]

@@ -1,0 +1,21 @@
+[package]
+name = "irmind-calendar"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+config-duration = ["dep:jiff"]
+
+[dependencies]
+jiff = { version = "=0.2.39", default-features = false, features = ["std"], optional = true }
+time = { version = "=0.3.55", default-features = false, features = ["std", "parsing", "formatting", "serde", "large-dates"] }
+
+serde = "1"
+
+[dev-dependencies]
+serde_json = "1"
+
+[lints]
+workspace = true

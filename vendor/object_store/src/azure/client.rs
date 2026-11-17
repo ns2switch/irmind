@@ -35,7 +35,7 @@ use async_trait::async_trait;
 use base64::Engine;
 use base64::prelude::{BASE64_STANDARD, BASE64_STANDARD_NO_PAD};
 use bytes::{Buf, Bytes};
-use chrono::{DateTime, Utc};
+use irmind_calendar::{DateTime, Utc};
 use http::{
     HeaderName, Method,
     header::{CONTENT_LENGTH, CONTENT_TYPE, HeaderMap, HeaderValue, IF_MATCH, IF_NONE_MATCH},
@@ -753,8 +753,8 @@ impl AzureClient {
         let credential = self.get_credential().await?;
         let url = self.config.service.clone();
 
-        let start = start.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-        let expiry = end.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+        let start = start.to_rfc3339_opts(irmind_calendar::SecondsFormat::Secs, true);
+        let expiry = end.to_rfc3339_opts(irmind_calendar::SecondsFormat::Secs, true);
 
         let mut body = String::new();
         body.push_str("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<KeyInfo>\n");
@@ -797,7 +797,7 @@ impl AzureClient {
     /// Since delegation keys are acquired ad-hoc, the signer allows for signing multiple urls with the same key.
     pub(crate) async fn signer(&self, expires_in: Duration) -> Result<AzureSigner> {
         let credential = self.get_credential().await?;
-        let signed_start = chrono::Utc::now();
+        let signed_start = irmind_calendar::Utc::now();
         let signed_expiry = signed_start + expires_in;
         match credential.as_deref() {
             Some(AzureCredential::BearerToken(_)) => {

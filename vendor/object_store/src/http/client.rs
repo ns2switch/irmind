@@ -25,7 +25,7 @@ use crate::util::deserialize_rfc1123;
 use crate::{Attribute, Attributes, ClientOptions, GetOptions, ObjectMeta, PutPayload, Result};
 use async_trait::async_trait;
 use bytes::Buf;
-use chrono::{DateTime, Utc};
+use irmind_calendar::{DateTime, Utc};
 use http::header::{
     CACHE_CONTROL, CONTENT_DISPOSITION, CONTENT_ENCODING, CONTENT_LANGUAGE, CONTENT_LENGTH,
     CONTENT_TYPE,

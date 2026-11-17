@@ -1,6 +1,6 @@
 //! Typed time columns are resolved once per batch; every row keeps full validation.
 use super::{AppError, RecordBatch, invalid_source};
-use arrow::array::{
+use arrow_array::{
     Array, BooleanArray, StringArray, TimestampMicrosecondArray, UInt8Array, UInt16Array,
 };
 use irmind_app::{IndexedInstant, IndexedTime, TimePrecision};

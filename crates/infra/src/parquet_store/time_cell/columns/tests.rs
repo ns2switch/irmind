@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used)]
 use super::*;
-use arrow::array::{ArrayRef, UInt64Array};
+use arrow_array::{ArrayRef, UInt64Array};
 use std::sync::Arc;
 
 fn batch() -> (RecordBatch, Vec<Option<IndexedTime>>) {

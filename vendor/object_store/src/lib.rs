@@ -609,7 +609,7 @@ use crate::path::Path;
 use crate::util::maybe_spawn_blocking;
 use async_trait::async_trait;
 use bytes::Bytes;
-use chrono::{DateTime, Utc};
+use irmind_calendar::{DateTime, Utc};
 use futures_util::{StreamExt, TryStreamExt, stream::BoxStream};
 use std::fmt::{Debug, Formatter};
 use std::ops::Range;
@@ -2152,7 +2152,7 @@ impl From<Error> for std::io::Error {
 mod tests {
     use super::*;
 
-    use chrono::TimeZone;
+    use irmind_calendar::TimeZone;
 
     macro_rules! maybe_skip_integration {
         () => {

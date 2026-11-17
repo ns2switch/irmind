@@ -3,7 +3,7 @@ use super::Node;
 use super::node::Peer;
 use crate::parquet_store::query::text;
 use crate::parquet_store::{AppError, invalid_source, storage};
-use arrow::record_batch::RecordBatch;
+use arrow_array::RecordBatch;
 use std::{borrow::Cow, collections::BTreeSet};
 
 pub(super) fn read_peers(batch: &RecordBatch, row: usize) -> Result<Vec<Node>, AppError> {

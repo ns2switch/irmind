@@ -1,7 +1,7 @@
 //! Shared exact count/extrema accumulation and optional batch CPU timing.
 use super::super::time_cell::{BorrowedCell, BorrowedRows, TimeCell};
 use super::super::{AppError, ParquetProfile};
-use arrow::record_batch::RecordBatch;
+use arrow_array::RecordBatch;
 
 pub(super) fn accumulate(
     batch: &RecordBatch,

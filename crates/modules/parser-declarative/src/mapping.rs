@@ -1,8 +1,8 @@
 use crate::{AppError, DeclarativeParser, error};
-use chrono::{
+use irmind_app::GraphRecord;
+use irmind_calendar::{
     DateTime, Datelike as _, FixedOffset, NaiveDateTime, SecondsFormat, TimeZone as _, Utc,
 };
-use irmind_app::GraphRecord;
 use serde::Serialize;
 use serde_json::value::RawValue;
 use std::{collections::BTreeMap, net::IpAddr};

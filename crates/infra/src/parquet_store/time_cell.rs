@@ -1,5 +1,5 @@
 use super::{AppError, RecordBatch, invalid_source};
-use arrow::array::{Array, StringArray, UInt64Array};
+use arrow_array::{Array, StringArray, UInt64Array};
 use irmind_app::IndexedTime;
 mod borrowed;
 mod columns;

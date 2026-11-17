@@ -6,10 +6,8 @@ use crate::parquet_store::query::time_rules;
 use crate::parquet_store::scan::{Predicate, ScanFlow};
 use crate::parquet_store::time_cell::TimeCell;
 use crate::parquet_store::{invalid_source, storage};
-use arrow::{
-    array::{Array, StringArray, UInt8Array, UInt16Array},
-    record_batch::RecordBatch,
-};
+use arrow_array::RecordBatch;
+use arrow_array::{Array, StringArray, UInt8Array, UInt16Array};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 

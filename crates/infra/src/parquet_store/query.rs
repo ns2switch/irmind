@@ -1,7 +1,7 @@
 use super::{AppError, CancellationToken, CaseId, ParquetArtifact, ParquetStore};
 use crate::parquet_store::scan::{Predicate, ScanFlow, ScanSpec, ScanStatus};
-use arrow::array::{StringArray, UInt64Array};
-use arrow::record_batch::RecordBatch;
+use arrow_array::RecordBatch;
+use arrow_array::{StringArray, UInt64Array};
 use irmind_domain::GraphQueryFilter;
 use std::time::{Duration, Instant};
 
@@ -74,7 +74,7 @@ impl QueryStore<'_> {
     }
 
     fn source_rows(&self, batch: &RecordBatch) -> Result<RecordBatch, AppError> {
-        use arrow::array::Array as _;
+        use arrow_array::Array as _;
         let Some(sources) = self.source_subset else {
             return Ok(batch.clone());
         };
@@ -85,11 +85,11 @@ impl QueryStore<'_> {
         if hashes.null_count() != 0 {
             return Err(super::invalid_source());
         }
-        let selected: arrow::array::BooleanArray = hashes
+        let selected: arrow_array::BooleanArray = hashes
             .iter()
             .map(|hash| Some(hash.is_some_and(|hash| sources.contains(hash))))
             .collect();
-        arrow::compute::filter_record_batch(batch, &selected).map_err(super::storage)
+        arrow_select::filter::filter_record_batch(batch, &selected).map_err(super::storage)
     }
 }
 

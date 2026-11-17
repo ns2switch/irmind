@@ -3,10 +3,8 @@ use super::peers::read_peers;
 use crate::parquet_store::query::{MAX_NEIGHBOR_RECORDS, QueryStore, number, text, time_rules};
 use crate::parquet_store::scan::{Predicate, ScanFlow, ScanSpec, ScanStatus};
 use crate::parquet_store::{AppError, invalid_source};
-use arrow::{
-    array::{Array, UInt8Array, UInt16Array},
-    record_batch::RecordBatch,
-};
+use arrow_array::RecordBatch;
+use arrow_array::{Array, UInt8Array, UInt16Array};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub(super) struct Candidates {

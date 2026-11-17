@@ -106,7 +106,7 @@ fn signed_case_preserves_precise_time_and_rejects_decoder_substitution() {
 }
 
 fn assert_precise_columns(store: &LocalStore, id: &CaseId, source: &[u8; 32]) {
-    use arrow::array::{Array, BooleanArray, TimestampMicrosecondArray, UInt8Array, UInt16Array};
+    use arrow_array::{Array, BooleanArray, TimestampMicrosecondArray, UInt8Array, UInt16Array};
     let catalog = irmind_app::artifact_catalog(&store.entries(id).unwrap()).unwrap();
     let hash = irmind_app::hex(source);
     let artifacts = catalog

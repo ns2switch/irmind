@@ -19,7 +19,7 @@
 
 use crate::ObjectMeta;
 use crate::path::Path;
-use chrono::{DateTime, TimeZone, Utc};
+use irmind_calendar::{DateTime, TimeZone, Utc};
 use http::HeaderMap;
 use http::header::{CONTENT_LENGTH, ETAG, LAST_MODIFIED};
 
@@ -60,7 +60,7 @@ pub(crate) enum Error {
     #[error("Invalid last modified '{}': {}", last_modified, source)]
     InvalidLastModified {
         last_modified: String,
-        source: chrono::ParseError,
+        source: irmind_calendar::ParseError,
     },
 
     #[error("Invalid content length '{}': {}", content_length, source)]

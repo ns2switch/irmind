@@ -13,12 +13,7 @@ impl CaseRuntime<'_, '_, '_> {
     pub(super) fn footer_data(&self, view: &crate::case::CaseFrame<'_>) -> StatusData {
         let mut data = crate::status_bar::frame_data(view);
         data.extend(self.status_data.clone());
-        data.insert(
-            StatusSegment::Clock,
-            chrono::DateTime::<chrono::Utc>::from(std::time::SystemTime::now())
-                .format("%H:%M:%S UTC")
-                .to_string(),
-        );
+        data.insert(StatusSegment::Clock, crate::utc_display::clock());
         data
     }
 

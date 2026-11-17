@@ -24,7 +24,7 @@ use crate::util::{hex_digest, hex_encode, hmac_sha256};
 use crate::{CredentialProvider, Result, RetryConfig};
 use async_trait::async_trait;
 use bytes::Buf;
-use chrono::{DateTime, Utc};
+use irmind_calendar::{DateTime, Utc};
 use http::header::{AUTHORIZATION, HeaderMap, HeaderName, HeaderValue};
 use http::{Method, StatusCode};
 use percent_encoding::utf8_percent_encode;

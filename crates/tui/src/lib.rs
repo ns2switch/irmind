@@ -14,6 +14,7 @@ mod setup;
 mod startup_review;
 mod status_bar;
 mod theme;
+mod utc_display;
 mod workflow;
 
 use anyhow::Result;

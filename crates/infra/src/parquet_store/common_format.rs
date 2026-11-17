@@ -1,6 +1,6 @@
 //! Physical schemas are bound by their signed IDs and checked file metadata.
 use super::{AppError, invalid_source};
-use arrow::datatypes::Schema;
+use arrow_schema::Schema;
 use irmind_domain::{ArtifactSchemaV2, COMMON_EVENT_V1};
 
 pub(super) const BUILDER: &str = irmind_domain::COMMON_EVENT_BUILDER;

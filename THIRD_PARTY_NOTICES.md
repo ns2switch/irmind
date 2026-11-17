@@ -47,3 +47,25 @@ Before a formal external binary release, generate and review complete third-part
 ## EVTX decoding helper
 
 The separately resolved `irmind-evtx` executable uses the official `evtx` 0.15.1 crate (MIT OR Apache-2.0), maintained at https://github.com/omerbenamram/evtx. Its dependencies and native-code audit are distributed with the helper SBOM. The small EVTX fixtures in `crates/testkit/fixtures/parser-evtx` are generated from synthetic events by `scripts/generate_evtx_fixture.py`; they contain no collected incident data.
+
+## winstructs GUID-only subset
+
+The isolated EVTX helper uses a reviewed GUID-only subset of
+[winstructs 0.3.2](https://github.com/omerbenamram/winstructs), by Omer Ben-Amram
+and Matthew Seyer, under its MIT OR Apache-2.0 license. The retained parsing,
+serialization and error files are unchanged; unused NTFS, security and timestamp
+modules are omitted. The official EVTX decoder is unchanged. The verified source
+archive and file hashes are recorded in
+[the provenance manifest](helpers/evtx/vendor/winstructs/UPSTREAM.json), with
+[the upstream license](helpers/evtx/vendor/winstructs/LICENSE).
+
+
+## Reviewed Arrow and Parquet source patches
+
+IRMind includes the published Apache `arrow-array` 59.3.2 and `parquet` 59.3.0
+sources under `vendor/`, with calendar dependency substitutions. Both are
+Apache-2.0, copyright The Apache Software Foundation. Their original
+`LICENSE.txt` and `NOTICE.txt`, archive checksums, original file hashes and local
+patch hashes accompany the sources. See each directory's `IRMIND_PATCH.md` and
+`UPSTREAM.json`. The Arrow umbrella is replaced by the same versioned array,
+schema, select and ordering components; no local Arrow cast patch is required.

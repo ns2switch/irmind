@@ -6,12 +6,11 @@ use aws_sdk_cloudtrail::{
     primitives::DateTime as AwsDateTime,
     types::{LookupAttribute, LookupAttributeKey},
 };
-use chrono::DateTime;
 use irmind_app::{
     AppError, CancellationToken, CloudAuditPort, async_trait,
     modules::{ConfigField, Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
 };
-use irmind_domain::{AuthorizedCall, Tool};
+use irmind_domain::{AuthorizedCall, Tool, UtcTimestamp};
 use secrecy::ExposeSecret;
 use serde_json::{Value, json};
 
@@ -374,8 +373,8 @@ fn parse_utc(value: Option<&str>) -> Result<i64, AppError> {
             irmind_app::AdapterPolicyError::CloudTrailRequiresUTCSecondPrecision,
         )));
     }
-    DateTime::parse_from_rfc3339(value)
-        .map(|time| time.timestamp())
+    UtcTimestamp::parse(value)
+        .map(|time| time.unix_seconds())
         .map_err(|_| {
             AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
                 irmind_app::AdapterPolicyError::InvalidCloudTrailTime,

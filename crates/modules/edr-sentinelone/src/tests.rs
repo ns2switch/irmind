@@ -188,3 +188,26 @@ fn rejects_ambiguous_agents_and_cross_site_threats() {
     assert!(validate_threats(&threat, "123", "789", from, to).is_err());
     assert!(validate_threats(&threat, "789", "456", from, to).is_err());
 }
+
+#[test]
+fn utc_filter_keeps_subseconds_and_offsets_without_accepting_unknown_time() {
+    let from = "2026-10-23T12:00:00Z";
+    let to = "2026-10-23T13:00:00Z";
+    for value in [
+        from,
+        to,
+        "2026-10-23T14:00:00+01:00",
+        "2026-10-23T12:00:00.000000001Z",
+    ] {
+        assert!(within(Some(value), from, to), "{value}");
+    }
+    for value in [
+        "2026-10-23T13:00:00.000000001Z",
+        "2026-10-23T11:59:59.999999999Z",
+        "2026-10-23T12:00:00-00:00",
+        "2026-10-23T12:00:60Z",
+        "not a timestamp",
+    ] {
+        assert!(!within(Some(value), from, to), "{value}");
+    }
+}

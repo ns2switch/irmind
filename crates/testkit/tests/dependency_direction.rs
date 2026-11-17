@@ -15,9 +15,9 @@ fn layer(name: &str) -> Result<u8, String> {
 }
 
 fn check_edge(from: &str, to: &str) -> Result<(), String> {
-    if from == "irmind-build-manifest" {
+    if matches!(from, "irmind-build-manifest" | "irmind-calendar") {
         return Err(format!(
-            "build manifest utility must not depend on runtime crates: {from} -> {to}"
+            "pure build/calendar utility must not depend on runtime crates: {from} -> {to}"
         ));
     }
     if from == "irmind-mapping-tables" && !matches!(to, "irmind-domain" | "irmind-app") {
@@ -32,6 +32,7 @@ fn check_edge(from: &str, to: &str) -> Result<(), String> {
         return Err(format!("reverse dependency: {from} -> {to}"));
     }
     let shared = [
+        "irmind-calendar",
         "irmind-process-containment",
         "irmind-fs",
         "irmind-http",
@@ -84,6 +85,8 @@ fn deliberate_reverse_edge_is_rejected() {
     assert!(check_edge("irmind-mod-keystore-file", "irmind-fs").is_ok());
     assert!(check_edge("irmind-fs", "irmind-process-containment").is_ok());
     assert!(check_edge("irmind-process-containment", "irmind-infra").is_err());
+    assert!(check_edge("irmind-calendar", "irmind-infra").is_err());
+    assert!(check_edge("irmind-calendar", "irmind-domain").is_err());
     assert!(check_edge("irmind-mod-mapping-linux", "irmind-mapping-tables").is_ok());
     assert!(check_edge("irmind-mapping-tables", "irmind-mod-parser-linux").is_err());
     assert!(check_edge("irmind-mod-siem-splunk", "irmind-http").is_ok());

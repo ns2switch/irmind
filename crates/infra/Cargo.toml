@@ -6,6 +6,9 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+arrow-select = { version = "=59.3.2", default-features = false }
+arrow-ord = { version = "=59.3.2", default-features = false }
+irmind-calendar = { path = "../calendar", version = "0.1.0" }
 irmind-app = { path = "../app", version = "0.1.0" }
 irmind-domain = { path = "../domain", version = "0.1.0" }
 irmind-fs = { path = "../fs", version = "0.1.0" }
@@ -18,10 +21,10 @@ serde_json = "1"
 unicode-normalization = "=0.1.26"
 serde = { version = "1", features = ["derive"] }
 bytes = "1"
-arrow = { version = "=59.3.0", default-features = false }
+arrow-array = { version = "=59.3.2", default-features = false }
+arrow-schema = { version = "=59.3.2", default-features = false }
 parquet = { version = "=59.3.0", default-features = false, features = ["arrow", "snap"] }
 sha2 = "0.10"
-chrono = { version = "0.4", default-features = false, features = ["std"] }
 fs4 = "0.13"
 toml = "0.9"
 tempfile = "3"

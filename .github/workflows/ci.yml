@@ -124,6 +124,8 @@ jobs:
         run: |
           PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_check_unsafe_boundary.py
           python3 .github/scripts/check_unsafe_boundary.py
+          PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_check_date_dependencies.py
+          python3 .github/scripts/check_date_dependencies.py
       - name: Lint and test the separately resolved EVTX helper
         run: |
           cargo fmt --manifest-path helpers/evtx/Cargo.toml --all --check
@@ -302,6 +304,8 @@ jobs:
         run: |
           PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_check_unsafe_boundary.py
           python3 .github/scripts/check_unsafe_boundary.py
+          PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_check_date_dependencies.py
+          python3 .github/scripts/check_date_dependencies.py
       - name: Record the native Windows version
         run: python -c "import platform; print(platform.win32_ver())"
       - name: Lint the Windows native containment boundary
@@ -421,6 +425,8 @@ jobs:
         run: |
           PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_check_unsafe_boundary.py
           python3 .github/scripts/check_unsafe_boundary.py
+          PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_check_date_dependencies.py
+          python3 .github/scripts/check_date_dependencies.py
       - name: Record the native macOS version
         run: sw_vers -productVersion
       - name: Build and test the separately resolved EVTX helper

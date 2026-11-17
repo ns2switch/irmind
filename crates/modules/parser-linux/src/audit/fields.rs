@@ -46,8 +46,8 @@ impl<'a> Line<'a> {
             fields,
             quoted,
         };
-        let at =
-            chrono::DateTime::from_timestamp(result.seconds, result.nanos).ok_or_else(invalid)?;
+        let at = irmind_calendar::DateTime::from_timestamp(result.seconds, result.nanos)
+            .ok_or_else(invalid)?;
         if result.seconds < 0
             || irmind_domain::UtcTimestamp::parse(&at.format("%Y-%m-%dT%H:%M:%SZ").to_string())
                 .is_err()
@@ -56,7 +56,7 @@ impl<'a> Line<'a> {
         }
         if result.field("node").is_some_and(|node| node.len() > 255)
             || !result.fields.contains_key("type")
-            || chrono::DateTime::from_timestamp(result.seconds, result.nanos).is_none()
+            || irmind_calendar::DateTime::from_timestamp(result.seconds, result.nanos).is_none()
         {
             return Err(invalid());
         }

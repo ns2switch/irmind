@@ -1,6 +1,6 @@
 #![allow(clippy::panic)]
 use super::*;
-use arrow::array::{UInt8Array, UInt32Array};
+use arrow_array::{UInt8Array, UInt32Array};
 use irmind_domain::GraphQueryFilter;
 
 #[test]

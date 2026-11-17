@@ -1,11 +1,10 @@
 #![forbid(unsafe_code)]
 
-use chrono::DateTime;
 use irmind_app::{
     AppError, CancellationToken, EdrPort, async_trait,
     modules::{ConfigField, Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
 };
-use irmind_domain::{AuthorizedCall, Tool};
+use irmind_domain::{AuthorizedCall, IndexedTime, Tool, UtcTimestamp};
 use reqwest::Url;
 use secrecy::{ExposeSecret, SecretString};
 use serde_json::{Value, json};
@@ -367,17 +366,17 @@ fn window(call: &AuthorizedCall) -> Result<(&str, &str), AppError> {
             irmind_app::AdapterPolicyError::MissingEndTime,
         ))
     })?;
-    let start = DateTime::parse_from_rfc3339(from).map_err(|_| {
+    let start = UtcTimestamp::parse(from).map_err(|_| {
         AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
             irmind_app::AdapterPolicyError::InvalidStartTime,
         ))
     })?;
-    let end = DateTime::parse_from_rfc3339(to).map_err(|_| {
+    let end = UtcTimestamp::parse(to).map_err(|_| {
         AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
             irmind_app::AdapterPolicyError::InvalidEndTime,
         ))
     })?;
-    if !(1..=86_400).contains(&end.signed_duration_since(start).num_seconds()) {
+    if !(1..=86_400).contains(&(end.unix_seconds() - start.unix_seconds())) {
         return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
             irmind_app::AdapterPolicyError::CrowdStrikeDetectionWindowMustBeAtMost24Hours,
         )));
@@ -387,13 +386,13 @@ fn window(call: &AuthorizedCall) -> Result<(&str, &str), AppError> {
 fn within(value: Option<&str>, from: &str, to: &str) -> bool {
     let Some(value) = value else { return false };
     let (Ok(value), Ok(from), Ok(to)) = (
-        DateTime::parse_from_rfc3339(value),
-        DateTime::parse_from_rfc3339(from),
-        DateTime::parse_from_rfc3339(to),
+        IndexedTime::from_rfc3339(value, false),
+        IndexedTime::from_rfc3339(from, false),
+        IndexedTime::from_rfc3339(to, false),
     ) else {
         return false;
     };
-    value >= from && value <= to
+    value.instant() >= from.instant() && value.instant() <= to.instant()
 }
 
 #[cfg(test)]

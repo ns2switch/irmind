@@ -6,7 +6,7 @@ use irmind_app::source_mapping::SourceValue;
 use irmind_app::{AppError, IndexedTime};
 pub(super) fn decode(line: &str, index: u64, offset: u64) -> Result<Decoded, AppError> {
     let row = crate::web::fields(line)?;
-    let timestamp = chrono::DateTime::parse_from_str(row.time, "%d/%b/%Y:%H:%M:%S %z")
+    let timestamp = irmind_calendar::DateTime::parse_from_str(row.time, "%d/%b/%Y:%H:%M:%S %z")
         .map_err(|_| invalid())?;
     let timestamp =
         IndexedTime::from_rfc3339(&timestamp.to_rfc3339(), false).map_err(|_| invalid())?;

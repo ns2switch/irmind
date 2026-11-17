@@ -39,9 +39,8 @@ impl DeclarativeParser {
     pub fn from_toml(text: &str) -> Result<Self, AppError> {
         let definition = config::Definition::decode(text)?;
         mapping::timezone(&definition.timestamp.default_timezone)?;
-        if chrono::format::StrftimeItems::new(&definition.timestamp.format)
-            .any(|item| matches!(item, chrono::format::Item::Error))
-            && !matches!(definition.timestamp.format.as_str(), "rfc3339" | "unix")
+        if !matches!(definition.timestamp.format.as_str(), "rfc3339" | "unix")
+            && irmind_calendar::validate_format(&definition.timestamp.format).is_err()
         {
             return Err(error("invalid timestamp format"));
         }
