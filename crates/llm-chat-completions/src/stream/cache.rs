@@ -13,6 +13,7 @@ pub(super) struct UsageSnapshots {
     value: Option<ModelUsage>,
     profile: UsageProfile,
     uncertain: bool,
+    cache_uncertain: bool,
     message_id: Option<String>,
 }
 impl UsageSnapshots {
@@ -41,8 +42,24 @@ impl UsageSnapshots {
                     && (b.read_input_tokens() < a.read_input_tokens()
                         || b.write_input_tokens() < a.write_input_tokens())
                 {
-                    self.uncertain = true;
+                    self.cache_uncertain = true;
                 }
+            }
+            let reported_cache = match self.profile {
+                UsageProfile::Compatible => false,
+                UsageProfile::OpenAi => value
+                    .pointer("/prompt_tokens_details/cached_tokens")
+                    .is_some(),
+                UsageProfile::DeepSeek => {
+                    value.get("prompt_cache_hit_tokens").is_some()
+                        || value.get("prompt_cache_miss_tokens").is_some()
+                        || value
+                            .pointer("/prompt_tokens_details/cached_tokens")
+                            .is_some()
+                }
+            };
+            if reported_cache && next.is_some_and(|usage| usage.cache.is_none()) {
+                self.cache_uncertain = true;
             }
             if next.is_none() {
                 self.uncertain = true;
@@ -51,7 +68,16 @@ impl UsageSnapshots {
         }
     }
     pub(super) fn finish(self) -> Option<ModelUsage> {
-        if self.uncertain { None } else { self.value }
+        if self.uncertain {
+            None
+        } else {
+            self.value.map(|mut usage| {
+                if self.cache_uncertain {
+                    usage.cache = None;
+                }
+                usage
+            })
+        }
     }
 }
 fn normalize_usage(value: &Value, profile: UsageProfile) -> Option<ModelUsage> {
@@ -178,5 +204,25 @@ mod cache_tests {
                 .1
                 .is_none()
         );
+    }
+    #[test]
+    fn inconsistent_cache_snapshots_never_turn_into_a_later_priced_report() {
+        let bad = serde_json::json!({"prompt_tokens":1000,"completion_tokens":1,"prompt_cache_hit_tokens":1200});
+        let good = serde_json::json!({"prompt_tokens":1000,"completion_tokens":50,"prompt_cache_hit_tokens":800,"prompt_cache_miss_tokens":200});
+        let (reply, usage) =
+            parse_profile(wire(&[bad, good]).as_bytes(), UsageProfile::DeepSeek).unwrap();
+        assert_eq!(reply.text, "paid answer");
+        let usage = usage.unwrap();
+        assert_eq!(usage.input_tokens, 1000);
+        assert_eq!(usage.output_tokens, 50);
+        assert!(usage.cache.is_none());
+        let counts = |read| serde_json::json!({"prompt_tokens":1000,"completion_tokens":50,"prompt_tokens_details":{"cached_tokens":read}});
+        let (_, usage) = parse_profile(
+            wire(&[counts(800), counts(700), counts(900)]).as_bytes(),
+            UsageProfile::OpenAi,
+        )
+        .unwrap();
+        assert_eq!(usage.unwrap().input_tokens, 1000);
+        assert!(usage.unwrap().cache.is_none());
     }
 }

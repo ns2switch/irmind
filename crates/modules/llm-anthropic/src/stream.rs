@@ -237,15 +237,20 @@ impl State {
             || value["usage"].get("cache_read_input_tokens").is_some()
             || value["usage"].get("cache_creation_input_tokens").is_some()
         {
-            let next = total_input(&value["usage"], self.default_write_lifetime.is_some());
+            let mut next = total_input(&value["usage"], self.default_write_lifetime.is_some());
             if let (Some((input, cache)), Some((next_input, next_cache))) = (self.input_usage, next)
-                && (next_input < input
+            {
+                if next_input < input {
+                    self.usage_uncertain = true;
+                }
+                if cache.is_none()
                     || next_cache.zip(cache).is_some_and(|(next, prior)| {
                         next.read_input_tokens() < prior.read_input_tokens()
                             || next.write_input_tokens() < prior.write_input_tokens()
-                    }))
-            {
-                self.usage_uncertain = true;
+                    })
+                {
+                    next = Some((next_input, None));
+                }
             }
             if next.is_none() {
                 self.usage_uncertain = true;
