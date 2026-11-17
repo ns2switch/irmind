@@ -190,3 +190,14 @@ fn contradictory_cache_updates_keep_known_inclusive_totals_unpriced() {
     assert_eq!(usage.output_tokens, 50);
     assert!(usage.cache.is_none());
 }
+
+#[test]
+fn a_changed_write_lifetime_cannot_receive_the_final_five_minute_price() {
+    let start = serde_json::json!({"input_tokens":100,"cache_read_input_tokens":800,"cache_creation_input_tokens":100,"cache_creation":{"ephemeral_5m_input_tokens":0,"ephemeral_1h_input_tokens":100}});
+    let next = serde_json::json!({"input_tokens":100,"cache_read_input_tokens":800,"cache_creation_input_tokens":100,"cache_creation":{"ephemeral_5m_input_tokens":100,"ephemeral_1h_input_tokens":0},"output_tokens":50});
+    let (reply, usage) = parse_profile(cache_wire(&start, &[next]).as_bytes(), true).unwrap();
+    assert_eq!(reply.text, "paid reply");
+    let usage = usage.unwrap();
+    assert_eq!(usage.input_tokens, 1000);
+    assert!(usage.cache.is_none());
+}
