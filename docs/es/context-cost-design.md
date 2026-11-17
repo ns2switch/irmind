@@ -309,3 +309,30 @@ Las cápsulas inmutables y cambios de nonce, resúmenes y paginación de resulta
 perfiles de contexto/compactación por modelo y el modelo auxiliar quedan aplazados
 hasta después del lanzamiento público. Se mantienen los nonces por turno y el
 aislamiento del contenido no confiable.
+
+## Mediciones release del primer incremento
+
+Tres repeticiones antes y después en el mismo runner conservan la cobertura de
+prefijo tras sustituir las dependencias de fechas. Los tres escenarios conservan
+los mismos totales de entrada en estas repeticiones. El observador usa el motor de producción y bytes JSON UTF-8 / 4,
+redondeando hacia arriba; no simula facturas ni llama a proveedores comerciales.
+Observa el puerto del motor antes de codificar para cada proveedor; no incluye
+el coste de sus marcadores ni su tokenización nativa.
+
+| Escenario | Peticiones | Entrada antes / después | Techo de prefijo reutilizable |
+| --- | ---: | ---: | ---: |
+| Conversación de diez turnos | 10 | 73.445 / 73.445 | 33.408 (45,49 %) |
+| Investigación con skill, 15 rondas | 15 | 126.382 / 126.382 | 107.776 (85,28 %) |
+| Tres subagentes | 11 | 48.655 / 48.655 | 29.056 (59,72 %) |
+
+Este incremento añade marcadores nativos de Anthropic y contadores del proveedor;
+no reduce el contexto enviado. Los proveedores automáticos podrían estar
+reutilizando ya ese prefijo. Los aciertos, la latencia y el ahorro facturado
+siguen sin medir hasta una evaluación explícita del analista.
+[Mediciones](../development/context-cost-data/cache-phase1-measurements.json) y
+[vector de liquidación del hijo](../development/context-cost-data/child-cache-settlement.json),
+cubiertos por el fichero de checksums.
+
+Las mediciones identifican los commits exactos y usan las mismas dependencias
+mantenidas de fechas antes y después. Se mantienen el guard y los nonces por
+turno; no se afirma una reducción de entrada ni un ahorro real facturado.

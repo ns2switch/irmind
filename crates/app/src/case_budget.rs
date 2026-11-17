@@ -61,6 +61,11 @@ pub struct CaseBudgetUsage {
     pub cloud_bytes: u64,
     pub cost_microusd: Option<u64>,
     pub provider_usage_available: bool,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub ordinary_input_tokens: u64,
+    pub reported_cache: Option<crate::CacheUsage>,
+    pub cache_reporting_complete: bool,
 }
 impl CaseBudgetUsage {
     pub fn fits(self, limits: CaseBudgetLimits) -> bool {
@@ -121,10 +126,25 @@ pub fn case_budget_usage(entries: &[SignedEntry]) -> Result<CaseBudgetUsage, App
     Ok(ledger.finish())
 }
 
+/// Internal overflow check only: an incomplete subtotal is never a displayed bill.
+pub(crate) fn reported_cost_subtotal(entries: &[SignedEntry]) -> Result<u64, AppError> {
+    entries
+        .iter()
+        .filter(|entry| entry.kind == crate::AuditEventKind::ModelUsage)
+        .try_fold(0u64, |total, entry| {
+            let usage: UsageEvent = serde_json::from_str(&entry.payload)
+                .map_err(|_| AppError::InvalidChain(entry.seq))?;
+            total
+                .checked_add(usage.estimated_cost_microusd.unwrap_or(0))
+                .ok_or(AppError::InvalidChain(entry.seq))
+        })
+}
+
 pub(crate) struct UsageAccumulator {
     usage: CaseBudgetUsage,
     models: std::collections::BTreeMap<String, ActorModelUsage>,
     cost_complete: bool,
+    cache_complete: bool,
 }
 #[derive(Default)]
 struct ActorModelUsage {
@@ -138,6 +158,7 @@ impl Default for UsageAccumulator {
             usage: CaseBudgetUsage::default(),
             models: std::collections::BTreeMap::new(),
             cost_complete: true,
+            cache_complete: true,
         }
     }
 }
@@ -172,27 +193,7 @@ impl UsageAccumulator {
                 model.replies = model.replies.checked_add(1).ok_or_else(invalid)?;
             }
             crate::AuditEventKind::ModelUsage => {
-                let event: UsageEvent =
-                    serde_json::from_str(&entry.payload).map_err(|_| invalid())?;
-                let model = self.models.entry(entry.actor.as_storage()).or_default();
-                model.reports = model.reports.checked_add(1).ok_or_else(invalid)?;
-                self.usage.model_tokens = self
-                    .usage
-                    .model_tokens
-                    .checked_add(event.input_tokens)
-                    .and_then(|n| n.checked_add(event.output_tokens))
-                    .ok_or_else(invalid)?;
-                if let Some(cost) = event.estimated_cost_microusd {
-                    self.usage.cost_microusd = Some(
-                        self.usage
-                            .cost_microusd
-                            .unwrap_or(0)
-                            .checked_add(cost)
-                            .ok_or_else(invalid)?,
-                    );
-                } else {
-                    self.cost_complete = false;
-                }
+                self.add_model_usage(entry)?;
             }
             crate::AuditEventKind::Allowed | crate::AuditEventKind::ToolDispatch => {
                 self.usage.tool_calls = self.usage.tool_calls.checked_add(1).ok_or_else(invalid)?;
@@ -211,12 +212,61 @@ impl UsageAccumulator {
         }
         Ok(())
     }
+    fn add_model_usage(&mut self, entry: &SignedEntry) -> Result<(), AppError> {
+        let invalid = || AppError::InvalidChain(entry.seq);
+        let event: UsageEvent = serde_json::from_str(&entry.payload).map_err(|_| invalid())?;
+        let model = self.models.entry(entry.actor.as_storage()).or_default();
+        model.reports = model.reports.checked_add(1).ok_or_else(invalid)?;
+        self.usage.model_tokens = self
+            .usage
+            .model_tokens
+            .checked_add(event.input_tokens)
+            .and_then(|n| n.checked_add(event.output_tokens))
+            .ok_or_else(invalid)?;
+        self.usage.input_tokens = self
+            .usage
+            .input_tokens
+            .checked_add(event.input_tokens)
+            .ok_or_else(invalid)?;
+        self.usage.output_tokens = self
+            .usage
+            .output_tokens
+            .checked_add(event.output_tokens)
+            .ok_or_else(invalid)?;
+        if let Some(cache) = event.cache {
+            self.usage.ordinary_input_tokens = self
+                .usage
+                .ordinary_input_tokens
+                .checked_add(cache.ordinary_input_tokens(event.input_tokens)?)
+                .ok_or_else(invalid)?;
+            self.usage.reported_cache = Some(match self.usage.reported_cache {
+                Some(previous) => previous.checked_add(cache)?,
+                None => cache,
+            });
+        } else {
+            self.cache_complete = false;
+        }
+        if let Some(cost) = event.estimated_cost_microusd {
+            self.usage.cost_microusd = Some(
+                self.usage
+                    .cost_microusd
+                    .unwrap_or(0)
+                    .checked_add(cost)
+                    .ok_or_else(invalid)?,
+            );
+        } else {
+            self.cost_complete = false;
+        }
+        Ok(())
+    }
     pub(crate) fn finish(&self) -> CaseBudgetUsage {
         let mut usage = self.usage;
         usage.provider_usage_available = self
             .models
             .values()
             .all(|model| model.reports >= model.replies.max(model.requests));
+        usage.cache_reporting_complete =
+            self.cache_complete && usage.provider_usage_available && usage.reported_cache.is_some();
         if !self.cost_complete || !usage.provider_usage_available {
             usage.cost_microusd = None;
         }
@@ -250,6 +300,61 @@ mod tests {
             sig: vec![],
             public_key: vec![],
         }
+    }
+    #[test]
+    fn an_unreported_request_makes_aggregate_cost_and_cache_coverage_unknown() {
+        let mut entries = vec![entry(
+            AuditEventKind::ModelUsage,
+            r#"{"input_tokens":1000,"output_tokens":50,"estimated_cost_microusd":380,"cache":{"read_input_tokens":800,"write_input_tokens":0,"write_lifetime":"not-applicable"}}"#,
+        )];
+        assert_eq!(
+            crate::summarize_usage(&entries)
+                .unwrap()
+                .estimated_cost_microusd,
+            Some(380)
+        );
+        for _ in 0..2 {
+            entries.push(entry(AuditEventKind::ModelRequest, "synthetic"));
+            entries.push(entry(AuditEventKind::ModelReply, "synthetic"));
+        }
+        let summary = crate::summarize_usage(&entries).unwrap();
+        assert_eq!(summary.estimated_cost_microusd, None);
+        assert!(summary.cache.is_none());
+        assert_eq!(reported_cost_subtotal(&entries).unwrap(), 380);
+    }
+    #[test]
+    fn cache_is_charged_in_full_and_unknown_reports_do_not_become_zero() {
+        let entries = [
+            entry(
+                AuditEventKind::ModelUsage,
+                r#"{"input_tokens":1000,"output_tokens":50,"estimated_cost_microusd":380,"cache":{"read_input_tokens":800,"write_input_tokens":0,"write_lifetime":"not-applicable"}}"#,
+            ),
+            entry(
+                AuditEventKind::ModelUsage,
+                r#"{"input_tokens":500,"output_tokens":20,"estimated_cost_microusd":null}"#,
+            ),
+        ];
+        let complete = case_budget_usage(&entries[..1]).unwrap();
+        assert_eq!(complete.model_tokens, 1050);
+        assert_eq!(complete.ordinary_input_tokens, 200);
+        assert!(complete.cache_reporting_complete);
+        let partial = case_budget_usage(&entries).unwrap();
+        assert_eq!(partial.model_tokens, 1570);
+        assert_eq!(partial.reported_cache.unwrap().read_input_tokens(), 800);
+        assert!(!partial.cache_reporting_complete);
+        assert_eq!(partial.cost_microusd, None);
+        assert_eq!(
+            crate::summarize_usage(&entries)
+                .unwrap()
+                .estimated_cost_microusd,
+            None
+        );
+        assert_eq!(
+            crate::summarize_usage(&[entries[1].clone(), entries[0].clone()])
+                .unwrap()
+                .estimated_cost_microusd,
+            None
+        );
     }
     #[test]
     fn case_budget_accounts_reserved_cloud_bytes_and_reports_missing_usage_honestly() {

@@ -4,6 +4,10 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 use std::io::{BufRead as _, BufReader, Read};
 
+mod cache;
+pub(super) use cache::UsageProfile;
+use cache::UsageSnapshots;
+
 const MAX_STREAM_BYTES: usize = 2_000_000;
 
 #[derive(Default)]
@@ -61,17 +65,27 @@ struct StreamState {
     raw: String,
     text: String,
     tools: BTreeMap<usize, ToolDelta>,
-    usage: Option<ModelUsage>,
+    usage: UsageSnapshots,
     finished: bool,
     truncated: bool,
     done: bool,
     bytes_read: usize,
 }
 
-pub(super) fn parse(reader: impl Read) -> Result<(ModelResponse, ModelUsage), AppError> {
+#[cfg(test)]
+pub(super) fn parse(reader: impl Read) -> Result<(ModelResponse, Option<ModelUsage>), AppError> {
+    parse_profile(reader, UsageProfile::Compatible)
+}
+pub(super) fn parse_profile(
+    reader: impl Read,
+    profile: UsageProfile,
+) -> Result<(ModelResponse, Option<ModelUsage>), AppError> {
     let mut reader = BufReader::new(reader.take((MAX_STREAM_BYTES + 1) as u64));
     let mut line = String::new();
-    let mut state = StreamState::default();
+    let mut state = StreamState {
+        usage: UsageSnapshots::new(profile),
+        ..StreamState::default()
+    };
     loop {
         line.clear();
         let count = reader
@@ -113,28 +127,7 @@ pub(super) fn parse(reader: impl Read) -> Result<(ModelResponse, ModelUsage), Ap
 
 impl StreamState {
     fn apply_chunk(&mut self, chunk: &Value) -> Result<(), AppError> {
-        if let Some(value) = chunk.get("usage").filter(|value| !value.is_null()) {
-            if self.usage.is_some() {
-                return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
-                    irmind_app::AdapterModelError::DuplicateProviderUsage,
-                )));
-            }
-            self.usage = Some(ModelUsage {
-                input_tokens: value.get("prompt_tokens").and_then(Value::as_u64).ok_or({
-                    AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
-                        irmind_app::AdapterModelError::MissingPromptTokenUsage,
-                    ))
-                })?,
-                output_tokens: value
-                    .get("completion_tokens")
-                    .and_then(Value::as_u64)
-                    .ok_or({
-                        AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
-                            irmind_app::AdapterModelError::MissingCompletionTokenUsage,
-                        ))
-                    })?,
-            });
-        }
+        self.usage.push(chunk);
         let choices = chunk.get("choices").and_then(Value::as_array).ok_or({
             AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
                 irmind_app::AdapterModelError::MissingProviderChoices,
@@ -227,17 +220,13 @@ impl StreamState {
         Ok(())
     }
 
-    fn finish(self) -> Result<(ModelResponse, ModelUsage), AppError> {
+    fn finish(self) -> Result<(ModelResponse, Option<ModelUsage>), AppError> {
         if !self.done || !self.finished {
             return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
                 irmind_app::AdapterModelError::ProviderStreamIncomplete,
             )));
         }
-        let usage = self.usage.ok_or({
-            AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
-                irmind_app::AdapterModelError::ProviderStreamOmittedUsage,
-            ))
-        })?;
+        let usage = self.usage.finish();
         let mut calls = Vec::with_capacity(self.tools.len());
         for (expected, (index, tool)) in self.tools.into_iter().enumerate() {
             if self.truncated {
@@ -330,8 +319,8 @@ mod tests {
                 .map(String::as_str),
             Some("AssumeRole")
         );
-        assert_eq!(usage.input_tokens, 14);
-        assert_eq!(usage.output_tokens, 7);
+        assert_eq!(usage.unwrap().input_tokens, 14);
+        assert_eq!(usage.unwrap().output_tokens, 7);
     }
 
     #[test]
@@ -339,7 +328,7 @@ mod tests {
         let prefix = "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hello\"},\"finish_reason\":\"stop\"}]}\n\n";
         assert!(parse(prefix.as_bytes()).is_err());
         let without_usage = format!("{prefix}data: [DONE]\n\n");
-        assert!(parse(without_usage.as_bytes()).is_err());
+        assert!(parse(without_usage.as_bytes()).unwrap().1.is_none());
     }
 
     #[test]
@@ -353,6 +342,6 @@ mod tests {
         assert!(answer.truncated);
         assert_eq!(answer.text, "partial");
         assert!(!answer.text.contains("reasoning"));
-        assert_eq!(usage.output_tokens, 10);
+        assert_eq!(usage.unwrap().output_tokens, 10);
     }
 }

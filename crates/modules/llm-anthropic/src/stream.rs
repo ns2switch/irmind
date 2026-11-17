@@ -24,16 +24,30 @@ struct State {
     started: bool,
     stopped: bool,
     finish: Option<String>,
-    input_tokens: Option<u64>,
+    input_usage: Option<(u64, Option<irmind_app::CacheUsage>)>,
+    usage_uncertain: bool,
+    default_write_lifetime: Option<irmind_app::CacheWriteLifetime>,
     output_tokens: Option<u64>,
+    initial_output_tokens: Option<u64>,
     blocks: BTreeMap<usize, Block>,
     closed: BTreeSet<usize>,
     raw: String,
 }
 
-pub(super) fn parse(reader: impl Read) -> Result<(ModelResponse, ModelUsage), AppError> {
+#[cfg(test)]
+pub(super) fn parse(reader: impl Read) -> Result<(ModelResponse, Option<ModelUsage>), AppError> {
+    parse_profile(reader, false)
+}
+pub(super) fn parse_profile(
+    reader: impl Read,
+    five_minute_writes: bool,
+) -> Result<(ModelResponse, Option<ModelUsage>), AppError> {
     let mut reader = BufReader::new(reader.take((MAX_STREAM_BYTES + 1) as u64));
-    let mut state = State::default();
+    let mut state = State {
+        default_write_lifetime: five_minute_writes
+            .then_some(irmind_app::CacheWriteLifetime::FiveMinutes),
+        ..State::default()
+    };
     let mut line = String::new();
     let mut event = String::new();
     let mut data = String::new();
@@ -111,7 +125,12 @@ impl State {
                     )));
                 }
                 self.started = true;
-                self.input_tokens = total_input(&value["message"]["usage"])?;
+                self.input_usage = total_input(
+                    &value["message"]["usage"],
+                    self.default_write_lifetime.is_some(),
+                );
+                self.usage_uncertain = self.input_usage.is_none();
+                self.initial_output_tokens = value["message"]["usage"]["output_tokens"].as_u64();
             }
             "ping" => {}
             "error" => {
@@ -214,10 +233,41 @@ impl State {
 
     fn message_delta(&mut self, value: &Value) -> Result<(), AppError> {
         self.require_started()?;
-        if let Some(input) = total_input(&value["usage"])? {
-            self.input_tokens = Some(input);
+        if value["usage"].get("input_tokens").is_some()
+            || value["usage"].get("cache_read_input_tokens").is_some()
+            || value["usage"].get("cache_creation_input_tokens").is_some()
+        {
+            let mut next = total_input(&value["usage"], self.default_write_lifetime.is_some());
+            if let (Some((input, cache)), Some((next_input, next_cache))) = (self.input_usage, next)
+            {
+                if next_input < input {
+                    self.usage_uncertain = true;
+                }
+                if cache.is_none()
+                    || next_cache.zip(cache).is_some_and(|(next, prior)| {
+                        next.read_input_tokens() < prior.read_input_tokens()
+                            || next.write_input_tokens() < prior.write_input_tokens()
+                            || (prior.write_input_tokens() != 0
+                                && next.write_input_tokens() != 0
+                                && prior.write_lifetime() != next.write_lifetime())
+                    })
+                {
+                    next = Some((next_input, None));
+                }
+            }
+            if next.is_none() {
+                self.usage_uncertain = true;
+            }
+            self.input_usage = next;
         }
         if let Some(output) = value["usage"]["output_tokens"].as_u64() {
+            if self
+                .output_tokens
+                .or(self.initial_output_tokens)
+                .is_some_and(|prior| output < prior)
+            {
+                self.usage_uncertain = true;
+            }
             self.output_tokens = Some(output);
         }
         if let Some(reason) = value["delta"]["stop_reason"].as_str() {
@@ -243,23 +293,25 @@ impl State {
         Ok(())
     }
 
-    fn finish(self) -> Result<(ModelResponse, ModelUsage), AppError> {
+    fn finish(self) -> Result<(ModelResponse, Option<ModelUsage>), AppError> {
         if !self.stopped || self.finish.is_none() || self.closed.len() != self.blocks.len() {
             return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
                 irmind_app::AdapterModelError::ProviderStreamIncomplete,
             )));
         }
-        let usage = ModelUsage {
-            input_tokens: self.input_tokens.ok_or({
-                AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
-                    irmind_app::AdapterModelError::MissingInputTokenUsage,
-                ))
-            })?,
-            output_tokens: self.output_tokens.ok_or({
-                AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
-                    irmind_app::AdapterModelError::MissingOutputTokenUsage,
-                ))
-            })?,
+        let usage = if self.usage_uncertain {
+            None
+        } else {
+            self.input_usage.zip(self.output_tokens).and_then(
+                |((input_tokens, cache), output_tokens)| {
+                    let usage = ModelUsage {
+                        input_tokens,
+                        output_tokens,
+                        cache,
+                    };
+                    usage.validate().ok().map(|()| usage)
+                },
+            )
         };
         let mut text = String::new();
         let mut calls = Vec::new();
@@ -329,21 +381,46 @@ fn required_string<'a>(value: &'a Value, key: &str) -> Result<&'a str, AppError>
         .ok_or_else(|| AppError::Model(format!("missing provider {key}")))
 }
 
-fn total_input(usage: &Value) -> Result<Option<u64>, AppError> {
-    let Some(input) = usage["input_tokens"].as_u64() else {
-        return Ok(None);
+fn total_input(
+    usage: &Value,
+    five_minute_writes: bool,
+) -> Option<(u64, Option<irmind_app::CacheUsage>)> {
+    use irmind_app::{CacheUsage, CacheWriteLifetime};
+    let ordinary = usage.get("input_tokens")?.as_u64()?;
+    let cached = usage.get("cache_read_input_tokens")?.as_u64()?;
+    let created = usage.get("cache_creation_input_tokens")?.as_u64()?;
+    let total = ordinary.checked_add(cached)?.checked_add(created)?;
+    let lifetime = if created == 0 {
+        CacheWriteLifetime::NotApplicable
+    } else if let Some(details) = usage.get("cache_creation") {
+        let breakdown = details
+            .get("ephemeral_5m_input_tokens")
+            .and_then(Value::as_u64)
+            .zip(
+                details
+                    .get("ephemeral_1h_input_tokens")
+                    .and_then(Value::as_u64),
+            );
+        let Some((five, hour)) = breakdown else {
+            return Some((total, None));
+        };
+        if five.checked_add(hour) != Some(created) {
+            return Some((total, None));
+        }
+        if hour == 0 {
+            CacheWriteLifetime::FiveMinutes
+        } else if five == 0 {
+            CacheWriteLifetime::OneHour
+        } else {
+            CacheWriteLifetime::Unknown
+        }
+    } else if five_minute_writes {
+        CacheWriteLifetime::FiveMinutes
+    } else {
+        CacheWriteLifetime::Unknown
     };
-    let cached = usage["cache_read_input_tokens"].as_u64().unwrap_or(0);
-    let created = usage["cache_creation_input_tokens"].as_u64().unwrap_or(0);
-    let total = input
-        .checked_add(cached)
-        .and_then(|value| value.checked_add(created))
-        .ok_or({
-            AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
-                irmind_app::AdapterModelError::ProviderInputTokenUsageOverflow,
-            ))
-        })?;
-    Ok(Some(total))
+    let cache = CacheUsage::new(cached, created, lifetime).ok()?;
+    Some((total, Some(cache)))
 }
 
 fn block_index(value: &Value) -> Result<usize, AppError> {

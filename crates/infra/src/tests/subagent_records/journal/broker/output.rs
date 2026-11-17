@@ -96,6 +96,10 @@ fn exercise_child(
         text: text.to_owned(),
         maximum,
         usage: ModelUsage {
+            cache: Some(
+                irmind_app::CacheUsage::new(10, 0, irmind_app::CacheWriteLifetime::NotApplicable)
+                    .unwrap(),
+            ),
             input_tokens: 20,
             output_tokens,
         },
@@ -154,6 +158,7 @@ fn a_long_child_native_stop_can_continue_once_without_unbounding_its_context() {
         text: "word ".repeat(128_000),
         maximum: Some(128_000),
         usage: ModelUsage {
+            cache: None,
             input_tokens: 20,
             output_tokens: 128_000,
         },

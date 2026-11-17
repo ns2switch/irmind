@@ -169,25 +169,7 @@ impl BudgetEditor {
         };
         let mut lines = vec![title.to_owned()];
         if let Some(used) = self.usage {
-            let tokens = if used.provider_usage_available {
-                used.model_tokens.to_string()
-            } else {
-                format!("unavailable; reported at least {}", used.model_tokens)
-            };
-            lines.push(format!("Consumed: tokens {tokens}"));
-            lines.push(format!(
-                "Calls {} · reserved cloud bytes {}",
-                used.tool_calls, used.cloud_bytes
-            ));
-            if used.provider_usage_available
-                && let Some(cost) = used.cost_microusd
-            {
-                lines.push(format!(
-                    "Estimated cost: ${}.{:06} USD",
-                    cost / 1_000_000,
-                    cost % 1_000_000
-                ));
-            }
+            append_usage(&mut lines, used);
         }
         for (i, (label, cap)) in [
             ("Model tokens", self.ceiling.model_tokens),
@@ -221,6 +203,53 @@ impl BudgetEditor {
     }
 }
 
+fn append_usage(lines: &mut Vec<String>, used: CaseBudgetUsage) {
+    let tokens = if used.provider_usage_available {
+        used.model_tokens.to_string()
+    } else {
+        format!("unavailable; reported at least {}", used.model_tokens)
+    };
+    lines.push(format!("Consumed: tokens {tokens}"));
+    let coverage = if used.cache_reporting_complete {
+        ""
+    } else {
+        " (reported · partial)"
+    };
+    if let Some(cache) = used.reported_cache {
+        lines.push(format!(
+            "Input ordinary {} · cache read {} · write {}{coverage}",
+            used.ordinary_input_tokens,
+            cache.read_input_tokens(),
+            cache.write_input_tokens()
+        ));
+    } else {
+        lines.push("Input breakdown: unavailable".into());
+    }
+    lines.push(format!(
+        "Reported output {} · inclusive input {}{}",
+        used.output_tokens,
+        used.input_tokens,
+        if used.provider_usage_available {
+            ""
+        } else {
+            " (partial)"
+        }
+    ));
+    lines.push(format!(
+        "Calls {} · reserved cloud bytes {}",
+        used.tool_calls, used.cloud_bytes
+    ));
+    if used.provider_usage_available
+        && let Some(cost) = used.cost_microusd
+    {
+        lines.push(format!(
+            "Estimated cost: ${}.{:06} USD",
+            cost / 1_000_000,
+            cost % 1_000_000
+        ));
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
@@ -229,6 +258,38 @@ mod tests {
     fn editor() -> BudgetEditor {
         let limits = CaseBudgetLimits::default();
         BudgetEditor::new(limits, limits, None)
+    }
+    #[test]
+    fn cache_breakdown_is_visible_and_partial_reporting_is_explicit() {
+        let usage = CaseBudgetUsage {
+            input_tokens: 1000,
+            output_tokens: 50,
+            ordinary_input_tokens: 100,
+            model_tokens: 1050,
+            provider_usage_available: true,
+            reported_cache: Some(
+                irmind_app::CacheUsage::new(800, 100, irmind_app::CacheWriteLifetime::FiveMinutes)
+                    .unwrap(),
+            ),
+            cache_reporting_complete: true,
+            ..Default::default()
+        };
+        let mut form = editor();
+        form.usage = Some(usage);
+        assert!(
+            form.text()
+                .contains("Input ordinary 100 · cache read 800 · write 100")
+        );
+        assert!(
+            form.text()
+                .contains("Reported output 50 · inclusive input 1000")
+        );
+        form.usage = Some(CaseBudgetUsage {
+            cache_reporting_complete: false,
+            ..usage
+        });
+        assert!(form.text().contains("reported · partial"));
+        insta::assert_snapshot!("case_budget_cache", form.text());
     }
     #[test]
     fn an_increase_requires_review_and_explicit_number_then_enter() {
@@ -265,10 +326,13 @@ mod tests {
             effective: Some(CaseBudgetLimits::default()),
             usage: CaseBudgetUsage {
                 model_tokens: 1_600_000,
+                input_tokens: 1_400_000,
+                output_tokens: 200_000,
                 tool_calls: 800,
                 cloud_bytes: 0,
                 cost_microusd: None,
                 provider_usage_available: true,
+                ..Default::default()
             },
         };
         assert!(status.warning());

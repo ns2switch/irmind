@@ -45,6 +45,7 @@ impl CaseRuntime<'_, '_, '_> {
             StatusSegment::CloudBytes,
             format!("{} B cloud", status.usage.cloud_bytes),
         );
+        cache_data(&mut data, status.usage);
         if let Some(limits) = status.effective {
             data.insert(
                 StatusSegment::TokenBudget,
@@ -74,6 +75,42 @@ impl CaseRuntime<'_, '_, '_> {
         );
         self.status_data = data;
         Ok(())
+    }
+}
+fn cache_data(data: &mut StatusData, usage: irmind_app::CaseBudgetUsage) {
+    for (segment, count) in [
+        (
+            StatusSegment::CacheRead,
+            usage
+                .reported_cache
+                .map(irmind_app::CacheUsage::read_input_tokens),
+        ),
+        (
+            StatusSegment::CacheWrite,
+            usage
+                .reported_cache
+                .map(irmind_app::CacheUsage::write_input_tokens),
+        ),
+    ] {
+        let label = if segment == StatusSegment::CacheRead {
+            "cache read"
+        } else {
+            "cache write"
+        };
+        data.insert(
+            segment,
+            match count {
+                Some(n) => format!(
+                    "{label} {n}{}",
+                    if usage.cache_reporting_complete {
+                        ""
+                    } else {
+                        " (partial)"
+                    }
+                ),
+                None => format!("{label} unavailable"),
+            },
+        );
     }
 }
 fn source_count(entries: &[irmind_app::SignedEntry]) -> Result<usize, irmind_app::AppError> {

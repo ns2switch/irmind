@@ -58,6 +58,7 @@ fn output_model(text: String, truncated: bool, output_tokens: u64) -> OutputMode
         truncate_followups: false,
         fail_followup: false,
         usage: ModelUsage {
+            cache: None,
             input_tokens: 20,
             output_tokens,
         },

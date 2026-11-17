@@ -160,12 +160,15 @@ fn output_profile(
 
 impl ChatCompletionsClient {
     fn request_body(&self, request: &CompletionRequest) -> serde_json::Value {
-        let tools = request
-            .tools
-            .iter()
+        let mut allowed = request.tools.iter().collect::<Vec<_>>();
+        allowed.sort_by_key(|tool| tool.name);
+        let tools = allowed
+            .into_iter()
             .map(|spec| {
+                let mut parameters = spec.parameters.clone();
+                parameters.sort_all_objects();
                 json!({"type":"function","function":{
-                    "name":spec.name,"description":spec.description,"parameters":spec.parameters
+                    "name":spec.name,"description":spec.description,"parameters":parameters
                 }})
             })
             .collect::<Vec<_>>();
@@ -289,6 +292,11 @@ impl LlmPort for ChatCompletionsClient {
             )));
         }
         let cancel = cancel.clone();
+        let usage_profile = match (self.profile, self.endpoint.host_str()) {
+            (ChatProfile::OpenAi, Some("api.openai.com")) => stream::UsageProfile::OpenAi,
+            (ChatProfile::DeepSeek, Some("api.deepseek.com")) => stream::UsageProfile::DeepSeek,
+            _ => stream::UsageProfile::Compatible,
+        };
         Ok(Box::pin(async_stream::try_stream! {
             let mut raw = Vec::new();
             let mut preview = stream::TextPreview::default();
@@ -308,8 +316,8 @@ impl LlmPort for ChatCompletionsClient {
                 }
                 yield ModelEvent::Progress(chunk.len());
             }
-            let (response, usage) = stream::parse(raw.as_slice())?;
-            yield ModelEvent::Completed { response, usage: Some(usage) };
+            let (response, usage) = stream::parse_profile(raw.as_slice(), usage_profile)?;
+            yield ModelEvent::Completed { response, usage };
         }))
     }
 }
@@ -320,6 +328,39 @@ mod tests {
     use super::*;
     use std::io::{Read as _, Write as _};
     use std::net::TcpListener;
+
+    #[test]
+    fn trusted_tool_schema_prefix_is_canonical_even_with_insertion_ordered_json() {
+        let client =
+            ChatCompletionsClient::new("http://127.0.0.1:11434/v1/", "synthetic", None).unwrap();
+        let mut request = CompletionRequest {
+            messages: vec![CompletionMessage::text(
+                MessageRole::User,
+                "Synthetic".into(),
+            )],
+            tools: irmind_app::tool_catalog::catalog()[..2].to_vec(),
+        };
+        let name = request.tools[0].name;
+        request.tools[0].parameters = serde_json::from_str(
+            r#"{"type":"object","properties":{"z":{"type":"string"},"a":{"type":"integer"}}}"#,
+        )
+        .unwrap();
+        let first = serde_json::to_vec(&client.request_body(&request)).unwrap();
+        request.tools.reverse();
+        request
+            .tools
+            .iter_mut()
+            .find(|tool| tool.name == name)
+            .unwrap()
+            .parameters = serde_json::from_str(
+            r#"{"properties":{"a":{"type":"integer"},"z":{"type":"string"}},"type":"object"}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            first,
+            serde_json::to_vec(&client.request_body(&request)).unwrap()
+        );
+    }
 
     #[tokio::test]
     async fn model_maxima_are_not_request_budgets_and_unknown_optional_is_omitted() {

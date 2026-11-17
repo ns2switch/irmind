@@ -1,0 +1,158 @@
+{
+  "after": [
+    {
+      "engine_commit": "e9d4856513f00e7a41d07c4e7e135d6746e16b19",
+      "measurement_sha256": "a9a2818bf87d9bc5b06400b7bcca9afcadd14d28dc75d076db9bdeec311963ad",
+      "scenarios": {
+        "conversation_10_turns": {
+          "cache_read_ceiling_sim": 33408,
+          "input_tokens_sim": 73445,
+          "model_requests": 10,
+          "output_tokens_sim": 3971
+        },
+        "skill_15_rounds": {
+          "cache_read_ceiling_sim": 107776,
+          "input_tokens_sim": 126382,
+          "model_requests": 15,
+          "output_tokens_sim": 495
+        },
+        "three_subagents": {
+          "cache_read_ceiling_sim": 29056,
+          "input_tokens_sim": 48655,
+          "model_requests": 11,
+          "output_tokens_sim": 163
+        }
+      }
+    },
+    {
+      "engine_commit": "e9d4856513f00e7a41d07c4e7e135d6746e16b19",
+      "measurement_sha256": "a9a2818bf87d9bc5b06400b7bcca9afcadd14d28dc75d076db9bdeec311963ad",
+      "scenarios": {
+        "conversation_10_turns": {
+          "cache_read_ceiling_sim": 33408,
+          "input_tokens_sim": 73445,
+          "model_requests": 10,
+          "output_tokens_sim": 3971
+        },
+        "skill_15_rounds": {
+          "cache_read_ceiling_sim": 107776,
+          "input_tokens_sim": 126382,
+          "model_requests": 15,
+          "output_tokens_sim": 495
+        },
+        "three_subagents": {
+          "cache_read_ceiling_sim": 29056,
+          "input_tokens_sim": 48655,
+          "model_requests": 11,
+          "output_tokens_sim": 163
+        }
+      }
+    },
+    {
+      "engine_commit": "e9d4856513f00e7a41d07c4e7e135d6746e16b19",
+      "measurement_sha256": "a9a2818bf87d9bc5b06400b7bcca9afcadd14d28dc75d076db9bdeec311963ad",
+      "scenarios": {
+        "conversation_10_turns": {
+          "cache_read_ceiling_sim": 33408,
+          "input_tokens_sim": 73445,
+          "model_requests": 10,
+          "output_tokens_sim": 3971
+        },
+        "skill_15_rounds": {
+          "cache_read_ceiling_sim": 107776,
+          "input_tokens_sim": 126382,
+          "model_requests": 15,
+          "output_tokens_sim": 495
+        },
+        "three_subagents": {
+          "cache_read_ceiling_sim": 29056,
+          "input_tokens_sim": 48655,
+          "model_requests": 11,
+          "output_tokens_sim": 163
+        }
+      }
+    }
+  ],
+  "before": [
+    {
+      "engine_commit": "c12a15aa2a9e782dbb217f5613aa16b2bbf9871e",
+      "measurement_sha256": "5e11939610445001072c99a919bf53251735d17584274dae8b20fee8d423bc2b",
+      "scenarios": {
+        "conversation_10_turns": {
+          "cache_read_ceiling_sim": 33408,
+          "input_tokens_sim": 73445,
+          "model_requests": 10,
+          "output_tokens_sim": 3971
+        },
+        "skill_15_rounds": {
+          "cache_read_ceiling_sim": 107776,
+          "input_tokens_sim": 126382,
+          "model_requests": 15,
+          "output_tokens_sim": 495
+        },
+        "three_subagents": {
+          "cache_read_ceiling_sim": 29056,
+          "input_tokens_sim": 48655,
+          "model_requests": 11,
+          "output_tokens_sim": 163
+        }
+      }
+    },
+    {
+      "engine_commit": "c12a15aa2a9e782dbb217f5613aa16b2bbf9871e",
+      "measurement_sha256": "b2aa0a3172c2ac2386a91722b4106bb25f4a32e1c1420c43f42f1d3e4d54e9f7",
+      "scenarios": {
+        "conversation_10_turns": {
+          "cache_read_ceiling_sim": 33408,
+          "input_tokens_sim": 73445,
+          "model_requests": 10,
+          "output_tokens_sim": 3971
+        },
+        "skill_15_rounds": {
+          "cache_read_ceiling_sim": 107776,
+          "input_tokens_sim": 126382,
+          "model_requests": 15,
+          "output_tokens_sim": 495
+        },
+        "three_subagents": {
+          "cache_read_ceiling_sim": 29056,
+          "input_tokens_sim": 48655,
+          "model_requests": 11,
+          "output_tokens_sim": 163
+        }
+      }
+    },
+    {
+      "engine_commit": "c12a15aa2a9e782dbb217f5613aa16b2bbf9871e",
+      "measurement_sha256": "b2aa0a3172c2ac2386a91722b4106bb25f4a32e1c1420c43f42f1d3e4d54e9f7",
+      "scenarios": {
+        "conversation_10_turns": {
+          "cache_read_ceiling_sim": 33408,
+          "input_tokens_sim": 73445,
+          "model_requests": 10,
+          "output_tokens_sim": 3971
+        },
+        "skill_15_rounds": {
+          "cache_read_ceiling_sim": 107776,
+          "input_tokens_sim": 126382,
+          "model_requests": 15,
+          "output_tokens_sim": 495
+        },
+        "three_subagents": {
+          "cache_read_ceiling_sim": 29056,
+          "input_tokens_sim": 48655,
+          "model_requests": 11,
+          "output_tokens_sim": 163
+        }
+      }
+    }
+  ],
+  "build_profile": "release",
+  "method": "context-cache-phase1-release-scripted-v1",
+  "observation_boundary": "CompletionRequest before provider-specific wire encoding",
+  "provider_calls": 0,
+  "provider_cost_usd": 0,
+  "repetitions": 3,
+  "simulation_only": true,
+  "variation_note": "All three release-mode repeats before and after the date-dependency replacement retain identical logical input totals and exact-prefix ceilings. Guard behavior and per-turn nonces are unchanged; these are simulated counters, not provider invoices."
+}

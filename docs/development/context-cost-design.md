@@ -319,3 +319,31 @@ cache markers as specified in [the accounting contract](context-cache-accounting
 Immutable capsules and nonce changes, result summaries and pagination, per-model
 context/compaction profiles, and an auxiliary model remain deferred until after
 the public launch. Per-turn nonces and untrusted-content isolation remain unchanged.
+
+## First-increment release measurements
+
+Three repeats before and after on the same runner retain the same exact-prefix
+coverage after the date-dependency replacement. All three workloads retain
+identical logical input totals across these repeats. The scripted observer uses the production
+engine with UTF-8 JSON bytes / 4, rounded upward; it does not simulate provider
+cache invoices. No commercial model was called. The observer captures the engine
+port before provider-specific encoding; adapter marker overhead and native
+tokenization are outside this neutral prefix model.
+
+| Workload | Requests | Input before / after | Reusable prefix ceiling |
+| --- | ---: | ---: | ---: |
+| Ten-turn conversation | 10 | 73,445 / 73,445 | 33,408 (45.49%) |
+| Skill investigation, 15 rounds | 15 | 126,382 / 126,382 | 107,776 (85.28%) |
+| Three subagents | 11 | 48,655 / 48,655 | 29,056 (59.72%) |
+
+The first increment adds native Anthropic breakpoints and provider-reported
+accounting, without reducing transmitted context. Automatic providers may
+already cache the stable prefix. Actual cache hits, latency and billed savings
+remain unmeasured until an explicit analyst-run evaluation.
+[Repeated measurements](context-cost-data/cache-phase1-measurements.json) and
+[child receipt/settlement vector](context-cost-data/child-cache-settlement.json)
+are covered by the data checksum file.
+
+The measurements identify the exact source commits and use the same maintained
+date dependencies on both sides. Guard behavior and per-turn nonces remain
+unchanged; no input-size reduction or real billed cache saving is claimed.

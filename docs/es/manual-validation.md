@@ -1,4 +1,4 @@
-Traducción de docs/development/manual-validation.md en el commit 050c01156cc3c45f5229306b88051eb22ed68348; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/manual-validation.md en el commit 0b79bea270e99a28756d123f51a045cf283cfd4a; si hay diferencias, prevalece la versión en inglés.
 
 # Validación manual del MVP
 
@@ -67,7 +67,7 @@ python3 scripts/hunteval_benchmark.py --help
 
 Esta prueba es para colaboradores con Windows 11. Las pruebas automáticas en Windows Server no confirman la compatibilidad con Windows cliente. Usa solo la muestra sintética y una cuenta sin privilegios. EVTX sigue siendo experimental hasta confirmar esta prueba.
 
-1. Descarga los binarios coincidentes de Windows y del auxiliar EVTX de la [release v0.5.2](https://github.com/ns2switch/irmind/releases/tag/v0.5.2). Colócalos juntos como `irmind.exe` e `irmind-evtx.exe`. Antes de renombrarlos, comprueba `SHA256SUMS`, los bundles de cosign y la procedencia de GitHub según [plataformas](platforms.md). La identidad esperada es `https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/v0.5.2`, el emisor es `https://token.actions.githubusercontent.com` y el commit de procedencia debe coincidir con ese tag.
+1. Descarga los binarios coincidentes de Windows y del auxiliar EVTX de la [release v0.5.3](https://github.com/ns2switch/irmind/releases/tag/v0.5.3). Colócalos juntos como `irmind.exe` e `irmind-evtx.exe`. Antes de renombrarlos, comprueba `SHA256SUMS`, los bundles de cosign y la procedencia de GitHub según [plataformas](platforms.md). La identidad esperada es `https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/v0.5.3`, el emisor es `https://token.actions.githubusercontent.com` y el commit de procedencia debe coincidir con ese tag.
 2. Abre la candidata en Windows Terminal con un directorio de pruebas nuevo y el llavero file. No configures modelos ni conectores remotos. El arranque ejecuta el autotest de aislamiento de EVTX. En `/settings preferences`, comprueba que el parser experimental está disponible. Si no lo está, registra el motivo mostrado. No desactives el cortafuegos, no añadas excepciones de loopback ni eleves privilegios para saltar la comprobación.
 3. Descarga `crates/testkit/fixtures/parser-evtx/source/Security.evtx` del mismo commit. Crea un caso con `/new`, ingiere la muestra con `/ingest` y comprueba `parser-evtx`, 14 registros y el manifiesto visible. Inspecciona `/timeline` y `/evidence`; ejecuta `/verify` conservando el original.
 4. Cierra y abre de nuevo la candidata. Comprueba el autotest de la nueva sesión y la verificación del caso. Borra los datos de pruebas al terminar.
@@ -78,7 +78,7 @@ AppContainer. Tras verificar e instalar la release, descarga la muestra del tag
 exacto y comprueba su hash antes de ingerir:
 
 ```powershell
-Invoke-WebRequest 'https://raw.githubusercontent.com/ns2switch/irmind/v0.5.2/crates/testkit/fixtures/parser-evtx/source/Security.evtx' -OutFile Security.evtx
+Invoke-WebRequest 'https://raw.githubusercontent.com/ns2switch/irmind/v0.5.3/crates/testkit/fixtures/parser-evtx/source/Security.evtx' -OutFile Security.evtx
 $expected = '028a2a2cd636806a3d2e6e086fa099d45c8bf062a3664cc22410e00eed23bc05'
 if ((Get-FileHash .\Security.evtx -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expected) { throw 'Synthetic fixture checksum mismatch' }
 Get-Service BFE,MpsSvc | Select-Object Name,Status

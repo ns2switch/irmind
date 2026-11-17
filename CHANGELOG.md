@@ -4,11 +4,40 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+## 0.5.3 — Prompt-cache accounting and interrupted-plan recovery
+
+**Format impact:** Optional cache metadata extends signed usage receipts and
+optional cache prices extend signed configuration. Missing fields retain their
+existing canonical bytes. Case, artifact, seal and export versions are unchanged.
+Retain the creating executable for full reconstruction of its signed native decoder/mapping profiles.
+
+- Replace unmaintained calendar/duration dependencies with maintained date
+  primitives and narrowly reviewed Arrow/Parquet/storage source patches. Current
+  canonical and physical-format golden bytes are unchanged; advisory enforcement,
+  explicit credentials, TLS, bounded reads and EVTX isolation remain enabled.
+
+- Publish native macOS Intel binaries alongside Apple Silicon, Linux x86_64,
+  Linux aarch64 and Windows. Verify clean installers even when optional native
+  signing is disabled. Sigstore, provenance and SBOM verification remain mandatory.
+- Refresh the complete offline presentation with the actual v0.5.3 executable.
+  Native Developer ID/notarization and Authenticode remain unavailable.
+- Expand the controlled Elasticsearch/TLS rehearsal guidance and the optional
+  HuntEval pilot runner. A local-model rehearsal does not replace analyst
+  validation of investigation quality or a connector in a real test environment.
+
 - Recover an interrupted subagent plan explicitly with `/subagents recover`,
   after confirmation. Nonblocking interprocess activity/recovery locks protect
   live previews and children, remain held through reconciliation and prevent
   concurrent deletion. Recovery preserves committed work and uncertain usage
   without replaying provider requests or tool effects. Signed formats are unchanged.
+
+- Account for provider-reported prompt-cache reads and writes separately in
+  `/budget` and the configurable status bar. Inclusive input still consumes the
+  full token budget; estimates require every applicable price. Native Anthropic
+  requests mark the trusted system/tool prefix; OpenAI and DeepSeek cache
+  automatically. Compatible/local endpoints receive no new cache controls.
+  Optional cache fields extend signed usage receipts and price configuration;
+  absent fields preserve existing bytes. Case, seal and export versions are unchanged.
 
 - Show an actionable notice when a provider completes without a visible answer,
   while retaining its signed empty reply and reported usage.
@@ -23,7 +52,6 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 - Confirmed Ctrl+C exits the application from an open case; canceling its modal
   leaves the conversation unchanged. Evidence-picker help matches the actual keys.
-- Add native macOS Intel release binaries, their matching isolated EVTX helper and clean verified installation tests. Extend dormant Developer ID/notarization preparation to both architectures; native signing remains disabled.
 
 ## 0.5.2 — Signed case deletion and a configurable status bar
 

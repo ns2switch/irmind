@@ -1,4 +1,4 @@
-Traducción de docs/development/roadmap.md en el commit 050c01156cc3c45f5229306b88051eb22ed68348; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/roadmap.md en el commit 0b79bea270e99a28756d123f51a045cf283cfd4a; si hay diferencias, prevalece la versión en inglés.
 
 # Hoja de ruta
 
@@ -46,6 +46,11 @@ son capacidades entregadas, no afirmaciones de validación con incidentes reales
   prioridades integrados para v0.5.2. El borrado conserva lápidas, respeta bloqueos
   y recupera interrupciones; no garantiza eliminación física segura.
 
+- La versión 0.5.3 añade contabilidad de caché del proveedor, marcadores del
+  prefijo confiable de Anthropic, recuperación explícita de planes protegida entre
+  procesos y paquetes macOS Intel. Mantiene el nonce por turno y el cargo de todos
+  los tokens. Las demás propuestas de contexto quedan para después del lanzamiento.
+
 Skills e hijos no amplían permisos ni alcance, los hijos no aprueban, y datos
 externos o del modelo nunca pasan a system confiable. Ningún modelo ni conector
 se activa por defecto. Los diseños históricos no prometen compatibilidad del
@@ -53,16 +58,16 @@ binario actual.
 
 ## v0.5.x: estabilización y preparación para evaluación
 
-- Completar la primera caché tras revisar el contrato concreto de contabilidad:
-  prefijo confiable estable, uso de caché reportado y visible en presupuesto.
-  Mantener nonce por turno y cobrar todos los tokens; sin precalentamiento,
-  cambios automáticos de ruta ni caché presentada como gratuita.
+- Medir la reutilización real de caché con la primera contabilidad. Mantener el
+  nonce por turno y el cargo de todos los tokens; aplazar las demás propuestas
+  de contexto hasta después del lanzamiento. Sin precalentamiento ni cambios
+  automáticos de ruta.
 - Ensayar la [validación real](real-validation.md) con Elasticsearch local, TLS,
   CA y modelo local. Registrar resultados, fallos y tiempos observados; no
   sustituye la validación del analista con su modelo y conector.
 - Repetir PTY bajo carga con sincronización por eventos: arranque, presentación,
   expansión y borrado.
-- Añadir macOS Intel nativo y Homebrew verificado. Mantener Linux aarch64,
+- Publicar Homebrew verificado. Mantener macOS Intel nativo y Linux aarch64,
   instaladores, Sigstore con identidad de tag, provenance y SBOM. AUR, Nix,
   winget y Scoop quedan abiertos a empaquetadores comunitarios.
 - Activar Developer ID, hardened runtime y notarización preparados solo tras

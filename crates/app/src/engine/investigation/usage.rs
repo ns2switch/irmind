@@ -28,6 +28,7 @@ impl Engine<'_> {
         token_limit: u64,
     ) -> Result<(), AppError> {
         if let Some(usage) = usage {
+            usage.validate()?;
             usage
                 .input_tokens
                 .checked_add(usage.output_tokens)
@@ -36,6 +37,7 @@ impl Engine<'_> {
                     crate::FixedAppError::PolicyModelTokenCountOverflow,
                 ))?;
             let event = UsageEvent {
+                cache: usage.cache,
                 input_tokens: usage.input_tokens,
                 output_tokens: usage.output_tokens,
                 estimated_cost_microusd: self.usage_cost(usage)?,
@@ -44,9 +46,9 @@ impl Engine<'_> {
                 let owned = id.clone();
                 let previous = self
                     .blocking_local(move |local| {
-                        Ok(summarize_usage(&local.audit_log.entries(&owned)?)?
-                            .estimated_cost_microusd
-                            .unwrap_or(0))
+                        crate::case_budget::reported_cost_subtotal(
+                            &local.audit_log.entries(&owned)?,
+                        )
                     })
                     .await?;
                 previous.checked_add(cost).ok_or(AppError::Fixed(
@@ -82,24 +84,10 @@ impl Engine<'_> {
     }
 
     pub(crate) fn usage_cost(&self, usage: ModelUsage) -> Result<Option<u64>, AppError> {
+        usage.validate()?;
         let Some(pricing) = self.pricing else {
             return Ok(None);
         };
-        let input = u128::from(usage.input_tokens)
-            .checked_mul(u128::from(pricing.input_microusd_per_million))
-            .ok_or(AppError::Fixed(
-                crate::FixedAppError::PolicyModelCostOverflow,
-            ))?;
-        let output = u128::from(usage.output_tokens)
-            .checked_mul(u128::from(pricing.output_microusd_per_million))
-            .ok_or(AppError::Fixed(
-                crate::FixedAppError::PolicyModelCostOverflow,
-            ))?;
-        let total = input.checked_add(output).ok_or(AppError::Fixed(
-            crate::FixedAppError::PolicyModelCostOverflow,
-        ))? / 1_000_000;
-        Ok(Some(u64::try_from(total).map_err(|_| {
-            AppError::Fixed(crate::FixedAppError::PolicyModelCostOverflow)
-        })?))
+        pricing.estimate(usage)
     }
 }

@@ -1,4 +1,4 @@
-<!-- Translation of docs/development/dependency-maintenance-review.md; source commit: 3a6bfca1 -->
+<!-- Translation of docs/development/dependency-maintenance-review.md; source commit: c8ed6cd8332c5b025f378e772e54a05c1ad24e71 -->
 # Retirada de dependencias de fechas sin mantenimiento
 
 La sustitución elimina `chrono` y `humantime` de los cuatro lockfiles: aplicación,
@@ -49,10 +49,12 @@ no versiones de upstream anunciadas como libres de esas dependencias.
 
 ## Verificación
 
-El grafo principal pasa `cargo-deny` con su política intacta. Hay vectores
+Los cuatro workspaces pasan `cargo-deny` con su política intacta. Hay vectores
 sintéticos congelados para 756 combinaciones de fecha, fracción y offset, además
 de patrones de presentación. Los 21 tests de formatos actuales pasan sin cambiar
-los bytes esperados. La matriz nativa completa sigue siendo requisito de cierre.
+los bytes esperados, también con preserve_order. La matriz de Linux, macOS
+arm64/Intel y Windows de la sustitución está en verde; la distribución firmada
+se comprueba como parte de la release.
 
 Los cuatro lockfiles deben seguir sin ambas dependencias. CI comprueba los
 hashes de 246 ficheros revisados y la conservación de los ficheros con unsafe.

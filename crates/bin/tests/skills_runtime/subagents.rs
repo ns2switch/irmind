@@ -184,6 +184,7 @@ impl LlmPort for MixedEpisode {
                 truncated: false,
             },
             measured.or(Some(ModelUsage {
+                cache: None,
                 input_tokens: 10,
                 output_tokens: 5,
             })),

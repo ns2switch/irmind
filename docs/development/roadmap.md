@@ -46,6 +46,11 @@ The following describes delivered capabilities, not field-validation claims.
   bar are integrated for v0.5.2. Deletion retains signed tombstones, honors process
   locks and recovers interrupted cleanup; it is not secure physical erasure.
 
+- Version 0.5.3 adds provider-reported cache accounting, trusted Anthropic prefix
+  markers, explicit interprocess-safe plan recovery and macOS Intel packages.
+  Fresh per-turn nonces and full logical token charging are unchanged. Later
+  context-cost proposals remain deferred until after launch.
+
 Skills never grant tools or scope, children never approve, and external/model
 content never enters trusted system instructions. No model or connector is
 enabled by default. Historical release designs explain old decisions; they are
@@ -53,16 +58,15 @@ not compatibility promises for the current executable.
 
 ## v0.5.x: Evaluation readiness and stabilization
 
-- Complete first-increment prompt-cache support after review of the concrete
-  accounting contract: stable trusted prefix, provider-reported cache usage and
-  visible budget accounting. Retain fresh per-turn nonces and charge every logical
-  token; no speculative warm-up, automatic routing change or claimed free input.
+- Measure real provider cache reuse with the first accounting increment. Keep fresh
+  per-turn nonces and charge every logical token; defer later context-cost changes
+  until after launch. No speculative warm-up or automatic routing changes.
 - Rehearse the [real-service procedure](real-validation.md) with local Elasticsearch,
   TLS/CA verification and a local model. Record actual outcomes, errors and timings;
   this does not replace the analyst's real-model/connector validation.
 - Exercise PTY interactions repeatedly under load with event-based synchronization,
   including first run, demo presentation, expansion and deletion.
-- Add native macOS Intel assets and verified Homebrew packaging. Maintain Linux
+- Publish verified Homebrew packaging. Maintain native macOS Intel and Linux
   aarch64, signed installers, exact-tag Sigstore verification, provenance and SBOM.
   AUR, Nix, winget and Scoop remain open to community maintainers.
 - Activate prepared Developer ID/hardened-runtime signing and notarization only

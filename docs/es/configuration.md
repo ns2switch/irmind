@@ -1,4 +1,4 @@
-Traducción de docs/configuration.md en el commit 0f8f4aa42c17ae139f58780668e7a5d2872c2ea9; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/configuration.md en el commit f47845c5b47a86bf6f838b7fd67fdd73d2047d41; si hay diferencias, prevalece la versión en inglés.
 
 # Configuración
 
@@ -164,9 +164,9 @@ caso; modelo y proveedor; tokens usados, presupuesto y porcentaje; tokens leído
 y escritos en caché; llamadas y su presupuesto; bytes de nube y su presupuesto;
 coste estimado; subagentes activos; aprobaciones pendientes; detecciones; fuentes
 ingeridas; perfil de los llaveros de firma y secretos; directorio de datos;
-versión de IRMind; reloj UTC; y actividad. Se omiten los contadores de caché no
-disponibles y el coste sin precios; nunca se presentan como cero. Los contadores
-de caché solo aparecen cuando la contabilidad del proveedor los admite. Las
+versión de IRMind; reloj UTC; y actividad. La caché desconocida se indica como
+no disponible y el coste sin precios se omite; nunca se presentan como cero.
+Los contadores de caché solo aparecen cuando el proveedor los informa. Las
 reglas de consumo y presupuesto se mantienen.
 
 El orden de la plantilla es el de presentación. En anchos reducidos, incluidas
@@ -313,3 +313,21 @@ no sellado. `/cases deleted` muestra las lápidas globales y la limpieza pendien
 No se pueden borrar casos sellados o abiertos en otro proceso. Consulta
 [casos](cases.md) para propiedad, interrupciones, evidencia compartida y límites
 del borrado lógico.
+
+### Contabilidad de caché de prompts
+
+`/budget` separa entrada ordinaria, lecturas de caché, escrituras de caché y salida.
+La entrada incluye todos esos componentes una sola vez: un acierto de caché nunca
+amplía el presupuesto del caso ni del hijo. Los datos ausentes figuran como no
+disponibles y la cobertura parcial se indica. OpenAI y DeepSeek usan caché automática.
+En Anthropic nativo solo se marcan el bloque de sistema confiable y la última
+herramienta permitida, con vigencia de cinco minutos. Los endpoints compatibles y
+locales no reciben controles de caché. Se mantiene un nonce nuevo por turno.
+
+Los precios opcionales `cache_read_microusd_per_million` y
+`cache_write_microusd_per_million` complementan los de entrada y salida en la
+configuración firmada. El precio de escritura solo se aplica a cinco minutos.
+Cada componente no nulo necesita su precio; si faltan datos, la vigencia es
+incierta o alguna petición no tiene precio, el coste total no está disponible.
+Los contadores son informes del proveedor, no una factura. Los segmentos de caché
+muestran los valores recibidos (indicando cobertura parcial) o no disponible.

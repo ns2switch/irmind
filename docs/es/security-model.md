@@ -1,4 +1,4 @@
-Traducción de docs/security-model.md en el commit 5ad1686a6192d11c42c1b2b8b3a09759a774cc80; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/security-model.md en el commit c8ed6cd8332c5b025f378e772e54a05c1ad24e71; si hay diferencias, prevalece la versión en inglés.
 
 # Modelo de seguridad
 
@@ -14,14 +14,14 @@ El analista controla el caso, su alcance, las aprobaciones y su clave de firma. 
 
 ## Garantías de esta versión
 
-- **Custodia:** Los cambios del caso y la actividad de herramientas entran en una cadena de auditoría SQLite de solo anexado, con firmas Ed25519. La evidencia pequeña heredada conserva una copia local por hash. La ingesta de archivos grandes firma el origen, tamaño, fecha de modificación y SHA-256; la copia del original es opcional y explícita. La verificación comprueba las entradas firmadas y los bytes seleccionados para comprobación completa o por muestreo.
+- **Custodia:** Los cambios del caso y la actividad de herramientas entran en una cadena de auditoría SQLite de solo anexado, con firmas Ed25519. La evidencia usa manifiestos de fuente firmados y artefactos Parquet mapeados. La ingesta de archivos firma el origen, tamaño, fecha de modificación y SHA-256; la copia del original es opcional y explícita. La verificación comprueba las entradas firmadas y los bytes seleccionados para comprobación completa o por muestreo.
 - **Diagnóstico:** Un archivo privado y acotado, `diagnostics.log`, registra nombres de operaciones, categorías de resultado y duración. Está separado de la custodia, no contiene evidencia ni argumentos de herramientas y no forma parte de exportaciones ni de la verificación.
 - **Identidades separadas:** Analyst y Agent tienen claves distintas en el backend elegido. Solo la firma del analista puede resolver una aprobación pendiente. Un caso sellado tiene una cadena operativa firmada aparte para cancelaciones; las migraciones entran en una cadena operativa global firmada.
 - **Entrada protegida del modelo:** El texto externo se normaliza, se examina en busca de inyección de instrucciones, se redacta según patrones conocidos de secretos y datos personales, se limita y se envuelve como dato no confiable. El original queda en local. Un autotest de arranque bloquea la aplicación si falla el corpus conocido del guard.
 - **Conectores limitados:** Las credenciales llegan desde el backend de secretos elegido a través de la raíz de composición. Los clientes remotos exigen HTTPS, salvo HTTP sin clave hacia un servicio de modelo explícito en loopback. Las redirecciones están desactivadas y las respuestas tienen límites.
 - **Presentación segura:** La TUI elimina controles del terminal de la salida del modelo, los resúmenes de evidencia y los nombres de archivo. Los diálogos de aprobación muestran los argumentos exactos tras escaparlos para el terminal.
 
-Un paquete exportado contiene el log firmado, el sello y la clave pública. Los paquetes v4 pueden omitir originales grandes; el verificador informa de que esos bytes no están disponibles en el paquete. Usa `verify-export --expected-key` con una huella obtenida por otro canal de confianza.
+Un paquete exportado contiene el log firmado, el sello y la clave pública. Los paquetes V8 actuales incluyen artefactos referenciados, admisiones de skills y registros de subagentes. Pueden omitir los bytes originales; el verificador informa de que esos bytes no están disponibles en el paquete. Usa `verify-export --expected-key` con una huella obtenida por otro canal de confianza.
 
 ## Amenazas consideradas
 
@@ -40,12 +40,12 @@ Un paquete exportado contiene el log firmado, el sello y la clave pública. Los 
 - El enriquecimiento en VirusTotal expone el IOC consultado a un servicio externo. Siempre necesita aprobación. Un conector de solo lectura también depende de los permisos reales concedidos por su servicio.
 - El grafo es un índice derivado, no la evidencia original. Verifícalo o reconstruye desde entradas firmadas cuando importe su exactitud.
 - Un paquete de un caso grande que solo contiene el manifiesto no hace portátiles los bytes originales. La comprobación completa requiere los originales en las rutas elegidas por el analista; el muestreo no dice nada sobre los archivos no comprobados. Si un original falta o cambia, el registro firmado demuestra lo observado durante la ingesta, pero no permite recuperar los bytes.
-- Los binarios de CI tienen checksums, pero no firma de código, notarización ni firma Authenticode. Consulta [plataformas](platforms.md).
+- Los binarios de release tienen bundles de Sigstore, attestations de procedencia y un SBOM. La firma nativa Developer ID/notarización y Authenticode no están activadas. Consulta [plataformas](platforms.md).
 - Los backends del sistema y de archivo cifrado se eligen expresamente; no hay cambios automáticos. El archivo funciona por SSH, pero depende de una passphrase sólida y de la integridad de la máquina. Perder la clave de firma puede impedir continuar un caso.
 
 ## Uso recomendado
 
-Empieza por el [ejemplo sintético](getting-started.md). Limita el alcance remoto, usa credenciales de servicio dedicadas de solo lectura y aprueba solo llamadas cuyos argumentos entiendas. Si sospechas una vulnerabilidad, usa el proceso privado de [SECURITY.md](../../SECURITY.md) en lugar de abrir un issue público.
+Empieza por el [ejemplo sintético](getting-started.md). Limita el alcance remoto, usa credenciales de servicio dedicadas de solo lectura y aprueba solo llamadas cuyos argumentos entiendas. Si sospechas una vulnerabilidad, sigue [SECURITY.md](../../SECURITY.md), usa un ejemplo sintético mínimo y excluye credenciales y evidencia real del informe.
 
 El decodificador EVTX se ejecuta en un proceso aislado por el sistema operativo, con un descriptor de evidencia de solo lectura, salida acotada y confirmación de finalización. El parser solo está disponible tras verificar el aislamiento al arrancar. No existe ejecución sin aislamiento. La salida conserva su procedencia no confiable y pasa por los controles habituales antes de mostrarse, enviarse al modelo o influir en llamadas. Consulta el [diseño de aislamiento EVTX](../development/evtx-helper-design.md).
 
