@@ -62,8 +62,9 @@ impl Engine<'_> {
         let Ok(tasks) = proposed_tasks(calls) else {
             return Ok("The task plan was rejected: use 1–16 bounded tasks with exact source hashes, closed types and explicit budgets; approval fields are not accepted.".into());
         };
+        let activity = self.acquire_turn_plan_activity(case, turn).await?;
         let prepared = self
-            .prepare_turn_plan(case, turn.nonce, calls, tasks, cancel)
+            .prepare_turn_plan(case, turn.nonce, calls, tasks, cancel, activity)
             .await?;
         let shared_budget = turn.skills.lock().map_err(|_| invalid())?.budget.clone();
         // No provider, UI or child wait may retain the parent transaction lock.
@@ -108,6 +109,33 @@ impl Engine<'_> {
         Ok(screened.text)
     }
 
+    async fn acquire_turn_plan_activity(
+        &self,
+        case: &Case,
+        turn: &TurnContext,
+    ) -> Result<crate::subagents::PlanActivity, AppError> {
+        // Recovery never waits on this transaction while we wait for its gate.
+        // Reacquire the transaction even on a busy gate before normal turn cleanup.
+        drop(
+            turn.case_lock
+                .lock()
+                .map_err(|_| invalid())?
+                .take()
+                .ok_or_else(invalid)?,
+        );
+        let id = case.id.clone();
+        let (activity, held) = self
+            .blocking_local(move |local| {
+                let activity = local.plan_activity(&id);
+                let held = local.repo.lock_case(&id)?;
+                local.verify_unlocked(&id)?;
+                Ok((activity, held))
+            })
+            .await?;
+        *turn.case_lock.lock().map_err(|_| invalid())? = Some(held);
+        activity
+    }
+
     async fn prepare_turn_plan(
         &self,
         case: &Case,
@@ -115,6 +143,7 @@ impl Engine<'_> {
         calls: &[ModelToolCall],
         tasks: Vec<SubagentTaskProposal>,
         cancel: &CancellationToken,
+        activity: crate::subagents::PlanActivity,
     ) -> Result<PreparedSubagentPlan, AppError> {
         for call in calls
             .iter()
@@ -145,6 +174,7 @@ impl Engine<'_> {
                 tasks,
                 SubagentResources::default(),
                 &signal,
+                activity,
             )
         })
         .await

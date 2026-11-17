@@ -30,7 +30,7 @@ impl Command {
             "parsers" => " [test <definition> <file>]",
             "skills" => " [install catalog:<name>[@tag] | update <name>]",
             "settings" => " [model|connectors|keystore|preferences|limits]",
-            "subagents" => " [cancel <task>]",
+            "subagents" => " [cancel <task>|recover]",
             "open" => " <case title or ID>",
             "case" => " delete [case title or ID]",
             "cases" => " [all|open|sealed|inconsistent|deleted]",

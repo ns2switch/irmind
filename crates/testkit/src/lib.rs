@@ -51,3 +51,9 @@ pub use product_contracts::{
     run_internal_intel_recorded, run_llm_contract, run_siem_alert_recorded, run_siem_contract,
     run_siem_recorded, run_threat_intel_contract, run_threat_intel_recorded,
 };
+
+/// Drive a development contract future with the same bounded local runtime as
+/// the module suites. This helper creates no provider or application capability.
+pub fn run_test_future<F: std::future::Future>(future: F) -> Result<F::Output, String> {
+    Ok(contract_support::contract_runtime()?.block_on(future))
+}

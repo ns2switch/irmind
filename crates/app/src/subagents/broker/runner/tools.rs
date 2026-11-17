@@ -139,7 +139,7 @@ impl Engine<'_> {
             } = ticket;
             let response = match action {
                 ChildAction::Query(query) => self
-                    .run_child_query(view, *query, task.deadline_at, cancel)
+                    .run_child_query(started, view, *query, task.deadline_at, cancel)
                     .await
                     .map(ChildReadResponse::Evidence),
                 ChildAction::Remote(call) => {

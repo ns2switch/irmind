@@ -25,6 +25,7 @@ pub struct PreparedSubagentPlan {
     preview: SafePlanPreview,
     entry_hash: SubagentDigest,
     hold: SubagentReservationV1,
+    activity: PlanActivity,
 }
 impl PreparedSubagentPlan {
     pub const fn preview(&self) -> &SafePlanPreview {
@@ -35,6 +36,7 @@ impl PreparedSubagentPlan {
 /// Minted only after replay and trusted Analyst interaction. Every dispatch
 /// still rechecks the durable allocation, policy and its request reservation.
 pub struct StartedSubagentPlan {
+    pub(super) activity: Option<PlanActivity>,
     pub(super) plan: SubagentPlanV1,
     pub(super) entry_hash: SubagentDigest,
     pub(super) allocation: SubagentReservationV1,
@@ -76,6 +78,8 @@ impl StartedSubagentPlan {
         self.entry_hash
     }
 }
+
+pub(crate) type PlanActivity = std::sync::Arc<std::sync::Mutex<Vec<Box<dyn crate::CaseLock>>>>;
 
 fn invalid() -> AppError {
     AppError::Policy("Subagent plan is unavailable, stale or outside its validated limits".into())
@@ -278,9 +282,25 @@ impl Engine<'_> {
         cancel: &CancellationToken,
     ) -> Result<PreparedSubagentPlan, AppError> {
         self.require_attended_analyst("prepare subagent plan")?;
+        let activity = self.plan_activity(case)?;
         let _lock = self.repo.lock_case(case)?;
         self.verify_unlocked_cancelable(case, cancel)?;
-        self.prepare_subagent_plan_unlocked(case, turn, tasks, coordination, cancel)
+        self.prepare_subagent_plan_unlocked(case, turn, tasks, coordination, cancel, activity)
+    }
+
+    pub(crate) fn plan_activity(&self, case: &CaseId) -> Result<PlanActivity, AppError> {
+        let session = self.open_case_session(case)?;
+        let gate = self
+            .subagents
+            .as_ref()
+            .ok_or_else(invalid)?
+            .branches
+            .try_plan_activity(case)?;
+        let mut leases = vec![gate];
+        if let Some(session) = session {
+            leases.push(session);
+        }
+        Ok(std::sync::Arc::new(std::sync::Mutex::new(leases)))
     }
 
     pub(crate) fn prepare_subagent_plan_unlocked(
@@ -290,6 +310,7 @@ impl Engine<'_> {
         tasks: Vec<SubagentTaskProposal>,
         coordination: SubagentResources,
         cancel: &CancellationToken,
+        activity: PlanActivity,
     ) -> Result<PreparedSubagentPlan, AppError> {
         self.require_attended_analyst("prepare subagent plan")?;
         if self.subagents.is_none()
@@ -355,6 +376,7 @@ impl Engine<'_> {
             },
             entry_hash,
             hold,
+            activity,
         })
     }
 
@@ -416,6 +438,7 @@ impl Engine<'_> {
         )?;
         batch.publish(cancel)?;
         Ok(Some(StartedSubagentPlan {
+            activity: Some(prepared.activity.clone()),
             plan: prepared.preview.plan.clone(),
             entry_hash: prepared.entry_hash,
             allocation,

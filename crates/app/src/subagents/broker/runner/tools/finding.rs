@@ -28,7 +28,7 @@ impl Engine<'_> {
                 .journal
                 .task_view(started, task.task_id, &self.policy)
                 .map_err(|_| invalid())?;
-            self.run_child_query(fresh, query, task.deadline_at, cancel)
+            self.run_child_query(started, fresh, query, task.deadline_at, cancel)
                 .await?;
         }
         let _lock = self.repo.lock_case(&case)?;

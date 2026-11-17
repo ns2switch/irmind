@@ -408,3 +408,31 @@ fn absent_provider_usage_is_not_rendered_as_measured_zero_tokens() {
     assert!(shown.contains("tokens unavailable"));
     assert!(!shown.contains("0 tok"));
 }
+
+#[test]
+fn interrupted_plan_recovery_is_legible_at_eighty_columns() {
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+    let mut view = visual_frame(&[]);
+    let text = format!(
+        "{}\n\n> 1. Cancel   2. Confirm\n↑/↓ choose · Enter select · Esc cancel",
+        crate::case::confirmation::subagent_recovery_confirmation()
+    );
+    view.overlay = Some(&text);
+    view.input_focused = false;
+    draw_case(&mut terminal, &view).unwrap();
+    let shown = screen(&terminal);
+    for expected in [
+        "Close interrupted subagent plans?",
+        "Close other IRMind sessions",
+        "uncertain provider usage",
+        "No provider request",
+        "> 1. Cancel",
+        "2. Confirm",
+    ] {
+        assert!(
+            shown.contains(expected),
+            "missing recovery information: {expected}"
+        );
+    }
+    insta::assert_snapshot!("interrupted_plan_recovery_80", shown);
+}
