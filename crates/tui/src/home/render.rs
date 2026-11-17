@@ -6,7 +6,7 @@ use super::{
 use crate::theme::Theme;
 use ratatui::{
     layout::Rect,
-    widgets::{BorderType, Clear, ListState},
+    widgets::{BorderType, Clear, ListState, Wrap},
 };
 use unicode_width::UnicodeWidthStr;
 
@@ -340,6 +340,10 @@ fn draw_dialog_screen(
         Paragraph::new(visual.title.to_owned()).style(theme.accent()),
         Rect::new(area.x, area.y, area.width, 1),
     );
+    if state.mode == Mode::Modules && state.pending_module_change.is_some() {
+        draw_module_confirmation(frame, area, state, visual, theme);
+        return;
+    }
     let width = area.width.saturating_sub(4).clamp(1, 96);
     let height = area.height.saturating_sub(3).clamp(1, 25);
     let modal = Rect::new(
@@ -385,6 +389,64 @@ fn draw_dialog_screen(
             Rect::new(inner.x, inner.bottom().saturating_sub(1), inner.width, 1),
         );
     }
+}
+
+fn draw_module_confirmation(
+    frame: &mut ratatui::Frame<'_>,
+    area: Rect,
+    state: &HomeState,
+    visual: &HomeVisual<'_>,
+    theme: Theme,
+) {
+    let block = Block::bordered()
+        .border_type(BorderType::Rounded)
+        .border_style(theme.warning())
+        .title("Confirm remote connector change");
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+    let parts = Layout::vertical([
+        Constraint::Length(2),
+        Constraint::Min(1),
+        Constraint::Length(2),
+    ])
+    .split(inner);
+    let summary = state
+        .pending_module_change
+        .as_ref()
+        .map(items::change_summary)
+        .unwrap_or_default();
+    frame.render_widget(
+        Paragraph::new("Review the exact change and connector settings before signing.")
+            .wrap(Wrap { trim: false })
+            .style(theme.warning()),
+        parts[0],
+    );
+    let mut details = vec![
+        Line::from(format!("Exact change: {}", case::escape_display(&summary))),
+        Line::from(""),
+    ];
+    details.extend(
+        visual
+            .module_detail
+            .iter()
+            .map(|row| Line::from(row.clone())),
+    );
+    frame.render_widget(
+        Paragraph::new(details)
+            .wrap(Wrap { trim: false })
+            .scroll((state.module_review_scroll, 0))
+            .style(Style::default().fg(theme.text)),
+        parts[1],
+    );
+    frame.render_widget(
+        Paragraph::new(format!(
+            "{} 1. Cancel   {} 2. Confirm and sign",
+            if state.selected_option == 0 { ">" } else { " " },
+            if state.selected_option == 1 { ">" } else { " " }
+        ))
+        .style(theme.accent()),
+        parts[2],
+    );
 }
 
 fn draw_modules(

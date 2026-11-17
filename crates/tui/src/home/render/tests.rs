@@ -383,3 +383,55 @@ fn assistants_hide_the_background_composer() {
     );
     insta::assert_snapshot!("home_model_provider", screen);
 }
+
+#[test]
+#[allow(clippy::expect_used)]
+fn connector_confirmation_keeps_options_visible_with_long_ca_details_at_eighty_columns() {
+    let mut state = HomeState::new(Vec::new(), false);
+    state.mode = Mode::Modules;
+    state.pending_module_change = Some(irmind_app::ConfigChange::SetEnabled {
+        module: "siem-elastic".into(),
+        enabled: true,
+    });
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).expect("test backend");
+    let details = (0..30)
+        .map(|i| format!("Public field {i}: {}", "x".repeat(100)))
+        .collect::<Vec<_>>();
+    let check = super::super::new_case::FormCheck::default();
+    let visual = HomeVisual {
+        title: "IRMind",
+        summary: "",
+        notice: "",
+        input: "",
+        has_model: false,
+        form: &state.form,
+        form_check: &check,
+        module_detail: &details,
+    };
+    terminal
+        .draw(|frame| {
+            super::draw_module_confirmation(
+                frame,
+                Rect::new(0, 0, 80, 23),
+                &state,
+                &visual,
+                Theme::plain(),
+            );
+        })
+        .expect("render");
+    let buffer = terminal.backend().buffer();
+    let screen = (0..24)
+        .map(|y| {
+            (0..80)
+                .map(|x| buffer[(x, y)].symbol())
+                .collect::<String>()
+                .trim_end()
+                .to_owned()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(screen.contains("Exact change: set siem-elastic enabled=true"));
+    assert!(screen.contains("2. Confirm and sign"));
+    assert!(!screen.contains("Find cases"));
+    insta::assert_snapshot!("connector_confirmation_80", screen);
+}

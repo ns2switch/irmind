@@ -1,6 +1,6 @@
 use crate::case::command_registry;
 use crate::case::state::{CaseState, panel_findings_for};
-use crate::case::{Confirmation, Engine, Result, escape_display};
+use crate::case::{Engine, Result, escape_display};
 use irmind_app::{ApprovalRequest, ApprovalSource, Finding};
 use std::collections::BTreeMap;
 
@@ -170,14 +170,9 @@ pub(super) fn overlay_text(state: &CaseState, engine: &Engine<'_>) -> Result<Opt
         return Ok(Some(engine.guard.screen(&lines.join("\n"))?.text));
     }
     if let Some(confirm) = &state.confirmation {
-        let detail = match confirm {
-            Confirmation::Seal(_, info)
-            | Confirmation::Export(_, info)
-            | Confirmation::ObjectRead(_, info) => info,
-        };
         return Ok(Some(format!(
             "{}\n\n{} 1. Cancel   {} 2. Confirm\n↑/↓ choose · Enter select · Esc cancel",
-            escape_display(detail),
+            escape_display(confirm.detail()),
             if state.confirmation_option == 0 {
                 ">"
             } else {
