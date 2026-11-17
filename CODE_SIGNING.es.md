@@ -1,45 +1,87 @@
-Traducción de CODE_SIGNING.md en el commit 050c01156cc3c45f5229306b88051eb22ed68348; si hay diferencias, prevalece la versión en inglés.
+Traducción de CODE_SIGNING.md en el commit 4346ab637e1d0e0cfb3a6a36382bfad1a46ac31e; si hay diferencias, prevalece la versión en inglés.
+
+[English version](CODE_SIGNING.md)
 
 # Política de firma de código
 
-Las releases de IRMind se construyen desde commits etiquetados y revisados mediante
-el workflow fijado de GitHub Actions. Los mantenedores aprueban las etiquetas;
-DCO, CI y los controles de política, custodia, TLS y aislamiento siguen siendo
-obligatorios. Se firman el ejecutable principal, el auxiliar EVTX y SHA256SUMS.
-Este inventario vincula instaladores, licencias, SBOM e informes de auditoría;
-GitHub Actions atesta la procedencia de binarios y SBOM.
+## Atribución
 
-La firma sin claves de Sigstore está activa. La identidad esperada fija repositorio,
-workflow y etiqueta exacta; véase [plataformas](docs/es/platforms.md). No se guarda
-una clave privada persistente de Sigstore en el repositorio.
+Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/)
 
-Developer ID Application, hardened runtime y notarización están preparados pero
-**desactivados** hasta que el mantenedor configure el environment protegido
-`release` y apruebe su activación. Authenticode mediante SignPath Foundation sigue
-pendiente de solicitud y aceptación. Las releases actuales no afirman tener esas
-firmas nativas. Solo trabajos de etiquetas pueden solicitar credenciales nativas;
-las PR y los ensayos de rama no pueden. Una vez activada, un fallo bloquea la
-publicación.
+Esta atribución se aplica a la firma Authenticode de los binarios propios de
+Windows: `irmind.exe` y su auxiliar EVTX aislado, `irmind-evtx.exe`. El mantenedor
+ha presentado la solicitud a la Foundation; la aprobación y la integración están
+pendientes. **SignPath no está activo y las versiones Windows actuales no llevan
+firmas Authenticode de SignPath.** Linux y macOS se firman con Sigstore sin claves
+permanentes. Developer ID Application, hardened runtime y la notarización de Apple
+para macOS están preparados, pero desactivados hasta su configuración y activación.
 
-La firma acredita origen y proceso de construcción, no corrección forense ni
+## Roles del equipo
+
+- Committers and reviewers: Anibal Cañada (@ns2switch)
+- Approvers: Anibal Cañada (@ns2switch)
+
+La cuenta del proyecto es [@ns2switch](https://github.com/ns2switch). Cada solicitud
+de firma requiere la aprobación manual del aprobador para un tag publicado.
+GitHub Actions compila el binario desde el código público de ese tag exacto;
+el workflow no puede aprobar su propia solicitud. El equipo debe usar
+multifactor en GitHub y SignPath.
+
+Las contribuciones llevan DCO y pasan revisión y CI. Aprobar una release no elude
+las pruebas de política, custodia, TLS, aislamiento ni límites. Los aprobadores
+adicionales deben identificarse en esta política antes de activar la integración.
+
+## Política de privacidad
+
+IRMind no incluye telemetría. Este programa no transferirá información a otros
+sistemas en red salvo petición específica del usuario o de la persona que lo
+instale u opere.
+
+Cuando el analista configura y aprueba expresamente un proveedor de modelos
+(DeepSeek, Anthropic, OpenAI, OpenRouter u otro compatible) o un conector (Splunk,
+Elastic, Chronicle, VirusTotal, MISP o servicios de nube), los datos enviados
+quedan sujetos a la política de privacidad del proveedor. Revisa sus condiciones
+antes de enviar datos. Configurarlo no elude la política, el alcance del caso,
+el techo de la organización ni las aprobaciones necesarias. Las skills y los
+subagentes no amplían esos permisos.
+
+Las descargas y actualizaciones explícitas del catálogo también son peticiones de
+red del usuario; las skills no se descargan ni actualizan automáticamente.
+La demo no contacta con ningún servicio: usa un modelo guionizado, consultas
+externas simuladas, datos sintéticos y claves temporales.
+
+## Qué se firma y cómo se compila
+
+Solo se firman la CLI propia y el auxiliar EVTX. Los assets Windows llevan sufijos
+de plataforma; los archivos instalados son `irmind.exe` e `irmind-evtx.exe`.
+La futura configuración SignPath debe limitar la firma a esos ejecutables y exigir
+el nombre de producto IRMind y la misma versión de release en ambos.
+
+El workflow de GitHub Actions, con acciones fijadas por commit, compila tags
+revisados con dependencias bloqueadas. Solo jobs de tags podrán solicitar
+credenciales nativas; las PR y los ensayos de ramas no podrán. SignPath usará el
+environment protegido `release`, con aprobación manual de cada firma. Una vez
+activado, un rechazo, timeout o resultado inválido bloqueará la publicación, sin
+alternativa silenciosa sin firma nativa.
+
+La firma nativa termina antes de generar checksums, Sigstore y procedencia para
+vincular los bytes finales descargables. Sigstore firma cada binario y
+`SHA256SUMS`; esta lista vincula instaladores, licencias, SBOM e inventarios de
+unsafe. GitHub Actions atesta la procedencia de binarios y SBOM. No se guarda una
+clave privada persistente de Sigstore en el repositorio.
+
+## Verificar una release
+
+Antes de ejecutar una descarga, sigue la [guía de plataformas](docs/es/platforms.md#verificar-una-versión-antes-de-instalar):
+comprueba el checksum, la identidad exacta de repositorio/workflow/tag y el emisor
+del bundle Sigstore y la procedencia de GitHub. Verifica el auxiliar por separado.
+
+Después de activar SignPath, comprueba además ambos ejecutables Windows con
+`Get-AuthenticodeSignature`: `Status` debe ser `Valid` y el firmante debe coincidir
+con el certificado de la Foundation documentado para esa release. Esta política
+no añade Authenticode retroactivamente a las versiones existentes.
+
+La firma acredita origen y proceso de compilación, no corrección forense ni
 aptitud para incidentes reales. IRMind es pre-1.0 y se evalúa principalmente con
 datos sintéticos. Véanse [SECURITY.md](SECURITY.md) y la
-[guía del mantenedor](docs/es/native-signing.md).
-
-## Responsabilidades y privacidad
-
-Las contribuciones llevan DCO y los mantenedores las revisan. El propietario del
-repositorio, [ns2switch](https://github.com/ns2switch), aprueba tags y futuras
-solicitudes de firma nativa. Otros aprobadores deben identificarse explícitamente
-antes de activar la integración. SignPath debe conservar la aprobación manual
-de cada solicitud y confirmar MFA para el equipo participante.
-
-IRMind contacta con modelos, conectores o catálogos remotos mediante la
-configuración y las acciones explícitas del analista. Antes de enviar datos,
-el analista debe revisar la privacidad del proveedor elegido. Skills y subagentes
-no amplían política, alcance ni aprobaciones.
-
-La aceptación por SignPath, la atribución a la Fundación, los metadatos Windows
-de producto y versión y las restricciones de artefactos siguen pendientes de
-integración. Esta política no afirma que la solicitud esté aceptada ni que los
-binarios Windows actuales lleven Authenticode.
+[guía de firma nativa](docs/es/native-signing.md).

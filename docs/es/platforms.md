@@ -1,8 +1,12 @@
-Traducción de docs/platforms.md en el commit 050c01156cc3c45f5229306b88051eb22ed68348; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/platforms.md en el commit 4346ab637e1d0e0cfb3a6a36382bfad1a46ac31e; si hay diferencias, prevalece la versión en inglés.
 
 # Plataformas
 
 Esta página es para quienes instalan IRMind en Linux, macOS o Windows, también por SSH. Explica la compilación, la verificación de descargas, los llaveros y los terminales. Empieza por [primeros pasos](getting-started.md) para el flujo de un caso.
+
+Consulta [Code signing policy — Política de firma de código](../../CODE_SIGNING.md)
+([versión en español](../../CODE_SIGNING.es.md)): atribución, roles del equipo,
+privacidad y estado de la firma nativa por plataforma.
 
 ## Compilar desde el código
 
@@ -101,7 +105,8 @@ La prueba PTY del binario real en los sistemas de CI cubre el byte `0x0f`. Esto 
 
 Developer ID y notarización para ambas arquitecturas están preparados pero desactivados; consulta
 [la guía del mantenedor](native-signing.md). Las releases actuales siguen sin
-firma nativa de Apple. #66 no contiene aceptación de SignPath registrada.
+firma nativa de Apple. La solicitud a SignPath Foundation está presentada;
+siguen pendientes la aprobación y la integración. Authenticode no está activo.
 Windows puede mostrar «Windows protected your PC», aplicación no reconocida o
 editor desconocido. Smart App Control de Windows 11 puede bloquear un fichero
 sin firma: verificar Sigstore no anula esa protección. Comprueba SHA256SUMS,
