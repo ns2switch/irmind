@@ -1,6 +1,7 @@
 """Keep native macOS builds and their published verification material aligned."""
 from pathlib import Path
 import unittest
+import re
 
 WORKFLOW = Path(__file__).parents[1] / 'workflows/ci.yml'
 
@@ -26,6 +27,17 @@ class MacOSReleaseTests(unittest.TestCase):
             self.assertEqual(len(loops), 2)
             self.assertTrue(all('release/' + name in line.split() for line in loops))
         self.assertIn("subject-path: 'release/irmind-*'", release)
+
+    def test_optional_native_signing_does_not_skip_post_release_installation(self):
+        workflow = WORKFLOW.read_text()
+        for name in ('verify_install_linux', 'verify_install_macos', 'verify_install_windows'):
+            with self.subTest(job=name):
+                job = workflow.split(f'  {name}:\n', 1)[1]
+                condition = re.search(r'^    if: (.+)$', job, re.MULTILINE).group(1)
+                self.assertIn('!cancelled()', condition)
+                self.assertIn("needs.release.result == 'success'", condition)
+                self.assertIn("startsWith(github.ref, 'refs/tags/v')", condition)
+                self.assertNotIn('needs.native_macos', condition)
 
     def test_clean_installation_runs_on_both_native_architectures(self):
         job = WORKFLOW.read_text().split('  verify_install_macos:\n', 1)[1].split('  verify_install_windows:', 1)[0]
