@@ -138,50 +138,17 @@ pub struct UsageEvent {
 }
 
 pub fn summarize_usage(entries: &[SignedEntry]) -> Result<UsageEvent, AppError> {
-    let mut total = UsageEvent {
-        input_tokens: 0,
-        output_tokens: 0,
-        estimated_cost_microusd: None,
-        cache: None,
-    };
-    let mut first = true;
-    for entry in entries
-        .iter()
-        .filter(|entry| entry.kind == irmind_domain::AuditEventKind::ModelUsage)
-    {
-        let usage: UsageEvent =
-            serde_json::from_str(&entry.payload).map_err(|_| AppError::InvalidChain(entry.seq))?;
-        let invalid = || AppError::InvalidChain(entry.seq);
-        total.input_tokens = total
-            .input_tokens
-            .checked_add(usage.input_tokens)
-            .ok_or_else(invalid)?;
-        total.output_tokens = total
-            .output_tokens
-            .checked_add(usage.output_tokens)
-            .ok_or_else(invalid)?;
-        total.estimated_cost_microusd = if first {
-            usage.estimated_cost_microusd
+    let usage = crate::case_budget_usage(entries)?;
+    Ok(UsageEvent {
+        input_tokens: usage.input_tokens,
+        output_tokens: usage.output_tokens,
+        estimated_cost_microusd: usage.cost_microusd,
+        cache: if usage.cache_reporting_complete {
+            usage.reported_cache
         } else {
-            total
-                .estimated_cost_microusd
-                .zip(usage.estimated_cost_microusd)
-                .map(|(a, b)| a.checked_add(b).ok_or_else(invalid))
-                .transpose()?
-        };
-        total.cache = if first {
-            usage.cache
-        } else {
-            total
-                .cache
-                .zip(usage.cache)
-                .map(|(a, b)| a.checked_add(b))
-                .transpose()
-                .map_err(|_| invalid())?
-        };
-        first = false;
-    }
-    Ok(total)
+            None
+        },
+    })
 }
 
 pub type ModelStream = std::pin::Pin<Box<dyn Stream<Item = Result<ModelEvent, AppError>> + Send>>;

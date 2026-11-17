@@ -313,6 +313,8 @@ mod tests {
             effective: Some(CaseBudgetLimits::default()),
             usage: CaseBudgetUsage {
                 model_tokens: 1_600_000,
+                input_tokens: 1_400_000,
+                output_tokens: 200_000,
                 tool_calls: 800,
                 cloud_bytes: 0,
                 cost_microusd: None,
