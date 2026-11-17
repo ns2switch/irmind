@@ -247,6 +247,9 @@ impl State {
                     || next_cache.zip(cache).is_some_and(|(next, prior)| {
                         next.read_input_tokens() < prior.read_input_tokens()
                             || next.write_input_tokens() < prior.write_input_tokens()
+                            || (prior.write_input_tokens() != 0
+                                && next.write_input_tokens() != 0
+                                && prior.write_lifetime() != next.write_lifetime())
                     })
                 {
                     next = Some((next_input, None));
