@@ -1,4 +1,4 @@
-Traducción de docs/configuration.md en el commit 45d63f93c8caca15da6d9c4d1611bd0aae657574; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/configuration.md en el commit 1e86ecde41ba6675b108c99f242ee85a577981c1; si hay diferencias, prevalece la versión en inglés.
 
 # Configuración
 
@@ -164,9 +164,9 @@ caso; modelo y proveedor; tokens usados, presupuesto y porcentaje; tokens leído
 y escritos en caché; llamadas y su presupuesto; bytes de nube y su presupuesto;
 coste estimado; subagentes activos; aprobaciones pendientes; detecciones; fuentes
 ingeridas; perfil de los llaveros de firma y secretos; directorio de datos;
-versión de IRMind; reloj UTC; y actividad. Se omiten los contadores de caché no
-disponibles y el coste sin precios; nunca se presentan como cero. Los contadores
-de caché solo aparecen cuando la contabilidad del proveedor los admite. Las
+versión de IRMind; reloj UTC; y actividad. La caché desconocida se indica como
+no disponible y el coste sin precios se omite; nunca se presentan como cero.
+Los contadores de caché solo aparecen cuando el proveedor los informa. Las
 reglas de consumo y presupuesto se mantienen.
 
 El orden de la plantilla es el de presentación. En anchos reducidos, incluidas

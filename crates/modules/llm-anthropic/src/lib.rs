@@ -71,6 +71,20 @@ fn trusted_system(messages: &[CompletionMessage]) -> Result<String, AppError> {
     Ok(trusted.join("\n"))
 }
 
+fn five_minute_cache_declared(body: &serde_json::Value) -> bool {
+    body["system"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .chain(body["tools"].as_array().into_iter().flatten())
+        .any(|block| {
+            block
+                .pointer("/cache_control/type")
+                .and_then(serde_json::Value::as_str)
+                == Some("ephemeral")
+        })
+}
+
 impl Anthropic {
     pub fn from_config(config: &ModuleConfig) -> Result<Self, AppError> {
         let model = config.required_value("IRMIND_ANTHROPIC_MODEL")?;
@@ -151,10 +165,12 @@ impl Anthropic {
         let mut tools = allowed
             .into_iter()
             .map(|tool| {
+                let mut parameters = tool.parameters.clone();
+                parameters.sort_all_objects();
                 json!({
                     "name": tool.name,
                     "description": tool.description,
-                    "input_schema": tool.parameters,
+                    "input_schema": parameters,
                 })
             })
             .collect::<Vec<_>>();
@@ -292,7 +308,7 @@ impl LlmPort for Anthropic {
             )));
         }
         let cancel = cancel.clone();
-        let five_minute_writes = self.endpoint.host_str() == Some("api.anthropic.com");
+        let five_minute_writes = five_minute_cache_declared(&body);
         Ok(Box::pin(async_stream::try_stream! {
             let mut response = response;
             let mut raw = Vec::new();
@@ -323,6 +339,38 @@ impl LlmPort for Anthropic {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn trusted_tool_schema_prefix_is_canonical_even_with_insertion_ordered_json() {
+        let client = Anthropic::new("claude-sonnet-4-6", "synthetic".into()).unwrap();
+        let mut request = CompletionRequest {
+            messages: vec![CompletionMessage::text(
+                MessageRole::User,
+                "Synthetic".into(),
+            )],
+            tools: irmind_app::tool_catalog::catalog()[..2].to_vec(),
+        };
+        let name = request.tools[0].name;
+        request.tools[0].parameters = serde_json::from_str(
+            r#"{"type":"object","properties":{"z":{"type":"string"},"a":{"type":"integer"}}}"#,
+        )
+        .unwrap();
+        let first = serde_json::to_vec(&client.body(&request).unwrap()).unwrap();
+        request.tools.reverse();
+        request
+            .tools
+            .iter_mut()
+            .find(|tool| tool.name == name)
+            .unwrap()
+            .parameters = serde_json::from_str(
+            r#"{"properties":{"a":{"type":"integer"},"z":{"type":"string"}},"type":"object"}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            first,
+            serde_json::to_vec(&client.body(&request).unwrap()).unwrap()
+        );
+    }
 
     #[test]
     fn mandatory_unknown_maximum_fails_before_request_construction() {
@@ -446,6 +494,10 @@ mod tests {
         );
         request.tools.clear();
         assert!(native.body(&request).unwrap().get("tools").is_none());
+        request
+            .messages
+            .retain(|message| message.role != MessageRole::System);
+        assert!(!five_minute_cache_declared(&native.body(&request).unwrap()));
     }
 
     #[test]

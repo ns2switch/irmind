@@ -176,3 +176,17 @@ fn incomplete_or_contradictory_usage_keeps_response_and_uncertain_accounting() {
     assert_eq!(reply.text, "paid reply");
     assert!(usage.is_none());
 }
+
+#[test]
+fn contradictory_cache_updates_keep_known_inclusive_totals_unpriced() {
+    let start = serde_json::json!({"input_tokens":100,"cache_read_input_tokens":800,"cache_creation_input_tokens":100});
+    let next = serde_json::json!({"input_tokens":200,"cache_read_input_tokens":700,"cache_creation_input_tokens":100,"output_tokens":50});
+    let final_snapshot = serde_json::json!({"input_tokens":50,"cache_read_input_tokens":850,"cache_creation_input_tokens":100,"output_tokens":50});
+    let (reply, usage) =
+        parse_profile(cache_wire(&start, &[next, final_snapshot]).as_bytes(), true).unwrap();
+    assert_eq!(reply.text, "paid reply");
+    let usage = usage.unwrap();
+    assert_eq!(usage.input_tokens, 1000);
+    assert_eq!(usage.output_tokens, 50);
+    assert!(usage.cache.is_none());
+}

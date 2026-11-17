@@ -165,8 +165,10 @@ impl ChatCompletionsClient {
         let tools = allowed
             .into_iter()
             .map(|spec| {
+                let mut parameters = spec.parameters.clone();
+                parameters.sort_all_objects();
                 json!({"type":"function","function":{
-                    "name":spec.name,"description":spec.description,"parameters":spec.parameters
+                    "name":spec.name,"description":spec.description,"parameters":parameters
                 }})
             })
             .collect::<Vec<_>>();
@@ -326,6 +328,39 @@ mod tests {
     use super::*;
     use std::io::{Read as _, Write as _};
     use std::net::TcpListener;
+
+    #[test]
+    fn trusted_tool_schema_prefix_is_canonical_even_with_insertion_ordered_json() {
+        let client =
+            ChatCompletionsClient::new("http://127.0.0.1:11434/v1/", "synthetic", None).unwrap();
+        let mut request = CompletionRequest {
+            messages: vec![CompletionMessage::text(
+                MessageRole::User,
+                "Synthetic".into(),
+            )],
+            tools: irmind_app::tool_catalog::catalog()[..2].to_vec(),
+        };
+        let name = request.tools[0].name;
+        request.tools[0].parameters = serde_json::from_str(
+            r#"{"type":"object","properties":{"z":{"type":"string"},"a":{"type":"integer"}}}"#,
+        )
+        .unwrap();
+        let first = serde_json::to_vec(&client.request_body(&request)).unwrap();
+        request.tools.reverse();
+        request
+            .tools
+            .iter_mut()
+            .find(|tool| tool.name == name)
+            .unwrap()
+            .parameters = serde_json::from_str(
+            r#"{"properties":{"a":{"type":"integer"},"z":{"type":"string"}},"type":"object"}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            first,
+            serde_json::to_vec(&client.request_body(&request)).unwrap()
+        );
+    }
 
     #[tokio::test]
     async fn model_maxima_are_not_request_budgets_and_unknown_optional_is_omitted() {
