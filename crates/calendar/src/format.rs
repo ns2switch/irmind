@@ -106,13 +106,34 @@ fn pieces(format: &str) -> Result<Vec<Piece>, Error> {
     Ok(result)
 }
 fn native(raw: &str) -> Result<Piece, Error> {
-    time::format_description::parse_strftime_owned(raw)
-        .map(Piece::Native)
-        .map_err(|e| Error(e.to_string()))
+    let mut item =
+        time::format_description::parse_strftime_owned(raw).map_err(|e| Error(e.to_string()))?;
+    retain_case_insensitive_names(&mut item);
+    Ok(Piece::Native(item))
 }
 pub fn validate_format(format: &str) -> Result<(), Error> {
     pieces(format).map(|_| ())
 }
+// Existing declared log formats accept case-insensitive English month, weekday
+// and AM/PM names. Formatting still emits the same canonical spelling.
+fn retain_case_insensitive_names(item: &mut Item) {
+    use time::format_description::Component;
+    match item {
+        Item::Component(Component::MonthShort(v)) => *v = v.with_case_sensitive(false),
+        Item::Component(Component::MonthLong(v)) => *v = v.with_case_sensitive(false),
+        Item::Component(Component::WeekdayShort(v)) => *v = v.with_case_sensitive(false),
+        Item::Component(Component::WeekdayLong(v)) => *v = v.with_case_sensitive(false),
+        Item::Component(Component::Period(v)) => *v = v.with_case_sensitive(false),
+        Item::Compound(items) | Item::First(items) => {
+            for item in items {
+                retain_case_insensitive_names(item);
+            }
+        }
+        Item::Optional(item) => retain_case_insensitive_names(item),
+        _ => {}
+    }
+}
+
 fn parse(
     raw: &str,
     fmt: &str,

@@ -114,3 +114,15 @@ fn malformed_offsets_and_nonrepresentable_durations_are_rejected() {
     }
     assert!(Duration::from_std(std::time::Duration::from_secs(u64::MAX)).is_err());
 }
+
+#[test]
+fn english_log_months_remain_case_insensitive() -> Result<(), Box<dyn std::error::Error>> {
+    for name in ["Nov", "nov", "NOV"] {
+        let raw = format!("2026 {name} 17 12:34:56");
+        assert_eq!(
+            NaiveDateTime::parse_from_str(&raw, "%Y %b %e %H:%M:%S")?.to_string(),
+            "2026-11-17 12:34:56"
+        );
+    }
+    Ok(())
+}
