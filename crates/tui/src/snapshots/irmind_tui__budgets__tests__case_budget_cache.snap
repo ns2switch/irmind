@@ -5,7 +5,7 @@ expression: form.text()
 Case allocation · changes are signed
 Consumed: tokens 1050
 Input ordinary 100 · cache read 800 · write 100 (reported · partial)
-Output 50 · inclusive input 1000
+Reported output 50 · inclusive input 1000
 Calls 0 · reserved cloud bytes 0
 > Model tokens · organization ceiling 2000000
 ┌──────────────────────────────────┐
