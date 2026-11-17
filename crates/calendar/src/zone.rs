@@ -126,6 +126,30 @@ impl std::str::FromStr for FixedOffset {
             b'-' => -1,
             _ => return Err(invalid()),
         };
+        let bytes = raw.as_bytes();
+        let valid_shape = match bytes.len() {
+            3 | 5 | 7 => bytes[1..].iter().all(u8::is_ascii_digit),
+            6 => {
+                bytes[3] == b':'
+                    && bytes[1..3]
+                        .iter()
+                        .chain(&bytes[4..])
+                        .all(u8::is_ascii_digit)
+            }
+            9 => {
+                bytes[3] == b':'
+                    && bytes[6] == b':'
+                    && bytes[1..3]
+                        .iter()
+                        .chain(&bytes[4..6])
+                        .chain(&bytes[7..])
+                        .all(u8::is_ascii_digit)
+            }
+            _ => false,
+        };
+        if !valid_shape {
+            return Err(invalid());
+        }
         let numbers = raw[1..].replace(':', "");
         if ![2, 4, 6].contains(&numbers.len()) || !numbers.bytes().all(|b| b.is_ascii_digit()) {
             return Err(invalid());

@@ -88,3 +88,29 @@ fn frozen_synthetic_reference_keeps_offsets_formats_and_nanoseconds()
     }
     Ok(())
 }
+
+#[test]
+fn malformed_offsets_and_nonrepresentable_durations_are_rejected() {
+    for offset in [
+        "+0:030",
+        "+00::3",
+        "+24:00",
+        "-00:60",
+        "+0\u{1b}[0",
+        "+000:0",
+        "+00:00:60",
+        "../UTC",
+        "EST",
+    ] {
+        assert!(offset.parse::<FixedOffset>().is_err(), "{offset:?}");
+    }
+    for text in [
+        "2026-01-01T00:00:00+0:030",
+        "2026-01-01T00:00:00+24:00",
+        "2026-02-29T00:00:00Z",
+        "2026-01-01T00:00:00.1234567890Z",
+    ] {
+        assert!(DateTime::parse_from_rfc3339(text).is_err(), "{text}");
+    }
+    assert!(Duration::from_std(std::time::Duration::from_secs(u64::MAX)).is_err());
+}

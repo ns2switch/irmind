@@ -86,6 +86,9 @@ impl Duration {
         self.0.try_into().map_err(|_| invalid())
     }
     pub fn from_std(v: std::time::Duration) -> Result<Self, Error> {
+        if v.as_millis() > i64::MAX as u128 {
+            return Err(invalid());
+        }
         time::SignedDuration::try_from(v)
             .map(Self)
             .map_err(|_| invalid())

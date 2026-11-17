@@ -3,7 +3,7 @@
 from pathlib import Path
 import hashlib
 import json
-import tomllib
+import re
 
 ROOT = Path(__file__).resolve().parents[2]
 LOCKS = ('Cargo.lock', 'fuzz/Cargo.lock', 'helpers/evtx/Cargo.lock', 'helpers/evtx/fuzz/Cargo.lock')
@@ -15,8 +15,8 @@ def digest(raw):
 
 def main():
     for relative in LOCKS:
-        lock = tomllib.loads((ROOT / relative).read_text())
-        retired = {p['name'] for p in lock['package']} & {'chrono', 'humantime'}
+        names = set(re.findall(r'^name = "([A-Za-z0-9_-]+)"$', (ROOT / relative).read_text(), re.MULTILINE))
+        retired = names & {'chrono', 'humantime'}
         if retired:
             raise SystemExit(f'{relative}: retired dependencies: {sorted(retired)}')
     reviewed = 0
