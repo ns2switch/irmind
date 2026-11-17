@@ -325,7 +325,9 @@ the public launch. Per-turn nonces and untrusted-content isolation remain unchan
 Three repeats before and after on the same runner reproduce identical logical
 input and exact-prefix coverage. The scripted observer uses the production
 engine with UTF-8 JSON bytes / 4, rounded upward; it does not simulate provider
-cache invoices. No commercial model was called.
+cache invoices. No commercial model was called. The observer captures the engine
+port before provider-specific encoding; adapter marker overhead and native
+tokenization are outside this neutral prefix model.
 
 | Workload | Requests | Input before / after | Reusable prefix ceiling |
 | --- | ---: | ---: | ---: |

@@ -1,8 +1,8 @@
 {
   "after": [
     {
-      "engine_commit": "ee6ee4cc40739eb75523b7f0615dd6efe36ff3ea",
-      "measurement_sha256": "039c8790becf1ddb70d6c498e7253d9f50f29eba4e783e01e7baf1c1881c710b",
+      "engine_commit": "8a3d3de5accb217caf1f46ca4e349d0427323490",
+      "measurement_sha256": "577030fafe10eee6e5f2d81c682c00117fcde451c7e17c49393a194109977c68",
       "scenarios": {
         "conversation_10_turns": {
           "cache_read_ceiling_sim": 33408,
@@ -25,8 +25,8 @@
       }
     },
     {
-      "engine_commit": "ee6ee4cc40739eb75523b7f0615dd6efe36ff3ea",
-      "measurement_sha256": "039c8790becf1ddb70d6c498e7253d9f50f29eba4e783e01e7baf1c1881c710b",
+      "engine_commit": "8a3d3de5accb217caf1f46ca4e349d0427323490",
+      "measurement_sha256": "577030fafe10eee6e5f2d81c682c00117fcde451c7e17c49393a194109977c68",
       "scenarios": {
         "conversation_10_turns": {
           "cache_read_ceiling_sim": 33408,
@@ -49,8 +49,8 @@
       }
     },
     {
-      "engine_commit": "ee6ee4cc40739eb75523b7f0615dd6efe36ff3ea",
-      "measurement_sha256": "039c8790becf1ddb70d6c498e7253d9f50f29eba4e783e01e7baf1c1881c710b",
+      "engine_commit": "8a3d3de5accb217caf1f46ca4e349d0427323490",
+      "measurement_sha256": "577030fafe10eee6e5f2d81c682c00117fcde451c7e17c49393a194109977c68",
       "scenarios": {
         "conversation_10_turns": {
           "cache_read_ceiling_sim": 33408,
@@ -147,7 +147,9 @@
       }
     }
   ],
+  "build_profile": "release",
   "method": "context-cache-phase1-release-scripted-v1",
+  "observation_boundary": "CompletionRequest before provider-specific wire encoding",
   "provider_calls": 0,
   "provider_cost_usd": 0,
   "repetitions": 3,
