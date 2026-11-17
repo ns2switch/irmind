@@ -1,4 +1,4 @@
-Traducción de docs/development/manual-validation.md en el commit 050c01156cc3c45f5229306b88051eb22ed68348; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/manual-validation.md en el commit 0b79bea270e99a28756d123f51a045cf283cfd4a; si hay diferencias, prevalece la versión en inglés.
 
 # Validación manual del MVP
 
