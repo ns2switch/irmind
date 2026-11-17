@@ -202,7 +202,11 @@ result, not a reason to script the answer or mark the test passed.
 ## 100–120 min: verify, seal and independent export verification
 
 Run `/verify <source-root>` and `/verify-graph <source-root>` while originals are
-available. Review `/report`, proposed findings and pending approvals/tasks.
+available. Uncopied local files are resolved only beneath that explicitly chosen
+root. Connector responses retained privately by the case are checked at their
+signed case location by size and SHA-256; no second external copy or repeat
+service query is needed. A missing or altered retained original fails instead
+of falling back to a different file. Review `/report`, proposed findings and pending approvals/tasks.
 Only confirmed evidence should support the report. Finish/cancel work before
 `/seal`; review the exact hash and key fingerprint, then `/export` with originals
 if desired. In a separate clean directory/process, run:

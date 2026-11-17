@@ -183,6 +183,13 @@ para convertirlo en una prueba superada.
 
 ## 100–120 minutos: custodia y exportación
 
+Los originales locales no copiados se resuelven solo bajo el directorio elegido
+explícitamente. Las respuestas del conector retenidas en el caso se comprueban
+en su ubicación firmada, por tamaño y SHA-256: no necesitan otra copia externa
+ni repetir la consulta. Una copia retenida ausente o alterada falla sin recurrir
+a otro fichero.
+
+
 Ejecuta `/verify <directorio-origen>` y `/verify-graph <directorio-origen>`, revisa
 `/report`, hallazgos y tareas pendientes. Termina o cancela trabajo antes de
 `/seal`, confirma hash y huella exactos y usa `/export`, con originales si quieres.
