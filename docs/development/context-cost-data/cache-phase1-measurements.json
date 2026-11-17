@@ -1,0 +1,155 @@
+{
+  "after": [
+    {
+      "engine_commit": "ee6ee4cc40739eb75523b7f0615dd6efe36ff3ea",
+      "measurement_sha256": "039c8790becf1ddb70d6c498e7253d9f50f29eba4e783e01e7baf1c1881c710b",
+      "scenarios": {
+        "conversation_10_turns": {
+          "cache_read_ceiling_sim": 33408,
+          "input_tokens_sim": 73445,
+          "model_requests": 10,
+          "output_tokens_sim": 3971
+        },
+        "skill_15_rounds": {
+          "cache_read_ceiling_sim": 107776,
+          "input_tokens_sim": 126382,
+          "model_requests": 15,
+          "output_tokens_sim": 495
+        },
+        "three_subagents": {
+          "cache_read_ceiling_sim": 29056,
+          "input_tokens_sim": 48655,
+          "model_requests": 11,
+          "output_tokens_sim": 163
+        }
+      }
+    },
+    {
+      "engine_commit": "ee6ee4cc40739eb75523b7f0615dd6efe36ff3ea",
+      "measurement_sha256": "039c8790becf1ddb70d6c498e7253d9f50f29eba4e783e01e7baf1c1881c710b",
+      "scenarios": {
+        "conversation_10_turns": {
+          "cache_read_ceiling_sim": 33408,
+          "input_tokens_sim": 73445,
+          "model_requests": 10,
+          "output_tokens_sim": 3971
+        },
+        "skill_15_rounds": {
+          "cache_read_ceiling_sim": 107776,
+          "input_tokens_sim": 126382,
+          "model_requests": 15,
+          "output_tokens_sim": 495
+        },
+        "three_subagents": {
+          "cache_read_ceiling_sim": 29056,
+          "input_tokens_sim": 48655,
+          "model_requests": 11,
+          "output_tokens_sim": 163
+        }
+      }
+    },
+    {
+      "engine_commit": "ee6ee4cc40739eb75523b7f0615dd6efe36ff3ea",
+      "measurement_sha256": "039c8790becf1ddb70d6c498e7253d9f50f29eba4e783e01e7baf1c1881c710b",
+      "scenarios": {
+        "conversation_10_turns": {
+          "cache_read_ceiling_sim": 33408,
+          "input_tokens_sim": 73445,
+          "model_requests": 10,
+          "output_tokens_sim": 3971
+        },
+        "skill_15_rounds": {
+          "cache_read_ceiling_sim": 107776,
+          "input_tokens_sim": 126382,
+          "model_requests": 15,
+          "output_tokens_sim": 495
+        },
+        "three_subagents": {
+          "cache_read_ceiling_sim": 29056,
+          "input_tokens_sim": 48655,
+          "model_requests": 11,
+          "output_tokens_sim": 163
+        }
+      }
+    }
+  ],
+  "before": [
+    {
+      "engine_commit": "2a2b298ebd8b5aa1c3698c81115ae526ba7098b3",
+      "measurement_sha256": "8e262e972d9e6c8958b2dbbe867ee40d3899945a6ffe3b20e4ed9f3e4a546528",
+      "scenarios": {
+        "conversation_10_turns": {
+          "cache_read_ceiling_sim": 33408,
+          "input_tokens_sim": 73445,
+          "model_requests": 10,
+          "output_tokens_sim": 3971
+        },
+        "skill_15_rounds": {
+          "cache_read_ceiling_sim": 107776,
+          "input_tokens_sim": 126382,
+          "model_requests": 15,
+          "output_tokens_sim": 495
+        },
+        "three_subagents": {
+          "cache_read_ceiling_sim": 29056,
+          "input_tokens_sim": 48655,
+          "model_requests": 11,
+          "output_tokens_sim": 163
+        }
+      }
+    },
+    {
+      "engine_commit": "2a2b298ebd8b5aa1c3698c81115ae526ba7098b3",
+      "measurement_sha256": "8e262e972d9e6c8958b2dbbe867ee40d3899945a6ffe3b20e4ed9f3e4a546528",
+      "scenarios": {
+        "conversation_10_turns": {
+          "cache_read_ceiling_sim": 33408,
+          "input_tokens_sim": 73445,
+          "model_requests": 10,
+          "output_tokens_sim": 3971
+        },
+        "skill_15_rounds": {
+          "cache_read_ceiling_sim": 107776,
+          "input_tokens_sim": 126382,
+          "model_requests": 15,
+          "output_tokens_sim": 495
+        },
+        "three_subagents": {
+          "cache_read_ceiling_sim": 29056,
+          "input_tokens_sim": 48655,
+          "model_requests": 11,
+          "output_tokens_sim": 163
+        }
+      }
+    },
+    {
+      "engine_commit": "2a2b298ebd8b5aa1c3698c81115ae526ba7098b3",
+      "measurement_sha256": "8e262e972d9e6c8958b2dbbe867ee40d3899945a6ffe3b20e4ed9f3e4a546528",
+      "scenarios": {
+        "conversation_10_turns": {
+          "cache_read_ceiling_sim": 33408,
+          "input_tokens_sim": 73445,
+          "model_requests": 10,
+          "output_tokens_sim": 3971
+        },
+        "skill_15_rounds": {
+          "cache_read_ceiling_sim": 107776,
+          "input_tokens_sim": 126382,
+          "model_requests": 15,
+          "output_tokens_sim": 495
+        },
+        "three_subagents": {
+          "cache_read_ceiling_sim": 29056,
+          "input_tokens_sim": 48655,
+          "model_requests": 11,
+          "output_tokens_sim": 163
+        }
+      }
+    }
+  ],
+  "method": "context-cache-phase1-release-scripted-v1",
+  "provider_calls": 0,
+  "provider_cost_usd": 0,
+  "repetitions": 3,
+  "simulation_only": true
+}
