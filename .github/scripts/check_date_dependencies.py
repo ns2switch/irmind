@@ -15,7 +15,7 @@ def digest(raw):
 
 def main():
     for relative in LOCKS:
-        names = set(re.findall(r'^name = "([A-Za-z0-9_-]+)"$', (ROOT / relative).read_text(), re.MULTILINE))
+        names = set(re.findall(r'^name = "([A-Za-z0-9_-]+)"$', (ROOT / relative).read_text(encoding="utf-8"), re.MULTILINE))
         retired = names & {'chrono', 'humantime'}
         if retired:
             raise SystemExit(f'{relative}: retired dependencies: {sorted(retired)}')
@@ -23,7 +23,7 @@ def main():
     unsafe_sources = 0
     for name in ('arrow-array', 'parquet'):
         base = ROOT / 'vendor' / name
-        manifest = json.loads((base / 'UPSTREAM.json').read_text())
+        manifest = json.loads((base / 'UPSTREAM.json').read_text(encoding="utf-8"))
         for relative, expected in manifest['reviewed_file_sha256'].items():
             path = base / relative
             if path.is_symlink() or not path.resolve().is_relative_to(base.resolve()):
@@ -32,7 +32,7 @@ def main():
                 raise SystemExit(f'{name}/{relative}: reviewed source hash differs')
             reviewed += 1
         for relative, expected in manifest['upstream_unsafe_source_sha256'].items():
-            source = (base / relative).read_text().replace('irmind_calendar::', 'chrono::')
+            source = (base / relative).read_text(encoding="utf-8").replace('irmind_calendar::', 'chrono::')
             for new, old in manifest.get('upstream_doc_whitespace_restoration', {}).get(relative, []):
                 source = source.replace(new, old)
             if digest(source.encode()) != expected:
