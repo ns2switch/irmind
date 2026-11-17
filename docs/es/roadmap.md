@@ -46,6 +46,11 @@ son capacidades entregadas, no afirmaciones de validación con incidentes reales
   prioridades integrados para v0.5.2. El borrado conserva lápidas, respeta bloqueos
   y recupera interrupciones; no garantiza eliminación física segura.
 
+- La versión 0.5.3 añade contabilidad de caché del proveedor, marcadores del
+  prefijo confiable de Anthropic, recuperación explícita de planes protegida entre
+  procesos y paquetes macOS Intel. Mantiene el nonce por turno y el cargo de todos
+  los tokens. Las demás propuestas de contexto quedan para después del lanzamiento.
+
 Skills e hijos no amplían permisos ni alcance, los hijos no aprueban, y datos
 externos o del modelo nunca pasan a system confiable. Ningún modelo ni conector
 se activa por defecto. Los diseños históricos no prometen compatibilidad del
