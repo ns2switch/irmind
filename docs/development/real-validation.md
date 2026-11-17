@@ -229,6 +229,25 @@ Clean up with the same Compose file and environment file, using the `down -v` su
 Delete the disposable key copy, lab password, test case and downloaded data when
 no longer needed. Keep any creating executable needed to inspect retained cases.
 
+## Local rehearsal scope
+
+The local rehearsal used the pinned Elasticsearch lab, its read-only API key,
+full CA verification and Ollama with Qwen2.5-1.5B. It exercised real TUI forms,
+local EVTX ingestion, one acquired Elastic event, skill loading, original-source
+verification, reproducible Parquet reconstruction, sealing and independent
+export verification. Both original sources were verified in the complete export;
+a different expected analyst key was rejected, without opening a data directory
+or keystore. The focused export correction is recorded at
+[97ac0b5b](https://github.com/ns2switch/irmind/commit/97ac0b5b).
+
+The small model's investigation answers were not reliable, and a later request
+for a plan completed without a visible answer. A separate earlier trial produced
+a signed two-child plan with one completed child and one request error. These are
+partial model outcomes, not a passed investigation or an analyst validation.
+No unsupported finding was confirmed. Keep the result table below for your own
+chosen model, environment and observations; this rehearsal does not fill the unobserved H5 procedure entries or
+the analyst’s connector-validation record.
+
 ## Result record (fill in; no pre-filled passes)
 
 | Check | Result / exact observation | Evidence or private record reference |

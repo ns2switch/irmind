@@ -213,6 +213,26 @@ Para limpiar, ejecuta docker compose con el mismo fichero y env-file, seguido de
 `down -v`. Borra contraseña, copia de API key, muestras y casos desechables cuando
 no sean necesarios; conserva el ejecutable creador de los casos que retengas.
 
+## Alcance del ensayo local
+
+El ensayo utilizó Elasticsearch con los datos fijados del laboratorio, su API key
+de solo lectura, verificación completa de la CA y Ollama con Qwen2.5-1.5B.
+Recorrió formularios reales de la TUI, ingesta local de EVTX, adquisición de un
+evento de Elastic, carga de una skill, verificación de originales, reconstrucción
+reproducible de Parquet, sello y verificación independiente del export. El paquete
+completo verificó los dos originales y rechazó otra clave esperada, sin abrir
+el directorio de datos ni el llavero. La corrección de export se registra en
+[97ac0b5b](https://github.com/ns2switch/irmind/commit/97ac0b5b).
+
+Las respuestas de investigación del modelo pequeño no fueron fiables; una petición
+posterior de plan terminó sin respuesta visible. Otro ensayo anterior produjo un
+plan firmado de dos hijos, con uno terminado y otro con error de petición.
+Son resultados parciales del modelo, no una investigación aprobada ni una
+validación del analista. No se confirmó ningún hallazgo sin respaldo. La tabla
+siguiente sigue reservada para tu modelo, entorno y observaciones: este ensayo
+no completa los pasos de H5 pendientes de registrar ni la validación del
+conector por el analista.
+
 ## Registro de resultados
 
 | Comprobación | Resultado y observación exacta | Referencia privada o evidencia |
