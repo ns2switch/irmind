@@ -6,7 +6,7 @@ This page is for analysts who want a repeatable investigation method without gra
 
 The source of the bundled methods is [ns2switch/irmind-skills](https://github.com/ns2switch/irmind-skills). Its `core/` directory contains the 15 included packages, reference resources and separate synthetic evaluation episodes. Propose improvements there; they reach IRMind through a reviewed synchronization PR and an IRMind release. No Rust is needed: contribute methodology, required sources, false-positive guidance and synthetic evaluation episodes.
 
-Community packages live in `catalog/`. They are installed explicitly with `/skills install catalog:<name>` when a trusted production catalog is available; they cannot replace a bundled name. The current catalog has no production release or signing key. Both contribution paths use the same bounded skill compiler and local scripted tests.
+Community packages live in `catalog/`. They are installed explicitly with `/skills install catalog:<name>` from a signed production catalog; they cannot replace a bundled name. IRMind v0.5.4 compiles the catalog production key; catalog packages are published separately. Both contribution paths use the same bounded skill compiler and local scripted tests.
 
 This repository keeps a [pinned offline copy](../skills/upstream.json). Builds never fetch skill content. See the [mirror maintenance instructions](../skills/README.md) for updating the upstream commit and checking every package and resource hash.
 
@@ -78,9 +78,12 @@ the exact proofs needed for offline verification against compiled publisher keys
 Previously installed packages from a retired interpreter stay disabled until
 explicit review and reinstallation. Keep the creating executable for older cases.
 
-No production catalog key is compiled yet. Catalog downloads and publication
-remain unavailable; local package installation continues to work without a network.
-The catalog controls report this explicitly before making a request.
+IRMind v0.5.4 accepts the production key documented in
+[the key setup guide](development/catalog-key-setup.md#active-production-key).
+Catalog packages are published separately in
+[irmind-skills releases](https://github.com/ns2switch/irmind-skills/releases).
+A merged contribution becomes installable only after its signed catalog release.
+Local folder installation remains available without network access.
 
 With compiled publisher keys, `/skills install catalog:<name>` opens the catalog
 form; append `@v1.2.3` to preselect a frozen tag or leave it empty for an explicit
