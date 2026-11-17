@@ -6,7 +6,7 @@ entry or global advisory-policy change. Date calculations use the existing
 validated IRMind UTC types where sufficient and a maintained date implementation
 where general calendar/format support is required.
 
-## First implemented slice
+## Runtime replacements
 
 - TUI UTC labels, the new-case time validator, AWS, Splunk, CrowdStrike and
   SentinelOne reuse the domain's checked UTC timestamps. Five direct `chrono`
@@ -22,11 +22,11 @@ where general calendar/format support is required.
 - The helper's fuzz lockfile no longer contains either retired dependency.
   The helper development graph now uses the same reviewed Arrow/Parquet sources.
 
-Validation so far: 159 TUI/connector tests, two additional exact-boundary tests,
-14 native Linux EVTX protocol/containment/custody tests and the retained GUID
-short-read contract pass. The selected TUI/connector Clippy check passes with
-warnings denied. Current signed-format and UI golden files are unchanged.
-This is not a completed dependency replacement or a green release matrix.
+Validation includes the TUI/connector and exact-boundary contracts, native EVTX
+protocol/containment/custody tests and the retained GUID short-read contract.
+The complete Linux, macOS arm64/Intel, Windows and preserve_order matrix passed
+for the dependency replacement. All four workspaces pass the unchanged advisory
+policy; current signed-format and physical golden bytes are unchanged.
 
 ## Why an upstream version bump is insufficient
 

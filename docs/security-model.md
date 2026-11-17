@@ -12,14 +12,14 @@ The analyst controls the case, its scope, approvals, and signing key. Files, log
 
 ## What the build enforces
 
-- **Custody:** Case changes and tool activity enter an append-only SQLite audit chain with Ed25519 signatures. Small legacy evidence has a local content-addressed copy. Large-file ingestion signs each original's source, size, modification time, and SHA-256; copying that original is an explicit choice. Verification checks signed entries and any bytes selected for full or sampled verification.
+- **Custody:** Case changes and tool activity enter an append-only SQLite audit chain with Ed25519 signatures. Evidence uses signed source manifests and mapped Parquet artifacts. File ingestion signs each original's source, size, modification time, and SHA-256; copying that original is an explicit choice. Verification checks signed entries and any bytes selected for full or sampled verification.
 - **Diagnostics:** A private, size-bounded `diagnostics.log` records operation names, result categories, and durations. It is separate from custody, contains no evidence or tool arguments, and is not part of exports or verification.
 - **Separate identities:** Analyst and Agent have distinct signing keys in the selected backend. Only an analyst signature can resolve a pending approval. A sealed case has a separate signed operational chain for task cancellations; backend migrations enter a global signed operational chain.
 - **Guarded model input:** External text is normalized, screened for prompt injection, redacted for known secret and PII patterns, bounded, and wrapped as untrusted data. The original remains local. A startup self-test blocks the application if the guard's known corpus fails.
 - **Constrained connectors:** Credentials come from the explicitly selected secret backend through the composition root. Remote clients require HTTPS, except keyless HTTP to an explicit loopback model service. Redirects are disabled and responses are bounded.
 - **Safe presentation:** The TUI removes terminal control characters from model output, evidence summaries, and filenames. Approval views show the exact proposed arguments after terminal escaping.
 
-A case export contains its signed log, seal, and public key. Streaming v4 exports can omit large originals; the verifier reports their bytes as unavailable in that package. Use `verify-export --expected-key` with a fingerprint obtained through another trusted channel.
+A case export contains its signed log, seal, and public key. Current V8 exports include referenced artifacts, skill admissions and subagent records. They can omit original source bytes; the verifier reports their bytes as unavailable in that package. Use `verify-export --expected-key` with a fingerprint obtained through another trusted channel.
 
 ## Threats considered
 
@@ -38,12 +38,12 @@ A case export contains its signed log, seal, and public key. Streaming v4 export
 - VirusTotal enrichment exposes the queried IOC to an outside service. It always needs approval. A read-only connector still depends on the permissions actually granted by its service.
 - The graph is a derived index, not original evidence. Verify or rebuild it from signed inputs when its correctness matters.
 - A manifest-only large-case export does not make the original bytes portable. A full source check needs the originals at the paths selected by the analyst; a sampled check says nothing about unchecked sources. If a source is gone or changed, the signed record still proves what was observed at ingestion but cannot restore those bytes.
-- CI binaries have checksums but are not code-signed, notarized, or Authenticode signed. See [platforms](platforms.md).
+- Release binaries have Sigstore bundles, provenance attestations and an SBOM. Native Developer ID/notarization and Authenticode are not enabled. See [platforms](platforms.md).
 - The OS keyring and encrypted-file backends are explicit choices, never silent fallbacks. The file backend works over SSH, but its security depends on a strong passphrase and a trustworthy host. Losing the signing key can prevent continued case work.
 
 ## Operating guidance
 
-Start with the [synthetic example](getting-started.md). Keep remote scope narrow, use dedicated read-only service credentials, and approve only calls whose exact arguments you understand. For a suspected vulnerability, use the private process in [SECURITY.md](../SECURITY.md) rather than a public issue.
+Start with the [synthetic example](getting-started.md). Keep remote scope narrow, use dedicated read-only service credentials, and approve only calls whose exact arguments you understand. For a suspected vulnerability, follow [SECURITY.md](../SECURITY.md), use a minimal synthetic reproducer and keep credentials and real evidence out of reports.
 
 The EVTX decoder runs as a separate, OS-contained process with a read-only evidence handle, bounded output and a completion handshake. A startup probe must verify isolation before the parser is available. There is no unconfined fallback. Decoder output remains tainted; the normal guard and policy still govern display, model context and tool calls. See the [EVTX containment design](development/evtx-helper-design.md).
 
