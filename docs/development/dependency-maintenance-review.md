@@ -1,63 +1,91 @@
-# Runtime date dependency maintenance notices
+# Removing unmaintained date dependencies
 
-The locked runtime graph contains two dependencies currently classified as
-unmaintained by the RustSec advisory database. The existing dependency policy
-rejects both notices. This document changes no policy and applies no exception.
+The replacement route removes `chrono` and `humantime` from all four locked
+build/test/fuzz graphs. Advisory enforcement stays unchanged; there is no ignore
+entry or global advisory-policy change. Date calculations use the existing
+validated IRMind UTC types where sufficient and a maintained date implementation
+where general calendar/format support is required.
 
-| Dependency | Advisory | Runtime paths |
+## First implemented slice
+
+- TUI UTC labels, the new-case time validator, AWS, Splunk, CrowdStrike and
+  SentinelOne reuse the domain's checked UTC timestamps. Five direct `chrono`
+  dependency edges are removed, without adding a replacement crate. EDR response
+  filtering compares exact instants, including nanoseconds and explicit offsets;
+  unknown offsets and leap-second values are rejected.
+- The official `evtx 0.15.1` source imports only `winstructs::guid::Guid`.
+  A GUID-only source patch retains the original GUID/error code and license
+  byte for byte, while omitting unused timestamp, NTFS and security modules.
+  The verified archive checksum and file hashes are in the
+  [source manifest](../../helpers/evtx/vendor/winstructs/UPSTREAM.json).
+  EVTX decoding, timestamps, protocol and containment are unchanged.
+- The helper's fuzz lockfile no longer contains either retired dependency.
+  The helper's development graph still reaches `chrono` through Parquet/Arrow;
+  removing that path remains part of the work below.
+
+Validation so far: 159 TUI/connector tests, two additional exact-boundary tests,
+14 native Linux EVTX protocol/containment/custody tests and the retained GUID
+short-read contract pass. The selected TUI/connector Clippy check passes with
+warnings denied. Current signed-format and UI golden files are unchanged.
+This is not a completed dependency replacement or a green release matrix.
+
+## Why an upstream version bump is insufficient
+
+| Dependency | Current notice | Existing runtime paths |
 | --- | --- | --- |
-| `chrono 0.4.45` | [RUSTSEC-2026-0543](https://github.com/RustSec/advisory-db/blob/main/crates/chrono/RUSTSEC-2026-0543.md) | Direct timestamp parsing/formatting in IRMind, Arrow 59 and Parquet 59, and object storage. |
-| `humantime 2.4.0` | [RUSTSEC-2026-0542](https://github.com/RustSec/advisory-db/blob/main/crates/humantime/RUSTSEC-2026-0542.md) | `object_store 0.13.2`, through the bounded vendored storage implementation. |
+| `chrono 0.4.45` | [RUSTSEC-2026-0543](https://github.com/RustSec/advisory-db/blob/main/crates/chrono/RUSTSEC-2026-0543.md) | IRMind parsers, Arrow/Parquet, storage, and the original helper's unused winstructs timestamp module. |
+| `humantime 2.4.0` | [RUSTSEC-2026-0542](https://github.com/RustSec/advisory-db/blob/main/crates/humantime/RUSTSEC-2026-0542.md) | The vendored `object_store` runtime. |
 
-Both database entries have `informational = "unmaintained"` and no patched
-version. They concern maintenance status; their text does not describe a concrete
-exploit in IRMind. See also the [upstream maintenance announcement](https://github.com/chronotope/chrono/issues/1768).
-This classification does not establish that all future findings are harmless.
+Both database entries are `informational = "unmaintained"` with no patched
+version listed. Published Arrow/Parquet 60.1.0 still require `chrono` normally;
+`object_store 0.14.2` still requires both packages. Updating those versions alone
+cannot satisfy the removal target. The existing physical-format versions can
+therefore stay pinned while their date dependencies are replaced explicitly.
 
-## Option A: narrowly scoped maintenance exceptions
+## Concrete remaining source/dependency proposal
 
-Keep the locked versions and consider the following explicit exceptions in the
-root policy, with no global change to advisory handling:
+1. Use **`time = 0.3.55`** directly for the remaining general date consumers.
+   It is already present in the main lockfile through AWS and supports strftime
+   parsing/formatting. Proposed features are `std`, `parsing`, `formatting`,
+   `serde` and `large-dates`, with no host-local-offset feature or timezone DB.
+   IRMind's existing supported instant range and validation remain authoritative.
+2. Replace the unused Arrow umbrella dependency with the already locked direct
+   `arrow-array`, `arrow-schema`, `arrow-select` and `arrow-ord` **59.3.2** crates.
+   Keep the same record batches, arrays, filtering, ordering and take kernels.
+   This drops unrelated arithmetic/string kernels without removing a product tool.
+3. Vendor the published **`arrow-array 59.3.2`**, **`arrow-cast 59.3.2`** and
+   **`parquet 59.3.0`** sources and replace only their date implementation with
+   `time`. Their current Rust source totals **218 files / 6,796,051 bytes**,
+   before manifests/licenses. Package checksums are fixed in
+   [date-dependency-sources.json](date-dependency-sources.json).
+   Retain Apache notices, record every changed file, keep new code safe, and
+   preserve existing upstream unsafe blocks unchanged. This is a maintained local
+   source patch, not an upstream chrono-free Arrow release.
+4. Extend the existing **`object_store 0.13.2`** source patch to use `time` and
+   remove `humantime`. Preserve its pre-parse 8 MiB HTTP response bound, streaming
+   object-body path, explicit credentials, full TLS and canonical request signing.
+5. Apply the same source selections to the main, main-fuzz, helper and helper-fuzz
+   workspaces. The GUID-only **`winstructs 0.3.2`** patch above remains separate
+   from the official EVTX decoder; no EVTX fork or isolation change is proposed.
 
-```toml
-[advisories]
-ignore = [
-    { id = "RUSTSEC-2026-0543", reason = "Maintenance notice: chrono remains required by the pinned Arrow/Parquet runtime; replace it when a supported upstream graph permits removal." },
-    { id = "RUSTSEC-2026-0542", reason = "Maintenance notice: humantime remains required by the bounded object_store runtime; remove this exception with that dependency." },
-]
-```
+The new direct dependency declarations and local third-party source patches are
+an additional supply-chain choice. They are proposed here; the `time` and Arrow
+changes are not implemented in this slice. None grants permissions or introduces
+credentials, and no IRMind domain/application port change is proposed.
 
-This is an explicit reduction of the maintenance gate for these two IDs, not a
-runtime fix. All other advisories, registry restrictions, licenses and dependency
-checks retain their current enforcement. There is no exception for a subsequent
-vulnerability, even in either crate. Timestamp validation, bounds, canonical
-bytes, custody and isolation remain unchanged. The exceptions must be removed
-when their dependencies leave the runtime graph; they are not a permanent
-blanket acceptance of unmaintained dependencies.
+## Completion gates
 
-Before integration, validate the exact policy with `cargo deny check` and repeat
-the existing native CI and current-format vectors. The implementation does not
-select this option merely to obtain a passing check.
-
-## Option B: remove the affected dependencies first
-
-Replacing first-party uses of `chrono` alone does not resolve the gate: Arrow,
-Parquet and object storage also depend on it. Removing `humantime` requires an
-upstream storage change or a reviewed modification to the vendored runtime.
-Neither advisory offers a version-only upgrade that resolves its classification.
-
-The locked main graph already contains `time 0.3.55` through AWS dependencies,
-but making it a direct replacement is a separate dependency and timestamp
-semantics decision. A migration must retain validated UTC handling, precision,
-stable ordering and current canonical vectors. It must include the transitive
-Arrow/Parquet and storage paths, rather than silently excluding their advisories.
-An upstream upgrade or maintained replacement also needs license, dependency,
-containment and release validation. Until that work is complete, the current
-policy continues blocking publication.
-
-## Current validation boundary
-
-The v0.5.3 candidate's full Linux workspace test step passed, including its updated
-versioned UI snapshots. Its dependency-advisory check subsequently failed on the
-two IDs above. That result does not constitute a passing native release matrix;
-no release tag is justified by this document alone.
+- All four locked graphs and all four lockfiles contain neither retired package;
+  `cargo deny` passes with the existing policy and no advisory suppression.
+- Differential date fixtures cover offsets, leap years, fractions through
+  nanoseconds, pre-epoch times, date boundaries, invalid/unknown zones and declared
+  formats. Preserve existing supported inputs and reject unsupported instants
+  explicitly; never clip precision or silently substitute UTC.
+- Existing canonical frames, Parquet physical hashes, signed commitments, source
+  provenance, hash verification, rollback, scope and export vectors stay unchanged.
+  A byte mismatch is investigated, not accepted by regenerating a signed golden.
+- Repeat native Linux/macOS/Windows tests, preserve_order tests, EVTX byte/worker
+  equivalence and containment. Verify the retained third-party source hashes.
+- Reintegrate cache accounting only after dependency removal, repeat its three
+  release-mode scripted measurements, then run the normal signed distribution and
+  clean-install checks before publishing v0.5.3.

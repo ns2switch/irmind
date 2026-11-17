@@ -2690,7 +2690,6 @@ dependencies = [
  "aws-sdk-sts",
  "aws-smithy-http-client",
  "aws-smithy-types",
- "chrono",
  "http 1.5.0",
  "irmind-app",
  "irmind-domain",
@@ -2704,7 +2703,6 @@ dependencies = [
 name = "irmind-mod-edr-crowdstrike"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "irmind-app",
  "irmind-domain",
  "irmind-http",
@@ -2719,7 +2717,6 @@ dependencies = [
 name = "irmind-mod-edr-sentinelone"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "irmind-app",
  "irmind-domain",
  "irmind-http",
@@ -3255,7 +3252,6 @@ dependencies = [
 name = "irmind-mod-siem-splunk"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "irmind-app",
  "irmind-domain",
  "irmind-http",
@@ -3362,7 +3358,6 @@ name = "irmind-tui"
 version = "0.5.2"
 dependencies = [
  "anyhow",
- "chrono",
  "crossterm",
  "insta",
  "irmind-app",

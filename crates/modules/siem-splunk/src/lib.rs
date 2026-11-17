@@ -1,11 +1,10 @@
 #![forbid(unsafe_code)]
 
-use chrono::DateTime;
 use irmind_app::{
     AppError, CancellationToken, SiemPort, async_trait,
     modules::{ConfigField, Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
 };
-use irmind_domain::{AuthorizedCall, SiemQuery, Tool};
+use irmind_domain::{AuthorizedCall, SiemQuery, Tool, UtcTimestamp};
 mod query;
 use query::SearchFields;
 use secrecy::{ExposeSecret, SecretString};
@@ -214,17 +213,17 @@ impl SiemPort for Splunk {
                 .ok_or_else(|| AppError::Policy(format!("missing {name}")))
         };
         let account = arg("account")?;
-        let from = DateTime::parse_from_rfc3339(arg("from")?).map_err(|_| {
+        let from = UtcTimestamp::parse(arg("from")?).map_err(|_| {
             AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
                 irmind_app::AdapterPolicyError::InvalidSplunkStartTime,
             ))
         })?;
-        let to = DateTime::parse_from_rfc3339(arg("to")?).map_err(|_| {
+        let to = UtcTimestamp::parse(arg("to")?).map_err(|_| {
             AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
                 irmind_app::AdapterPolicyError::InvalidSplunkEndTime,
             ))
         })?;
-        if !(1..=86_400).contains(&to.signed_duration_since(from).num_seconds()) {
+        if !(1..=86_400).contains(&(to.unix_seconds() - from.unix_seconds())) {
             return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
                 irmind_app::AdapterPolicyError::SplunkQueryWindowMustBeAtMost24Hours,
             )));
@@ -245,8 +244,8 @@ impl SiemPort for Splunk {
                 ));
             }
         };
-        let earliest = from.timestamp().to_string();
-        let latest = to.timestamp().to_string();
+        let earliest = from.unix_seconds().to_string();
+        let latest = to.unix_seconds().to_string();
         let response = tokio::select! {
             biased;
             () = cancel.cancelled() => return Err(AppError::Cancelled),

@@ -1,0 +1,14 @@
+[package]
+name = "winstructs"
+version = "0.3.2"
+edition = "2018"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/omerbenamram/winstructs"
+description = "Reviewed GUID-only subset of winstructs for the isolated EVTX helper"
+publish = false
+authors = ["Omer Ben-Amram <omerbenamram@gmail.com>", "Matthew Seyer <matthew.seyer@gmail.com>"]
+
+[dependencies]
+byteorder = "1.3"
+serde = "1"
+thiserror = "1.0"

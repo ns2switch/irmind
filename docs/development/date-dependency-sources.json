@@ -1,0 +1,32 @@
+{
+  "current_sources": [
+    {
+      "name": "arrow-array",
+      "version": "59.3.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "72b5b1682924f11ecf6929689c16cbc69efbb6dd141b06ad98ee1cb10d858c43"
+    },
+    {
+      "name": "arrow-cast",
+      "version": "59.3.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "3f23c3379feede42135ef27ca60e67f6e643cd4343ae74e4c8b16c83f55afd85"
+    },
+    {
+      "name": "parquet",
+      "version": "59.3.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "ff322f54b1a0f9288e614ed1f2d329b380af5476420db19f46ffb865e1163d73"
+    },
+    {
+      "name": "time",
+      "version": "0.3.55",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "cdb87b95ec50ddfa440816d227a17b2ccbdda963a316a727fda0fc4334f7d134"
+    }
+  ],
+  "existing_object_store_archive_sha256": "622acbc9100d3c10e2ee15804b0caa40e55c933d5aa53814cd520805b7958a49",
+  "winstructs_guid_source": "../../helpers/evtx/vendor/winstructs/UPSTREAM.json",
+  "proposed_arrow_source_rs_bytes": 6796051,
+  "proposed_arrow_source_rs_files": 218
+}

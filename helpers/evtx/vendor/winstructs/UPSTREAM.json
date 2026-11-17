@@ -1,0 +1,11 @@
+{
+  "crate": "winstructs",
+  "version": "0.3.2",
+  "commit": "2344ba841125c93c1dae9053c2c50459f84015d5",
+  "registry_package_sha256": "6dc7406cd936173d9cc3a4fd5dc5b295bc59612439d72038e3d7ac4e5dd42de9",
+  "retained_files": {
+    "src/guid.rs": "fadb2e5b88078ba3e202b049af97d59cbec1666f8fb0725082b1a52298c681f0",
+    "src/err.rs": "c484a91e23e31b4dde86df3a94acc1784d0e597064cb335f1e74cfba797722d3",
+    "LICENSE": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+  }
+}

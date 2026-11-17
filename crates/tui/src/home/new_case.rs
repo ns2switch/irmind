@@ -119,7 +119,9 @@ pub(super) fn check(state: &HomeState, engine: &Engine<'_>) -> FormCheck {
 }
 
 fn valid_utc(value: &str) -> bool {
-    value.len() == 20 && value.ends_with('Z') && chrono::DateTime::parse_from_rfc3339(value).is_ok()
+    value.len() == 20
+        && value.ends_with('Z')
+        && irmind_app::IndexedTime::from_rfc3339(value, false).is_ok()
 }
 
 #[cfg(test)]

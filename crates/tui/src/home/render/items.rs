@@ -349,13 +349,7 @@ fn case_items(state: &HomeState, engine: &Engine<'_>) -> Result<Vec<ListItem<'st
         .enumerate()
         .map(|(index, row)| -> Result<ListItem<'_>> {
             let marker = if index == state.selected { ">" } else { " " };
-            let at = i64::try_from(row.last_activity)
-                .ok()
-                .and_then(|at| chrono::DateTime::<chrono::Utc>::from_timestamp(at, 0))
-                .map_or_else(
-                    || "unknown".into(),
-                    |at| at.format("%d %b %Y %H:%M UTC").to_string(),
-                );
+            let at = crate::utc_display::recent(row.last_activity);
             Ok(ListItem::new(safe(&format!(
                 "{marker} {}  ·  {}  ·  {}  ·  {}",
                 row.title,

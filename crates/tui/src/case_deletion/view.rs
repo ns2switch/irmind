@@ -41,13 +41,7 @@ where
     let title = safe(&inventory.title)?;
     let confirmation = safe(&form.confirmation)?;
     let reason = safe(&form.reason)?;
-    let created = i64::try_from(inventory.created_at)
-        .ok()
-        .and_then(|value| chrono::DateTime::from_timestamp(value, 0))
-        .map_or_else(
-            || format!("UTC epoch {}", inventory.created_at),
-            |value| value.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
-        );
+    let created = crate::utc_display::created(inventory.created_at);
     let notice = safe(if confirm_exit {
         "Exit IRMind? Enter confirms; Esc cancels."
     } else {

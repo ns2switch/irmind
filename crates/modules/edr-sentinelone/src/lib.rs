@@ -1,11 +1,10 @@
 #![forbid(unsafe_code)]
 
-use chrono::DateTime;
 use irmind_app::{
     AppError, CancellationToken, EdrPort, async_trait,
     modules::{ConfigField, Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
 };
-use irmind_domain::{AuthorizedCall, Tool};
+use irmind_domain::{AuthorizedCall, IndexedTime, Tool, UtcTimestamp};
 use reqwest::Url;
 use secrecy::{ExposeSecret, SecretString};
 use serde_json::Value;
