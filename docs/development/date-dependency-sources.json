@@ -28,5 +28,19 @@
   "existing_object_store_archive_sha256": "622acbc9100d3c10e2ee15804b0caa40e55c933d5aa53814cd520805b7958a49",
   "winstructs_guid_source": "../../helpers/evtx/vendor/winstructs/UPSTREAM.json",
   "proposed_arrow_source_rs_bytes": 6796051,
-  "proposed_arrow_source_rs_files": 218
+  "proposed_arrow_source_rs_files": 218,
+  "existing_helper_duration_sources": [
+    {
+      "name": "jiff",
+      "version": "0.2.39",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "3ac703058abac89e5c39b0b879dce2b6b14a4ba36600c7e7e3d0c60a6883ef3c"
+    },
+    {
+      "name": "jiff-core",
+      "version": "0.1.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "aee43309eb53bafb8c36d35d6e444769c8f8e6206a9fbf7546f5db9d7d4a0e93"
+    }
+  ]
 }

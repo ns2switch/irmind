@@ -60,8 +60,11 @@ físicas actuales mientras se sustituye explícitamente su implementación tempo
    Conservar avisos Apache, registrar los ficheros modificados, usar código nuevo
    seguro y mantener intactos los bloques unsafe upstream existentes. Es un
    parche local mantenido, no una release oficial de Arrow sin chrono.
-4. Ampliar el parche actual de **object_store 0.13.2** para usar `time` y retirar
-   `humantime`. Conservar el límite HTTP de 8 MiB antes de parsear, streaming,
+4. Ampliar el parche de **object_store 0.13.2** con `time` para fechas y
+   **`jiff = 0.2.39`** (solo `std`) para duraciones, retirando `humantime`. Jiff
+   y **jiff-core 0.1.2** ya se distribuyen en el grafo del auxiliar. Conservar
+   unidades admitidas y rechazo de overflow, sin inferir calendario ni zona local.
+   Mantener el límite HTTP de 8 MiB antes de parsear, streaming,
    credenciales explícitas, TLS completo y firma canónica de peticiones.
 5. Aplicar las mismas fuentes a los cuatro workspaces. El parche GUID de
    **winstructs 0.3.2** queda separado del decodificador oficial EVTX. No se

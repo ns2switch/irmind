@@ -61,8 +61,12 @@ therefore stay pinned while their date dependencies are replaced explicitly.
    Retain Apache notices, record every changed file, keep new code safe, and
    preserve existing upstream unsafe blocks unchanged. This is a maintained local
    source patch, not an upstream chrono-free Arrow release.
-4. Extend the existing **`object_store 0.13.2`** source patch to use `time` and
-   remove `humantime`. Preserve its pre-parse 8 MiB HTTP response bound, streaming
+4. Extend the existing **`object_store 0.13.2`** source patch to use `time` for
+   dates and **`jiff = 0.2.39`** (`std` only) for duration parsing/formatting,
+   removing `humantime`. Jiff and its **`jiff-core 0.1.2`** dependency already
+   ship in the helper graph. Preserve supported configuration-duration units and
+   overflow rejection without calendar or host-timezone inference. Preserve the
+   pre-parse 8 MiB HTTP response bound, streaming
    object-body path, explicit credentials, full TLS and canonical request signing.
 5. Apply the same source selections to the main, main-fuzz, helper and helper-fuzz
    workspaces. The GUID-only **`winstructs 0.3.2`** patch above remains separate
