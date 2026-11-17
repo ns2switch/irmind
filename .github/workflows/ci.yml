@@ -98,6 +98,8 @@ jobs:
         run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_check_docs.py
       - name: Test native release coverage
         run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_release_platforms.py
+      - name: Test release-note policy links and retry behavior
+        run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_release_notes.py
       - name: Test allocation profile attribution
         run: PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_profile_pipeline_allocations.py
       - name: Test current absolute benchmark criteria
@@ -571,6 +573,14 @@ jobs:
               cp "artifacts/macos-$architecture/IRMind-macos-$architecture.dmg" release/
             fi
           done
+      # SIGNPATH INTEGRATION POINT (inactive): a future tag-only signing job in
+      # the protected release environment will require manual SignPath approval
+      # and replace BOTH Windows executables here, before SBOMs, checksums,
+      # provenance and Sigstore. No signing action or credential access is active.
+      # Future secret: SIGNPATH_API_TOKEN. Non-secret settings:
+      # SIGNPATH_ORGANIZATION_ID, SIGNPATH_PROJECT_SLUG,
+      # SIGNPATH_SIGNING_POLICY_SLUG, SIGNPATH_ARTIFACT_CONFIGURATION_SLUG.
+      # Foundation acceptance and a reviewed activation change are required.
       - uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           path: .
@@ -666,6 +676,14 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" release/* --verify-tag --prerelease --generate-notes --title "IRMind $GITHUB_REF_NAME"
           fi
+      - name: Add the public code signing policy to release notes
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" --json body --jq .body > "$RUNNER_TEMP/irmind-release-notes.md"
+          python3 .github/scripts/release_notes.py "$RUNNER_TEMP/irmind-release-notes.md"
+          gh release edit "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/irmind-release-notes.md"
       - name: Clean release staging
         if: always()
         run: python3 -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('release', 'artifacts')) if p.is_dir()]"

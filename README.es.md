@@ -1,4 +1,4 @@
-Traducción de README.md en el commit 0b79bea270e99a28756d123f51a045cf283cfd4a; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit 4346ab637e1d0e0cfb3a6a36382bfad1a46ac31e; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — investigaciones en terminal con registro firmado
 
@@ -48,6 +48,10 @@ Analista → TUI → caso + política → conector autorizado → evidencia loca
 Consulta el [modelo de seguridad](docs/es/security-model.md) para conocer las garantías y límites.
 
 ## Instalación
+
+Consulta [Code signing policy — Política de firma de código](CODE_SIGNING.md)
+([versión en español](CODE_SIGNING.es.md)): atribución, roles del equipo,
+privacidad y estado de la firma nativa por plataforma.
 
 Empieza por [la instalación verificada](docs/es/platforms.md#verificar-una-versión-antes-de-instalar): descarga y verifica el instalador antes de ejecutarlo, sin pasar scripts de red directamente a una shell. Compilar desde código es opcional para [contribuir](CONTRIBUTING.es.md).
 

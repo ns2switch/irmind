@@ -49,6 +49,9 @@ See the [security model](docs/security-model.md) for the guarantees and their li
 
 ## Install
 
+See the [Code signing policy](CODE_SIGNING.md) for attribution, team roles,
+privacy and the status of native platform signing.
+
 Start with the [verified release instructions](docs/platforms.md#verify-a-release-before-installing). Download and verify the saved installer before running it; do not pipe a network script to a shell. Source builds are optional for [contributors](CONTRIBUTING.md).
 
 

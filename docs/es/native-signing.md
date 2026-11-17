@@ -1,4 +1,4 @@
-Traducción de docs/development/native-signing.md en el commit 050c01156cc3c45f5229306b88051eb22ed68348; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/native-signing.md en el commit 4346ab637e1d0e0cfb3a6a36382bfad1a46ac31e; si hay diferencias, prevalece la versión en inglés.
 
 # Preparar la firma nativa
 
@@ -63,12 +63,10 @@ Sigue pendiente probar una descarga normal con cuarentena en un Mac del usuario.
 
 ## SignPath y Windows
 
-[#66](https://github.com/ns2switch/irmind/issues/66) no contiene constancia de
-solicitud o aceptación. El mantenedor revisa las condiciones y solicita el programa
-en [SignPath](https://signpath.org/apply). Debe aportar repositorio, licencia,
-release existente, política de firma, procedencia de CI y los dos ejecutables.
-SignPath decide si el proyecto cumple sus condiciones; no se promete aceptación.
-No se añaden credenciales ni integración hasta recibir los IDs y aprobar el diseño.
+El mantenedor ha presentado la solicitud a SignPath Foundation. La aprobación y
+la configuración de la integración siguen pendientes; Authenticode no está
+activo. La [política de firma](../../CODE_SIGNING.es.md) identifica al equipo y
+exige aprobación manual de cada solicitud. La Foundation decide la admisión.
 Una firma tampoco garantiza reputación inmediata en SmartScreen. Mientras tanto,
 [verifica las descargas](platforms.md#windows) sin desactivar las protecciones del SO.
 
@@ -93,13 +91,11 @@ admite ticket adjunto: evalúalo con red. Registra versión de macOS, tag y
 resultados. Las releases actuales sin firma nativa no tienen por qué superar
 estas comprobaciones.
 
-## Preparar la solicitud de SignPath
+## Información para la integración SignPath
 
-El repositorio no registra el resultado de ninguna solicitud. Solo el mantenedor
-puede confirmar el estado de una solicitud privada. Prepara las URL del proyecto
-y sus releases, licencia, política de firma, procedencia de builds, artefactos
-a firmar y responsables de revisión y aprobación. Comprueba los campos vigentes
-del formulario externo al enviarlo.
+Conserva las URL del proyecto y sus releases, licencia, política de firma,
+procedencia de builds, artefactos y responsables de revisión y aprobación para
+completar la configuración que indique la Foundation.
 
 Descripción propuesta del proyecto:
 
@@ -114,7 +110,40 @@ Descripción propuesta del proyecto:
 Las [condiciones de la Fundación](https://signpath.org/terms) exigen roles
 explícitos, información de privacidad, builds verificables y aprobación de cada
 solicitud de firma. [CODE_SIGNING.md](../../CODE_SIGNING.md) identifica los roles
-y el estado actual. No atribuyas patrocinio antes de la aceptación. Los metadatos
+y el estado actual. La atribución identifica el servicio previsto, sin afirmar
+que esté activo. Los metadatos
 de nombre y versión de Windows y las restricciones de artefactos de SignPath
 se comprobarán al integrar: la política por sí sola no demuestra cumplimiento.
 Credenciales y activación requieren una acción posterior del mantenedor.
+
+## Integración SignPath preparada, pero inactiva
+
+El mantenedor ha presentado la solicitud a la Foundation; Authenticode sigue
+inactivo hasta la aprobación y la configuración del servicio. La
+[política de firma de código](../../CODE_SIGNING.es.md) identifica al equipo y la
+aprobación manual obligatoria de cada solicitud.
+
+El workflow marca el punto de integración antes de generar los SBOM. Un futuro
+job dedicado aceptará solo push de tags publicados y usará el environment
+protegido `release`. Enviará el artefacto de esa compilación con `irmind.exe` e
+`irmind-evtx.exe`; Anibal Cañada aprobará manualmente cada firma en SignPath.
+El resultado verificado sustituirá ambos binarios antes de SHA256SUMS, Sigstore y
+procedencia. Un rechazo, timeout o resultado inválido bloqueará la publicación.
+Las PR y los ensayos de ramas o manuales no solicitarán firma de producción.
+
+| Ajuste del environment `release` | Uso |
+| --- | --- |
+| Secreto `SIGNPATH_API_TOKEN` | Credencial de envío indicada por la Foundation para este proyecto; no las credenciales interactivas del aprobador. |
+| Variable `SIGNPATH_ORGANIZATION_ID` | Identificador de organización. |
+| Variable `SIGNPATH_PROJECT_SLUG` | Proyecto aprobado. |
+| Variable `SIGNPATH_SIGNING_POLICY_SLUG` | Política con aprobación manual. |
+| Variable `SIGNPATH_ARTIFACT_CONFIGURATION_SLUG` | Restricción a los dos ejecutables, con el nombre de producto IRMind y su versión. |
+
+Estos identificadores no son claves privadas. La Foundation conserva la clave de
+firma: no se necesita un PFX Windows ni una contraseña de certificado aquí.
+Se prevé reutilizar el `GITHUB_TOKEN` del job para leer su artefacto y metadatos,
+sin PAT adicional. Al implementarlo, la acción oficial se fijará por commit
+completo revisado; véase la [integración oficial](https://docs.signpath.io/trusted-build-systems/github).
+No hay acción SignPath activa. Configurar estos valores no
+activa la firma: todavía requiere una modificación revisada del workflow y la
+activación explícita del mantenedor.
