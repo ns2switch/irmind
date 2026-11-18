@@ -2272,6 +2272,7 @@ dependencies = [
  "irmind-mod-mapping-evtx",
  "irmind-mod-mapping-falco",
  "irmind-mod-mapping-gcp-audit",
+ "irmind-mod-mapping-guardduty",
  "irmind-mod-mapping-identity",
  "irmind-mod-mapping-journald-compat",
  "irmind-mod-mapping-json-compat",
@@ -2289,6 +2290,7 @@ dependencies = [
  "irmind-mod-parser-eztools",
  "irmind-mod-parser-falco",
  "irmind-mod-parser-gcp-audit",
+ "irmind-mod-parser-guardduty",
  "irmind-mod-parser-hayabusa",
  "irmind-mod-parser-json",
  "irmind-mod-parser-kubernetes",
@@ -2698,6 +2700,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-mapping-guardduty"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-build-manifest",
+ "irmind-domain",
+ "irmind-mapping-tables",
+ "irmind-mod-parser-guardduty",
+ "irmind-testkit",
+]
+
+[[package]]
 name = "irmind-mod-mapping-identity"
 version = "0.1.0"
 dependencies = [
@@ -2885,6 +2899,15 @@ dependencies = [
 
 [[package]]
 name = "irmind-mod-parser-gcp-audit"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-testkit",
+]
+
+[[package]]
+name = "irmind-mod-parser-guardduty"
 version = "0.1.0"
 dependencies = [
  "irmind-app",

@@ -145,6 +145,7 @@ La compilación normal incluye todos los módulos de producto actuales y ambos l
 | Microsoft Entra ID | parser y mapeo locales | `parser-entra` (por defecto) | experimental | [Entra](docs/es/parsers.md#microsoft-entra-id) |
 | Microsoft 365 audit | parser y mapeo locales | `parser-m365` (por defecto) | experimental | [M365](docs/es/parsers.md) |
 | Okta System Log | parser y mapeo locales | `parser-okta` (por defecto) | experimental | [Okta](docs/es/parsers.md) |
+| AWS GuardDuty | parser y mapeo locales | `parser-guardduty` (por defecto) | experimental | [GuardDuty](docs/es/parsers.md#exports-de-guardduty) |
 | Auditoría Kubernetes | parser y mapeo locales | `parser-kubernetes` (por defecto) | experimental | [Contexto de clúster](docs/es/parsers.md#interpretación-de-kubernetes-y-falco) |
 | Falco | parser y mapeo locales | `parser-falco` (por defecto) | experimental | [Alertas de origen](docs/es/parsers.md#interpretación-de-kubernetes-y-falco) |
 | Logs de Linux | parser local | `parser-linux` (por defecto) | experimental | [Linux](docs/es/modules.md#logs-de-linux) |

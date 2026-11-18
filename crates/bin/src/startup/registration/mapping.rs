@@ -25,6 +25,11 @@ const NETWORK_PARSERS: &[&str] = &[
 ];
 
 pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(feature = "mapping-guardduty")]
+    registry.register(
+        Box::new(irmind_mod_mapping_guardduty::GuardDutyMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
     #[cfg(all(feature = "mapping-identity", feature = "parser-m365"))]
     registry.register(
         Box::new(irmind_mod_mapping_identity::IdentityMapping::m365()?),

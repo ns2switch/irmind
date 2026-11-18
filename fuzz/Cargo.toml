@@ -12,6 +12,9 @@ export = ["dep:irmind-infra"]
 cargo-fuzz = true
 
 [dependencies]
+irmind-mod-parser-guardduty = { path = "../crates/modules/parser-guardduty", version = "0.1.0" }
+irmind-mod-mapping-guardduty = { path = "../crates/modules/mapping-guardduty", version = "0.1.0" }
+
 irmind-mod-parser-m365 = { path = "../crates/modules/parser-m365", version = "0.1.0" }
 irmind-mod-parser-okta = { path = "../crates/modules/parser-okta", version = "0.1.0" }
 irmind-mod-mapping-identity = { path = "../crates/modules/mapping-identity", version = "0.1.0" }
@@ -225,6 +228,13 @@ bench = false
 [[bin]]
 name = "parser_okta"
 path = "fuzz_targets/parser_okta.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_guardduty"
+path = "fuzz_targets/parser_guardduty.rs"
 test = false
 doc = false
 bench = false

@@ -1,0 +1,59 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "guardduty-sdk-fields"
+version = "guardduty-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-guardduty"
+parser_versions = ["guardduty-source-v1"]
+format = "guardduty-sdk"
+format_version = "guardduty-source-v1"
+action = ["Type"]
+
+[partition]
+account = ["AccountId"]
+region = ["Region"]
+
+[[rules]]
+categories = ["intrusion_detection"]
+types = ["info"]
+kind = "alert"
+outcome = "unknown"
+
+[[fields]]
+source = ["Id"]
+target = "irmind.detection.id"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["AccountId"]
+target = "cloud.account.id"
+omit_text = ["", "-"]
+observation = { kind = "account", role = "subject", scope = { kind = "account", path = ["AccountId"] } }
+
+[[fields]]
+source = ["Region"]
+target = "cloud.region"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["Resource", "AccessKeyDetails", "UserName"]
+target = "user.name"
+omit_text = ["", "-"]
+observation = { kind = "user", role = "actor", scope = { kind = "account", path = ["AccountId"] } }
+
+[[fields]]
+source = ["Resource", "AccessKeyDetails", "PrincipalId"]
+target = "user.id"
+omit_text = ["", "-"]
+observation = { kind = "user", role = "actor", scope = { kind = "account", path = ["AccountId"] } }
+
+[[fields]]
+source = ["Resource", "InstanceDetails", "InstanceId"]
+target = "host.id"
+omit_text = ["", "-"]
+observation = { kind = "host", role = "subject", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["Id"]
+target = "irmind.source_event.id"
+observation = { kind = "event", role = "subject", scope = { kind = "source_record" } }

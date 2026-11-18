@@ -7,6 +7,7 @@ license.workspace = true
 
 [features]
 default = [
+    "parser-guardduty", "mapping-guardduty",
     "parser-m365", "parser-okta", "mapping-identity",
     "parser-gcp-audit", "mapping-gcp-audit",
     "parser-entra", "mapping-entra",
@@ -72,7 +73,13 @@ storage-s3 = ["dep:irmind-mod-storage-object", "irmind-mod-storage-object/s3"]
 storage-gcs = ["dep:irmind-mod-storage-object", "irmind-mod-storage-object/gcs"]
 storage-azure = ["dep:irmind-mod-storage-object", "irmind-mod-storage-object/azure"]
 
+parser-guardduty = ["dep:irmind-mod-parser-guardduty", "mapping-guardduty"]
+mapping-guardduty = ["dep:irmind-mod-mapping-guardduty"]
+
 [dependencies]
+irmind-mod-parser-guardduty = { path = "../modules/parser-guardduty", version = "0.1.0", optional = true }
+irmind-mod-mapping-guardduty = { path = "../modules/mapping-guardduty", version = "0.1.0", optional = true }
+
 irmind-mod-parser-m365 = { path = "../modules/parser-m365", version = "0.1.0", optional = true }
 irmind-mod-parser-okta = { path = "../modules/parser-okta", version = "0.1.0", optional = true }
 irmind-mod-mapping-identity = { path = "../modules/mapping-identity", version = "0.1.0", optional = true }

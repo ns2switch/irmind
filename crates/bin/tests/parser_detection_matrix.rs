@@ -74,6 +74,11 @@ mod matrix {
     #[allow(clippy::too_many_lines)]
     fn each_fixture_has_one_unique_high_confidence_parser() -> Result<(), irmind_app::AppError> {
         let mut registry = ModuleRegistry::new();
+        #[cfg(feature = "parser-guardduty")]
+        registry.register(
+            Box::new(irmind_mod_parser_guardduty::GuardDutyParser),
+            &ModuleConfig::new(),
+        )?;
         #[cfg(feature = "parser-m365")]
         registry.register(
             Box::new(irmind_mod_parser_m365::M365Parser),
@@ -176,6 +181,34 @@ mod matrix {
                 "okta-api.json",
                 include_bytes!("../../testkit/fixtures/parser-okta/source/api.json").as_slice(),
                 "parser-okta",
+            ),
+            #[cfg(feature = "parser-guardduty")]
+            (
+                "guardduty-events.ndjson",
+                include_bytes!("../../testkit/fixtures/parser-guardduty/source/events.ndjson")
+                    .as_slice(),
+                "parser-guardduty",
+            ),
+            #[cfg(feature = "parser-guardduty")]
+            (
+                "guardduty-api.json",
+                include_bytes!("../../testkit/fixtures/parser-guardduty/source/api.json")
+                    .as_slice(),
+                "parser-guardduty",
+            ),
+            #[cfg(feature = "parser-guardduty")]
+            (
+                "guardduty-cli.json",
+                include_bytes!("../../testkit/fixtures/parser-guardduty/source/cli.json")
+                    .as_slice(),
+                "parser-guardduty",
+            ),
+            #[cfg(feature = "parser-guardduty")]
+            (
+                "guardduty-eventbridge.json",
+                include_bytes!("../../testkit/fixtures/parser-guardduty/source/eventbridge.json")
+                    .as_slice(),
+                "parser-guardduty",
             ),
             #[cfg(feature = "parser-syslog")]
             (
@@ -423,7 +456,7 @@ mod matrix {
             "parser-syslog" => [None; 8],
             "parser-linux" | "parser-zeek" | "parser-suricata" | "parser-kubernetes"
             | "parser-falco" | "parser-gcp-audit" | "parser-entra" | "parser-m365"
-            | "parser-okta" => [
+            | "parser-okta" | "parser-guardduty" => [
                 if matches!(sample.first(), Some(b'{' | b'[')) {
                     Some(45)
                 } else {
@@ -460,6 +493,13 @@ mod matrix {
         Ok(())
     }
     fn assert_additional_scores(name: &str, sample: &[u8], expected: &str) {
+        #[cfg(feature = "parser-guardduty")]
+        assert_eq!(
+            irmind_mod_parser_guardduty::GuardDutyParser
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            (expected == "parser-guardduty").then_some(98)
+        );
         #[cfg(feature = "parser-m365")]
         assert_eq!(
             irmind_mod_parser_m365::M365Parser
