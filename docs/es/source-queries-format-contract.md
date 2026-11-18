@@ -1,4 +1,4 @@
-Traducción de docs/development/source-queries-format-contract.md en el commit ec22a8f293e7a381a87579d2d48c6412fcd0a7ed; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/source-queries-format-contract.md en el commit 3545f178b195b68a05d99bf78b869dec21ba7cec; si hay diferencias, prevalece la versión en inglés.
 
 # Puertos de consultas, adquisición firmada y export V9
 
@@ -179,6 +179,20 @@ la fuente **derivada**, no referencias a temporales. 0600/0700 o ACL del usuario
 no-follow, espacio, cancelación y limpieza de huérfanos obligatorios. Si falta una
 primitiva durable en la implementación, parar para un contrato aditivo preciso;
 nunca usar temporal del sistema ni eludir append atómico.
+
+### Despacho del modelo
+
+Proponer Tool::SourceQuery, nombre `source_query`, con SourceQueryV1 exacto.
+Riesgo Read como las lecturas cloud actuales, **más** admisión, broker y aprobación
+exacta no eludibles de este contrato. Read por sí solo nunca envía la consulta.
+Sin herramientas para cambiar configuración, plan de tabla, presupuesto o
+credenciales. Las herramientas SIEM mantienen sus propias 24 horas y filas.
+
+Solo el hijo cloud incluido gana la herramienta declarada: tipo cloud versión 2,
+nuevo hash de inventario y mismo codec de snapshot. Los demás no cambian ni
+pueden acceder por alias u omisión. El plan V2 vincula el inventario nuevo. Son
+puntos de revisión, no permisos concedidos por esta PR. La reverificación remota
+sigue siendo acción explícita del analista, no herramienta de modelo o hijo.
 
 ## 4. Broker, aprobación y trabajos inciertos
 
