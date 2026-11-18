@@ -1,4 +1,4 @@
-Traducción de docs/development/source-queries-format-contract.md en el commit 3545f178b195b68a05d99bf78b869dec21ba7cec; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/source-queries-format-contract.md en el commit de17e7373ec7f5859c372bf176201b0b692d716d; si hay diferencias, prevalece la versión en inglés.
 
 # Puertos de consultas, adquisición firmada y export V9
 
@@ -396,10 +396,11 @@ Otra adquisición requiere otro plan firmado y presupuestado.
 
 Conservar el orden V8 hasta pruebas de catálogo y chunks de ramas. La sección
 de operaciones incluye además las pruebas globales de adopción referidas por
-planes: primero las operaciones del caso en su orden actual, después adopciones
+planes y las admisiones de reverificación referidas por recibos: primero las operaciones del caso en su orden actual, después pruebas globales
 únicas ordenadas por hash. Es regla V9 explícita, no V8. Verificar desafío/firma
-actuales con Analyst esperado, aceptar solo source-query-configuration-v1 y
-comparar fuente/política con el plan. Falta, prueba ajena o clave distinta invalida.
+actuales con Analyst esperado, aceptar solo source-query-configuration-v1 o
+remote-original-verification-admission-v1 y comparar fuente/política con el plan
+o el objetivo/método/límite exactos de reverificación. Falta, prueba ajena o clave distinta invalida.
 Atesta la operación referida, no todo el historial global; no exportar otra
 configuración global no relacionada. Después de las ramas, añadir dos
 contadores u64 big endian obligatorios, incluso cero:
@@ -422,7 +423,7 @@ Parquet como contador de capturas. Un tercero prueba admisión/firma/vínculos,
 bytes retenidos y reconstrucción local, no verdad/completitud de la base remota
 ni firma del proveedor. Reejecutar es otra adquisición, no reconstrucción remota.
 
-RemoteOriginalVerificationV1: version,case_id,seal,source_manifest,object,method,
+RemoteOriginalVerificationV1: version,case_id,admission,seal,source_manifest,object,method,
 observed_at,outcome,observed,sha256,transfer_bytes,reason,nonce. object fija versión
 inmutable. Métodos metadata/sha256; resultados identity_match,digest_match,changed,
 missing,denied,unavailable,cancelled. Metadatos nunca digest_match; ETag no es
@@ -436,12 +437,24 @@ ID=SHA-256 del desafío. Comparar clave con Analyst/sello esperado, no solo con
 la propia envoltura. Nonce nuevo de 32 bytes, distinto de delimitadores UNTRUSTED.
 No inferir caducidad ni reemplazo de recibos anteriores.
 
+Antes de comprobar, Analyst firma operación global
+remote-original-verification-admission-v1: con hex(J({version,case_id,seal,
+source_manifest,object,method,transfer_bytes,policy,at,nonce})). admission del
+recibo es el hash de esa operación, incluida como prueba en export V9. Fija
+objetivo/método/máximo/política antes de la red; metadata no autoriza sha256.
+
+El broker único conserva reservas/uso separado bajo el bloqueo caso/sello,
+partiendo del saldo de transferencia/llamadas autenticado al sellar y restando
+comprobaciones pendientes y uso separado previo entre procesos. No duplica el
+presupuesto. Transferencias inciertas mantienen o cargan su cota hasta reconciliar;
+un timeout no libera capacidad. Agotar bloquea nuevas comprobaciones, sin
+ampliación implícita tras sellar ni excepción de deuda de tokens.
+
 No reabrir/añadir a cadena sellada. Guardar recibo independiente del sello fijo;
 incluirlo requiere otro fichero de export, nunca sobreescribir el anterior. Un
 recibo solo prueba la observación en su instante. No exportar credenciales. GET
-posterior usa sesión de verificación admitida y presupuesto de transferencia
-independiente, sin editar el ledger sellado; el recibo conserva el uso firmado.
-Sin concesión de presupuesto implícita tras sellar.
+posterior usa el saldo restante en esa sesión admitida, sin editar el ledger
+sellado; el recibo conserva uso firmado y manda el techo de organización.
 
 ## 9. Vectores y pruebas de implementación
 
