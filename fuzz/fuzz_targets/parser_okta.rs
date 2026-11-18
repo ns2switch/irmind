@@ -10,8 +10,9 @@ fuzz_target!(|bytes: &[u8]| {
         return;
     }
     static MAPPERS: OnceLock<irmind_mod_mapping_identity::IdentityMapping> = OnceLock::new();
-    let mappers = MAPPERS
-        .get_or_init(|| irmind_mod_mapping_identity::IdentityMapping::okta().expect("included mappings"));
+    let mappers = MAPPERS.get_or_init(|| {
+        irmind_mod_mapping_identity::IdentityMapping::okta().expect("included mappings")
+    });
     let source = SourceReferenceV1::file("fuzz.ndjson").expect("fixed source");
     let cancel = CancellationToken::new();
     let _ = irmind_mod_parser_okta::OktaParser.detect("fuzz.ndjson", bytes);
