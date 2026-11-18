@@ -6,6 +6,13 @@ A successful run can supply the missing record for [#63](https://github.com/ns2s
 and the unobserved H5 steps in [manual validation](manual-validation.md).
 Do not mark those checks done before recording their actual results.
 
+A [partial real-model investigation recorded on 2026-11-17](manual-validation.md#partial-real-model-investigation-2026-11-17)
+used IRMind 0.5.3, DeepSeek and locally ingested public CloudTrail data. It covered
+multi-turn questions, a skill, analyst-confirmed findings and status-bar
+customization. It did not test Elastic with TLS and a private CA, hash citations
+or export verification; `/verify` remains unrecorded. The procedure below still
+provides the path for those outstanding checks.
+
 ## 0–20 min: verified installation and disposable lab
 
 Verify the release, helper, signed checksums and provenance using [platforms](../platforms.md).

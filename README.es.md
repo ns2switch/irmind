@@ -1,11 +1,11 @@
-Traducción de README.md en el commit 4346ab637e1d0e0cfb3a6a36382bfad1a46ac31e; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit 09424e9a2da7020b92f1932f69cac6bd4904397a; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — investigaciones en terminal con registro firmado
 
 IRMind es un asistente de terminal de software libre para analistas DFIR que evalúan flujos de respuesta a incidentes. Investiga evidencia local y remota mediante una conversación, carga **skills** forenses cuando hacen falta y delega tareas acotadas en **subagentes** paralelos. El modelo propone, la **política** decide y la **custodia firmada** conserva lo ocurrido.
 
 
-**Pre-1.0 · evaluación con datos sintéticos; no validado para incidentes reales.**
+**Pre-1.0 · software para evaluación; no validado para incidentes reales.** Un analista ha probado una investigación de varios turnos con un modelo DeepSeek real y un dataset público de CloudTrail, incluida una skill y la confirmación de hallazgos. Es una [validación parcial](docs/es/manual-validation.md#investigación-parcial-con-modelo-real-2026-11-17); siguen pendientes las pruebas del conector real y de verificación.
 
 ## Prueba la demo sin conexión en dos minutos
 

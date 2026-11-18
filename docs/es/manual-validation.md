@@ -1,8 +1,8 @@
-Traducción de docs/development/manual-validation.md en el commit 0b79bea270e99a28756d123f51a045cf283cfd4a; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/manual-validation.md en el commit 09424e9a2da7020b92f1932f69cac6bd4904397a; si hay diferencias, prevalece la versión en inglés.
 
 # Validación manual del MVP
 
-Esta guía permite al analista registrar las pruebas manuales. Usa solo los archivos sintéticos de `examples/`. Una prueba automatizada no sustituye una comprobación manual.
+Esta guía registra las comprobaciones del analista y las que siguen pendientes. El procedimiento repetible usa archivos sintéticos de `examples/`; el registro de resultados incluye por separado una investigación parcial con un dataset público de CloudTrail. Guarda los detalles en privado; una prueba automatizada no sustituye una comprobación manual.
 
 ## H5: modelo DeepSeek real
 
@@ -37,8 +37,34 @@ Guarda los registros detallados de validación en privado. El resumen público d
 | Comprobación de compatibilidad | Resumen público |
 | --- | --- |
 | Saludo con DeepSeek, IRMind 0.1.2 | Se observó una respuesta natural sin herramientas innecesarias. |
-| Investigación, cita de hash, seguimiento, streaming y `/verify` | No constan como observados. |
-| Conector real | La validación sigue pendiente. |
+| Investigación de varios turnos, IRMind 0.5.3 | El analista informa de una investigación que funciona con un modelo DeepSeek real, una skill y hallazgos confirmados; detalles a continuación. |
+| Citas de hash, `/verify` y verificación del export | Pendientes de observación y registro por el analista. |
+| Streaming como comprobación específica del procedimiento | No consta como observado. |
+| Conector real: Elastic con TLS y CA propia | La validación sigue pendiente; la ingesta local no prueba este conector. |
+
+### Investigación parcial con modelo real, 2026-11-17
+
+Es una validación parcial comunicada por el analista: no completa el
+[procedimiento con servicios reales](real-validation.md) ni valida el uso en
+incidentes reales.
+
+| Elemento | Observación registrada |
+| --- | --- |
+| Fecha | 2026-11-17 |
+| Versión de IRMind | 0.5.3 |
+| Sistema | Linux |
+| Modelo | DeepSeek V4.1 Flash, según la configuración guardada del analista; el proveedor no informó de una revisión. No se ha facilitado un identificador API adicional para este registro. |
+| Evidencia | CloudTrail del [dataset público de Invictus IR](https://github.com/invictus-ir/aws_dataset), ingerido localmente. No se han facilitado la revisión del dataset ni hashes individuales de las fuentes para este registro. |
+| Observado | Ingesta; preguntas de investigación de varios turnos; uso de una skill; confirmación de hallazgos por el analista; personalización de la barra de estado. |
+| Resultado | El analista informa de que estas operaciones funcionan correctamente. |
+| No probado | Conector Elastic con TLS y CA propia; verificación del export; citas de hash en las respuestas. |
+| Aún sin registrar | `/verify` y streaming como comprobaciones específicas del procedimiento. |
+
+H5 sigue aceptada por decisión del analista. Ahora constan la investigación de
+varios turnos, el uso de una skill y la confirmación de hallazgos, además del
+saludo anterior. Siguen pendientes las citas de hash, `/verify` y la verificación
+del export. Este registro no acredita planes de subagentes, adquisición remota,
+otros modelos, otros sistemas operativos ni aptitud para incidentes reales.
 
 ## Evaluación opcional con HuntEval y modelo real
 

@@ -1,4 +1,4 @@
-Traducción de docs/development/real-validation.md en el commit 050c01156cc3c45f5229306b88051eb22ed68348; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/real-validation.md en el commit 09424e9a2da7020b92f1932f69cac6bd4904397a; si hay diferencias, prevalece la versión en inglés.
 
 # Validación con servicios reales en unas dos horas
 
@@ -8,6 +8,13 @@ fijadas; no se incorporan datasets al repositorio. Este recorrido puede aportar
 el resultado que falta para [#63](https://github.com/ns2switch/irmind/issues/63) y los
 pasos de H5 pendientes en [validación manual](manual-validation.md). No marques
 ningún paso como observado antes de ejecutarlo y registrar su resultado.
+
+La [investigación parcial registrada el 2026-11-17](manual-validation.md#investigación-parcial-con-modelo-real-2026-11-17)
+usó IRMind 0.5.3, DeepSeek y datos públicos de CloudTrail ingeridos localmente.
+Cubrió preguntas de varios turnos, una skill, confirmación de hallazgos y
+personalización de la barra. No probó Elastic con TLS y CA propia, las citas de
+hash ni la verificación del export; `/verify` sigue sin registrar. Este
+procedimiento sigue siendo la guía para las comprobaciones pendientes.
 
 Mantén el mismo ejecutable y auxiliar durante todo el recorrido. Recompilar un
 candidato de desarrollo o cambiar su lockfile puede cambiar las identidades de

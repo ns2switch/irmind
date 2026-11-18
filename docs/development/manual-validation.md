@@ -1,6 +1,6 @@
 # Manual MVP validation
 
-This guide is for the analyst closing the two manual release gates. Use only the synthetic files in `examples/`. Keep detailed results in a private record; a successful automated test does not replace either check.
+This guide records the analyst's manual checks and the checks still outstanding. The repeatable procedure below uses synthetic files in `examples/`; a separate partial investigation with a public CloudTrail dataset is recorded in the result record. Keep detailed results in a private record; a successful automated test does not replace either check.
 
 ## H5: real DeepSeek model
 
@@ -35,8 +35,33 @@ Store detailed validation records privately. Public summaries should include onl
 | Compatibility check | Public summary |
 | --- | --- |
 | DeepSeek greeting, IRMind 0.1.2 | A natural greeting response without unnecessary tool calls was observed. |
-| Investigation, evidence-hash citation, follow-up, streaming and `/verify` | Not recorded as observed. |
-| Real connector | Validation remains pending. |
+| Multi-turn investigation, IRMind 0.5.3 | The analyst reports a working investigation with a real DeepSeek model, a skill and analyst-confirmed findings; details below. |
+| Evidence-hash citations, `/verify` and export verification | Pending analyst observation and recording. |
+| Streaming as a separate procedure check | Not recorded as observed. |
+| Real connector: Elastic with TLS and a private CA | Validation remains pending; local-file ingestion does not test this connector. |
+
+### Partial real-model investigation, 2026-11-17
+
+This is an analyst-reported partial validation, not completion of the full
+[real-service procedure](real-validation.md) or validation for real incidents.
+
+| Item | Recorded observation |
+| --- | --- |
+| Date | 2026-11-17 |
+| IRMind version | 0.5.3 |
+| System | Linux |
+| Model | DeepSeek V4.1 Flash, as identified in the analyst's saved configuration; the provider did not report a revision. No separate API model identifier was supplied for this record. |
+| Evidence | CloudTrail from the public [Invictus IR AWS dataset](https://github.com/invictus-ir/aws_dataset), ingested locally. No dataset revision or individual source hashes were supplied for this record. |
+| Observed | Ingestion; multi-turn investigation questions; use of a skill; analyst confirmation of findings; status-bar customization. |
+| Result | The analyst reports that these operations work correctly. |
+| Not tested | Elastic connector with TLS and a private CA; export verification; evidence-hash citations in model responses. |
+| Still unrecorded | `/verify` and streaming as separate procedure checks. |
+
+H5 remains accepted by analyst decision. Its observation record now includes
+multi-turn investigation, skill use and confirmation of findings, in addition to
+the earlier greeting check. Hash citations, `/verify` and export verification
+remain pending. This record makes no claim about subagent plans, remote evidence
+acquisition, other models, other operating systems or incident-response fitness.
 
 ## Optional HuntEval model evaluation
 
