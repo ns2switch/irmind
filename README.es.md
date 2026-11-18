@@ -1,4 +1,4 @@
-Traducción de README.md en el commit 09424e9a2da7020b92f1932f69cac6bd4904397a; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit df9a8bff2dfb803a6ce692b9ad5713f540b45057; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — investigaciones en terminal con registro firmado
 
@@ -59,8 +59,10 @@ brew upgrade ns2switch/irmind/irmind
 La fórmula instala el binario y el auxiliar EVTX desde GitHub Releases con SHA-256 fijados, sin compilar IRMind. La [guía de plataformas](docs/es/platforms.md#homebrew) explica la confianza y cómo conservar la versión que creó un caso antes de actualizar.
 
 Consulta [Code signing policy — Política de firma de código](CODE_SIGNING.md)
-([versión en español](CODE_SIGNING.es.md)): atribución, roles del equipo,
+([versión en español](CODE_SIGNING.es.md)): verificación actual, roles del equipo,
 privacidad y estado de la firma nativa por plataforma.
+La firma Authenticode de Windows sigue pendiente; se reevaluará SignPath
+Foundation tras el lanzamiento público. No hay patrocinio de firma vigente.
 
 Empieza por [la instalación verificada](docs/es/platforms.md#verificar-una-versión-antes-de-instalar): descarga y verifica el instalador antes de ejecutarlo, sin pasar scripts de red directamente a una shell. Compilar desde código es opcional para [contribuir](CONTRIBUTING.es.md).
 

@@ -17,9 +17,8 @@ key list. Synthetic fixture keys remain excluded from release trust.
   key; installation remains explicit, previewed and admitted by an analyst signature.
   Community contributions, synthetic episodes and review guidance live in
   `ns2switch/irmind-skills`, separately from the core skills bundled here.
-- Publish the SignPath code signing policy, attribution and release-note link.
-  Foundation approval/integration are pending; Windows Authenticode and Apple
-  notarization are not activated by this release.
+- Publish the project code signing policy and release-note link. Windows
+  Authenticode and Apple notarization are not activated by this release.
 
 ## 0.5.3 — Prompt-cache accounting and interrupted-plan recovery
 

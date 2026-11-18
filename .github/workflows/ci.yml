@@ -575,14 +575,12 @@ jobs:
               cp "artifacts/macos-$architecture/IRMind-macos-$architecture.dmg" release/
             fi
           done
-      # SIGNPATH INTEGRATION POINT (inactive): a future tag-only signing job in
-      # the protected release environment will require manual SignPath approval
-      # and replace BOTH Windows executables here, before SBOMs, checksums,
-      # provenance and Sigstore. No signing action or credential access is active.
-      # Future secret: SIGNPATH_API_TOKEN. Non-secret settings:
-      # SIGNPATH_ORGANIZATION_ID, SIGNPATH_PROJECT_SLUG,
-      # SIGNPATH_SIGNING_POLICY_SLUG, SIGNPATH_ARTIFACT_CONFIGURATION_SLUG.
-      # Foundation acceptance and a reviewed activation change are required.
+      # WINDOWS NATIVE SIGNING (inactive, comment only): Authenticode is pending.
+      # SignPath Foundation may be reevaluated after the public launch; a paid
+      # signing subscription is another future option. No signing service or
+      # secret is configured here. Any future integration needs reviewed tag-only
+      # activation in the protected release environment and must replace BOTH
+      # Windows executables before SBOMs, checksums, provenance and Sigstore.
       - uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           path: .

@@ -5,15 +5,15 @@ import argparse
 
 
 POLICY_URL = "https://github.com/ns2switch/irmind/blob/main/CODE_SIGNING.md"
-ATTRIBUTION = (
-    "Free code signing provided by [SignPath.io](https://about.signpath.io/), "
-    "certificate by [SignPath Foundation](https://signpath.org/)"
-)
-FOOTER = f"Code signing policy: {POLICY_URL}\n\n{ATTRIBUTION}"
+FOOTER = f"Code signing policy: {POLICY_URL}"
 
 
 def append_policy(notes: str) -> str:
     """Keep manual/generated notes and avoid duplicates on publication retries."""
+    lines = notes.splitlines(keepends=True)
+    retained = [line for line in lines if not line.startswith("Free code signing provided by ")]
+    if len(retained) != len(lines):
+        notes = "".join(retained).rstrip() + "\n"
     if FOOTER in notes:
         return notes
     prefix = notes.rstrip()

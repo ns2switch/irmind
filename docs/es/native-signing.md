@@ -1,4 +1,4 @@
-Traducción de docs/development/native-signing.md en el commit 4346ab637e1d0e0cfb3a6a36382bfad1a46ac31e; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/native-signing.md en el commit df9a8bff2dfb803a6ce692b9ad5713f540b45057; si hay diferencias, prevalece la versión en inglés.
 
 # Preparar la firma nativa
 
@@ -61,14 +61,17 @@ Apple no permite adjuntar tickets a ejecutables CLI sueltos: el DMG sirve para l
 distribución con ticket sin conexión; los ejecutables sueltos usan consulta online.
 Sigue pendiente probar una descarga normal con cuarentena en un Mac del usuario.
 
-## SignPath y Windows
+## Authenticode de Windows: opción futura
 
-El mantenedor ha presentado la solicitud a SignPath Foundation. La aprobación y
-la configuración de la integración siguen pendientes; Authenticode no está
-activo. La [política de firma](../../CODE_SIGNING.es.md) identifica al equipo y
-exige aprobación manual de cada solicitud. La Foundation decide la admisión.
-Una firma tampoco garantiza reputación inmediata en SmartScreen. Mientras tanto,
-[verifica las descargas](platforms.md#windows) sin desactivar las protecciones del SO.
+La firma Authenticode de Windows sigue pendiente. Se reevaluará SignPath
+Foundation tras el lanzamiento público; una suscripción de pago es otra opción
+futura. No hay servicio, certificado ni patrocinio vigente. Esta configuración
+no tiene jobs activos de firma nativa Windows ni secretos de ese servicio.
+
+Las descargas de `irmind.exe` e `irmind-evtx.exe` pueden mostrar SmartScreen.
+[Verifica Sigstore, hashes y procedencia](platforms.md#windows) y usa el
+`install.ps1` verificado, sin desactivar las protecciones del SO. La
+[política de firma](../../CODE_SIGNING.es.md) describe el estado actual y los roles.
 
 ## Comprobar una candidata con firma nativa en macOS
 
@@ -91,59 +94,17 @@ admite ticket adjunto: evalúalo con red. Registra versión de macOS, tag y
 resultados. Las releases actuales sin firma nativa no tienen por qué superar
 estas comprobaciones.
 
-## Información para la integración SignPath
+## Punto de integración Windows inactivo
 
-Conserva las URL del proyecto y sus releases, licencia, política de firma,
-procedencia de builds, artefactos y responsables de revisión y aprobación para
-completar la configuración que indique la Foundation.
+El workflow conserva solo un comentario antes de generar los SBOM: no llama a un
+servicio de firma ni referencia sus secretos. Una integración futura con la
+Foundation o un servicio de pago requiere una acción revisada y fijada por commit,
+aprobación del mantenedor y credenciales configuradas por separado en `release`,
+solo para tags. No se configuran credenciales ahora.
 
-Descripción propuesta del proyecto:
-
-> IRMind es un asistente de terminal de código abierto para respuesta defensiva
-> a incidentes y análisis forense. El analista consulta evidencia local o fuentes
-> remotas configuradas explícitamente. La política y las aprobaciones gobiernan
-> las herramientas; los registros del caso se firman. La release Windows incluye
-> la CLI y el decodificador EVTX aislado. Los builds proceden de código revisado
-> mediante GitHub Actions fijadas e incluyen checksums, firmas Sigstore,
-> procedencia y SBOM.
-
-Las [condiciones de la Fundación](https://signpath.org/terms) exigen roles
-explícitos, información de privacidad, builds verificables y aprobación de cada
-solicitud de firma. [CODE_SIGNING.md](../../CODE_SIGNING.md) identifica los roles
-y el estado actual. La atribución identifica el servicio previsto, sin afirmar
-que esté activo. Los metadatos
-de nombre y versión de Windows y las restricciones de artefactos de SignPath
-se comprobarán al integrar: la política por sí sola no demuestra cumplimiento.
-Credenciales y activación requieren una acción posterior del mantenedor.
-
-## Integración SignPath preparada, pero inactiva
-
-El mantenedor ha presentado la solicitud a la Foundation; Authenticode sigue
-inactivo hasta la aprobación y la configuración del servicio. La
-[política de firma de código](../../CODE_SIGNING.es.md) identifica al equipo y la
-aprobación manual obligatoria de cada solicitud.
-
-El workflow marca el punto de integración antes de generar los SBOM. Un futuro
-job dedicado aceptará solo push de tags publicados y usará el environment
-protegido `release`. Enviará el artefacto de esa compilación con `irmind.exe` e
-`irmind-evtx.exe`; Anibal Cañada aprobará manualmente cada firma en SignPath.
-El resultado verificado sustituirá ambos binarios antes de SHA256SUMS, Sigstore y
-procedencia. Un rechazo, timeout o resultado inválido bloqueará la publicación.
-Las PR y los ensayos de ramas o manuales no solicitarán firma de producción.
-
-| Ajuste del environment `release` | Uso |
-| --- | --- |
-| Secreto `SIGNPATH_API_TOKEN` | Credencial de envío indicada por la Foundation para este proyecto; no las credenciales interactivas del aprobador. |
-| Variable `SIGNPATH_ORGANIZATION_ID` | Identificador de organización. |
-| Variable `SIGNPATH_PROJECT_SLUG` | Proyecto aprobado. |
-| Variable `SIGNPATH_SIGNING_POLICY_SLUG` | Política con aprobación manual. |
-| Variable `SIGNPATH_ARTIFACT_CONFIGURATION_SLUG` | Restricción a los dos ejecutables, con el nombre de producto IRMind y su versión. |
-
-Estos identificadores no son claves privadas. La Foundation conserva la clave de
-firma: no se necesita un PFX Windows ni una contraseña de certificado aquí.
-Se prevé reutilizar el `GITHUB_TOKEN` del job para leer su artefacto y metadatos,
-sin PAT adicional. Al implementarlo, la acción oficial se fijará por commit
-completo revisado; véase la [integración oficial](https://docs.signpath.io/trusted-build-systems/github).
-No hay acción SignPath activa. Configurar estos valores no
-activa la firma: todavía requiere una modificación revisada del workflow y la
-activación explícita del mantenedor.
+Los dos ejecutables procederán del mismo tag, tendrán producto y versión
+coherentes y se firmarán antes de hashes, bundles Sigstore y procedencia. Una vez
+activada, un rechazo, timeout o salida inválida bloqueará la publicación. Un
+certificado no garantiza reputación inmediata en SmartScreen. Siguen pendientes
+la elección de proveedor y la revisión explícita de activación; no se promete
+ninguna integración.
