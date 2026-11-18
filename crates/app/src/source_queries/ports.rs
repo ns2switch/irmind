@@ -1,0 +1,250 @@
+use super::*;
+use crate::{AppError, AuthorizedCall, CancellationToken, async_trait};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::{collections::BTreeMap, sync::Arc};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct QueryPreflightV1 {
+    pub plan_digest: String,
+    pub observed_at: QueryTime,
+    pub accounting: QueryAccounting,
+    pub estimate: QueryEstimate,
+    pub provider_ceiling: Option<u64>,
+    pub source_metadata: Value,
+    pub uncertainty: Vec<String>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct QueryEstimate {
+    pub unit: String,
+    pub value: Option<u64>,
+    pub basis: String,
+    pub reliable: bool,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SourceQueryUsage {
+    pub scanned_bytes: Option<u64>,
+    pub processed_bytes: Option<u64>,
+    pub billed_bytes: Option<u64>,
+    pub returned_wire_bytes: u64,
+    pub returned_decoded_bytes: u64,
+    pub query_price_basis: QueryAccounting,
+}
+#[derive(Clone, Debug)]
+pub enum SubmitObservationV1 {
+    Accepted(QueryExecutionRef),
+    NotSubmitted,
+    Unknown,
+}
+#[derive(Clone, Debug)]
+pub struct QueryExecutionRef {
+    plan: String,
+    attempt: u64,
+    provider_id: String,
+}
+impl QueryExecutionRef {
+    pub fn new(plan: &str, attempt: u64, provider_id: &str) -> Result<Self, SourceQueryError> {
+        if !super::types::digest(plan) || attempt == 0 || !super::types::text(provider_id, 1024) {
+            return Err(SourceQueryError::Invalid);
+        }
+        Ok(Self {
+            plan: plan.into(),
+            attempt,
+            provider_id: provider_id.into(),
+        })
+    }
+    pub fn plan(&self) -> &str {
+        &self.plan
+    }
+    pub const fn attempt(&self) -> u64 {
+        self.attempt
+    }
+    pub fn provider_id(&self) -> &str {
+        &self.provider_id
+    }
+}
+#[derive(Clone, Debug)]
+pub enum QueryExecutionStatus {
+    Running,
+    Succeeded,
+    Failed,
+    Cancelled,
+    Partial,
+    Unknown,
+    Unsupported,
+}
+#[derive(Clone, Debug)]
+pub struct ExecutionObservationV1 {
+    pub status: QueryExecutionStatus,
+    pub request_id: Option<String>,
+    pub usage: SourceQueryUsage,
+    pub source_observation: Option<Value>,
+}
+#[derive(Clone, Debug)]
+pub enum CancelObservationV1 {
+    Requested,
+    Terminal,
+    Unsupported,
+    Unknown,
+}
+#[derive(Clone, Debug)]
+pub struct QueryResultCursor {
+    execution: String,
+    ordinal: u64,
+    token: Option<String>,
+}
+impl QueryResultCursor {
+    pub fn first(execution: &QueryExecutionRef) -> Self {
+        Self {
+            execution: execution.provider_id.clone(),
+            ordinal: 0,
+            token: None,
+        }
+    }
+    pub fn next(
+        &self,
+        execution: &QueryExecutionRef,
+        token: &str,
+    ) -> Result<Self, SourceQueryError> {
+        if self.execution != execution.provider_id
+            || self.ordinal + 1 >= QUERY_MAX_PAGES
+            || token.is_empty()
+            || token.len() > 4096
+            || self.token.as_deref() == Some(token)
+        {
+            return Err(SourceQueryError::Invalid);
+        }
+        Ok(Self {
+            execution: self.execution.clone(),
+            ordinal: self.ordinal + 1,
+            token: Some(token.into()),
+        })
+    }
+    pub const fn ordinal(&self) -> u64 {
+        self.ordinal
+    }
+    pub fn token(&self) -> Option<&str> {
+        self.token.as_deref()
+    }
+    pub fn check(&self, execution: &QueryExecutionRef) -> Result<(), SourceQueryError> {
+        if self.execution == execution.provider_id {
+            Ok(())
+        } else {
+            Err(SourceQueryError::Invalid)
+        }
+    }
+}
+pub struct QueryResponsePage {
+    pub request_id: Option<String>,
+    pub next_token: Option<String>,
+    pub content_encoding: String,
+    pub chunks: crate::ObjectStream,
+}
+/// Unforgeable lease. Only the verified broker can construct it.
+pub struct AdmittedSourceQuery {
+    pub(super) case_id: crate::CaseId,
+    pub(super) plan: String,
+    pub(super) reservation: String,
+    pub(super) source: ResolvedQuerySourceV1,
+    pub(super) compiled: CompiledSourceQueryV1,
+    pub(super) limits: SourceQueryLimits,
+    pub(super) execution_key: String,
+}
+impl AdmittedSourceQuery {
+    pub fn case_id(&self) -> &crate::CaseId {
+        &self.case_id
+    }
+    pub fn plan(&self) -> &str {
+        &self.plan
+    }
+    pub fn reservation(&self) -> &str {
+        &self.reservation
+    }
+    pub fn source(&self) -> &ResolvedQuerySourceV1 {
+        &self.source
+    }
+    pub fn compiled(&self) -> &CompiledSourceQueryV1 {
+        &self.compiled
+    }
+    pub fn limits(&self) -> &SourceQueryLimits {
+        &self.limits
+    }
+    pub fn execution_key(&self) -> &str {
+        &self.execution_key
+    }
+    pub fn check(&self, module: &str, source: &str) -> Result<(), SourceQueryError> {
+        if self.source.module() == module && self.source.id() == source {
+            Ok(())
+        } else {
+            Err(SourceQueryError::Scope)
+        }
+    }
+}
+#[async_trait]
+pub trait SourceQueryExecutor: Send + Sync {
+    fn descriptor(&self) -> SourceQueryModuleV1;
+    fn compile(
+        &self,
+        source: &ResolvedQuerySourceV1,
+        query: &SourceQueryV1,
+    ) -> Result<CompiledSourceQueryV1, AppError>;
+    async fn preflight(
+        &self,
+        call: &AuthorizedCall,
+        query: &CompiledSourceQueryV1,
+        cancel: &CancellationToken,
+    ) -> Result<QueryPreflightV1, AppError>;
+    async fn submit(
+        &self,
+        lease: &AdmittedSourceQuery,
+        cancel: &CancellationToken,
+    ) -> Result<SubmitObservationV1, AppError>;
+    async fn reconcile(
+        &self,
+        lease: &AdmittedSourceQuery,
+        execution: &QueryExecutionRef,
+        cancel: &CancellationToken,
+    ) -> Result<ExecutionObservationV1, AppError>;
+    async fn fetch(
+        &self,
+        lease: &AdmittedSourceQuery,
+        execution: &QueryExecutionRef,
+        cursor: &QueryResultCursor,
+        cancel: &CancellationToken,
+    ) -> Result<QueryResponsePage, AppError>;
+    async fn cancel(
+        &self,
+        lease: &AdmittedSourceQuery,
+        execution: &QueryExecutionRef,
+        cancel: &CancellationToken,
+    ) -> Result<CancelObservationV1, AppError>;
+}
+#[derive(Default)]
+pub struct SourceQueryPorts {
+    executors: BTreeMap<String, Arc<dyn SourceQueryExecutor>>,
+}
+impl SourceQueryPorts {
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn add(&mut self, executor: Arc<dyn SourceQueryExecutor>) -> Result<(), SourceQueryError> {
+        let descriptor = executor.descriptor();
+        descriptor.validate()?;
+        if self.executors.contains_key(&descriptor.id) {
+            return Err(SourceQueryError::Invalid);
+        }
+        self.executors.insert(descriptor.id, executor);
+        Ok(())
+    }
+    pub fn executor(
+        &self,
+        module: &str,
+    ) -> Result<&Arc<dyn SourceQueryExecutor>, SourceQueryError> {
+        self.executors
+            .get(module)
+            .ok_or(SourceQueryError::Unavailable)
+    }
+}
