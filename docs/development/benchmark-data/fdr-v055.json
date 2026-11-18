@@ -1,0 +1,23 @@
+{
+  "build": "release",
+  "candidate": "a71ffeef",
+  "decoder": "parser-fdr/fdr-source-v1",
+  "corpus": "repeated synthetic ProcessRollup2 JSONL; no padding",
+  "measurements": 1,
+  "source_bytes": 1073741838,
+  "records": 2329158,
+  "ingest_seconds": 63.340,
+  "mib_per_second": 16.167,
+  "timing_includes": ["source selection", "hashing", "decoding", "mapping", "Parquet", "signed publication"],
+  "timing_excludes": ["corpus generation", "post-ingest verification"],
+  "verification": "passed",
+  "worker_artifact_equivalence": [1, 2, 4, 7],
+  "host_cap": 64,
+  "host_partition_checks": [
+    {"hosts": 1, "ordinary_partitions": 1, "overflow_buckets": 0},
+    {"hosts": 64, "ordinary_partitions": 64, "overflow_buckets": 0},
+    {"hosts": 1024, "ordinary_partitions": 64, "overflow_buckets": 1},
+    {"hosts": 1025, "ordinary_partitions": 64, "overflow_buckets": 1}
+  ],
+  "address_sanitizer": {"target": "parser_fdr", "seconds": 601, "executions": 1121240, "failures": 0}
+}

@@ -2060,3 +2060,20 @@ and verification; ingestion timing excludes both. The larger free runner used
 here exposes five cores on macOS; Linux and Windows expose four. Numeric results
 retain full verification times, source/output limits and memory-method labels in
 [the release samples](benchmark-data/mapped-evtx-parallel-workers.json).
+
+## Experimental FDR ingestion candidate
+
+The [release-build sample](benchmark-data/fdr-v055.json) uses one synthetic
+ProcessRollup2 JSONL record repeated without padding. It ingests 1,073,741,838
+bytes and 2,329,158 records in 63.340 seconds (16.167 MiB/s). Timing includes
+source selection, hashing, decoding, mapping, Parquet and signed publication;
+corpus generation and the successful post-ingest verification are outside it.
+This is one local synthetic sample, not a production workload or a paired speedup.
+
+Separate tests retain the same artifact hashes with 1, 2, 4 and 7 workers, in
+original and reversed record order. At 1, 64, 1,024 and 1,025 distinct `aid` hosts,
+the cap remains 64 ordinary host partitions and one signed cardinality-overflow
+bucket when needed; original host values remain searchable. The FDR decoder's
+AddressSanitizer campaign completed 1,121,240 executions in 601 seconds without
+failures. Compressed-source admission is described separately in the
+[FDR admission proposal](fdr-compressed-admission.md).

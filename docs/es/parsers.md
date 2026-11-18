@@ -407,3 +407,10 @@ nube. En gzip no se inventan offsets físicos. Se mantienen los límites de lín
 profundidad/campos JSON, fuente y cancelación. La
 [propuesta de admisión comprimida](development/fdr-compressed-admission.md)
 explica el límite actual de staging para gzip.
+
+La muestra sintética de [rendimiento FDR](../development/benchmark-data/fdr-v055.json)
+usa 1 GiB sin relleno en build release: 2.329.158 registros, 63,340 s y
+16,167 MiB/s; la verificación posterior pasa fuera del tiempo medido. Es una
+muestra local, no una comparación de aceleración. El fuzzing ASan completa
+1.121.240 ejecuciones en 601 s sin fallos. Las pruebas con 1/64/1.024/1.025 hosts
+mantienen el límite de 64 y conservan los valores originales en el desbordamiento.
