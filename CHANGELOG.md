@@ -4,6 +4,11 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+- Add experimental Microsoft Defender Advanced Hunting CSV/JSON and Streaming
+  export decoding with included finite mapping tables, host partitions and
+  record-scoped process/parent observations. AlertInfo and AlertEvidence remain
+  unconfirmed source findings; unknown actions retain their original fields.
+
 - Add experimental RFC 5322 email and bounded MIME decoding, separate email
   mapping rules, original header/body retention, literal URL extraction and
   attachment metadata with decoded SHA-256. HTML remains literal source.

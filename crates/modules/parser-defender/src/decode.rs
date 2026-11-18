@@ -23,11 +23,11 @@ fn text<'a>(fields: &'a SourceValue, key: &str) -> Option<&'a str> {
     fields.field(key).and_then(SourceValue::as_text)
 }
 fn view(fields: &SourceValue) -> Option<(&SourceValue, bool)> {
-    if let Some(category) = text(fields, "category") {
-        if category.starts_with("AdvancedHunting-") {
-            let inner = fields.field("properties")?;
-            return matches!(inner, SourceValue::Object(_)).then_some((inner, true));
-        }
+    if let Some(category) = text(fields, "category")
+        && category.starts_with("AdvancedHunting-")
+    {
+        let inner = fields.field("properties")?;
+        return matches!(inner, SourceValue::Object(_)).then_some((inner, true));
     }
     Some((fields, false))
 }

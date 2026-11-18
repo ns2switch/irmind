@@ -5,7 +5,7 @@ use irmind_app::{
 };
 const FIXTURE: &[u8] =
     include_bytes!("../../../testkit/fixtures/parser-defender/source/events.ndjson");
-pub(super) fn rows(bytes: &[u8]) -> (irmind_app::ParseReport, Vec<SourceRecordV1>) {
+fn rows(bytes: &[u8]) -> (irmind_app::ParseReport, Vec<SourceRecordV1>) {
     let source = SourceReferenceV1::file("synthetic.data").unwrap();
     let cancel = CancellationToken::new();
     let mut output = Vec::new();

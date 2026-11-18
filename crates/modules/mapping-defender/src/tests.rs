@@ -104,3 +104,114 @@ fn actor_target_and_pid_roles_are_record_scoped_without_lifetime_inference() {
     }
     assert_eq!(output[0].partition().host(), "synthetic-device-a");
 }
+
+#[test]
+fn network_roles_follow_explicit_direction_even_for_the_same_address() {
+    let row = include_str!("../../../testkit/fixtures/parser-defender/source/events.ndjson")
+        .lines()
+        .nth(1)
+        .unwrap();
+    let output = mapped(row.as_bytes());
+    let observations = output[0].record().common.observations().values();
+    assert!(observations.iter().any(
+        |o| o.role() == irmind_domain::EntityRole::Source && o.entity().value() == "192.0.2.10"
+    ));
+    let incoming = row.replace("ConnectionSuccess", "InboundConnectionAccepted");
+    let output = mapped(incoming.as_bytes());
+    let observations = output[0].record().common.observations().values();
+    assert!(
+        observations
+            .iter()
+            .any(|o| o.role() == irmind_domain::EntityRole::Source
+                && o.entity().value() == "203.0.113.77")
+    );
+    assert!(
+        observations
+            .iter()
+            .any(|o| o.role() == irmind_domain::EntityRole::Destination
+                && o.entity().value() == "192.0.2.10")
+    );
+    let same = row.replace("192.0.2.10", "203.0.113.77");
+    let output = mapped(same.as_bytes());
+    let observations = output[0].record().common.observations().values();
+    assert_eq!(
+        observations
+            .iter()
+            .filter(|o| o.entity().value() == "203.0.113.77")
+            .count(),
+        2
+    );
+}
+#[test]
+fn repeated_pids_have_distinct_source_record_scope_and_equal_users_keep_two_roles() {
+    let row = include_str!("../../../testkit/fixtures/parser-defender/source/events.ndjson")
+        .lines()
+        .next()
+        .unwrap();
+    let repeated = format!("{row}\n{row}\n");
+    let output = mapped(repeated.as_bytes());
+    let process = |o: &MappingOutput| {
+        o.record()
+            .common
+            .observations()
+            .values()
+            .iter()
+            .find(|v| {
+                v.entity().kind() == irmind_domain::ObservedEntityKind::Process
+                    && v.role() == irmind_domain::EntityRole::Subject
+            })
+            .unwrap()
+            .entity()
+            .scope()
+            .clone()
+    };
+    assert_ne!(process(&output[0]), process(&output[1]));
+    let host = |output: &MappingOutput| {
+        output
+            .record()
+            .common
+            .observations()
+            .values()
+            .iter()
+            .find(|v| v.entity().kind() == irmind_domain::ObservedEntityKind::Host)
+            .unwrap()
+            .entity()
+            .clone()
+    };
+    assert_eq!(host(&output[0]), host(&output[1]));
+    let same = row.replace("\"AccountName\": \"target\"", "\"AccountName\": \"actor\"");
+    let output = mapped(same.as_bytes());
+    assert_eq!(
+        output[0]
+            .record()
+            .common
+            .observations()
+            .values()
+            .iter()
+            .filter(|o| o.entity().value() == "actor")
+            .count(),
+        2
+    );
+}
+#[test]
+fn unknown_status_retains_original_fields_without_a_guessed_success() {
+    let row = include_str!("../../../testkit/fixtures/parser-defender/source/events.ndjson")
+        .lines()
+        .next()
+        .unwrap()
+        .replace("ProcessCreated", "SyntheticUnknownAction");
+    let output = mapped(row.as_bytes());
+    assert_eq!(
+        output[0].record().common.event().outcome(),
+        irmind_domain::EventOutcome::Unknown
+    );
+    assert_eq!(output[0].record().common.event().categories().bits(), 0);
+    assert!(
+        output[0]
+            .record()
+            .indexed
+            .record
+            .text
+            .contains("SyntheticUnknownAction")
+    );
+}

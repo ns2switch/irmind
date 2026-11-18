@@ -13,7 +13,7 @@ native_type = "AlertEvidence"
 source = ["properties", "DeviceId"]
 target = "host.id"
 omit_text = ["", "-"]
-observation = { kind = "host", role = "observer", scope = { kind = "source_record" } }
+observation = { kind = "host", role = "observer", scope = { kind = "host", path = ["properties", "DeviceId"] } }
 
 [[fields]]
 source = ["properties", "DeviceName"]
@@ -29,18 +29,6 @@ omit_text = ["", "-"]
 source = ["properties", "Severity"]
 target = "irmind.detection.source_severity"
 omit_text = ["", "-"]
-
-[[fields]]
-source = ["properties", "AccountName"]
-target = "user.name"
-omit_text = ["", "-"]
-observation = { kind = "user", role = "subject", scope = { kind = "source_record" } }
-
-[[fields]]
-source = ["properties", "RemoteIP"]
-target = "destination.ip"
-omit_text = ["", "-"]
-observation = { kind = "ip", role = "related", scope = { kind = "global" } }
 
 [[rules]]
 categories = ["intrusion_detection"]

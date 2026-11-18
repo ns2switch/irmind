@@ -13,7 +13,7 @@ native_type = "AlertInfo"
 source = ["DeviceId"]
 target = "host.id"
 omit_text = ["", "-"]
-observation = { kind = "host", role = "observer", scope = { kind = "source_record" } }
+observation = { kind = "host", role = "observer", scope = { kind = "host", path = ["DeviceId"] } }
 
 [[fields]]
 source = ["DeviceName"]
