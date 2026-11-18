@@ -1,8 +1,8 @@
-Traducción de docs/parsers.md en el commit 7813ccfe6bf922bf37c06ac224297f283ad8ec1d; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/parsers.md en el commit 09424e9a2da7020b92f1932f69cac6bd4904397a; si hay diferencias, prevalece la versión en inglés.
 
 # Parsers de logs
 
-Esta página ayuda al analista a elegir un parser local y probar un formato propio antes de ingerirlo. Todos los parsers actuales son experimentales y se han validado con datos sintéticos. Consulta [módulos](modules.md) para los formatos concretos y [configuración](configuration.md) para el directorio de datos.
+Esta página ayuda al analista a elegir un parser local y probar un formato propio antes de ingerirlo. Todos los parsers actuales son experimentales y tienen pruebas con datos sintéticos. Un analista también ha registrado una [investigación parcial con un modelo real y datos públicos de CloudTrail ingeridos localmente](manual-validation.md#investigación-parcial-con-modelo-real-2026-11-17); no valida todos los parsers, un conector remoto ni el uso en incidentes reales. Consulta [módulos](modules.md) para los formatos concretos y [configuración](configuration.md) para el directorio de datos.
 
 ## Cómo se elige el parser
 
