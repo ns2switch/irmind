@@ -78,6 +78,13 @@ unrecognized field, conflicting source, unsupported filter or absent account
 binding is an actionable error, never a retry without that restriction. The
 model cannot add sources by encoding them in a value.
 
+Resource identifiers from signed configuration must still pass the service's
+identifier grammar and exact allowlist: a signature does not make a SQL fragment
+an identifier. Literal-prefix translation must escape `%`, `_` and the escape
+character where a dialect uses LIKE, or use an adapter-owned literal-prefix
+operator with equivalent semantics. Parameter binding alone does not remove
+wildcard semantics.
+
 ### Translation and completeness
 
 | Service | Safe translation and result retrieval |
@@ -384,7 +391,7 @@ responses, never real cloud accounts or paid scans. The minimum suite covers:
 - AST/golden requests for every enabled adapter and each supported filter,
   stable binding order and identical scope predicates for model and child calls.
 - Malicious values such as `' OR 1=1 --`, backticks, `'; .drop table X`, pipes,
-  `workspace("other")`, encoded newlines and Unicode controls: reject invalid
+  `workspace("other")`, LIKE wildcard/escape characters, encoded newlines and Unicode controls: reject invalid
   values or bind/encode them as a single literal, with no additional syntax.
   Reject malicious table/field identifiers rather than quoting arbitrary input.
 - Account/project/region/workspace substitution, unsupported semantic filters,
