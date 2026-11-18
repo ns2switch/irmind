@@ -115,7 +115,17 @@ impl SourceMapper for IdentityMapping {
     }
     fn map(&self, source: &SourceRecordV1) -> Result<MappingOutput, MappingError> {
         let base = self.base.map(source)?;
-        let partition = base.partition().clone();
+        let partition = base.partition();
+        let partition = if self.source == "m365" && partition.account() == "-" {
+            irmind_app::source_mapping::MappingPartition::try_new(
+                partition.profile(),
+                "",
+                partition.region(),
+                partition.host(),
+            )?
+        } else {
+            partition.clone()
+        };
         let mut record = base.into_record();
         let class = self.classify.event_header(source)?;
         let status = self.status.event_header(source)?;
@@ -137,7 +147,7 @@ impl SourceMapper for IdentityMapping {
             fields
                 .field("OrganizationId")
                 .and_then(SourceValue::as_text)
-                .filter(|s| !s.is_empty())
+                .filter(|s| !matches!(*s, "" | "-"))
                 .map(|s| EventText::identifier(s).map(EntityIdentityScope::Account))
                 .transpose()
                 .map_err(bad)?
@@ -220,7 +230,7 @@ fn project_m365(
             value,
             F::IrmindResourceId,
             K::Resource,
-            R::Subject,
+            R::Target,
             scope,
             observations,
             diagnostics,
@@ -281,7 +291,7 @@ fn project_okta_targets(
                     if let Some(value) = target
                         .field(key)
                         .and_then(SourceValue::as_text)
-                        .filter(|v| !v.is_empty())
+                        .filter(|v| !matches!(*v, "" | "-"))
                     {
                         if context.get(field).is_none() {
                             if let Ok(v) = EventText::new(value) {
@@ -328,7 +338,7 @@ fn observe(
     out: &mut Vec<EntityObservation>,
     diagnostics: &mut Vec<MappingDiagnostic>,
 ) {
-    if value.is_empty() {
+    if value.is_empty() || value == "-" {
         return;
     }
     if out.len() >= 32 {

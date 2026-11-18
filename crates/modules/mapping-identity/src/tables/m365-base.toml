@@ -28,7 +28,7 @@ observation = { kind = "user", role = "actor", scope = { kind = "source_record" 
 source = ["ObjectId"]
 target = "irmind.resource.id"
 omit_text = ["", "-"]
-observation = { kind = "resource", role = "subject", scope = { kind = "source_record" } }
+observation = { kind = "resource", role = "target", scope = { kind = "source_record" } }
 
 [[fields]]
 source = ["UserAgent"]

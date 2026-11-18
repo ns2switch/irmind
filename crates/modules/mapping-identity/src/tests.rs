@@ -154,3 +154,20 @@ fn multiple_okta_targets_remain_searchable_without_invalid_scalar_observations()
             ))
     );
 }
+
+#[test]
+fn m365_placeholder_identities_are_not_observations() {
+    let bytes=br#"{"Id":"synthetic-placeholder","Operation":"FutureOperation","CreationTime":"2026-01-01T00:00:00Z","Workload":"Exchange","OrganizationId":"-","UserId":"-","ObjectId":"-","MailboxOwnerUPN":"-"}"#;
+    let rows = records(&irmind_mod_parser_m365::M365SourceDecoder, bytes);
+    let output = IdentityMapping::m365().unwrap().map(&rows[0]).unwrap();
+    assert!(output.partition().account().is_empty());
+    let projection = output.into_record();
+    assert!(
+        projection
+            .common
+            .observations()
+            .values()
+            .iter()
+            .all(|o| o.entity().value() != "-")
+    );
+}
