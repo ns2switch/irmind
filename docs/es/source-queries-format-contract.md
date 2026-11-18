@@ -1,14 +1,14 @@
-Traducción de docs/development/source-queries-format-contract.md en el commit 9aaca2552a3393015ac190dc1227b64ac3806114; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/source-queries-format-contract.md en el commit c9e704f109dc19e13786967e9c0cec0a4ead0db2; si hay diferencias, prevalece la versión en inglés.
 
 # Puertos de consultas, adquisición firmada y export V9
 
 [English](../development/source-queries-format-contract.md)
 
-**Estado: propuesta de contrato concreto para revisión; sin implementación ni activación.**
+**Estado: contrato v0.6 aprobado con alcance reducido; implementación por separado.**
 Complementa la [arquitectura de consultas en origen](source-queries-design.md).
 Propone puertos, marcador de caso 5, export V9 y vectores canónicos sintéticos.
 No cambia código de producción, dependencias, credenciales, golden ni workflows.
-El flujo Entra y los puertos necesitan aprobación concreta antes de implementarse.
+SourceQueryExecutor y el flujo Entra con client secret están aprobados; los certificados quedan para después.
 Cada servicio sigue siendo un módulo independiente.
 
 ## 1. Alcance y fronteras conservadas
@@ -121,13 +121,6 @@ pub trait SourceQueryExecutor: Send + Sync {
         -> Result<CancelObservationV1, AppError>;
 }
 
-#[async_trait]
-pub trait RemoteOriginalVerifier: Send + Sync {
-    async fn verify(&self, lease: &AdmittedOriginalVerification,
-        target: &FrozenRemoteOriginalV1, method: RemoteVerificationMethodV1,
-        cancel: &CancellationToken)
-        -> Result<RemoteVerificationObservationV1, AppError>;
-}
 ```
 
 SourceQueryModuleV1 declara ID/versión, capacidades exactas, formatos, modo de
@@ -141,11 +134,12 @@ requieren AuthorizedCall restringida a la fuente, política, TLS, plazo y
 contabilidad de llamadas/frecuencia. No ejecutar consulta real ni crear recursos
 facturables sin admisión durante preflight.
 
-AdmittedSourceQuery y AdmittedOriginalVerification tienen campos privados, no
-son deserializables y solo los crea el broker tras política/alcance/firma/reserva.
-Vinculan caso, hijo, fuente, plan/sello/objeto, límites, revisión, actor y fase;
-sin firmante Analyst. Rechazar capacidades de otro módulo/fuente/hijo/fase/plan.
-Cada HTTP, incluso reintento/poll/fetch/cancel, comprueba la capacidad.
+AdmittedSourceQuery tiene campos privados y no es deserializable. Solo el broker
+la crea tras política, alcance, aprobación y reserva; vincula caso, fuente,
+plan, límites, revisión, actor y fase, nunca firmante Analyst. v0.6 rechaza
+cualquier task_id no null con SourceQueriesUnavailableForSubagents antes de
+preflight, reserva o red. El módulo comprueba fuente/módulo/fase/plan en cada
+petición, incluidos reintentos, poll, fetch y cancel.
 
 QueryExecutionRef vincula plan, intento y job ID opaco, nunca URL del modelo.
 El motor crea QueryResultCursor desde respuestas validadas, por ejecución/ordinal;
@@ -159,17 +153,10 @@ aceptado, definitivamente no enviado y desconocido; desconocido no es un error
 ordinario reintentable. Reconcile/cancel pueden declarar `unsupported`; no
 inventar estado de job ni cancelación exitosa en una API sin esa capacidad.
 
-RemoteVerificationMethodV1 es metadata o sha256. El objetivo viene de la
-identidad firmada, no de URI del modelo. La capacidad fija versión inmutable
-S3/GCS/Blob, tamaño/ETag/hash, sello y transferencia. Metadatos condicionales y,
-solo para sha256 aprobado, GET/hash en streaming con comprobación antes/después.
-Devuelve observaciones, no veredicto firmado. Sin versión exacta,
-`ExactVersionUnavailable`, nunca alternativa al objeto actual.
-
 ### Registro y almacenamiento
 
-Proponer `EnginePorts::with_source_queries(SourceQueryPorts)` opcional con mapas
-de ejecutores/verificadores. `EnginePorts::new` no cambia; sin adaptador,
+Proponer `EnginePorts::with_source_queries(SourceQueryPorts)` opcional con un mapa
+de ejecutores. `EnginePorts::new` no cambia; sin adaptador,
 SourceQueriesUnavailable. Claves únicas y features por módulo. Reusar HTTP,
 SigV4 y OAuth/RS256 de Google del keystore antes de añadir SDKs.
 
@@ -188,11 +175,11 @@ exacta no eludibles de este contrato. Read por sí solo nunca envía la consulta
 Sin herramientas para cambiar configuración, plan de tabla, presupuesto o
 credenciales. Las herramientas SIEM mantienen sus propias 24 horas y filas.
 
-Solo el hijo cloud incluido gana la herramienta declarada: tipo cloud versión 2,
-nuevo hash de inventario y mismo codec de snapshot. Los demás no cambian ni
-pueden acceder por alias u omisión. El plan V2 vincula el inventario nuevo. Son
-puntos de revisión, no permisos concedidos por esta PR. La reverificación remota
-sigue siendo acción explícita del analista, no herramienta de modelo o hijo.
+En v0.6 solo el principal puede usar source_query. Los seis tipos de hijo y sus
+inventarios/snapshots actuales no cambian; ninguno recibe la herramienta. Los
+intentos directos o mediante alias se rechazan antes de trabajo remoto. Tipo
+cloud V2, SubagentPlanV2 y reverificación quedan en el
+[diseño posterior a v0.6](source-queries-deferred.md).
 
 ## 4. Broker, aprobación y trabajos inciertos
 
@@ -202,30 +189,14 @@ además intervalo, filas/bytes/escaneo por consulta, plazo, frecuencia/concurren
 y umbral de escaneo. Cambios de caso mediante SourceQueryBudgetV1 firmado por
 Analyst; no superar techo ni reducir por debajo de uso/reservas vigentes.
 
-Un broker serializa admisión entre procesos y principal/hijos con los bloqueos
+Un broker serializa admisión entre peticiones del principal y procesos con los bloqueos
 existentes; uso + reservas + nueva reserva deben caber. Sin bloquear durante UI
 ni red. Escaneo separado de cloud_bytes, que conserva transferencia de objetos.
-Tráfico/retención de consultas aparte; GET de reverificación sha256 sigue
-reservando cloud_bytes.
+Tráfico/retención de consultas aparte; no se incluye reverificación tras el sello.
 
-Para vincular fuentes remotas y reservas del plan completo, proponer
-SubagentPlanV2, nueva etiqueta/dominio `irmind-subagent-plan-v2`: todos los
-miembros V1 y `query_resources` obligatorio; format_version pasa a 2.
-Payload V2 usa J y su dominio nuevo, sin reinterpretar el codec V1. Array por task_id con
-`task_id,sources,scope,scan_bytes,retained_rows,retained_bytes`; hasta 32 fuentes
-configuradas únicas por hijo, nunca hashes locales ficticios. Los task ID
-mantienen su cálculo actual, sin hash de vuelta al plan padre. Aprobación,
-reserva y checkpoint existentes referencian la nueva identidad en sus campos
-hash sin cambiar codec. Así el consentimiento cubre toda la asignación antes de
-arrancar. Sin entrada de recursos, el hijo no consulta fuentes remotas. Plan V2
-y umbral ampliado son puntos explícitos de revisión.
-
-La consulta consume llamadas y escaneo/retención. Cada hijo usa la misma bolsa.
-Extensión propuesta del 25%: comparar la reserva del plan completo en escaneo,
-filas y bytes retenidos con sus asignaciones restantes; superar cualquiera exige
-consentimiento Analyst. Demanda positiva con saldo cero se rechaza; Analytics
-sin demanda de escaneo no inventa 0/0. Siguen los umbrales de tokens/llamadas/bytes
-y la preferencia de confirmar todos los planes. Un hijo nunca se autoaprueba.
+Las consultas consumen llamadas del principal y asignaciones independientes de
+escaneo/retención. Límites de hijos y regla del 25% no cambian: no se delegan
+consultas en v0.6. Saldo agotado rechaza antes de red, sin excepción de deuda de tokens.
 
 Aprobación exacta por encima del umbral, con estimación no fiable y cuando lo
 exige la política externa. Analytics es admisión explícita sin cargo de consulta,
@@ -382,7 +353,7 @@ de esa página. Separar PartialError, truncado local, filas inválidas y cobertu
 Contabilizar y sanear las muestras de rechazo como datos no confiables.
 
 Publicar captura, resultado, manifiestos, recibos mapeo/Parquet y liquidación de
-retención atómicamente en principal/rama tras hash y tamaño final. Recibos previos
+retención atómicamente en la cadena principal tras hash y tamaño final. Recibos previos
 de ejecución/escaneo se conservan aunque falle la admisión. Ficheros de append
 fallido se limpian como huérfanos, sin fuente admitida a medias. Ningún dato entra
 al rol system. Mantener Provenance, ContentGuard y UNTRUSTED con nonce.
@@ -392,90 +363,56 @@ y vista previa acotada. Timeline, búsqueda, entidades y lectura consultan despu
 en local con los límites existentes; nunca generan consultas remotas ocultas.
 Otra adquisición requiere otro plan firmado y presupuestado.
 
-## 8. Export V9, sello y reverificación separada
+## 8. Export V9 y sello
 
-Conservar el orden V8 hasta pruebas de catálogo y chunks de ramas. La sección
-de operaciones incluye además las pruebas globales de adopción referidas por
-planes y las admisiones de reverificación referidas por recibos: primero las operaciones del caso en su orden actual, después pruebas globales
-únicas ordenadas por hash. Es regla V9 explícita, no V8. Verificar desafío/firma
-actuales con Analyst esperado, aceptar solo source-query-configuration-v1 o
-remote-original-verification-admission-v1 y comparar fuente/política con el plan
-o el objetivo/método/límite exactos de reverificación. Falta, prueba ajena o clave distinta invalida.
-Atesta la operación referida, no todo el historial global; no exportar otra
-configuración global no relacionada. Después de las ramas, añadir dos
-contadores u64 big endian obligatorios, incluso cero:
+Conservar el orden V8 hasta catálogo y chunks de ramas. La sección de operaciones
+incluye exactamente las adopciones source-query-configuration-v1 referidas por
+planes: operaciones del caso en su orden actual, después pruebas globales únicas
+por hash. Verificar firma/desafío actuales con Analyst esperado y comparar los
+bytes de fuente/política. Falta, prueba ajena o clave distinta invalida; no
+exportar configuración global no relacionada.
 
-1. Capturas, ordenadas por SHA-256: frame descriptor J
-   `{capture_sha256,bytes,chunks}` y exactamente esos chunks de bytes, hasta
-   512 KiB cada uno. Rechazar repetidos, no referidos, faltantes, desorden,
-   tamaño/hash incorrectos u overflow.
-2. Recibos separados de reverificación, ordenados por ID, un frame firmado por recibo.
+Tras las ramas hay **un** contador u64 big endian de capturas, incluso cero.
+**No existe contador de recibos separados, ni siquiera un cero**, en V9 de v0.6.
+Capturas por SHA-256; descriptor J `{capture_sha256,bytes,chunks}` y exactamente
+sus chunks de hasta 512 KiB. Rechazar faltantes, duplicados, no referidos,
+longitudes/hash/orden incorrectos, overflow y bytes sobrantes.
 
-Capturas obligatorias aunque se omitan originales externos. No duplicarlas en
-la sección opcional de originales, reservada a File externos. Contadores/capturas
-deben coincidir con referencias del grafo de eventos principal/ramas verificado.
-Mantener comprobaciones de todos los activos/pruebas V8. Rechazar bytes finales,
-versiones desconocidas o secciones obligatorias no soportadas.
+Capturas obligatorias aunque se omitan originales externos; no duplicarlas en
+la sección opcional de originales File. Deben coincidir con SourceQueryResultV1
+verificados de la cadena principal. Los hijos no tienen recibos de consulta en
+v0.6. Mantener verificación acotada de ramas, skills, catálogo y Parquet.
 
-El inventario V2 del sello no cambia de bytes ni algoritmo. La cadena/checkpoints
-ancla planes, reservas, recibos y capturas antes del sello. No usar el contador
-Parquet como contador de capturas. Un tercero prueba admisión/firma/vínculos,
-bytes retenidos y reconstrucción local, no verdad/completitud de la base remota
-ni firma del proveedor. Reejecutar es otra adquisición, no reconstrucción remota.
+El inventario de sello V2 no cambia de bytes/algoritmo. La cadena ancla registros
+y capturas antes de sellar; no confundir contador Parquet con capturas. Offline
+prueba admisión firmada, vínculos, bytes y reconstrucción local, no la verdad o
+completitud del servicio ni firma del proveedor. Reejecutar es adquisición nueva.
 
-RemoteOriginalVerificationV1: version,case_id,admission,seal,source_manifest,object,method,
-observed_at,outcome,observed,sha256,transfer_bytes,reason,nonce. object fija versión
-inmutable. Métodos metadata/sha256; resultados identity_match,digest_match,changed,
-missing,denied,unavailable,cancelled. Metadatos nunca digest_match; ETag no es
-SHA-256 y 403 ambiguo no es missing. Hash distinto es changed aunque coincidan
-ETag y tamaño.
-
-Envoltura `{payload,public_key,signature}`: payload es hex de J, clave pública y
-firma Ed25519 en hex. Desafío
-`"irmind-remote-original-verification-v1" || 00 || u64(len(J)) || J`.
-ID=SHA-256 del desafío. Comparar clave con Analyst/sello esperado, no solo con
-la propia envoltura. Nonce nuevo de 32 bytes, distinto de delimitadores UNTRUSTED.
-No inferir caducidad ni reemplazo de recibos anteriores.
-
-Antes de comprobar, Analyst firma operación global
-remote-original-verification-admission-v1: con hex(J({version,case_id,seal,
-source_manifest,object,method,transfer_bytes,policy,at,nonce})). admission del
-recibo es el hash de esa operación, incluida como prueba en export V9. Fija
-objetivo/método/máximo/política antes de la red; metadata no autoriza sha256.
-
-El broker único conserva reservas/uso separado bajo el bloqueo caso/sello,
-partiendo del saldo de transferencia/llamadas autenticado al sellar y restando
-comprobaciones pendientes y uso separado previo entre procesos. No duplica el
-presupuesto. Transferencias inciertas mantienen o cargan su cota hasta reconciliar;
-un timeout no libera capacidad. Agotar bloquea nuevas comprobaciones, sin
-ampliación implícita tras sellar ni excepción de deuda de tokens.
-
-No reabrir/añadir a cadena sellada. Guardar recibo independiente del sello fijo;
-incluirlo requiere otro fichero de export, nunca sobreescribir el anterior. Un
-recibo solo prueba la observación en su instante. No exportar credenciales. GET
-posterior usa el saldo restante en esa sesión admitida, sin editar el ledger
-sellado; el recibo conserva uso firmado y manda el techo de organización.
+RemoteOriginalVerifier, RemoteOriginalVerificationV1, su operación de admisión y
+su sección de export se conservan en el [diseño futuro](source-queries-deferred.md),
+fuera del parser y de las capacidades de v0.6.
 
 ## 9. Vectores y pruebas de implementación
 
 El [inventario y método](../development/source-query-format-vectors/README.md)
-fija marcador 5, magic V9, contadores vacíos, identidades/preimágenes de registros,
+fija marcador 5, magic V9, un contador vacío de capturas, identidades/preimágenes de registros,
 captura completa, compromiso de páginas y cola V9. Incluye Analytics con escaneo
-null, Basic rechazado, resultado parcial y literal malicioso como dato. La firma
-Ed25519 y clave alternativa son **sintéticas públicas**, no claves de producción.
+null, Basic rechazado, resultado parcial y literal malicioso como dato. Las firmas
+Analyst/Agent usan claves **sintéticas públicas**, nunca claves de producción.
 
 Casos negativos: cambiar consulta tras aprobación, revisión/fuente, quitar o
-reordenar páginas, cambiar captura, inventar cero escaneado, reserva de otro hijo,
-liquidación duplicada y atribuir prueba de hash a una lectura de metadatos.
+reordenar páginas, cambiar captura, inventar cero escaneado, intento de hijo rechazado
+y liquidación duplicada.
 Son ejemplos de formato/cálculos de referencia; no afirman que el runtime esté
 implementado o haya pasado esos contratos.
 
 La implementación añadirá pruebas de cada rechazo, HTTP sintético por servicio,
 registros grandes/malformados, ausencia de temporal del sistema, disco lleno,
 cancelación/callback bloqueado, rollback/crash, sobresuscripción entre procesos,
-modelo obediente malicioso, carreras de versión y reconstrucción offline V9.
+modelo obediente malicioso, rechazo de hijos y reconstrucción offline V9.
 Golden también con preserve_order y 1/N trabajadores, sin cambiar los actuales.
 Sin cuentas ni escaneos pagados en CI. Benchmarks release separan planificación,
 preflight y decodificar/mapear/escribir de la latencia del servidor falso.
-La validación real será opcional del analista. No implementar hasta revisar
-puertos, etiquetas, caso/export, credenciales y vectores de este contrato.
+La validación real será opcional del analista. Orden de PRs: base común y caso 5/export V9 vacío; Athena; BigQuery; Azure
+Analytics; presupuesto/barra/docs/validación opcional. Cada paso con servidores
+falsos. Las dependencias nuevas siguen requiriendo aprobación.
