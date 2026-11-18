@@ -199,6 +199,23 @@ no-follow opens, space checks, cancellation and orphan cleanup remain mandatory.
 If actual implementation needs a missing durable publication primitive, stop for
 a narrow additive contract; do not use a system temporary or bypass atomic append.
 
+### Model-facing dispatch
+
+Propose closed `Tool::SourceQuery` / wire name `source_query`, taking exactly
+SourceQueryV1. Its risk is `Read`, like current cloud audit reads, **with** the
+additional non-bypassable source-query admission, scan/retention broker and
+exact-plan approvals defined here. A normal Read decision alone never submits
+it. No tool can change its source configuration, table plan, allocation or
+credential. Existing SIEM tools retain their own 24-hour/row contracts.
+
+Only the included cloud child initially gains this declared tool: propose cloud
+built-in type version 2, with a new compiled inventory hash and the same type
+snapshot codec. Other types remain unchanged and cannot use the new tool by
+omission or alias. Version 2 query-resource plans bind that inventory. These
+additions are concrete contract review points, not permissions added by this PR.
+Remote-original verification stays an explicit analyst operation, not a model
+or child tool; no ordinary model read can contact the cloud after sealing.
+
 ## 4. Budget broker, approvals and uncertain jobs
 
 `SourceQueryAllocationV1` contains `enabled,analytics_allowed,scan_bytes,
