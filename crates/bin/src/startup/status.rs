@@ -52,6 +52,8 @@ pub(super) fn module_statuses(
 }
 
 const PARSER_STATUSES: &[(&str, bool)] = &[
+    ("parser-m365", cfg!(feature = "parser-m365")),
+    ("parser-okta", cfg!(feature = "parser-okta")),
     ("parser-entra", cfg!(feature = "parser-entra")),
     ("parser-gcp-audit", cfg!(feature = "parser-gcp-audit")),
     ("parser-kubernetes", cfg!(feature = "parser-kubernetes")),

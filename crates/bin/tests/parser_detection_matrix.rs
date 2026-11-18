@@ -74,6 +74,17 @@ mod matrix {
     #[allow(clippy::too_many_lines)]
     fn each_fixture_has_one_unique_high_confidence_parser() -> Result<(), irmind_app::AppError> {
         let mut registry = ModuleRegistry::new();
+        #[cfg(feature = "parser-m365")]
+        registry.register(
+            Box::new(irmind_mod_parser_m365::M365Parser),
+            &ModuleConfig::new(),
+        )?;
+        #[cfg(feature = "parser-okta")]
+        registry.register(
+            Box::new(irmind_mod_parser_okta::OktaParser),
+            &ModuleConfig::new(),
+        )?;
+
         #[cfg(feature = "parser-zeek")]
         registry.register(Box::new(ZeekParser), &ModuleConfig::new())?;
         #[cfg(feature = "parser-suricata")]
@@ -126,6 +137,46 @@ mod matrix {
         )?;
         let mut matrix: Matrix = std::collections::BTreeMap::new();
         for (name, sample, expected) in [
+            #[cfg(feature = "parser-m365")]
+            (
+                "m365.ndjson",
+                include_bytes!("../../testkit/fixtures/parser-m365/source/events.ndjson")
+                    .as_slice(),
+                "parser-m365",
+            ),
+            #[cfg(feature = "parser-m365")]
+            (
+                "purview.csv",
+                include_bytes!("../../testkit/fixtures/parser-m365/source/purview.csv").as_slice(),
+                "parser-m365",
+            ),
+            #[cfg(feature = "parser-okta")]
+            (
+                "okta.ndjson",
+                include_bytes!("../../testkit/fixtures/parser-okta/source/events.ndjson")
+                    .as_slice(),
+                "parser-okta",
+            ),
+            #[cfg(feature = "parser-m365")]
+            (
+                "activity.json",
+                include_bytes!("../../testkit/fixtures/parser-m365/source/activity.json")
+                    .as_slice(),
+                "parser-m365",
+            ),
+            #[cfg(feature = "parser-m365")]
+            (
+                "powershell.json",
+                include_bytes!("../../testkit/fixtures/parser-m365/source/powershell.json")
+                    .as_slice(),
+                "parser-m365",
+            ),
+            #[cfg(feature = "parser-okta")]
+            (
+                "okta-api.json",
+                include_bytes!("../../testkit/fixtures/parser-okta/source/api.json").as_slice(),
+                "parser-okta",
+            ),
             #[cfg(feature = "parser-syslog")]
             (
                 "synthetic.log",
@@ -371,7 +422,8 @@ mod matrix {
         let expected_scores: [Option<u8>; 8] = match expected {
             "parser-syslog" => [None; 8],
             "parser-linux" | "parser-zeek" | "parser-suricata" | "parser-kubernetes"
-            | "parser-falco" | "parser-gcp-audit" | "parser-entra" => [
+            | "parser-falco" | "parser-gcp-audit" | "parser-entra" | "parser-m365"
+            | "parser-okta" => [
                 if matches!(sample.first(), Some(b'{' | b'[')) {
                     Some(45)
                 } else {
@@ -408,6 +460,21 @@ mod matrix {
         Ok(())
     }
     fn assert_additional_scores(name: &str, sample: &[u8], expected: &str) {
+        #[cfg(feature = "parser-m365")]
+        assert_eq!(
+            irmind_mod_parser_m365::M365Parser
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            (expected == "parser-m365").then_some(98)
+        );
+        #[cfg(feature = "parser-okta")]
+        assert_eq!(
+            irmind_mod_parser_okta::OktaParser
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            (expected == "parser-okta").then_some(98)
+        );
+
         #[cfg(feature = "parser-entra")]
         assert_eq!(
             irmind_mod_parser_entra::EntraParser

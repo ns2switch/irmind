@@ -1,5 +1,7 @@
 //! Shared bounded framing mechanics. Source modules still own their format and time rules.
+mod csv;
 mod json;
+pub use csv::{csv_frame, csv_values};
 mod time;
 use super::{
     DecodeAnnotationsV1, DecodeBudget, SourceFormatV1, SourceMetadata, SourceRecordV1, SourceValue,

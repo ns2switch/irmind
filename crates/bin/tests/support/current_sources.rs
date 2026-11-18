@@ -5,6 +5,37 @@ use irmind_infra::LocalStore;
 use std::{path::Path, sync::Arc};
 fn registry() -> ModuleRegistry {
     let mut registry = ModuleRegistry::new();
+    #[cfg(feature = "parser-m365")]
+    {
+        registry
+            .register(
+                Box::new(irmind_mod_parser_m365::M365Parser),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+        registry
+            .register(
+                Box::new(irmind_mod_mapping_identity::IdentityMapping::m365().unwrap()),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+    }
+    #[cfg(feature = "parser-okta")]
+    {
+        registry
+            .register(
+                Box::new(irmind_mod_parser_okta::OktaParser),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+        registry
+            .register(
+                Box::new(irmind_mod_mapping_identity::IdentityMapping::okta().unwrap()),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+    }
+
     #[cfg(feature = "parser-json")]
     {
         registry

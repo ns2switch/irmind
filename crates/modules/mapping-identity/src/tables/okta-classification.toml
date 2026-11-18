@@ -1,0 +1,262 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-okta-classification"
+version = "identity-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-okta"
+parser_versions = ["okta-source-v1"]
+format = "okta-system-log"
+format_version = "okta-source-v1"
+action = ["eventType"]
+
+[[rules]]
+categories = ["authentication"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.session.start" }
+
+[[rules]]
+categories = ["authentication"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.session.end" }
+
+[[rules]]
+categories = ["authentication"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.authentication.sso" }
+
+[[rules]]
+categories = ["authentication"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.authentication.auth_via_mfa" }
+
+[[rules]]
+categories = ["authentication"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.authentication.auth_via_IDP" }
+
+[[rules]]
+categories = ["authentication"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.authentication.auth_via_inbound_SAML" }
+
+[[rules]]
+categories = ["authentication"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.authentication.verify" }
+
+[[rules]]
+categories = ["authentication"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.authentication.authenticate" }
+
+[[rules]]
+categories = ["authentication"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.mfa.okta_verify" }
+
+[[rules]]
+categories = ["authentication"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.mfa.factor.activate" }
+
+[[rules]]
+categories = ["authentication"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.mfa.factor.deactivate" }
+
+[[rules]]
+categories = ["authentication"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.mfa.factor.reset_all" }
+
+[[rules]]
+categories = ["authentication"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.mfa.factor.update" }
+
+[[rules]]
+categories = ["authentication"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.authentication.auth_via_social" }
+
+[[rules]]
+categories = ["iam"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.account.reset_password" }
+
+[[rules]]
+categories = ["iam"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.account.update_password" }
+
+[[rules]]
+categories = ["iam"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.account.privilege.grant" }
+
+[[rules]]
+categories = ["iam"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.account.privilege.revoke" }
+
+[[rules]]
+categories = ["iam"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "group.user_membership.add" }
+
+[[rules]]
+categories = ["iam"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "group.user_membership.remove" }
+
+[[rules]]
+categories = ["iam"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.lifecycle.create" }
+
+[[rules]]
+categories = ["iam"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.lifecycle.activate" }
+
+[[rules]]
+categories = ["iam"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.lifecycle.deactivate" }
+
+[[rules]]
+categories = ["iam"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.lifecycle.suspend" }
+
+[[rules]]
+categories = ["iam"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.lifecycle.unsuspend" }
+
+[[rules]]
+categories = ["iam"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.session.impersonation.initiate" }
+
+[[rules]]
+categories = ["iam"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.session.impersonation.end" }
+
+[[rules]]
+categories = ["iam"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "user.session.impersonation.grant" }
+
+[[rules]]
+categories = ["configuration"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "policy.lifecycle.create" }
+
+[[rules]]
+categories = ["configuration"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "policy.lifecycle.update" }
+
+[[rules]]
+categories = ["configuration"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "policy.lifecycle.delete" }
+
+[[rules]]
+categories = ["configuration"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "policy.rule.add" }
+
+[[rules]]
+categories = ["configuration"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "policy.rule.update" }
+
+[[rules]]
+categories = ["configuration"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "policy.rule.delete" }
+
+[[rules]]
+categories = ["configuration"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "policy.evaluate_sign_on" }
+
+[[rules]]
+categories = ["configuration"]
+outcome = "unknown"
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "application.lifecycle.update" }

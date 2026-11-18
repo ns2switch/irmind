@@ -1,0 +1,53 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-m365-base"
+version = "identity-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-m365"
+parser_versions = ["m365-source-v1"]
+format = "m365-audit"
+format_version = "m365-source-v1"
+action = ["Operation"]
+
+[partition]
+account = ["OrganizationId"]
+
+[[fields]]
+source = ["OrganizationId"]
+target = "cloud.account.id"
+omit_text = ["", "-"]
+observation = { kind = "account", role = "subject", scope = { kind = "account", path = ["OrganizationId"] } }
+
+[[fields]]
+source = ["UserId"]
+target = "user.name"
+omit_text = ["", "-"]
+observation = { kind = "user", role = "actor", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["ObjectId"]
+target = "irmind.resource.id"
+omit_text = ["", "-"]
+observation = { kind = "resource", role = "subject", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["UserAgent"]
+target = "user_agent.original"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["Workload"]
+target = "cloud.service.name"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["Id"]
+target = "irmind.source_event.id"
+omit_text = ["", "-"]
+observation = { kind = "event", role = "subject", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["MailboxOwnerUPN"]
+target = "user.target.name"
+omit_text = ["", "-"]
+observation = { kind = "user", role = "target", scope = { kind = "source_record" } }

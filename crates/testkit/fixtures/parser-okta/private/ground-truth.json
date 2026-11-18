@@ -1,0 +1,1 @@
+{"synthetic":true,"events":["synthetic-okta-0","synthetic-okta-1","synthetic-okta-2","synthetic-okta-3"],"entities":["alice@example.invalid","bob@example.invalid","203.0.113.77"],"techniques":["T1078","T1556.006"],"accepted_conclusions":["Synthetic identity activity includes authentication failure, MFA reset, privilege change and impersonation."]}

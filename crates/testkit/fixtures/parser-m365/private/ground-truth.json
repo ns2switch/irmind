@@ -1,0 +1,1 @@
+{"synthetic":true,"events":["synthetic-m365-0","synthetic-m365-1","synthetic-m365-2","synthetic-m365-3","synthetic-m365-4"],"entities":["alice@example.invalid","bob@example.invalid","203.0.113.77"],"techniques":["T1078","T1114.003"],"accepted_conclusions":["Synthetic account activity includes a failed login, a mailbox rule and forwarding-related configuration."]}

@@ -1,0 +1,34 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-okta-status"
+version = "identity-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-okta"
+parser_versions = ["okta-source-v1"]
+format = "okta-system-log"
+format_version = "okta-source-v1"
+action = ["eventType"]
+
+[[rules]]
+outcome = "success"
+[[rules.when]]
+path = ["outcome", "result"]
+predicate = { op = "text", value = "SUCCESS" }
+
+[[rules]]
+outcome = "success"
+[[rules.when]]
+path = ["outcome", "result"]
+predicate = { op = "text", value = "ALLOW" }
+
+[[rules]]
+outcome = "failure"
+[[rules.when]]
+path = ["outcome", "result"]
+predicate = { op = "text", value = "FAILURE" }
+
+[[rules]]
+outcome = "failure"
+[[rules.when]]
+path = ["outcome", "result"]
+predicate = { op = "text", value = "DENY" }

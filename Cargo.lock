@@ -2272,6 +2272,7 @@ dependencies = [
  "irmind-mod-mapping-evtx",
  "irmind-mod-mapping-falco",
  "irmind-mod-mapping-gcp-audit",
+ "irmind-mod-mapping-identity",
  "irmind-mod-mapping-journald-compat",
  "irmind-mod-mapping-json-compat",
  "irmind-mod-mapping-kubernetes",
@@ -2292,7 +2293,9 @@ dependencies = [
  "irmind-mod-parser-json",
  "irmind-mod-parser-kubernetes",
  "irmind-mod-parser-linux",
+ "irmind-mod-parser-m365",
  "irmind-mod-parser-ocsf",
+ "irmind-mod-parser-okta",
  "irmind-mod-parser-plaso",
  "irmind-mod-parser-suricata",
  "irmind-mod-parser-syslog",
@@ -2695,6 +2698,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-mapping-identity"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-build-manifest",
+ "irmind-domain",
+ "irmind-mapping-tables",
+ "irmind-mod-parser-m365",
+ "irmind-mod-parser-okta",
+ "irmind-testkit",
+]
+
+[[package]]
 name = "irmind-mod-mapping-journald-compat"
 version = "0.1.0"
 dependencies = [
@@ -2922,6 +2938,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-parser-m365"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-testkit",
+]
+
+[[package]]
 name = "irmind-mod-parser-ocsf"
 version = "0.1.0"
 dependencies = [
@@ -2934,6 +2959,15 @@ dependencies = [
  "parquet",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "irmind-mod-parser-okta"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-testkit",
 ]
 
 [[package]]

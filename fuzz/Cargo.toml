@@ -12,6 +12,10 @@ export = ["dep:irmind-infra"]
 cargo-fuzz = true
 
 [dependencies]
+irmind-mod-parser-m365 = { path = "../crates/modules/parser-m365", version = "0.1.0" }
+irmind-mod-parser-okta = { path = "../crates/modules/parser-okta", version = "0.1.0" }
+irmind-mod-mapping-identity = { path = "../crates/modules/mapping-identity", version = "0.1.0" }
+
 irmind-mod-mapping-network = { path = "../crates/modules/mapping-network", version = "0.1.0" }
 irmind-mod-parser-entra = { path = "../crates/modules/parser-entra", version = "0.1.0" }
 irmind-mod-mapping-entra = { path = "../crates/modules/mapping-entra", version = "0.1.0" }
@@ -210,3 +214,17 @@ bench = false
 [patch.crates-io]
 arrow-array = { path = "../vendor/arrow-array" }
 parquet = { path = "../vendor/parquet" }
+
+[[bin]]
+name = "parser_m365"
+path = "fuzz_targets/parser_m365.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_okta"
+path = "fuzz_targets/parser_okta.rs"
+test = false
+doc = false
+bench = false

@@ -1,0 +1,213 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-m365-classification"
+version = "identity-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-m365"
+parser_versions = ["m365-source-v1"]
+format = "m365-audit"
+format_version = "m365-source-v1"
+action = ["Operation"]
+
+[[rules]]
+categories = ["authentication"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "UserLoggedIn" }
+
+[[rules]]
+categories = ["authentication"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "UserLoginFailed" }
+
+[[rules]]
+categories = ["email"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "New-InboxRule" }
+
+[[rules]]
+categories = ["email"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "Set-InboxRule" }
+
+[[rules]]
+categories = ["email"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "UpdateInboxRules" }
+
+[[rules]]
+categories = ["email"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "Set-Mailbox" }
+
+[[rules]]
+categories = ["email"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "MailItemsAccessed" }
+
+[[rules]]
+categories = ["email"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "Send" }
+
+[[rules]]
+categories = ["email"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "SendAs" }
+
+[[rules]]
+categories = ["email"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "SendOnBehalf" }
+
+[[rules]]
+categories = ["email"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "Add-MailboxPermission" }
+
+[[rules]]
+categories = ["iam"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "Consent to application." }
+
+[[rules]]
+categories = ["iam"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "Add service principal credentials." }
+
+[[rules]]
+categories = ["iam"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "Add application credentials." }
+
+[[rules]]
+categories = ["iam"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "Add app role assignment to service principal." }
+
+[[rules]]
+categories = ["iam"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "Add delegated permission grant." }
+
+[[rules]]
+categories = ["iam"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "Consent to application" }
+
+[[rules]]
+categories = ["iam"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "Add service principal credentials" }
+
+[[rules]]
+categories = ["iam"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "Add application credentials" }
+
+[[rules]]
+categories = ["file"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "FileDownloaded" }
+
+[[rules]]
+categories = ["file"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "FileAccessed" }
+
+[[rules]]
+categories = ["file"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "FileSyncDownloadedFull" }
+
+[[rules]]
+categories = ["configuration"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "SharingSet" }
+
+[[rules]]
+categories = ["configuration"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "SharingInvitationCreated" }
+
+[[rules]]
+categories = ["configuration"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "AnonymousLinkCreated" }
+
+[[rules]]
+categories = ["configuration"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "CompanyLinkCreated" }
+
+[[rules]]
+categories = ["configuration"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "SecureLinkCreated" }
+
+[[rules]]
+categories = ["configuration"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "AddedToSecureLink" }
+
+[[rules]]
+categories = ["configuration"]
+outcome = "unknown"
+[[rules.when]]
+path = ["Operation"]
+predicate = { op = "text", value = "SharingRevoked" }

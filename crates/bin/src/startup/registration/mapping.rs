@@ -25,6 +25,17 @@ const NETWORK_PARSERS: &[&str] = &[
 ];
 
 pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(all(feature = "mapping-identity", feature = "parser-m365"))]
+    registry.register(
+        Box::new(irmind_mod_mapping_identity::IdentityMapping::m365()?),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(all(feature = "mapping-identity", feature = "parser-okta"))]
+    registry.register(
+        Box::new(irmind_mod_mapping_identity::IdentityMapping::okta()?),
+        &ModuleConfig::new(),
+    )?;
+
     #[cfg(feature = "mapping-json-compat")]
     registry.register(Box::new(json_compatibility()?), &ModuleConfig::new())?;
     #[cfg(feature = "mapping-journald-compat")]

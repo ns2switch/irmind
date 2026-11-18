@@ -10,6 +10,8 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 
 | Parser | Input | Detection | Mapped fields | Status |
 | --- | --- | --- | --- | --- |
+| Microsoft 365 Unified Audit Log | Purview CSV, Search-UnifiedAuditLog JSON, Management Activity API JSON | Native AuditData/Operation, CreationTime and workload; 98 | UTC time, actor, mailbox target when explicit, resource, source IP, user agent, workload, finite operation/outcome tables | experimental |
+| Okta System Log | API JSON arrays and JSON/NDJSON exports | eventType, uuid, actor and published time; 98 | Authentication, MFA, administration, policies and impersonation; actor/target and source IP | experimental |
 | Windows EVTX | Binary EVTX: Security, System, PowerShell, Sysmon | Valid EVTX header and checksum; 95 | UTC time at 100 ns precision, host, user, process, IP/port and real record offsets | available; experimental |
 | Linux | auth.log/secure, auditd, journald JSON, HTTP common/combined | Authentication tags, audit headers, journal fields or HTTP header; 95 | UTC time, host, user, process, command, IP/port, action/result; bounded audit correlation | experimental |
 | Syslog | RFC 5424 / RFC 3164, plain or gzip | PRI and timestamp/header shape; 95 / 90 | UTC time, host, application, PID, facility, severity, message and raw data | experimental |
@@ -190,3 +192,31 @@ arrays are detected. Retain the complete cluster labels. For a self-managed
 cluster, configure the API server audit log backend and collect its JSON/NDJSON
 Events through an authorized read-only path. See the
 [formats and primary references](development/managed-kubernetes-transports.md).
+
+## Microsoft 365 and Okta exports
+
+Export a Purview audit search as UTF-8 CSV retaining the `AuditData` column, or
+export `Search-UnifiedAuditLog` results as JSON retaining that field. Management
+Activity API JSON records can be ingested directly. Preserve the original files;
+IRMind neither executes PowerShell nor requests tenant access. The decoder extracts
+the native audit object, retaining operation parameters as untrusted searchable
+fields. Mailbox targets use `MailboxOwnerUPN` when supplied; an object path is not
+assumed to be a user. The documented UTC `CreationTime` is retained precisely.
+
+Export Okta System Log API responses as JSON arrays or one original event per line.
+Keep `published`, `uuid`, `eventType`, `actor`, `target`, `client`,
+`authenticationContext`, `securityContext` and bounded `debugContext` intact.
+The mapper uses documented event names and explicit outcome values; missing or
+unrecognized outcomes remain unknown. Unknown operations remain searchable API
+records. Neither module uses a remote connector or requires credentials.
+
+Original arrays remain searchable. The scalar common schema projects the first
+user target; additional distinct targets remain in the original with a coverage
+diagnostic. A missing tenant is never inferred from an ISP or file name: Okta
+user observations retain source-record scope. M365 uses an explicit OrganizationId
+when available. None of these mappings uses process-lifetime scope.
+
+Sources: [Microsoft audit schema](https://learn.microsoft.com/en-us/office/office-365-management-api/office-365-management-activity-api-schema),
+[Purview export](https://learn.microsoft.com/en-us/purview/audit-log-export-records),
+[Okta System Log](https://developer.okta.com/docs/api/openapi/okta-management/management/tags/systemlog),
+[Okta event catalog](https://developer.okta.com/docs/reference/api/event-types/).

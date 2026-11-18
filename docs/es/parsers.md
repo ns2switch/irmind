@@ -12,6 +12,8 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 
 | Parser | Entrada | Detección | Campos mapeados | Estado |
 | --- | --- | --- | --- | --- |
+| Microsoft 365 Unified Audit Log | CSV de Purview, JSON de Search-UnifiedAuditLog y Management Activity API | AuditData/Operation, CreationTime y workload originales; 98 | Instante UTC, actor, buzón objetivo explícito, recurso, IP de origen, user agent, workload y tablas de operación/resultado | experimental |
+| Okta System Log | Arrays JSON de la API y exports JSON/NDJSON | eventType, uuid, actor e instante published; 98 | Autenticación, MFA, administración, políticas y suplantación; actor/objetivo e IP de origen | experimental |
 | JSON y logs de nube exportados | JSON/NDJSON; AWS, GCP, Azure y HuntEval | Campos reconocidos del registro | Instante, identidades, cuentas, recursos e IP | experimental |
 | GCP Cloud Audit Logs | LogEntry JSON/NDJSON; exportaciones de GKE | Servicio/método protoPayload e instante originales | Nanosegundos UTC, estado explícito, roles de principal, recurso y extremos; clúster GKE confirmado | experimental |
 | Microsoft Entra ID | JSON/NDJSON de Azure Monitor y filas-objeto de Log Analytics | Categoría o Type documentado e instante original | Accesos y auditoría, resultado explícito, tenant, actor, objetivo e IP | experimental |
@@ -193,3 +195,32 @@ NDJSON como arrays JSON de gcloud. Conserva las etiquetas completas del clúster
 En un clúster propio, configura el backend de logs de auditoría del API server y
 recoge sus Events JSON/NDJSON por una ruta autorizada de solo lectura. Consulta
 los [formatos y las fuentes oficiales](../development/managed-kubernetes-transports.md).
+
+## Exports de Microsoft 365 y Okta
+
+Exporta una búsqueda de auditoría de Purview como CSV UTF-8 conservando `AuditData`,
+o guarda los resultados de `Search-UnifiedAuditLog` en JSON con ese campo.
+Los registros JSON de Management Activity API se ingieren directamente. Conserva
+los originales: IRMind no ejecuta PowerShell ni pide acceso al tenant. El
+decodificador extrae el objeto de auditoría original; sus parámetros siguen siendo
+campos consultables no confiables. El buzón objetivo usa `MailboxOwnerUPN` si está
+presente; una ruta de objeto no se interpreta como usuario. Se conserva la precisión
+de `CreationTime`, que el formato documenta como UTC.
+
+Exporta las respuestas de System Log de Okta como arrays JSON o un evento por línea.
+Conserva `published`, `uuid`, `eventType`, `actor`, `target`, `client`,
+`authenticationContext`, `securityContext` y el `debugContext` acotado. Los nombres
+de evento y resultados se clasifican mediante tablas finitas. Los resultados
+ausentes o desconocidos quedan como unknown. Las operaciones desconocidas siguen
+siendo registros API consultables. Ninguno de estos módulos necesita credenciales.
+
+Los arrays originales siguen siendo consultables. El esquema común escalar proyecta
+el primer usuario objetivo; los objetivos distintos adicionales se conservan en el
+original con un diagnóstico de cobertura. No se deduce un tenant del ISP ni del
+nombre del fichero: los usuarios de Okta conservan ámbito por registro de origen.
+M365 usa OrganizationId cuando es explícito. No se usa ámbito process_lifetime.
+
+Fuentes: [esquema de Microsoft](https://learn.microsoft.com/en-us/office/office-365-management-api/office-365-management-activity-api-schema),
+[exportación de Purview](https://learn.microsoft.com/en-us/purview/audit-log-export-records),
+[System Log de Okta](https://developer.okta.com/docs/api/openapi/okta-management/management/tags/systemlog),
+[catálogo de eventos de Okta](https://developer.okta.com/docs/reference/api/event-types/).

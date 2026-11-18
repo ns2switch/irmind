@@ -7,6 +7,7 @@ license.workspace = true
 
 [features]
 default = [
+    "parser-m365", "parser-okta", "mapping-identity",
     "parser-gcp-audit", "mapping-gcp-audit",
     "parser-entra", "mapping-entra",
     "mapping-falco", "mapping-kubernetes", "mapping-json-compat", "mapping-journald-compat", "mapping-cloudtrail", "mapping-linux", "mapping-ecs", "mapping-evtx", "mapping-dfir", "mapping-syslog", "mapping-network", "mapping-ocsf",
@@ -19,6 +20,9 @@ default = [
     "siem-splunk", "siem-elastic", "siem-chronicle", "cloud-aws", "edr-crowdstrike", "edr-sentinelone",
     "ti-misp", "ti-virustotal", "storage-s3", "storage-gcs", "storage-azure",
 ]
+parser-m365 = ["dep:irmind-mod-parser-m365", "mapping-identity"]
+parser-okta = ["dep:irmind-mod-parser-okta", "mapping-identity"]
+mapping-identity = ["dep:irmind-mod-mapping-identity"]
 mapping-entra = ["dep:irmind-mod-mapping-entra", "parser-entra"]
 parser-entra = ["dep:irmind-mod-parser-entra", "mapping-entra"]
 mapping-gcp-audit = ["dep:irmind-mod-mapping-gcp-audit", "parser-gcp-audit"]
@@ -69,6 +73,10 @@ storage-gcs = ["dep:irmind-mod-storage-object", "irmind-mod-storage-object/gcs"]
 storage-azure = ["dep:irmind-mod-storage-object", "irmind-mod-storage-object/azure"]
 
 [dependencies]
+irmind-mod-parser-m365 = { path = "../modules/parser-m365", version = "0.1.0", optional = true }
+irmind-mod-parser-okta = { path = "../modules/parser-okta", version = "0.1.0", optional = true }
+irmind-mod-mapping-identity = { path = "../modules/mapping-identity", version = "0.1.0", optional = true }
+
 irmind-mod-parser-entra = { path = "../modules/parser-entra", version = "0.1.0", optional = true }
 irmind-mod-mapping-entra = { path = "../modules/mapping-entra", version = "0.1.0", optional = true }
 irmind-mod-parser-gcp-audit = { path = "../modules/parser-gcp-audit", version = "0.1.0", optional = true }
