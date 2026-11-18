@@ -11,6 +11,7 @@
     feature = "mapping-kubernetes",
     feature = "mapping-gcp-audit",
     feature = "mapping-entra",
+    feature = "mapping-identity",
     feature = "mapping-falco",
 ))]
 mod mapping;
@@ -46,6 +47,8 @@ use super::{
     feature = "parser-kubernetes",
     feature = "parser-gcp-audit",
     feature = "parser-entra",
+    feature = "parser-m365",
+    feature = "parser-okta",
     feature = "parser-falco",
     feature = "parser-velociraptor",
     feature = "parser-hayabusa",
@@ -103,6 +106,8 @@ pub(super) fn configured_registry(
         feature = "parser-kubernetes",
         feature = "parser-gcp-audit",
         feature = "parser-entra",
+        feature = "parser-m365",
+        feature = "parser-okta",
         feature = "parser-falco",
         feature = "parser-velociraptor",
         feature = "parser-hayabusa",
@@ -163,6 +168,8 @@ pub(super) fn configured_registry(
     feature = "parser-kubernetes",
     feature = "parser-gcp-audit",
     feature = "parser-entra",
+    feature = "parser-m365",
+    feature = "parser-okta",
     feature = "parser-falco",
     feature = "parser-velociraptor",
     feature = "parser-hayabusa",
@@ -193,11 +200,14 @@ fn register_parsers(
         feature = "mapping-kubernetes",
         feature = "mapping-gcp-audit",
         feature = "mapping-entra",
+        feature = "mapping-identity",
         feature = "mapping-falco",
     ))]
     mapping::register(registry)?;
     #[cfg(any(
         feature = "parser-entra",
+        feature = "parser-m365",
+        feature = "parser-okta",
         feature = "parser-gcp-audit",
         feature = "parser-kubernetes",
         feature = "parser-falco"
@@ -674,11 +684,23 @@ fn register_chronicle(
 
 #[cfg(any(
     feature = "parser-entra",
+    feature = "parser-m365",
+    feature = "parser-okta",
     feature = "parser-gcp-audit",
     feature = "parser-kubernetes",
     feature = "parser-falco"
 ))]
 fn register_contextual_parsers(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(feature = "parser-m365")]
+    registry.register(
+        Box::new(irmind_mod_parser_m365::M365Parser),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(feature = "parser-okta")]
+    registry.register(
+        Box::new(irmind_mod_parser_okta::OktaParser),
+        &ModuleConfig::new(),
+    )?;
     #[cfg(feature = "parser-entra")]
     registry.register(
         Box::new(irmind_mod_parser_entra::EntraParser),

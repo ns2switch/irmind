@@ -4,6 +4,11 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+- Add experimental Microsoft 365 Unified Audit Log and Okta System Log modules
+  with separate bounded decoders and identified mapping tables. Purview CSV,
+  PowerShell/API JSON, original parameters, precise UTC times, explicit outcomes
+  and actor/target roles are retained. Unknown operations remain searchable.
+
 ## 0.5.4 — Verified Homebrew installation and the community skill catalog
 
 **Format impact:** No case, artifact, seal, export or definition format changes.

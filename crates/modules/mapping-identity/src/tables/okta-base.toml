@@ -1,0 +1,33 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-okta-base"
+version = "identity-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-okta"
+parser_versions = ["okta-source-v1"]
+format = "okta-system-log"
+format_version = "okta-source-v1"
+action = ["eventType"]
+
+[[fields]]
+source = ["actor", "id"]
+target = "user.id"
+omit_text = ["", "-"]
+observation = { kind = "user", role = "actor", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["actor", "alternateId"]
+target = "user.name"
+omit_text = ["", "-"]
+observation = { kind = "user", role = "actor", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["client", "userAgent", "rawUserAgent"]
+target = "user_agent.original"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["uuid"]
+target = "irmind.source_event.id"
+omit_text = ["", "-"]
+observation = { kind = "event", role = "subject", scope = { kind = "source_record" } }

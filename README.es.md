@@ -143,6 +143,8 @@ La compilación normal incluye todos los módulos de producto actuales y ambos l
 | Parser declarativo | parser local | `parser-declarative` (por defecto) | experimental | [Formatos propios](docs/es/parsers.md) |
 | GCP Cloud Audit / GKE | parser y mapeo locales | `parser-gcp-audit` (por defecto) | experimental | [GCP y GKE](docs/es/parsers.md#cloud-audit-logs-de-gcp-y-gke) |
 | Microsoft Entra ID | parser y mapeo locales | `parser-entra` (por defecto) | experimental | [Entra](docs/es/parsers.md#microsoft-entra-id) |
+| Microsoft 365 audit | parser y mapeo locales | `parser-m365` (por defecto) | experimental | [M365](docs/es/parsers.md) |
+| Okta System Log | parser y mapeo locales | `parser-okta` (por defecto) | experimental | [Okta](docs/es/parsers.md) |
 | Auditoría Kubernetes | parser y mapeo locales | `parser-kubernetes` (por defecto) | experimental | [Contexto de clúster](docs/es/parsers.md#interpretación-de-kubernetes-y-falco) |
 | Falco | parser y mapeo locales | `parser-falco` (por defecto) | experimental | [Alertas de origen](docs/es/parsers.md#interpretación-de-kubernetes-y-falco) |
 | Logs de Linux | parser local | `parser-linux` (por defecto) | experimental | [Linux](docs/es/modules.md#logs-de-linux) |

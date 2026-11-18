@@ -1,0 +1,58 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-m365-status"
+version = "identity-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-m365"
+parser_versions = ["m365-source-v1"]
+format = "m365-audit"
+format_version = "m365-source-v1"
+action = ["Operation"]
+
+[[rules]]
+outcome = "success"
+[[rules.when]]
+path = ["ResultStatus"]
+predicate = { op = "text", value = "Success" }
+
+[[rules]]
+outcome = "success"
+[[rules.when]]
+path = ["ResultStatus"]
+predicate = { op = "text", value = "Succeeded" }
+
+[[rules]]
+outcome = "success"
+[[rules.when]]
+path = ["ResultStatus"]
+predicate = { op = "text", value = "True" }
+
+[[rules]]
+outcome = "success"
+[[rules.when]]
+path = ["ResultStatus"]
+predicate = { op = "text", value = "true" }
+
+[[rules]]
+outcome = "failure"
+[[rules.when]]
+path = ["ResultStatus"]
+predicate = { op = "text", value = "Failed" }
+
+[[rules]]
+outcome = "failure"
+[[rules.when]]
+path = ["ResultStatus"]
+predicate = { op = "text", value = "Failure" }
+
+[[rules]]
+outcome = "failure"
+[[rules.when]]
+path = ["ResultStatus"]
+predicate = { op = "text", value = "False" }
+
+[[rules]]
+outcome = "failure"
+[[rules.when]]
+path = ["ResultStatus"]
+predicate = { op = "text", value = "false" }

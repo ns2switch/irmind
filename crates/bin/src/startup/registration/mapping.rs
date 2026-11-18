@@ -25,6 +25,17 @@ const NETWORK_PARSERS: &[&str] = &[
 ];
 
 pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(all(feature = "mapping-identity", feature = "parser-m365"))]
+    registry.register(
+        Box::new(irmind_mod_mapping_identity::IdentityMapping::m365()?),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(all(feature = "mapping-identity", feature = "parser-okta"))]
+    registry.register(
+        Box::new(irmind_mod_mapping_identity::IdentityMapping::okta()?),
+        &ModuleConfig::new(),
+    )?;
+
     #[cfg(feature = "mapping-json-compat")]
     registry.register(Box::new(json_compatibility()?), &ModuleConfig::new())?;
     #[cfg(feature = "mapping-journald-compat")]
@@ -248,8 +259,19 @@ mod tests {
         registry
             .add_source_decoder(Arc::new(irmind_mod_parser_entra::EntraSourceDecoder))
             .unwrap();
+        register_identity_decoders(&mut registry);
         register(&mut registry).unwrap();
         check_catalog(&registry);
+    }
+    fn register_identity_decoders(registry: &mut ModuleRegistry) {
+        #[cfg(all(feature = "mapping-identity", feature = "parser-m365"))]
+        registry
+            .add_source_decoder(Arc::new(irmind_mod_parser_m365::M365SourceDecoder))
+            .unwrap();
+        #[cfg(all(feature = "mapping-identity", feature = "parser-okta"))]
+        registry
+            .add_source_decoder(Arc::new(irmind_mod_parser_okta::OktaSourceDecoder))
+            .unwrap();
     }
     fn check_catalog(registry: &ModuleRegistry) {
         let catalog = registry.mapping_catalog().unwrap();
@@ -257,7 +279,13 @@ mod tests {
         assert!(catalog.supports_decoder("parser-linux", "linux-source-v1"));
         assert_eq!(
             catalog.snapshots().unwrap().len(),
-            2 + 4 * usize::from(cfg!(feature = "mapping-entra"))
+            2 + usize::from(cfg!(all(
+                feature = "mapping-identity",
+                feature = "parser-m365"
+            ))) + usize::from(cfg!(all(
+                feature = "mapping-identity",
+                feature = "parser-okta"
+            ))) + 4 * usize::from(cfg!(feature = "mapping-entra"))
                 + 2 * usize::from(cfg!(feature = "mapping-gcp-audit"))
                 + 3 * usize::from(cfg!(feature = "mapping-falco"))
                 + 3 * usize::from(cfg!(feature = "mapping-kubernetes"))
