@@ -200,7 +200,6 @@ fn identity_failures_keep_roles_originals_and_signed_export() {
 #[test]
 #[ignore = "manual optimized 1 GiB source ingestion benchmark"]
 fn one_gib_release_throughput() -> Result<(), &'static str> {
-    use std::io::{BufWriter, Write};
     if cfg!(debug_assertions) {
         return Err("Use --release for benchmarks");
     }
@@ -218,51 +217,67 @@ fn one_gib_release_throughput() -> Result<(), &'static str> {
         #[cfg(feature = "parser-gcp-flow")]
         "gcp-flow",
     ] {
-        let bench_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target");
-        let root = tempfile::Builder::new()
-            .prefix("irmind-source-bench-")
-            .tempdir_in(bench_root)
-            .unwrap();
-        let originals = root.path().join("originals");
-        fs::create_dir(&originals).unwrap();
-        let store = Arc::new(current_sources::open(&root.path().join("data")));
-        let engine = engine(&store);
-        let case = engine
-            .create_case("Synthetic identity benchmark", "Local only")
-            .unwrap();
-        let (header, line, per_record) = benchmark_lines(name);
-        let mut writer =
-            BufWriter::new(fs::File::create(originals.join("benchmark.ndjson")).unwrap());
-        writer.write_all(&header).unwrap();
-        let mut bytes = header.len() as u64;
-        let mut count = 0u64;
-        while bytes < 1024 * 1024 * 1024 {
-            writer.write_all(&line).unwrap();
-            bytes += line.len() as u64;
-            count += per_record;
-        }
-        writer.flush().unwrap();
-        drop(writer);
-        let started = std::time::Instant::now();
-        assert_eq!(
-            ingest_with_context(
-                &engine,
-                store.as_ref(),
-                &case.id,
-                &originals,
-                "benchmark.ndjson",
-                None
-            ),
-            count
-        );
-        let seconds = started.elapsed().as_secs_f64();
-        println!(
-            "IDENTITY_BENCH parser={name} bytes={bytes} records={count} seconds={seconds:.3} MiB_per_second={:.3}",
-            f64::from(u32::try_from(bytes).unwrap()) / 1_048_576.0 / seconds
-        );
-        engine.verify(&case.id).unwrap();
+        benchmark_source(name);
     }
     Ok(())
+}
+
+#[cfg(all(feature = "parser-azure-flow", feature = "parser-gcp-flow"))]
+#[test]
+#[ignore = "manual optimized 1 GiB cloud JSON ingestion benchmark"]
+fn one_gib_release_cloud_json_throughput() -> Result<(), &'static str> {
+    if cfg!(debug_assertions) {
+        return Err("Use --release for benchmarks");
+    }
+    for name in ["azure-vnet", "azure-nsg", "gcp-flow"] {
+        benchmark_source(name);
+    }
+    Ok(())
+}
+fn benchmark_source(name: &str) {
+    use std::io::{BufWriter, Write};
+    let bench_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target");
+    let root = tempfile::Builder::new()
+        .prefix("irmind-source-bench-")
+        .tempdir_in(bench_root)
+        .unwrap();
+    let originals = root.path().join("originals");
+    fs::create_dir(&originals).unwrap();
+    let store = Arc::new(current_sources::open(&root.path().join("data")));
+    let engine = engine(&store);
+    let case = engine
+        .create_case("Synthetic identity benchmark", "Local only")
+        .unwrap();
+    let (header, line, per_record) = benchmark_lines(name);
+    let mut writer = BufWriter::new(fs::File::create(originals.join("benchmark.ndjson")).unwrap());
+    writer.write_all(&header).unwrap();
+    let mut bytes = header.len() as u64;
+    let mut count = 0u64;
+    while bytes < 1024 * 1024 * 1024 {
+        writer.write_all(&line).unwrap();
+        bytes += line.len() as u64;
+        count += per_record;
+    }
+    writer.flush().unwrap();
+    drop(writer);
+    let started = std::time::Instant::now();
+    assert_eq!(
+        ingest_with_context(
+            &engine,
+            store.as_ref(),
+            &case.id,
+            &originals,
+            "benchmark.ndjson",
+            None
+        ),
+        count
+    );
+    let seconds = started.elapsed().as_secs_f64();
+    println!(
+        "IDENTITY_BENCH parser={name} bytes={bytes} records={count} seconds={seconds:.3} MiB_per_second={:.3}",
+        f64::from(u32::try_from(bytes).unwrap()) / 1_048_576.0 / seconds
+    );
+    engine.verify(&case.id).unwrap();
 }
 
 fn benchmark_lines(name: &str) -> (Vec<u8>, Vec<u8>, u64) {
@@ -276,7 +291,9 @@ fn benchmark_lines(name: &str) -> (Vec<u8>, Vec<u8>, u64) {
         return (header, row, 1);
     }
     let mut value: serde_json::Value = serde_json::from_slice(first).unwrap();
-    value["synthetic_padding"] = serde_json::json!("x".repeat(1024));
+    if !name.starts_with("azure-") && name != "gcp-flow" {
+        value["synthetic_padding"] = serde_json::json!("x".repeat(1024));
+    }
     let mut row = serde_json::to_vec(&value).unwrap();
     row.push(b'\n');
     (
