@@ -279,9 +279,10 @@ Las tres familias separan decodificador y mapeo. Las tablas finitas de campos y
 resultados son declarativas; el código nativo valida los tipos numéricos y expande
 las tuplas acotadas de Azure. Son exportaciones locales, no conectores en vivo.
 Se mantienen límites, taint, hashes y procedencia firmada. Una entrada compacta o
-gzip puede superar la cuota vigente de tamaño normalizado aunque cumpla el límite
-de fuente; la ingesta falla con el error de almacenamiento existente, sin omitir
-registros silenciosamente. Estos módulos no amplían esa cuota.
+gzip puede superar la cuota de tamaño normalizado aunque cumpla el límite de fuente. VPC usa una cuota
+acotada de 32× los bytes descomprimidos, con recuento gzip previo de solo lectura
+y reserva completa del grupo y de su ordenación. Los demás módulos conservan su
+cuota. Un exceso rechaza la fuente/grupo, sin omitir registros silenciosamente.
 
 Fuentes: [AWS](https://docs.aws.amazon.com/vpc/latest/userguide/flow-log-records.html),
 [Azure VNet](https://learn.microsoft.com/en-us/azure/network-watcher/vnet-flow-logs-overview),

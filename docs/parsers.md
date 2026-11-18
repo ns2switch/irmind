@@ -277,9 +277,10 @@ and field tables are included declaratively; native glue validates different
 numeric representations and expands bounded Azure tuples. These are local
 exports, not live connectors. Record/source limits, taint, source hashes and
 signed parser/mapping provenance apply. Compact or gzip inputs can exceed the
-existing normalized-size allowance even below the source-size limit; ingestion
-then fails with the existing storage-limit error rather than silently dropping
-records. Increasing that allowance is not part of these modules.
+normalized-size allowance even below the source-size limit. VPC uses a bounded
+32× decoded-byte allowance, with a read-only gzip counting preflight and full
+group/sort disk reservation. Other modules retain their existing allowance. A
+quota overrun rejects the source/group rather than silently dropping records.
 
 Sources: [AWS flow record fields](https://docs.aws.amazon.com/vpc/latest/userguide/flow-log-records.html),
 [Azure VNet flow format](https://learn.microsoft.com/en-us/azure/network-watcher/vnet-flow-logs-overview),
