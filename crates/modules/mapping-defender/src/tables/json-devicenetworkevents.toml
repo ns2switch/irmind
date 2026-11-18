@@ -1,0 +1,204 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mde-json-devicenetworkevents"
+version = "defender-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-defender"
+parser_versions = ["defender-source-v1"]
+format = "mde-json"
+format_version = "defender-source-v1"
+native_type = "DeviceNetworkEvents"
+action = ["ActionType"]
+
+[partition]
+host = ["DeviceId"]
+
+[[fields]]
+source = ["DeviceId"]
+target = "host.id"
+omit_text = ["", "-"]
+observation = { kind = "host", role = "observer", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["DeviceName"]
+target = "host.name"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["InitiatingProcessAccountName"]
+target = "user.name"
+omit_text = ["", "-"]
+observation = { kind = "user", role = "actor", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["InitiatingProcessAccountDomain"]
+target = "user.domain"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["InitiatingProcessId"]
+target = "process.pid"
+omit_text = ["", "-"]
+observation = { kind = "process", role = "subject", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["InitiatingProcessFileName"]
+target = "process.name"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["InitiatingProcessCommandLine"]
+target = "process.command_line"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["InitiatingProcessParentId"]
+target = "process.parent.pid"
+omit_text = ["", "-"]
+observation = { kind = "process", role = "parent", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["InitiatingProcessParentFileName"]
+target = "process.parent.name"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["LocalIP"]
+target = "source.ip"
+omit_text = ["", "-"]
+observation = { kind = "ip", role = "source", scope = { kind = "global" } }
+[[fields.when]]
+path = ["ActionType"]
+predicate = { op = "text", value = "ConnectionSuccess" }
+
+[[fields]]
+source = ["LocalPort"]
+target = "source.port"
+omit_text = ["", "-"]
+[[fields.when]]
+path = ["ActionType"]
+predicate = { op = "text", value = "ConnectionSuccess" }
+
+[[fields]]
+source = ["RemoteIP"]
+target = "destination.ip"
+omit_text = ["", "-"]
+observation = { kind = "ip", role = "destination", scope = { kind = "global" } }
+[[fields.when]]
+path = ["ActionType"]
+predicate = { op = "text", value = "ConnectionSuccess" }
+
+[[fields]]
+source = ["RemotePort"]
+target = "destination.port"
+omit_text = ["", "-"]
+[[fields.when]]
+path = ["ActionType"]
+predicate = { op = "text", value = "ConnectionSuccess" }
+
+[[fields]]
+source = ["LocalIP"]
+target = "source.ip"
+omit_text = ["", "-"]
+observation = { kind = "ip", role = "source", scope = { kind = "global" } }
+[[fields.when]]
+path = ["ActionType"]
+predicate = { op = "text", value = "ConnectionFailed" }
+
+[[fields]]
+source = ["LocalPort"]
+target = "source.port"
+omit_text = ["", "-"]
+[[fields.when]]
+path = ["ActionType"]
+predicate = { op = "text", value = "ConnectionFailed" }
+
+[[fields]]
+source = ["RemoteIP"]
+target = "destination.ip"
+omit_text = ["", "-"]
+observation = { kind = "ip", role = "destination", scope = { kind = "global" } }
+[[fields.when]]
+path = ["ActionType"]
+predicate = { op = "text", value = "ConnectionFailed" }
+
+[[fields]]
+source = ["RemotePort"]
+target = "destination.port"
+omit_text = ["", "-"]
+[[fields.when]]
+path = ["ActionType"]
+predicate = { op = "text", value = "ConnectionFailed" }
+
+[[fields]]
+source = ["LocalIP"]
+target = "destination.ip"
+omit_text = ["", "-"]
+observation = { kind = "ip", role = "destination", scope = { kind = "global" } }
+[[fields.when]]
+path = ["ActionType"]
+predicate = { op = "text", value = "InboundConnectionAccepted" }
+
+[[fields]]
+source = ["LocalPort"]
+target = "destination.port"
+omit_text = ["", "-"]
+[[fields.when]]
+path = ["ActionType"]
+predicate = { op = "text", value = "InboundConnectionAccepted" }
+
+[[fields]]
+source = ["RemoteIP"]
+target = "source.ip"
+omit_text = ["", "-"]
+observation = { kind = "ip", role = "source", scope = { kind = "global" } }
+[[fields.when]]
+path = ["ActionType"]
+predicate = { op = "text", value = "InboundConnectionAccepted" }
+
+[[fields]]
+source = ["RemotePort"]
+target = "source.port"
+omit_text = ["", "-"]
+[[fields.when]]
+path = ["ActionType"]
+predicate = { op = "text", value = "InboundConnectionAccepted" }
+
+[[fields]]
+source = ["InitiatingProcessMD5"]
+target = "process.hash.md5"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["InitiatingProcessSHA1"]
+target = "process.hash.sha1"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["InitiatingProcessSHA256"]
+target = "process.hash.sha256"
+omit_text = ["", "-"]
+
+[[rules]]
+categories = ["network"]
+types = ["connection"]
+outcome = "success"
+[[rules.when]]
+path = ["ActionType"]
+predicate = { op = "text", value = "ConnectionSuccess" }
+
+[[rules]]
+categories = ["network"]
+types = ["connection"]
+outcome = "failure"
+[[rules.when]]
+path = ["ActionType"]
+predicate = { op = "text", value = "ConnectionFailed" }
+
+[[rules]]
+categories = ["network"]
+types = ["connection"]
+outcome = "success"
+[[rules.when]]
+path = ["ActionType"]
+predicate = { op = "text", value = "InboundConnectionAccepted" }

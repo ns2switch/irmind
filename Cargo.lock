@@ -2279,6 +2279,7 @@ dependencies = [
  "irmind-mod-llm-openrouter",
  "irmind-mod-mapping-cloud-flow",
  "irmind-mod-mapping-cloudtrail",
+ "irmind-mod-mapping-defender",
  "irmind-mod-mapping-dfir",
  "irmind-mod-mapping-ecs",
  "irmind-mod-mapping-email",
@@ -2299,6 +2300,7 @@ dependencies = [
  "irmind-mod-parser-azure-flow",
  "irmind-mod-parser-chainsaw",
  "irmind-mod-parser-declarative",
+ "irmind-mod-parser-defender",
  "irmind-mod-parser-ecs",
  "irmind-mod-parser-email",
  "irmind-mod-parser-entra",
@@ -2658,6 +2660,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-mapping-defender"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-build-manifest",
+ "irmind-domain",
+ "irmind-mapping-tables",
+ "irmind-mod-parser-defender",
+ "irmind-testkit",
+]
+
+[[package]]
 name = "irmind-mod-mapping-dfir"
 version = "0.1.0"
 dependencies = [
@@ -2903,6 +2917,15 @@ dependencies = [
  "serde",
  "serde_json",
  "toml 0.9.12+spec-1.1.0",
+]
+
+[[package]]
+name = "irmind-mod-parser-defender"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-testkit",
 ]
 
 [[package]]

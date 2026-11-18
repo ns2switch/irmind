@@ -1,0 +1,49 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mde-stream-alertevidence"
+version = "defender-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-defender"
+parser_versions = ["defender-source-v1"]
+format = "mde-stream"
+format_version = "defender-source-v1"
+native_type = "AlertEvidence"
+
+[[fields]]
+source = ["properties", "DeviceId"]
+target = "host.id"
+omit_text = ["", "-"]
+observation = { kind = "host", role = "observer", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["properties", "DeviceName"]
+target = "host.name"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["properties", "AlertId"]
+target = "irmind.detection.id"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["properties", "Severity"]
+target = "irmind.detection.source_severity"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["properties", "AccountName"]
+target = "user.name"
+omit_text = ["", "-"]
+observation = { kind = "user", role = "subject", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["properties", "RemoteIP"]
+target = "destination.ip"
+omit_text = ["", "-"]
+observation = { kind = "ip", role = "related", scope = { kind = "global" } }
+
+[[rules]]
+categories = ["intrusion_detection"]
+types = ["indicator"]
+kind = "alert"
+outcome = "unknown"

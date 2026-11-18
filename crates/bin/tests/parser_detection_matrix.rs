@@ -74,6 +74,11 @@ mod matrix {
     #[allow(clippy::too_many_lines)]
     fn each_fixture_has_one_unique_high_confidence_parser() -> Result<(), irmind_app::AppError> {
         let mut registry = ModuleRegistry::new();
+        #[cfg(feature = "parser-defender")]
+        registry.register(
+            Box::new(irmind_mod_parser_defender::DefenderParser),
+            &ModuleConfig::new(),
+        )?;
         #[cfg(feature = "parser-email")]
         registry.register(
             Box::new(irmind_mod_parser_email::EmailParser),
@@ -163,6 +168,33 @@ mod matrix {
         )?;
         let mut matrix: Matrix = std::collections::BTreeMap::new();
         for (name, sample, expected) in [
+            #[cfg(feature = "parser-defender")]
+            (
+                "defender-events.ndjson",
+                include_bytes!("../../testkit/fixtures/parser-defender/source/events.ndjson")
+                    .as_slice(),
+                "parser-defender",
+            ),
+            #[cfg(feature = "parser-defender")]
+            (
+                "defender-api.json",
+                include_bytes!("../../testkit/fixtures/parser-defender/source/api.json").as_slice(),
+                "parser-defender",
+            ),
+            #[cfg(feature = "parser-defender")]
+            (
+                "defender-stream.json",
+                include_bytes!("../../testkit/fixtures/parser-defender/source/stream.json")
+                    .as_slice(),
+                "parser-defender",
+            ),
+            #[cfg(feature = "parser-defender")]
+            (
+                "defender-hunting.csv",
+                include_bytes!("../../testkit/fixtures/parser-defender/source/hunting.csv")
+                    .as_slice(),
+                "parser-defender",
+            ),
             #[cfg(feature = "parser-email")]
             (
                 "multipart.eml",
@@ -560,7 +592,7 @@ mod matrix {
             "parser-linux" | "parser-zeek" | "parser-suricata" | "parser-kubernetes"
             | "parser-falco" | "parser-gcp-audit" | "parser-entra" | "parser-m365"
             | "parser-okta" | "parser-guardduty" | "parser-vpc-flow" | "parser-azure-flow"
-            | "parser-gcp-flow" => [
+            | "parser-gcp-flow" | "parser-defender" => [
                 if matches!(sample.first(), Some(b'{' | b'[')) {
                     Some(45)
                 } else {
@@ -598,6 +630,13 @@ mod matrix {
         Ok(())
     }
     fn assert_priority_scores(name: &str, sample: &[u8], expected: &str) {
+        #[cfg(feature = "parser-defender")]
+        assert_eq!(
+            irmind_mod_parser_defender::DefenderParser
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            (expected == "parser-defender").then_some(98)
+        );
         #[cfg(feature = "parser-email")]
         assert_eq!(
             irmind_mod_parser_email::EmailParser

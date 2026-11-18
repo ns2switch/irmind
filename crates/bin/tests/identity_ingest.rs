@@ -106,6 +106,8 @@ fn ingest_with_context(
 }
 fn fixture(parser: &str) -> &'static [u8] {
     match parser {
+        #[cfg(feature = "parser-defender")]
+        "defender" => include_bytes!("../../testkit/fixtures/parser-defender/source/events.ndjson"),
         #[cfg(feature = "parser-email")]
         "email" => include_bytes!("../../testkit/fixtures/parser-email/source/multipart.eml"),
         "m365" => include_bytes!("../../testkit/fixtures/parser-m365/source/events.ndjson"),
@@ -142,6 +144,8 @@ fn identity_failures_keep_roles_originals_and_signed_export() {
     for (name, count) in [
         #[cfg(feature = "parser-email")]
         ("email", 7),
+        #[cfg(feature = "parser-defender")]
+        ("defender", 9),
         ("m365", 8),
         ("okta", 7),
         #[cfg(feature = "parser-guardduty")]
@@ -306,7 +310,7 @@ fn benchmark_lines(name: &str) -> (Vec<u8>, Vec<u8>, u64) {
         return (header, row, 1);
     }
     let mut value: serde_json::Value = serde_json::from_slice(first).unwrap();
-    if !name.starts_with("azure-") && name != "gcp-flow" {
+    if !name.starts_with("azure-") && name != "gcp-flow" && name != "defender" {
         value["synthetic_padding"] = serde_json::json!("x".repeat(1024));
     }
     let mut row = serde_json::to_vec(&value).unwrap();
@@ -503,5 +507,16 @@ fn one_gib_release_email_throughput() -> Result<(), &'static str> {
     );
     // Reconstruction, seal and export are exercised by the mixed-source case test;
     // this measurement covers ingestion of a collection under the per-message cap.
+    Ok(())
+}
+
+#[cfg(feature = "parser-defender")]
+#[test]
+#[ignore = "manual optimized 1 GiB Defender ingestion benchmark"]
+fn one_gib_release_defender_throughput() -> Result<(), &'static str> {
+    if cfg!(debug_assertions) {
+        return Err("Use --release for benchmarks");
+    }
+    benchmark_source("defender");
     Ok(())
 }

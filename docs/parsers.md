@@ -12,6 +12,7 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 | --- | --- | --- | --- | --- |
 | Microsoft 365 Unified Audit Log | Purview CSV, Search-UnifiedAuditLog JSON, Management Activity API JSON | Native AuditData/Operation, CreationTime and workload; 98 | UTC time, actor, mailbox target when explicit, resource, source IP, user agent, workload, finite operation/outcome tables | experimental |
 | Okta System Log | API JSON arrays and JSON/NDJSON exports | eventType, uuid, actor and published time; 98 | Authentication, MFA, administration, policies and impersonation; actor/target and source IP | experimental |
+| Microsoft Defender | Advanced Hunting CSV/JSON and Streaming JSON | Native Timestamp, DeviceId/ActionType or AlertId, plus source layout: 98 | Process/parent, file, registry, network and logon; AlertInfo/AlertEvidence remain unconfirmed | experimental |
 | RFC 5322 email | One `.eml` or header dump per file; bounded MIME parts | From plus native header combination: 98; minimal headers: 70, analyst choice | Ordered Received hops, addresses, raw headers/body bytes, literal URLs and attachment metadata/hashes; email outcome stays unknown | experimental |
 | AWS GuardDuty | API, CLI/console and EventBridge JSON | Native account, finding ID/type, region, resource and time; 98 | Unconfirmed source alert, actor/resource/IP roles, exact severity and original observation times | experimental |
 | AWS VPC Flow Logs | Headered/custom and standard v2 text, gzip, CloudWatch messages | Native column header: 98; headerless v2: 70 and analyst confirmation | Network endpoints/roles, explicit disposition, bytes/packets, account/region and explicit instance host | experimental |
@@ -340,3 +341,39 @@ outcome remains unknown. No process-lifetime identity or permission is introduce
 Sources: [message syntax](https://www.rfc-editor.org/rfc/rfc5322),
 [MIME structure](https://www.rfc-editor.org/rfc/rfc2046),
 [reported authentication status](https://www.rfc-editor.org/rfc/rfc8601).
+
+## Microsoft Defender exports
+
+Export Advanced Hunting results as CSV or JSON, or save the original Streaming API
+JSON from Event Hubs/storage. Streaming envelopes use `records`, the documented
+`AdvancedHunting-<table>` category and `properties`; API exports may use `Results`.
+The nine supported tables are DeviceProcessEvents, DeviceNetworkEvents,
+DeviceFileEvents, DeviceRegistryEvents, DeviceLogonEvents, DeviceImageLoadEvents,
+DeviceEvents, AlertInfo and AlertEvidence. Project `Table` (or `$table`/`Type`) in
+exports when the native columns do not uniquely identify the table. A filename
+never supplies table identity. Unidentified layouts and actions retain the original
+fields without invented classification.
+
+The decoder preserves field names/types and timestamp precision. Advanced Hunting
+Timestamp is UTC; no machine clock or file mtime supplies a timestamp. CSV records
+are bounded at 4 MiB/1,024 fields with multiline framing; JSON uses the shared
+bounded reader, including arrays/documents with a first line larger than 4 MiB.
+Source and record-count limits remain those of the common decoder contract.
+
+Classification, explicit outcomes and roles are included finite TOML tables.
+The mapping module's native code only selects a table and reports unsupported
+optional values; it contains no action heuristics. DeviceId supplies host
+partitioning. Process and parent observations use source-record scope, including
+PID reuse; ProcessUniqueId is retained in the original, not promoted to process
+lifetime. Sysmon ProcessGuid remains the only supported process-lifetime source.
+Incoming network roles reverse only for the documented inbound action; unknown
+network actions retain their raw endpoints without guessing a direction.
+ConnectionSuccess describes the transport event and does not prove that Network
+Protection allowed the application request. AlertInfo and AlertEvidence are source
+alerts, never analyst-confirmed findings.
+
+Sources: [Advanced Hunting tables](https://learn.microsoft.com/en-us/defender-xdr/advanced-hunting-schema-tables),
+[Streaming envelope](https://learn.microsoft.com/en-us/defender-xdr/streaming-api-event-hub),
+[process fields](https://learn.microsoft.com/en-us/defender-xdr/advanced-hunting-deviceprocessevents-table),
+[network fields](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/devicenetworkevents),
+[Network Protection interpretation](https://learn.microsoft.com/en-us/defender-endpoint/network-protection).

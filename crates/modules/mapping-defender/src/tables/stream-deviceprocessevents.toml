@@ -1,0 +1,102 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mde-stream-deviceprocessevents"
+version = "defender-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-defender"
+parser_versions = ["defender-source-v1"]
+format = "mde-stream"
+format_version = "defender-source-v1"
+native_type = "DeviceProcessEvents"
+action = ["properties", "ActionType"]
+
+[partition]
+host = ["properties", "DeviceId"]
+
+[[fields]]
+source = ["properties", "DeviceId"]
+target = "host.id"
+omit_text = ["", "-"]
+observation = { kind = "host", role = "observer", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["properties", "DeviceName"]
+target = "host.name"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["properties", "InitiatingProcessAccountName"]
+target = "user.name"
+omit_text = ["", "-"]
+observation = { kind = "user", role = "actor", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["properties", "InitiatingProcessAccountDomain"]
+target = "user.domain"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["properties", "AccountName"]
+target = "user.target.name"
+omit_text = ["", "-"]
+observation = { kind = "user", role = "target", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["properties", "AccountDomain"]
+target = "user.target.domain"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["properties", "ProcessId"]
+target = "process.pid"
+omit_text = ["", "-"]
+observation = { kind = "process", role = "subject", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["properties", "FileName"]
+target = "process.name"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["properties", "ProcessCommandLine"]
+target = "process.command_line"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["properties", "InitiatingProcessId"]
+target = "process.parent.pid"
+omit_text = ["", "-"]
+observation = { kind = "process", role = "parent", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["properties", "InitiatingProcessFileName"]
+target = "process.parent.name"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["properties", "InitiatingProcessCommandLine"]
+target = "process.parent.command_line"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["properties", "MD5"]
+target = "process.hash.md5"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["properties", "SHA1"]
+target = "process.hash.sha1"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["properties", "SHA256"]
+target = "process.hash.sha256"
+omit_text = ["", "-"]
+
+[[rules]]
+categories = ["process"]
+types = ["start"]
+outcome = "success"
+[[rules.when]]
+path = ["properties", "ActionType"]
+predicate = { op = "text", value = "ProcessCreated" }

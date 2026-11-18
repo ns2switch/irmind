@@ -79,6 +79,11 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
     Ok(())
 }
 fn register_export_mappings(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(all(feature = "mapping-defender", feature = "parser-defender"))]
+    registry.register(
+        Box::new(irmind_mod_mapping_defender::DefenderMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
     let _ = &registry;
     #[cfg(all(feature = "mapping-email", feature = "parser-email"))]
     registry.register(
@@ -295,6 +300,10 @@ mod tests {
         check_catalog(&registry);
     }
     fn register_identity_decoders(registry: &mut ModuleRegistry) {
+        #[cfg(all(feature = "mapping-defender", feature = "parser-defender"))]
+        registry
+            .add_source_decoder(Arc::new(irmind_mod_parser_defender::DefenderSourceDecoder))
+            .unwrap();
         #[cfg(all(feature = "mapping-email", feature = "parser-email"))]
         registry
             .add_source_decoder(Arc::new(irmind_mod_parser_email::EmailSourceDecoder))
@@ -335,6 +344,9 @@ mod tests {
         assert_eq!(
             catalog.snapshots().unwrap().len(),
             2 + usize::from(cfg!(all(
+                feature = "mapping-defender",
+                feature = "parser-defender"
+            ))) + usize::from(cfg!(all(
                 feature = "mapping-email",
                 feature = "parser-email"
             ))) + usize::from(cfg!(all(
