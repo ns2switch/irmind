@@ -5,7 +5,7 @@
 IRMind is an open-source terminal assistant for DFIR analysts evaluating incident response workflows. Investigate local and remote evidence in a conversation, load forensic **skills** on demand and delegate bounded tasks to parallel **subagents**. The model proposes, **policy** decides, and a **signed custody record** preserves what happened.
 
 
-**Pre-1.0 · synthetic-data evaluation; not validated for real incidents.**
+**Pre-1.0 · evaluation software; not validated for real incidents.** An analyst has tested a multi-turn investigation with a real DeepSeek model on a public CloudTrail dataset, including a skill and confirmed findings. This is [partial validation](docs/development/manual-validation.md#partial-real-model-investigation-2026-11-17); real-connector and verification checks remain pending.
 
 ## Try the offline demo in two minutes
 

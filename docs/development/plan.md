@@ -121,7 +121,7 @@ The 0.1.0 scope included GCP and Azure only as object-storage read sources and e
 
 For uncopied originals, the signed manifest proves what IRMind observed when it hashed each source, while later full verification requires access to that same source. Sampling verifies only selected originals. Neither mode claims that an unavailable source remains intact. Export without originals is verifiable as a signed manifest and case chain, not as a complete portable evidence package.
 
-The original MVP exit criteria remain: H0–H8 meet their stated acceptance criteria, the H5 manual test is documented, at least one connector has been tested against a real test environment, and the release has a changelog and downloadable binaries. Synthetic recordings alone do not satisfy the connector test. `v0.1.0` was published as a pre-release before the two manual validations. H5 has since been closed by analyst decision after a real DeepSeek greeting test, as recorded in [manual validation](manual-validation.md#result-record). The live-connector gate remains open. Unreported H5 procedure steps remain pending analyst records; the tag itself does not satisfy any validation gate.
+The original MVP exit criteria remain: H0–H8 meet their stated acceptance criteria, the H5 manual test is documented, at least one connector has been tested against a real test environment, and the release has a changelog and downloadable binaries. Synthetic recordings alone do not satisfy the connector test. `v0.1.0` was published as a pre-release before the two manual validations. H5 was accepted by analyst decision after a real DeepSeek greeting test. The [partial investigation record for IRMind 0.5.3](manual-validation.md#partial-real-model-investigation-2026-11-17) adds observed multi-turn investigation, skill use and analyst confirmation of findings with locally ingested public CloudTrail data. Hash citations, `/verify` and export verification remain pending; streaming has not been separately recorded. The live-connector gate remains open. A release tag does not satisfy a validation gate.
 
 | MVP exit criterion | Status | Evidence or next action |
 | --- | --- | --- |
@@ -130,8 +130,8 @@ The original MVP exit criteria remain: H0–H8 meet their stated acceptance crit
 | H8 existing connector and object-source contracts | Done | Recorded synthetic contract suites and setup guides. |
 | H5 recorded-response tests | Done | CI contract and application tests. |
 | H5 conversation-loop correction | Done | PR #31 integrated with the trusted-system-role security correction; no manual DeepSeek test was run before merge. The later analyst acceptance is recorded below. |
-| H5 manual test with real DeepSeek | Recorded | IRMind 0.1.2 answered a greeting naturally without unnecessary tool calls. Other manual observations remain unrecorded. See the [public compatibility summary](manual-validation.md#result-record); detailed validation records remain private. |
-| One connector against a real test environment | Pending analyst | Run the Splunk lab procedure in [manual validation](manual-validation.md) and record the result. |
+| H5 manual test with real DeepSeek | Accepted by analyst; partial observations recorded | The earlier greeting and the IRMind 0.5.3 multi-turn investigation, skill use and confirmation of findings are observed. Hash citations, `/verify` and export verification remain pending; streaming is not separately recorded. See the [result record](manual-validation.md#result-record). |
+| One connector against a real test environment | Pending analyst | Complete [Elastic with TLS and a private CA](real-validation.md) and record the result in [#63](https://github.com/ns2switch/irmind/issues/63). Local CloudTrail ingestion does not satisfy this check. |
 | Release dry run without a tag | Done | [Manual CI run 41117075395](https://github.com/ns2switch/irmind/actions/runs/41117075395) passed on Linux, macOS and Windows before the first tag. |
 | `v0.1.0` and `v0.1.1` tags, changelog and downloadable binaries | Done with explicit validation exception | Both pre-releases were published from green `main`; v0.1.1 adds signed and attested assets. These releases preceded H5 acceptance; the live-connector gate remains pending. |
 
@@ -278,7 +278,7 @@ Skills move to v0.4, subagents to v0.5, public launch follows subagents, source-
 
 The release includes precise artifact V2 in the CLI/TUI/demo, optional explicit V1 precision migration, mixed-generation export V5, isolated EVTX and the restored experimental Zeek/Suricata modules. It does not include Elastic, Chronicle or the new common event schemas. Existing cases stay readable and never migrate on open. Semantic migration remains deferred; re-ingestion into a new case is available.
 
-Keep the evaluation-only warning: H5 is accepted by analyst decision after the recorded DeepSeek greeting, while the remaining procedure observations and a real-connector validation are still pending. Signed release assets use the existing tag workflow with main/helper SBOMs, Sigstore, provenance and clean installer checks. Native signing/notarization and the recorded post-release performance work remain separate.
+Keep the evaluation-only warning. H5 is accepted by analyst decision, with the greeting and a later [partial real-model investigation](manual-validation.md#result-record) recorded. Outstanding hash-citation, `/verify`, export and live-connector checks remain pending; this is not validation for real incidents. Signed release assets use the existing tag workflow with main/helper SBOMs, Sigstore, provenance and clean installer checks. Native signing/notarization and the recorded post-release performance work remain separate.
 
 
 ## Mapped artifacts and physical compaction

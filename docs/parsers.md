@@ -1,6 +1,6 @@
 # Log parsers
 
-This page helps analysts choose a local log parser and test a custom format before ingestion. All current parsers are experimental and validated with synthetic data. See [modules](modules.md) for individual formats and [configuration](configuration.md) for the data directory.
+This page helps analysts choose a local log parser and test a custom format before ingestion. All current parsers are experimental and have synthetic test coverage. An analyst has also reported a [partial investigation with a real model and locally ingested public CloudTrail data](development/manual-validation.md#partial-real-model-investigation-2026-11-17); this does not validate every parser, a remote connector or real-incident use. See [modules](modules.md) for individual formats and [configuration](configuration.md) for the data directory.
 
 ## How a parser is selected
 
