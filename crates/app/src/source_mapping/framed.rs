@@ -1,4 +1,6 @@
 //! Shared bounded framing mechanics. Source modules still own their format and time rules.
+mod text;
+pub use text::text_frame;
 mod csv;
 mod json;
 pub use csv::{csv_frame, csv_values};

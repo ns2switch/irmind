@@ -1,0 +1,12 @@
+{
+  "synthetic": true,
+  "connections": 2,
+  "entities": [
+    "203.0.113.77",
+    "192.0.2.10"
+  ],
+  "outcomes": [
+    "success",
+    "failure"
+  ]
+}

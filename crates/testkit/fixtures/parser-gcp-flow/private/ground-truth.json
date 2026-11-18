@@ -1,0 +1,14 @@
+{
+  "synthetic": true,
+  "records": 3,
+  "outcomes": [
+    "unknown",
+    "failure",
+    "unknown"
+  ],
+  "entities": [
+    "203.0.113.77",
+    "192.0.2.10",
+    "synthetic-host-1"
+  ]
+}

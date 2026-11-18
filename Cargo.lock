@@ -2609,6 +2609,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-mapping-cloud-flow"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-build-manifest",
+ "irmind-domain",
+ "irmind-mapping-tables",
+ "irmind-mod-parser-azure-flow",
+ "irmind-mod-parser-gcp-flow",
+ "irmind-mod-parser-vpc-flow",
+ "irmind-testkit",
+]
+
+[[package]]
 name = "irmind-mod-mapping-cloudtrail"
 version = "0.1.0"
 dependencies = [
@@ -2822,6 +2836,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-parser-azure-flow"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-testkit",
+]
+
+[[package]]
 name = "irmind-mod-parser-chainsaw"
 version = "0.1.0"
 dependencies = [
@@ -2899,6 +2922,15 @@ dependencies = [
 
 [[package]]
 name = "irmind-mod-parser-gcp-audit"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-testkit",
+]
+
+[[package]]
+name = "irmind-mod-parser-gcp-flow"
 version = "0.1.0"
 dependencies = [
  "irmind-app",
@@ -3037,6 +3069,16 @@ dependencies = [
  "irmind-testkit",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-parser-vpc-flow"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "irmind-app",
+ "irmind-domain",
+ "irmind-testkit",
 ]
 
 [[package]]

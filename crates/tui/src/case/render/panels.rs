@@ -228,6 +228,11 @@ fn parser_prompt_text(
                 )
             }),
     );
+    if let Some((id, _)) = prompt.candidates.get(prompt.selected)
+        && let Some(description) = prompt.descriptions.get(id)
+    {
+        lines.push(description.clone());
+    }
     lines.push("↑/↓ choose · Enter confirm · Esc cancel".into());
     Ok(engine.guard.screen(&lines.join("\n"))?.text)
 }

@@ -1,0 +1,68 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "cloud-flow-aws-fields"
+version = "cloud-flow-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-vpc-flow"
+parser_versions = ["vpc-flow-source-v1"]
+format = "aws-vpc-flow"
+format_version = "vpc-flow-source-v1"
+action = ["columns", "action"]
+
+[[rules]]
+categories = ["network"]
+types = ["connection"]
+outcome = "unknown"
+
+[[fields]]
+source = ["columns", "srcaddr"]
+target = "source.ip"
+omit_text = ["", "-"]
+observation = { kind = "ip", role = "source", scope = { kind = "global" } }
+
+[[fields]]
+source = ["columns", "dstaddr"]
+target = "destination.ip"
+omit_text = ["", "-"]
+observation = { kind = "ip", role = "destination", scope = { kind = "global" } }
+
+[[fields]]
+source = ["columns", "srcport"]
+target = "source.port"
+omit_text = ["", "-"]
+conversion = "decimal"
+
+[[fields]]
+source = ["columns", "dstport"]
+target = "destination.port"
+omit_text = ["", "-"]
+conversion = "decimal"
+
+[[fields]]
+source = ["columns", "packets"]
+target = "network.packets"
+omit_text = ["", "-"]
+conversion = "decimal"
+
+[[fields]]
+source = ["columns", "bytes"]
+target = "network.bytes"
+omit_text = ["", "-"]
+conversion = "decimal"
+
+[[fields]]
+source = ["columns", "account-id"]
+target = "cloud.account.id"
+omit_text = ["", "-"]
+observation = { kind = "account", role = "subject", scope = { kind = "account", path = ["columns", "account-id"] } }
+
+[[fields]]
+source = ["columns", "region"]
+target = "cloud.region"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["columns", "instance-id"]
+target = "host.id"
+omit_text = ["", "-"]
+observation = { kind = "host", role = "observer", scope = { kind = "account", path = ["columns", "account-id"] } }
