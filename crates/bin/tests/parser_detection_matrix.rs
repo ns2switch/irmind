@@ -492,7 +492,7 @@ mod matrix {
         }
         Ok(())
     }
-    fn assert_additional_scores(name: &str, sample: &[u8], expected: &str) {
+    fn assert_priority_scores(name: &str, sample: &[u8], expected: &str) {
         #[cfg(feature = "parser-guardduty")]
         assert_eq!(
             irmind_mod_parser_guardduty::GuardDutyParser
@@ -514,7 +514,9 @@ mod matrix {
                 .map(irmind_app::ParserConfidence::value),
             (expected == "parser-okta").then_some(98)
         );
-
+    }
+    fn assert_additional_scores(name: &str, sample: &[u8], expected: &str) {
+        assert_priority_scores(name, sample, expected);
         #[cfg(feature = "parser-entra")]
         assert_eq!(
             irmind_mod_parser_entra::EntraParser
