@@ -75,6 +75,23 @@ Omite la versión para elegir la última publicada, incluida una preliminar. Un 
 
 CI también genera artefactos de prueba en ejecuciones nocturnas relevantes; no son versiones publicadas. Las PR y los merges a `main` no publican binarios. Apple no notariza los binarios y Windows no usa Authenticode; ambos sistemas pueden mostrar avisos incluso después de verificar la descarga.
 
+## Homebrew
+
+Opción recomendada en macOS y disponible en Linux. El [tap](https://github.com/ns2switch/homebrew-irmind) cubre Apple Silicon, Intel, Linux x86_64 y Linux arm64, incluido `irmind-evtx`:
+
+```sh
+brew install ns2switch/irmind/irmind
+irmind --version
+irmind demo
+brew upgrade ns2switch/irmind/irmind
+# Para retirar ambos binarios:
+brew uninstall ns2switch/irmind/irmind
+```
+
+No compila IRMind. El actualizador autentica `SHA256SUMS` con la identidad Sigstore exacta del workflow y tag antes de fijar los hashes de los assets. Homebrew comprueba esos hashes al instalar. Revisa la fórmula antes de confiar en ella; las versiones recientes pueden pedir confianza explícita en la fórmula; sigue las [instrucciones del tap](https://github.com/ns2switch/homebrew-irmind/blob/main/README.es.md).
+
+El tap ejecuta `brew audit` en modo estricto, `brew test`, inicio real de la demo en 80×24, comprobación de bytes y desinstalación en runners limpios macOS arm64, macOS Intel y Linux. En macOS comprueba cuarentena **sin retirarla** y registra la ejecución. No equivale a firma ni notarización de Apple ni certifica toda política local de Gatekeeper. Conserva fuera de Homebrew el ejecutable y auxiliar que crearon un caso antes de actualizar: la limpieza de Homebrew puede borrar versiones anteriores.
+
 ## Linux
 
 Usa un terminal compatible con xterm, como GNOME Terminal o Konsole. El backend `os` necesita Secret Service mediante D-Bus, que puede no estar disponible por SSH. Elige `file` explícitamente para una sesión sin entorno gráfico. Los archivos y directorios locales se restringen al usuario actual con permisos Unix `0600` y `0700`.

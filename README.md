@@ -49,6 +49,15 @@ See the [security model](docs/security-model.md) for the guarantees and their li
 
 ## Install
 
+On macOS, the recommended binary installation is the [Homebrew tap](https://github.com/ns2switch/homebrew-irmind):
+
+```sh
+brew install ns2switch/irmind/irmind
+brew upgrade ns2switch/irmind/irmind
+```
+
+The formula installs the main binary and EVTX helper from GitHub Releases with pinned SHA-256 hashes, without compiling IRMind. See the [platform guide](docs/platforms.md#homebrew) for trust checks and preserving the creating version before upgrading a case.
+
 See the [Code signing policy](CODE_SIGNING.md) for attribution, team roles,
 privacy and the status of native platform signing.
 
@@ -182,3 +191,5 @@ Licensed under either of
 - MIT license ([LICENSE-MIT](LICENSE-MIT)),
 
 at your option. Unless you explicitly state otherwise, a contribution intentionally submitted for inclusion is dual licensed under the same terms, without additional conditions.
+
+Propose a skill without Rust in [irmind-skills CONTRIBUTING](https://github.com/ns2switch/irmind-skills/blob/main/CONTRIBUTING.md): methodology, required sources, false positives and synthetic episodes.
