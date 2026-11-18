@@ -94,7 +94,26 @@ fn catalog_index_signature_preimage_proof_and_asset_match_approved_vectors() {
 #[test]
 fn catalog_has_no_production_test_key_or_unverified_alternate_trust_path() {
     let production = Ed25519CatalogIndexVerifier::production().unwrap();
-    assert!(!production.available());
+    assert!(production.available());
+    assert_eq!(RELEASE_CATALOG_KEYS.len(), 1);
+    assert_eq!(
+        hex::encode(RELEASE_CATALOG_KEYS[0]),
+        "fb2015c83d13fe018e270a7fe73bf7bccfdb622565e30f7ade436637c3b2c25b"
+    );
+    assert_eq!(
+        irmind_app::hex(&irmind_app::sha256(&RELEASE_CATALOG_KEYS[0])),
+        "f04daae3f8243ed76452d5f787ea527c8fbec895ca0c91a35f453f6677575e4f"
+    );
+    let public = VerifyingKey::from_bytes(&RELEASE_CATALOG_KEYS[0]).unwrap();
+    assert!(!public.is_weak());
+    assert!(!RELEASE_CATALOG_KEYS.contains(&keys()[0]));
+    for seed in [42, 43, 44, 73, 74, 88, 90] {
+        let synthetic = SigningKey::from_bytes(&[seed; 32])
+            .verifying_key()
+            .to_bytes();
+        assert!(!RELEASE_CATALOG_KEYS.contains(&synthetic));
+    }
+    // Even a valid index signed by the documented fixture key is not trusted.
     let release = FrozenCatalogRelease::new("v0.1.0").unwrap();
     assert!(
         production
@@ -102,7 +121,7 @@ fn catalog_has_no_production_test_key_or_unverified_alternate_trust_path() {
             .err()
             .unwrap()
             .to_string()
-            .contains("no compiled")
+            .contains("catalog")
     );
     let verifier = Ed25519CatalogIndexVerifier::from_release_keys(keys()).unwrap();
     assert!(

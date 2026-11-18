@@ -11,7 +11,10 @@ pub use store::FileCatalogProofStore;
 
 // Publisher keys enter only through a reviewed IRMind release. No synthetic
 // fixture key, environment fallback or downloaded trust root is accepted here.
-const RELEASE_CATALOG_KEYS: &[[u8; 32]] = &[];
+const RELEASE_CATALOG_KEYS: &[[u8; 32]] = &[[
+    251, 32, 21, 200, 61, 19, 254, 1, 142, 39, 10, 127, 231, 59, 247, 188, 207, 219, 98, 37, 101,
+    227, 15, 122, 222, 67, 102, 55, 195, 178, 194, 91,
+]];
 
 #[derive(Clone)]
 pub struct Ed25519CatalogIndexVerifier {

@@ -5,7 +5,7 @@ on:
       release_tag:
         description: Exact signed release tag to install and exercise
         required: true
-        default: v0.5.3
+        default: v0.5.4
         type: string
 permissions:
   contents: read

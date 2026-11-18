@@ -8,7 +8,7 @@ Esta página ayuda a los analistas a aplicar un método de investigación repeti
 
 La fuente de las skills incluidas es [ns2switch/irmind-skills](https://github.com/ns2switch/irmind-skills). Su directorio `core/` contiene los 15 paquetes incluidos, sus recursos y episodios sintéticos de evaluación separados. Propón las mejoras allí; llegan a IRMind mediante una PR de sincronización revisada y una release de IRMind. No hace falta Rust: puedes aportar metodología, fuentes necesarias, falsos positivos y episodios sintéticos de evaluación.
 
-Los paquetes comunitarios viven en `catalog/`. Se instalan explícitamente con `/skills install catalog:<name>` cuando exista un catálogo de producción confiable; no pueden sustituir un nombre del núcleo. El catálogo actual no tiene release ni clave de firma de producción. Ambas vías usan el mismo compilador acotado de skills y pruebas locales con modelo scripted.
+Los paquetes comunitarios viven en `catalog/`. Se instalan explícitamente con `/skills install catalog:<name>` desde un catálogo de producción firmado; no pueden sustituir un nombre del núcleo. IRMind v0.5.4 incorpora la clave pública de producción; los paquetes del catálogo se publican por separado. Ambas vías usan el mismo compilador acotado de skills y pruebas locales con modelo scripted.
 
 Este repositorio mantiene una [copia local fijada](../../skills/upstream.json). El build nunca descarga contenido de skills. Las [instrucciones de mantenimiento](../../skills/README.md) explican cómo actualizar el commit de origen y comprobar los hashes de cada paquete y recurso.
 
@@ -65,6 +65,29 @@ La ingesta local correcta autoriza el directorio elegido para la sesión actual.
 Siguen vigentes el plazo de 10 segundos, el límite de punteros y el extracto de 2.000 caracteres. Una fuente muy grande puede superar el plazo. Los extractos truncados y los cuerpos ausentes son lagunas de cobertura. La redacción de datos privados y el guard siguen aplicándose a identificadores y texto. No deduzcas campos que la proyección o el extracto no muestran. El [contrato de lectura en inglés](../development/verified-original-record-read.md) define los límites.
 
 Recoge auditoría autorizada del API server de Kubernetes con una política que registre los metadatos o cuerpos necesarios. Exporta auditoría del plano de control de EKS, entradas Kubernetes de Cloud Audit de GKE o diagnósticos kube-audit/kube-audit-admin de AKS como indica la [guía de parsers](parsers.md). IRMind no recoge datos ni implementa un conector Kubernetes en vivo. Las alertas Falco de `source="k8s_audit"` y de syscalls tienen mapeos separados y siguen sin confirmar; hay que confirmar explícitamente el clúster de adquisición. La relación entre identidad de nube y clúster debe existir en la evidencia: compartir nombre de pod o cuenta de servicio no basta.
+
+## Catálogo firmado
+
+IRMind v0.5.4 acepta la clave de producción indicada en la
+[guía de claves](catalog-key-setup.md#clave-de-producción-activa).
+Los paquetes se publican en las [releases de irmind-skills](https://github.com/ns2switch/irmind-skills/releases).
+Estar en main no basta: hace falta una release firmada del catálogo.
+
+`/skills install catalog:<nombre>` abre el formulario; añade `@v1.2.3` para fijar
+un tag o déjalo vacío para consultar explícitamente la última release.
+`/skills update <nombre>` muestra diferencias antes de firmar. No hay descargas
+de inicio ni actualizaciones automáticas. Esc cancela; Ctrl+K vuelve a la paleta.
+
+Para instalar sin conexión, elige **Offline catalog** y proporciona carpeta,
+nombre y tag exacto. Guarda juntos `index.json`, `index.ed25519` (64 bytes) y
+el asset `.skill.json`. Se usan las mismas claves compiladas, compilador y admisión
+firmada, sin red. El primer índice sin conexión no garantiza actualidad.
+Los descensos de versión requieren una confirmación adicional separada.
+
+El caso conserva una copia independiente e inmutable de la prueba del catálogo.
+La verificación y exportación rechazan copias ausentes o alteradas: no las reparan
+con otra descarga ni desde el almacén global. La exportación V8 completa incluye
+las pruebas necesarias para verificar sin conexión con las claves compiladas.
 
 ## Gestionar paquetes locales
 

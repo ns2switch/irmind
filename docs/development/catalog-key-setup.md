@@ -6,6 +6,28 @@ agent need only the public key and its ID. Do not send the seed or a private key
 The publishing workflow uses the protected `release` environment in
 `ns2switch/irmind-skills`; branch rehearsals use synthetic fixture keys.
 
+## Active production key
+
+Production key registered on 2026-11-17 for IRMind v0.5.4:
+
+```text
+public_key=fb2015c83d13fe018e270a7fe73bf7bccfdb622565e30f7ade436637c3b2c25b
+key_id=f04daae3f8243ed76452d5f787ea527c8fbec895ca0c91a35f453f6677575e4f
+```
+
+The ID is SHA-256 of the 32 raw public bytes. The release accepts only reviewed
+compiled keys (at most eight); synthetic keys are confined to test verifiers.
+The private seed exists only in the catalog's protected release environment.
+IRMind never downloads trust roots or reads a private catalog key.
+
+To rotate, generate a new seed locally, submit only its public key and ID for a
+reviewed IRMind release, and coordinate the catalog signer with the compiled list.
+A bounded overlap allows an orderly transition. Removing a key also requires an
+IRMind release: after removal, indexes signed only by that key are rejected.
+A catalog index cannot grant trust to another key. Distribute the new executable
+before switching the catalog signer. If a key is compromised, retire it in the
+next IRMind release and stop signing with it; an older binary retains its old roots.
+
 ## Generate locally
 
 Requires Python 3 and OpenSSL 3. The following creates a new private directory,
@@ -58,7 +80,7 @@ key without displaying the private input.
 In the catalog repository's Settings → Environments, create `release`. Configure
 required maintainer review and allow deployments only from selected **tags**
 matching `v*`, not branches. The production publishing job must reference this
-environment and execute only on tag pushes. Synthetic dispatch jobs never request
+environment and execute only from an explicitly selected published tag. Synthetic dispatch jobs never request
 it. Follow GitHub's [environment configuration](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
 
 Use an environment secret named `CATALOG_ED25519_SEED_HEX`, not a repository or
