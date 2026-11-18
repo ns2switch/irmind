@@ -2,7 +2,7 @@
 
 [Español](../es/source-queries-design.md)
 
-**Status: design for review; nothing in this document is implemented or enabled.**
+**Status: architecture approved with the adjustments below; not implemented or enabled.**
 This proposes remote, read-only evidence queries through independently selectable
 modules. It does not enable a provider, provision cloud resources, add credentials
 or dependencies, or change a current port or signed format. The
@@ -20,7 +20,7 @@ and [subagent design](subagents-design.md) remain the starting contracts.
 | v0.6 after those contracts pass | Cloud Logging Log Analytics through `query-bigquery` | An already linked BigQuery dataset/log view; same job, scope and scan controls. The UI is now documented as Observability Analytics. |
 | Later, explicit opt-in design extension | `query-cloudtrail-lake` | Existing customers only; unknown preflight scan estimate and no documented equivalent of BigQuery's per-job byte cap. |
 | Later, cost-enforcement prerequisite | `query-azure-data-explorer` | Fixed cluster/database/table, Kusto read-only query endpoint; no management operations. |
-| Later, cost-enforcement prerequisite | `query-azure-log-analytics` | Fixed workspace and approved tables, Azure Monitor Logs Query API v1 with generated KQL. |
+| v0.6, Analytics tables only | `query-azure-log-analytics` | Fixed workspace and verified Analytics table plan, Azure Monitor Logs Query API v1 with generated KQL. Entra client credentials require a separate concrete approval. |
 
 These are priorities, not release promises. AWS states that **CloudTrail Lake is
 closed to new customers from 2026-05-31**; it is not the onboarding recommendation.
@@ -45,13 +45,14 @@ common-field and entity-role types rather than text field paths.
 | Component | Proposed closed representation and limits |
 | --- | --- |
 | Source | One configured `SourceId` and one analyst-approved dataset alias; resolve to immutable account/project/workspace, region/location and table identity before approval. No wildcard or cross-service source expression. |
-| Time | Required UTC half-open interval `[from, to)`, nonempty, within both case and organization scope. Start with the existing structured-SIEM 24-hour maximum; the effective limit may be lower. No implicit recent window or server clock expression. |
+| Time | Required UTC half-open interval `[from, to)`, nonempty, within both case and organization scope. Proposed independent organization default: 31 days (2,678,400 seconds), configurable under a compiled bound in the concrete contract. Case scope, scan budget and approval still apply; do not inherit the SIEM 24-hour cap. Date-partitioned sources must prune every included date partition. No implicit recent window or server clock expression. |
 | Filters | AND of at most 16 predicates; equality, finite membership (at most 32 values), typed range, literal prefix and explicit missing-field test. No arbitrary Boolean expression, regex, function, subquery or negation of scope. |
 | Fields | At most 32 approved common fields: timestamp, category/type/action/outcome, actor/target identities, source/destination IP and port, host, cloud and resource identity. Each backend advertises an exact supported subset. |
 | Values | Checked enums, integers, IPs and UTC instants; bounded text of at most 256 UTF-8 bytes. Control characters and invalid Unicode/identifiers are rejected. Literal punctuation remains data. |
 | Result | Events, exact count, count grouped by at most two approved fields, or top counts. No joins, UDFs, arbitrary arithmetic, approximate distinct count, writes or exports to a model-chosen location. |
-| Rows | At most the existing 100-row structured-SIEM limit across all pages, reduced by policy. A limit of rows never claims to limit scanned bytes. |
-| Work | Existing tool-call, timeout, response-size, transfer, guard and context limits remain; the smaller limit wins. Explicit scanned-byte admission is additional. |
+| Evidence rows | Separate acquisition policy, proposed up to 100,000 rows or 100 MB (100,000,000 decoded payload bytes), whichever comes first across all pages; also reserve case-wide rows and retained bytes. Provider and parser limits can reduce this. A row cap is not a scan cap. |
+| Model view | Existing bounded tool summary/context only; never send the full acquisition to the model. Subsequent timeline/search/entity queries run locally over the derived source. |
+| Work | Existing calls, guard, stream, record, custody and context limits remain. The dedicated acquisition path streams bounded pages/chunks under the new retained-evidence policy; it does not increase existing SIEM tool-response limits. Explicit scan, elapsed-time, frequency and case-retention admission are additional. |
 
 Illustrative data, **not a currently supported command or installed definition**:
 
@@ -68,7 +69,7 @@ Illustrative data, **not a currently supported command or installed definition**
   ],
   "fields": ["@timestamp", "event.action", "user.target.name", "source.ip"],
   "result": "events",
-  "limit": 100
+  "limit": 100000
 }
 ```
 
@@ -124,7 +125,8 @@ The current `CaseBudgetLimits.cloud_bytes` measures reserved **object transfer**
 not remote engine scans. Keep it intact. Propose separate `scan_bytes_per_query`,
 `scan_bytes_per_case`, and `scan_approval_threshold` in organization policy, plus
 analyst-signed case allocations no greater than that ceiling. No configured scan
-allocation means this feature is unavailable. No production default is silently
+allocation makes scan-priced adapters unavailable. Verified Analytics queries use
+the explicit no-query-charge admission below, never a fabricated zero-byte scan. No production default is silently
 increased. The model cannot edit any allocation.
 
 The unit must be explicit: bytes processed, bytes billed, object bytes and bytes
@@ -142,7 +144,8 @@ currency, region, unit and version; otherwise cost is unavailable.
 | Security Lake | Same Athena cutoff; derive partitions from the registered table schema, not guessed directory conventions. | Missing partition metadata means unknown estimate, not zero. Lake Formation controls remain additional. |
 | Linked Cloud Logging | BigQuery job controls apply; check actual table/view and dry-run limitations. | A link is provisioned by the administrator, never by IRMind; billing project is explicit. |
 | CloudTrail Lake | `DescribeQuery` reports `BytesScanned` after execution; time predicates are not a guaranteed scan ceiling. | Later support requires a reviewed unknown-cost policy; signed approval alone cannot override a hard byte ceiling. |
-| ADX / Azure Log Analytics | Time, row, memory and execution limits; service statistics describe resource use after work. No equivalent hard scan-byte control or reliable byte dry run is established here. | Keep unavailable under strict byte-budget policy. Do not confuse result-size limits, ingestion charges, extents or CPU with scanned bytes. |
+| Azure Log Analytics, Analytics only | Check the exact table plan and interactive retention before every execution; ordinary read queries only. Provider pricing distinguishes this from scan-priced plans. | Admit under explicit Analytics policy plus time, rows, retained bytes and rate limits. Record “no query charge under the table plan”; scanned/billed bytes are unavailable unless actually reported, not zero. |
+| ADX / Basic / Auxiliary | No enforceable scan-priced ceiling established here for ADX; Basic/Auxiliary are excluded regardless of approval. | Unavailable by default; never substitute result-size, ingestion charges or CPU for scan bytes. |
 
 Provider constraints:
 [BigQuery dry-run limitations](https://docs.cloud.google.com/bigquery/docs/running-queries),
@@ -181,13 +184,55 @@ existing 80% warning behavior. Exhaustion names the counter and points to
 Neither local result caching nor provider query-cache hits are presumed free;
 use reported statistics and label cache/reuse explicitly.
 
+### Azure Analytics eligibility and accounting
+
+The official [Azure Monitor pricing, Query section](https://azure.microsoft.com/en-us/pricing/details/monitor/)
+confirms no query charge for Analytics, and per-GB scanned charges for Basic and
+Auxiliary. This is not a claim that ingestion, retention, export or the workspace
+is free. [Cost guidance](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/cost-logs)
+also distinguishes long-term-retention searches. v0.6 excludes archive/search
+jobs, restored/search-result tables, cross-table/resource expressions and
+provider functions whose underlying sources cannot be enumerated.
+
+Before each submit, read the configured table through the
+[Tables Get API, 2025-07-01](https://learn.microsoft.com/en-us/rest/api/loganalytics/tables/get?view=rest-loganalytics-2025-07-01),
+requiring explicit `plan=Analytics`, readable effective interactive retention and
+stable provisioning state. Missing/unknown metadata, Basic/Auxiliary or a window
+outside interactive retention is a visible rejection. Re-read immediately before
+submit and record a post-query observation; a change invalidates admission for
+future calls. The metadata and query APIs do not provide an atomic table-plan
+lock: record that race honestly, do not promise protection against an external
+administrator changing billing mid-query. An organization requiring that stronger
+guarantee leaves the adapter unavailable.
+
+Start with `SigninLogs`, `AADNonInteractiveUserSignInLogs`, `AuditLogs` and
+`AzureActivity`; resolve their actual schemas and existing Entra/Azure Activity
+mapping contracts, including any missing exact pushdown. Use `TimeGenerated`
+bounds plus native event time where the mapping requires it. Do not silently
+substitute one time axis or classification for another.
+
+Proposed defaults, reducible by organization/case: 31-day interval, 100,000 rows,
+100 MB decoded evidence, 180 seconds elapsed time, one in-flight query and six
+submissions per rolling minute for the configured workspace/credential, shared
+across parent and children. Retry attempts also consume rate/call budget; no
+automatic query splitting or resubmission to circumvent a limit. The stricter
+[provider limits](https://learn.microsoft.com/en-us/azure/azure-monitor/fundamentals/service-limits)
+always win. Unknown scan bytes stay `null` with reason `not_reported`, while the
+query-price basis is `analytics_no_query_charge`. Do not debit fictional bytes
+or display a whole-workspace zero cost. Retention, transfer and tool budgets
+still apply. New Entra client-credentials admission is not approved by this design.
+
 ## 4. Credentials, scope and minimum permissions
 
 Source credentials and refresh/session material live only in the keystore, not
 environment variables, arguments, configuration, translated SQL or receipts.
 Reuse existing AWS SigV4 and Google RS256/keystore adapters where applicable;
-Azure client authentication is a proposed new credential flow, not activated by
-this document. Require full TLS/hostname verification and the existing per-source
+Azure client authentication is a proposed new credential flow requiring concrete
+approval: tenant/client identifiers and client secret in the keystore, separate
+tokens for management-plane table metadata and Logs Query audiences, in-memory
+access tokens only. Use the documented
+[Entra client-credentials flow](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/api/access-api);
+no delegated/ambient fallback or new secret is activated by this document. Require full TLS/hostname verification and the existing per-source
 CA option. No ambient credential discovery. Endpoints and result locations come
 from analyst configuration; reject redirects that would forward authentication
 to another origin. Check region, billing project and resource owner independently
@@ -216,7 +261,7 @@ cleanup by the administrator over granting IRMind object deletion.
 | BigQuery | Custom execution-project role with `bigquery.jobs.create`, and Data Viewer on the exact allowed dataset/table or authorized view. No project Editor, dataset creator or Data Editor. Own-job retrieval/cancellation must pass native service tests without adding broad job-administrator access. |
 | Linked Cloud Logging | BigQuery grants plus Logs View Accessor on the exact log view as required by linked-view access. No Logging Admin or link creation. |
 | ADX | Database Viewer on a dedicated database, not database/cluster Admin or Ingestor; Viewer reads the database broadly, so use administrator-managed restricted views/database separation where scope is narrower. |
-| Azure Log Analytics | Workspace query/read and workspace metadata/read plus table data/read restricted by granular RBAC to approved tables/rows. Prefer Log Analytics Data Reader with scoped conditions over broad Reader/Contributor; no sharedKeys, ingestion, search-job or workspace-write permissions. |
+| Azure Log Analytics | `Microsoft.OperationalInsights/workspaces/tables/read` to verify the plan, workspace metadata/query read plus table data/read restricted by granular RBAC to approved tables/rows. Prefer Log Analytics Data Reader with scoped conditions over broad Reader/Contributor; no sharedKeys, ingestion, search-job or workspace-write permissions. |
 
 Permission references:
 [Athena actions](https://docs.aws.amazon.com/service-authorization/latest/reference/list_athena.html),
@@ -317,6 +362,34 @@ The same remote query is **not reproducible**: retention, late arrivals, permiss
 provider engine and source contents can change. Re-execution creates new evidence
 and a comparison; it never replaces the signed original. Local reconstruction of
 the retained result remains a separate, reproducible check.
+
+### Fetch once, analyze locally
+
+Acquisition and model output are different surfaces. Reserve and retain at most
+the approved 100,000 rows / 100 MB per query, streamed to private case-local
+files, then ingest those exact retained bytes with an identified decoder and
+mapping. The next contract fixes a separate case allocation (proposed initial
+1,000,000 rows / 1 GB), with organization ceilings and signed case changes. Local
+index overhead is bounded separately by existing disk/ingest controls. Preserve
+provider envelopes, projection, typed values, query/execution/page/row identity
+and capture hashes so a selected-column result is never described as a complete
+original event. Include the fields required by the selected mapping or reject
+an incompatible projection; do not manufacture missing source fields.
+
+Return only the existing guarded summary: source hash/ID, retained row/byte
+counts, interval, completeness/coverage and a bounded preview. The analyst or
+agent then uses the existing timeline, search, entity and evidence tools against
+that local source. Repeating those local tools causes **no new remote query**.
+A second remote acquisition is a new admitted, budgeted plan, not a hidden next
+page of a model summary. This is the recommended cost-reduction pattern.
+
+Stop at the first retention cap without splitting a record. Preserve a valid
+complete prefix only when decoding can prove its row boundaries, and label it
+partial with the exact cause; a malformed envelope is not salvaged by guessing.
+Provider truncation and `PartialError` are distinct from local retention. Never
+claim all matching events were acquired because the model preview is complete.
+The signed frame remains 1 MiB, ContentGuard and stream limits are unchanged,
+and the full evidence file never becomes a model message.
 
 ## 6. Remote re-verification after sealing
 
@@ -432,11 +505,12 @@ test credentials. Never run this paid/credentialed procedure automatically.
    scan dimension, then approve concrete ports and format vectors separately.
 2. Implement shared typed query compiler/admission and receipt/export verification
    with fakes; preserve all current limits and untrusted-content boundaries.
-3. Add Athena CloudTrail and on-demand BigQuery as separate modules/PRs; measure
-   planning overhead and bounded result decode/map/write in release builds.
+3. Add Athena CloudTrail, on-demand BigQuery and Analytics-only Azure Logs in
+   separate module PRs; Azure authentication needs its concrete approval first.
+   Measure planning and bounded result decode/map/write in release builds.
 4. Add Security Lake/linked Logging on those validated executors and explicit
    mappings. Publish coverage and optional real-service observations separately.
-5. Revisit CloudTrail Lake and Azure only with a demonstrated cost-enforcement
+5. Revisit CloudTrail Lake and Azure Data Explorer only with a demonstrated cost-enforcement
    contract. Do not claim support based solely on successful HTTP queries.
 
 This PR is documentation only. It does not close connector validation, authorize
