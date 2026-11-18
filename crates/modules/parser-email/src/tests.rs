@@ -200,18 +200,21 @@ fn minimal_headers_require_analyst_selection_and_no_clock_is_invented() {
 }
 #[test]
 fn depth_and_part_limits_reject_the_complete_message() {
+    use std::fmt::Write as _;
     let mut deep = String::from(
         "From: sender@example.invalid\nContent-Type: multipart/mixed; boundary=b0\n\n",
     );
     for depth in 0..17 {
-        deep.push_str(&format!(
+        write!(
+            deep,
             "--b{depth}\nContent-Type: multipart/mixed; boundary=b{}\n\n",
             depth + 1
-        ));
+        )
+        .unwrap();
     }
     deep.push_str("--b17\nContent-Type: text/plain\n\nsynthetic\n--b17--\n");
     for depth in (0..17).rev() {
-        deep.push_str(&format!("--b{depth}--\n"));
+        writeln!(deep, "--b{depth}--").unwrap();
     }
     assert!(matches!(
         decode(deep.as_bytes()),
@@ -230,6 +233,13 @@ fn depth_and_part_limits_reject_the_complete_message() {
 #[test]
 fn source_size_and_reader_cancellation_fail_without_emitting_records() {
     use std::io::Read;
+    struct Cancelling<'a>(&'a CancellationToken);
+    impl Read for Cancelling<'_> {
+        fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+            self.0.cancel();
+            Err(std::io::Error::other("synthetic cancellation"))
+        }
+    }
     let source = SourceReferenceV1::file("synthetic.eml").unwrap();
     let cancel = CancellationToken::new();
     let mut reader = std::io::repeat(b'x').take(32 * 1024 * 1024 + 1);
@@ -255,13 +265,6 @@ fn source_size_and_reader_cancellation_fail_without_emitting_records() {
         Err(AppError::Fixed(irmind_app::FixedAppError::SourceLimit))
     ));
     assert!(!emitted);
-    struct Cancelling<'a>(&'a CancellationToken);
-    impl Read for Cancelling<'_> {
-        fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
-            self.0.cancel();
-            Err(std::io::Error::other("synthetic cancellation"))
-        }
-    }
     let cancel = CancellationToken::new();
     let result = EmailSourceDecoder.decode_reader(
         SourceInput {

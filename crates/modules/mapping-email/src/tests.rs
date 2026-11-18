@@ -109,9 +109,9 @@ fn url_crossing_text_chunk_boundary_is_mapped_once_without_decoding_escapes() {
             },
             &mut |record| {
                 record.inspect(|record| {
-                    let mapped = mapper.map(record).unwrap();
+                    let output = mapper.map(record).unwrap();
                     urls.extend(
-                        mapped
+                        output
                             .record()
                             .indexed
                             .record
