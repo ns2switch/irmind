@@ -119,3 +119,13 @@ fn api_entries_wrapper_keeps_connection_payload() {
     )
     .unwrap();
 }
+
+#[test]
+fn canonical_records_and_rejections_are_independent_of_worker_count() {
+    irmind_testkit::run_decode_budget_contract(
+        &GcpFlowSourceDecoder,
+        "events.ndjson",
+        include_bytes!("../../../testkit/fixtures/parser-gcp-flow/source/events.ndjson"),
+    )
+    .unwrap();
+}

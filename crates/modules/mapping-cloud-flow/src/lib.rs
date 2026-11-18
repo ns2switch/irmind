@@ -50,6 +50,7 @@ pub struct CloudFlowMapping {
     manifest: MappingManifest,
     base: TableMapping,
     status: TableMapping,
+    unknown: Option<TableMapping>,
 }
 fn bad<T>(_: T) -> MappingError {
     MappingError::UnsupportedSourceValue
@@ -106,11 +107,17 @@ impl CloudFlowMapping {
             },
             false,
         )?;
+        let unknown = if matches!(kind, SourceKind::AzureVnet | SourceKind::AzureNsg) {
+            Some(table(include_str!("tables/azure-unknown.toml"))?)
+        } else {
+            None
+        };
         Ok(Self {
             kind,
             manifest,
             base,
             status,
+            unknown,
         })
     }
 }
@@ -131,7 +138,17 @@ impl SourceMapper for CloudFlowMapping {
         &self.manifest
     }
     fn map(&self, source: &SourceRecordV1) -> Result<MappingOutput, MappingError> {
-        let (base, diagnostics) = match self.base.map(source) {
+        let unknown = source
+            .format()
+            .discriminators()
+            .get(&irmind_domain::SourceDiscriminator::RecordType)
+            .is_some_and(|kind| kind == "unknown");
+        let base_table = if unknown {
+            self.unknown.as_ref().unwrap_or(&self.base)
+        } else {
+            &self.base
+        };
+        let (base, mut diagnostics) = match base_table.map(source) {
             Ok(base) => (base, vec![]),
             Err(MappingError::UnsupportedSourceValue) => (
                 MappingOutput::unclassified(source, MappingDiagnostic::UnsupportedValue)?,
@@ -140,8 +157,13 @@ impl SourceMapper for CloudFlowMapping {
             Err(error) => return Err(error),
         };
         let mut record = base.into_record();
-        let classification = self.base.event_header(source)?;
-        let outcome = self.status.event_header(source)?.outcome();
+        let classification = base_table.event_header(source)?;
+        let outcome = if unknown {
+            diagnostics.push(MappingDiagnostic::Unclassified);
+            classification.outcome()
+        } else {
+            self.status.event_header(source)?.outcome()
+        };
         let mut header = EventHeaderV1::new(
             classification.categories(),
             classification.types(),
@@ -153,7 +175,11 @@ impl SourceMapper for CloudFlowMapping {
         }
         let mut context = record.common.context().clone();
         let mut observations = record.common.observations().values().to_vec();
-        let partition = projection::project(source, self.kind, &mut context, &mut observations)?;
+        let partition = if unknown {
+            MappingPartition::default()
+        } else {
+            projection::project(source, self.kind, &mut context, &mut observations)?
+        };
         record.common = CommonEventV1::try_new(
             source.origin().clone(),
             source.timestamp(),

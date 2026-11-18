@@ -34,7 +34,17 @@ fn invalid() -> AppError {
     AppError::Fixed(FixedAppError::SourceFormat)
 }
 fn header(line: &str) -> Option<Vec<String>> {
-    let names: Vec<_> = line.split_ascii_whitespace().map(str::to_owned).collect();
+    if !line
+        .split_ascii_whitespace()
+        .any(|token| token == "version")
+    {
+        return None;
+    }
+    let names: Vec<_> = line
+        .split_ascii_whitespace()
+        .take(65)
+        .map(str::to_owned)
+        .collect();
     if names.len() > 64
         || names.len() < 3
         || !names.iter().any(|s| s == "version")
@@ -57,7 +67,10 @@ fn prepare(
     declared: bool,
 ) -> Result<DecodedSourceFrame, AppError> {
     let text = std::str::from_utf8(bytes).map_err(|_| invalid())?;
-    let values: Vec<_> = text.split_ascii_whitespace().collect();
+    let values: Vec<_> = text
+        .split_ascii_whitespace()
+        .take(names.len() + 1)
+        .collect();
     if values.len() != names.len()
         || (!declared && values.first() != Some(&"2"))
         || bytes.len() > irmind_domain::SOURCE_MAX_BYTES
@@ -71,9 +84,14 @@ fn prepare(
         .collect::<BTreeMap<_, _>>();
     let time = columns
         .get("start")
-        .or_else(|| columns.get("end"))
         .and_then(SourceValue::as_text)
-        .filter(|v| *v != "-");
+        .filter(|v| *v != "-")
+        .or_else(|| {
+            columns
+                .get("end")
+                .and_then(SourceValue::as_text)
+                .filter(|v| *v != "-")
+        });
     let timestamp = time
         .map(|v| IndexedTime::from_epoch_decimal(v, false).map_err(|_| invalid()))
         .transpose()?;
@@ -127,7 +145,15 @@ impl SourceDecoder for VpcFlowSourceDecoder {
             let compressed = crate::gzip::bounded(reader, input.metadata.cancel);
             let gzip = flate2::read::MultiGzDecoder::new(compressed);
             let mut decoded = crate::gzip::bounded(gzip, input.metadata.cancel);
-            let result = lines(&mut decoded, input.metadata, true, budget, emit);
+            let mut callback_failed = false;
+            let result = lines(&mut decoded, input.metadata, true, budget, &mut |record| {
+                let result = emit(record);
+                callback_failed |= result.is_err();
+                result
+            });
+            if callback_failed {
+                return result;
+            }
             if input.metadata.cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
             }

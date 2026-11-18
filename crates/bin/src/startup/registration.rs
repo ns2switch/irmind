@@ -13,6 +13,7 @@
     feature = "mapping-entra",
     feature = "mapping-identity",
     feature = "mapping-guardduty",
+    feature = "mapping-cloud-flow",
     feature = "mapping-falco",
 ))]
 mod mapping;
@@ -51,6 +52,9 @@ use super::{
     feature = "parser-m365",
     feature = "parser-okta",
     feature = "parser-guardduty",
+    feature = "parser-vpc-flow",
+    feature = "parser-azure-flow",
+    feature = "parser-gcp-flow",
     feature = "parser-falco",
     feature = "parser-velociraptor",
     feature = "parser-hayabusa",
@@ -111,6 +115,9 @@ pub(super) fn configured_registry(
         feature = "parser-m365",
         feature = "parser-okta",
         feature = "parser-guardduty",
+        feature = "parser-vpc-flow",
+        feature = "parser-azure-flow",
+        feature = "parser-gcp-flow",
         feature = "parser-falco",
         feature = "parser-velociraptor",
         feature = "parser-hayabusa",
@@ -174,6 +181,9 @@ pub(super) fn configured_registry(
     feature = "parser-m365",
     feature = "parser-okta",
     feature = "parser-guardduty",
+    feature = "parser-vpc-flow",
+    feature = "parser-azure-flow",
+    feature = "parser-gcp-flow",
     feature = "parser-falco",
     feature = "parser-velociraptor",
     feature = "parser-hayabusa",
@@ -206,6 +216,7 @@ fn register_parsers(
         feature = "mapping-entra",
         feature = "mapping-identity",
         feature = "mapping-guardduty",
+        feature = "mapping-cloud-flow",
         feature = "mapping-falco",
     ))]
     mapping::register(registry)?;
@@ -214,6 +225,9 @@ fn register_parsers(
         feature = "parser-m365",
         feature = "parser-okta",
         feature = "parser-guardduty",
+        feature = "parser-vpc-flow",
+        feature = "parser-azure-flow",
+        feature = "parser-gcp-flow",
         feature = "parser-gcp-audit",
         feature = "parser-kubernetes",
         feature = "parser-falco"
@@ -693,11 +707,29 @@ fn register_chronicle(
     feature = "parser-m365",
     feature = "parser-okta",
     feature = "parser-guardduty",
+    feature = "parser-vpc-flow",
+    feature = "parser-azure-flow",
+    feature = "parser-gcp-flow",
     feature = "parser-gcp-audit",
     feature = "parser-kubernetes",
     feature = "parser-falco"
 ))]
 fn register_contextual_parsers(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(feature = "parser-vpc-flow")]
+    registry.register(
+        Box::new(irmind_mod_parser_vpc_flow::VpcFlowParser),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(feature = "parser-azure-flow")]
+    registry.register(
+        Box::new(irmind_mod_parser_azure_flow::AzureFlowParser),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(feature = "parser-gcp-flow")]
+    registry.register(
+        Box::new(irmind_mod_parser_gcp_flow::GcpFlowParser),
+        &ModuleConfig::new(),
+    )?;
     #[cfg(feature = "parser-guardduty")]
     registry.register(
         Box::new(irmind_mod_parser_guardduty::GuardDutyParser),

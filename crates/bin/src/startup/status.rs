@@ -52,6 +52,9 @@ pub(super) fn module_statuses(
 }
 
 const PARSER_STATUSES: &[(&str, bool)] = &[
+    ("parser-vpc-flow", cfg!(feature = "parser-vpc-flow")),
+    ("parser-azure-flow", cfg!(feature = "parser-azure-flow")),
+    ("parser-gcp-flow", cfg!(feature = "parser-gcp-flow")),
     ("parser-m365", cfg!(feature = "parser-m365")),
     ("parser-okta", cfg!(feature = "parser-okta")),
     ("parser-guardduty", cfg!(feature = "parser-guardduty")),

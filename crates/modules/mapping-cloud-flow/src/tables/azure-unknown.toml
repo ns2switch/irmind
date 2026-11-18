@@ -1,0 +1,13 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "cloud-flow-azure-unknown"
+version = "cloud-flow-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-azure-flow"
+parser_versions = ["azure-flow-source-v1"]
+native_type = "unknown"
+
+[[rules]]
+categories = ["network"]
+types = ["info"]
+outcome = "unknown"

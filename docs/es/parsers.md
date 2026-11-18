@@ -15,6 +15,9 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 | Microsoft 365 Unified Audit Log | CSV de Purview, JSON de Search-UnifiedAuditLog y Management Activity API | AuditData/Operation, CreationTime y workload originales; 98 | Instante UTC, actor, buzón objetivo explícito, recurso, IP de origen, user agent, workload y tablas de operación/resultado | experimental |
 | Okta System Log | Arrays JSON de la API y exports JSON/NDJSON | eventType, uuid, actor e instante published; 98 | Autenticación, MFA, administración, políticas y suplantación; actor/objetivo e IP de origen | experimental |
 | AWS GuardDuty | JSON de API, CLI/consola y EventBridge | Cuenta, ID/tipo de hallazgo, región, recurso e instante originales; 98 | Alerta de origen sin confirmar, roles de actor/recurso/IP, severidad exacta e instantes originales | experimental |
+| AWS VPC Flow Logs | Texto con cabecera/personalizado o v2, gzip y mensajes CloudWatch | Cabecera nativa: 98; v2 sin cabecera: 70 y confirmación del analista | Extremos y roles, resultado explícito, bytes/paquetes, cuenta/región y host de instancia explícito | experimental |
+| Azure flow logs | Contenedores JSON VNet y NSG | Categoría del proveedor y estructura de flujos: 98 | Tupla original, instante preciso, extremos, resultado, contadores, suscripción y regla | experimental |
+| GCP VPC Flow Logs | JSON/NDJSON de Cloud Logging y envolturas entries | logName de VPC, connection e instante: 98 | Roles de extremos, proyecto, VM observadora, bytes/paquetes; resultado ausente desconocido | experimental |
 | JSON y logs de nube exportados | JSON/NDJSON; AWS, GCP, Azure y HuntEval | Campos reconocidos del registro | Instante, identidades, cuentas, recursos e IP | experimental |
 | GCP Cloud Audit Logs | LogEntry JSON/NDJSON; exportaciones de GKE | Servicio/método protoPayload e instante originales | Nanosegundos UTC, estado explícito, roles de principal, recurso y extremos; clúster GKE confirmado | experimental |
 | Microsoft Entra ID | JSON/NDJSON de Azure Monitor y filas-objeto de Log Analytics | Categoría o Type documentado e instante original | Accesos y auditoría, resultado explícito, tenant, actor, objetivo e IP | experimental |
@@ -244,3 +247,43 @@ consultables. La ingesta local no crea ninguna conexión ni credencial de GuardD
 Fuentes: [esquema GetFindings](https://docs.aws.amazon.com/guardduty/latest/APIReference/API_GetFindings.html),
 [salida CLI](https://docs.aws.amazon.com/cli/latest/reference/guardduty/get-findings.html),
 [detalles de hallazgos](https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_findings-summary.html).
+
+## Exportaciones de flujos de red en la nube
+
+Exporta AWS VPC Flow Logs de S3 en texto o gzip, conservando la cabecera de columnas
+de los formatos personalizados. También se admiten exportaciones de mensajes
+CloudWatch `events`/`logEvents`. Sin cabecera, el analista debe elegir explícitamente
+`parser-vpc-flow` y confirmar el formato estándar v2 de 14 campos. La TUI explica
+este requisito al elegir parser; la detección desatendida no ingiere ese fichero
+automáticamente. Usa cabecera para cualquier otro formato. Las columnas desconocidas
+se conservan. Solo un `instance-id` explícito aporta el host de partición; una
+interfaz no se interpreta como host.
+
+Exporta el JSON de VNet o NSG de Azure desde su almacenamiento sin reescribir
+`flows` ni `flowTuples`. VNet expresa el instante de la tupla en milisegundos Unix;
+NSG, en segundos. Se reconocen VNet 2/4/5 y NSG 1/2. Una versión desconocida se
+conserva una vez como registro de red sin clasificar, sin aplicar una disposición
+conocida de columnas. Las tuplas expandidas no inventan offsets dentro de cadenas
+JSON escapadas. La regla, el recurso y la tupla original siguen siendo consultables.
+Una dirección MAC no se convierte en identidad de host.
+
+Exporta las entradas de Cloud Logging de GCP conservando `logName`, `timestamp`,
+`resource` y `jsonPayload.connection`; el nombre del log debe identificar
+`vpc_flows`. Conserva `src_instance`, `dest_instance` y `reporter` para atribuir el
+host observador. Un `DROPPED` explícito se mapea a fallo; su ausencia no demuestra
+aceptación. Los bytes de carga útil estimados de GCP, los incrementos de Azure y
+los contadores de AWS mantienen su significado propio: no son mediciones
+intercambiables de facturación ni de captura de paquetes.
+
+Las tres familias separan decodificador y mapeo. Las tablas finitas de campos y
+resultados son declarativas; el código nativo valida los tipos numéricos y expande
+las tuplas acotadas de Azure. Son exportaciones locales, no conectores en vivo.
+Se mantienen límites, taint, hashes y procedencia firmada. Una entrada compacta o
+gzip puede superar la cuota vigente de tamaño normalizado aunque cumpla el límite
+de fuente; la ingesta falla con el error de almacenamiento existente, sin omitir
+registros silenciosamente. Estos módulos no amplían esa cuota.
+
+Fuentes: [AWS](https://docs.aws.amazon.com/vpc/latest/userguide/flow-log-records.html),
+[Azure VNet](https://learn.microsoft.com/en-us/azure/network-watcher/vnet-flow-logs-overview),
+[Azure NSG](https://learn.microsoft.com/en-us/azure/network-watcher/nsg-flow-logs-overview),
+[GCP](https://docs.cloud.google.com/vpc/docs/about-flow-logs-records).

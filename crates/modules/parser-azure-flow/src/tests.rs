@@ -89,3 +89,13 @@ fn filename_is_not_a_format_proof() {
     use irmind_app::LogParser;
     assert!(AzureFlowParser.detect("vnet.json", b"unrelated").is_none());
 }
+
+#[test]
+fn canonical_records_and_rejections_are_independent_of_worker_count() {
+    irmind_testkit::run_decode_budget_contract(
+        &AzureFlowSourceDecoder,
+        "vnet.json",
+        include_bytes!("../../../testkit/fixtures/parser-azure-flow/source/vnet.json"),
+    )
+    .unwrap();
+}

@@ -126,3 +126,24 @@ fn gzip_checks_integrity_and_never_invents_compressed_record_offsets() {
             .is_err()
     );
 }
+
+#[test]
+fn canonical_records_and_rejections_are_independent_of_worker_count() {
+    irmind_testkit::run_decode_budget_contract(
+        &VpcFlowSourceDecoder,
+        "custom.log",
+        include_bytes!("../../../testkit/fixtures/parser-vpc-flow/source/custom.log"),
+    )
+    .unwrap();
+}
+
+#[test]
+fn missing_start_uses_explicit_end_without_inventing_a_time() {
+    let bytes = b"version srcaddr dstaddr start end\n2 203.0.113.77 192.0.2.10 - 1767225601\n";
+    let (report, records) = decode(bytes);
+    assert_eq!(report.accepted, 1);
+    assert_eq!(
+        records[0].timestamp().unwrap().instant().unix_micros(),
+        1_767_225_601_000_000
+    );
+}

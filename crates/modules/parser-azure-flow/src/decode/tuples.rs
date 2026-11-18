@@ -114,7 +114,15 @@ fn unknown(source: &SourceRecordV1, vnet: bool) -> Result<DecodedSourceFrame, Ap
     Ok(DecodedSourceFrame {
         fields: source.fields().clone(),
         timestamp: source.timestamp(),
-        format: format(vnet)?,
+        format: {
+            let base = format(vnet)?;
+            SourceFormatV1::try_new(
+                base.id(),
+                base.version(),
+                BTreeMap::from([(SourceDiscriminator::RecordType, "unknown".into())]),
+            )
+            .map_err(|_| invalid())?
+        },
     })
 }
 fn format(vnet: bool) -> Result<SourceFormatV1, AppError> {
@@ -137,7 +145,6 @@ fn prepare(
     group: &SourceValue,
     tuple: &str,
 ) -> Result<DecodedSourceFrame, AppError> {
-    let values: Vec<_> = tuple.split(',').collect();
     let names = if vnet { VNET } else { NSG };
     let count = if vnet {
         if version == 5 { 16 } else { 13 }
@@ -146,6 +153,7 @@ fn prepare(
     } else {
         13
     };
+    let values: Vec<_> = tuple.split(',').take(count + 1).collect();
     if values.len() != count {
         return Err(invalid());
     }

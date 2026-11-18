@@ -328,3 +328,7 @@ mod tests {
         assert!(receiver.try_recv().is_err());
     }
 }
+
+#[cfg(test)]
+#[path = "normalized_profile.rs"]
+mod normalized_profile;

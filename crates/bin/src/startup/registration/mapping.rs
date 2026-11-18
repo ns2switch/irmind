@@ -25,6 +25,21 @@ const NETWORK_PARSERS: &[&str] = &[
 ];
 
 pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(all(feature = "mapping-cloud-flow", feature = "parser-vpc-flow"))]
+    registry.register(
+        Box::new(irmind_mod_mapping_cloud_flow::CloudFlowMapping::aws()?),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(all(feature = "mapping-cloud-flow", feature = "parser-gcp-flow"))]
+    registry.register(
+        Box::new(irmind_mod_mapping_cloud_flow::CloudFlowMapping::gcp()?),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(all(feature = "mapping-cloud-flow", feature = "parser-azure-flow"))]
+    for mapper in irmind_mod_mapping_cloud_flow::CloudFlowMapping::azure()? {
+        registry.register(Box::new(mapper), &ModuleConfig::new())?;
+    }
+
     #[cfg(all(feature = "mapping-guardduty", feature = "parser-guardduty"))]
     registry.register(
         Box::new(irmind_mod_mapping_guardduty::GuardDutyMapping::new()?),
@@ -269,6 +284,20 @@ mod tests {
         check_catalog(&registry);
     }
     fn register_identity_decoders(registry: &mut ModuleRegistry) {
+        #[cfg(all(feature = "mapping-cloud-flow", feature = "parser-vpc-flow"))]
+        registry
+            .add_source_decoder(Arc::new(irmind_mod_parser_vpc_flow::VpcFlowSourceDecoder))
+            .unwrap();
+        #[cfg(all(feature = "mapping-cloud-flow", feature = "parser-azure-flow"))]
+        registry
+            .add_source_decoder(Arc::new(
+                irmind_mod_parser_azure_flow::AzureFlowSourceDecoder,
+            ))
+            .unwrap();
+        #[cfg(all(feature = "mapping-cloud-flow", feature = "parser-gcp-flow"))]
+        registry
+            .add_source_decoder(Arc::new(irmind_mod_parser_gcp_flow::GcpFlowSourceDecoder))
+            .unwrap();
         #[cfg(all(feature = "mapping-guardduty", feature = "parser-guardduty"))]
         registry
             .add_source_decoder(Arc::new(
@@ -291,6 +320,15 @@ mod tests {
         assert_eq!(
             catalog.snapshots().unwrap().len(),
             2 + usize::from(cfg!(all(
+                feature = "mapping-cloud-flow",
+                feature = "parser-vpc-flow"
+            ))) + usize::from(cfg!(all(
+                feature = "mapping-cloud-flow",
+                feature = "parser-gcp-flow"
+            ))) + 2 * usize::from(cfg!(all(
+                feature = "mapping-cloud-flow",
+                feature = "parser-azure-flow"
+            ))) + usize::from(cfg!(all(
                 feature = "mapping-guardduty",
                 feature = "parser-guardduty"
             ))) + usize::from(cfg!(all(

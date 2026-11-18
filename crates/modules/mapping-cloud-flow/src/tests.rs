@@ -169,3 +169,53 @@ fn assert_outcomes(
         .unwrap();
     assert_eq!(seen, expected.len());
 }
+
+#[test]
+fn unknown_azure_versions_do_not_interpret_lookalike_columns() {
+    let mut bytes =
+        include_bytes!("../../../testkit/fixtures/parser-azure-flow/source/future.ndjson")
+            .as_slice();
+    let reference = SourceReferenceV1::file("future.ndjson").unwrap();
+    let cancel = CancellationToken::new();
+    let mapper = CloudFlowMapping::azure().unwrap().remove(0);
+    irmind_mod_parser_azure_flow::AzureFlowSourceDecoder
+        .decode_reader(
+            SourceInput {
+                metadata: SourceMetadata {
+                    source: &reference,
+                    evidence_hash: irmind_app::sha256(bytes),
+                    time_context: None,
+                    cluster_context: None,
+                    cancel: &cancel,
+                },
+                reader: &mut bytes,
+            },
+            &mut |r| {
+                r.inspect(|r| {
+                    let projection = mapper.map(r).unwrap().into_record();
+                    assert_eq!(
+                        projection.common.event().outcome(),
+                        irmind_domain::EventOutcome::Unknown
+                    );
+                    assert!(projection.common.observations().values().is_empty());
+                    assert!(
+                        projection
+                            .common
+                            .context()
+                            .get(irmind_domain::CommonField::CloudAccountId)
+                            .is_none()
+                    );
+                    assert!(
+                        projection
+                            .common
+                            .event()
+                            .types()
+                            .contains(irmind_domain::EventType::Info)
+                    );
+                    assert!(projection.indexed.record.text.contains("flowLogVersion"));
+                });
+                Ok(())
+            },
+        )
+        .unwrap();
+}
