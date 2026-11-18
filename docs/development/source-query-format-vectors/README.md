@@ -67,6 +67,7 @@ existing production catalog root is not used or accepted by these vectors.
 | `recovery-rejected-shape.json` | A priced Athena execution cannot be acknowledged as an expired unknown Analytics execution. |
 | `subagent-plan-v2-shape.json`, matching preimage | Proposed V2 plan member and query allocations. Reuses the old synthetic plan's task IDs/checkpoints as a shape, not as a valid plan for this new query chain. |
 | `remote-receipt.json`, matching preimage, `signed-remote-receipt.json` | Detached exact-version metadata observation. Does not establish byte/hash equality. |
+| `signed-remote-metadata-admission.json`, `signed-remote-sha256-admission.json`, matching preimages | Distinct Analyst-signed, exact-method pre-network admissions, sharing the unchanged global operation challenge. |
 | `remote-original.txt`, `remote-sha256-receipt.json`, matching preimage, `signed-remote-sha256.json` | Exact 1,024-byte synthetic object and positive full-byte SHA-256 receipt, separate from metadata proof. |
 | `azure-partial-response.json` | HTTP-success-shaped Azure response with PartialError; never a complete result. |
 | `wrong-key-remote-receipt.json` | Self-consistent Ed25519 signature by another key; verification against the expected case Analyst key must reject it. |

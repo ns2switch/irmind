@@ -464,11 +464,13 @@ budget. A requested new remote acquisition is a distinct signed/budgeted plan.
 
 V9 retains the current V8 body order through catalog proofs and branch chunks.
 The existing signed-operation section additionally carries exactly the global
-source-query adoption proofs referenced by exported plans: case operations in
-their existing order, then unique adoption proofs sorted by operation hash.
+source-query adoption proofs referenced by exported plans and verification
+admissions referenced by detached receipts: case operations in
+their existing order, then unique global proofs sorted by operation hash.
 This is an explicit V9 admission rule; V8 does not acquire it. Verify the
 unchanged operation challenge/signature against the expected Analyst, parse only
-`source-query-configuration-v1`, and match its source/policy bytes to the plan.
+`source-query-configuration-v1` or `remote-original-verification-admission-v1`,
+and match its source/policy bytes to the plan or its exact verification target.
 A missing, unrelated or other-key adoption invalidates verification. These
 signatures authenticate a referenced operation, not the completeness of the
 installation's entire global history. Export no unrelated global configuration.
@@ -500,7 +502,7 @@ truth of the mutable remote service and not a provider signature. Re-running a
 query is a new acquisition, never verification by reconstruction of remote data.
 
 Detached `RemoteOriginalVerificationV1` has required canonical fields
-`version,case_id,seal,source_manifest,object,method,observed_at,outcome,observed,
+`version,case_id,admission,seal,source_manifest,object,method,observed_at,outcome,observed,
 sha256,transfer_bytes,reason,nonce`. `object` binds the exact immutable version;
 `method` is metadata or sha256. Outcomes are identity_match, digest_match,
 changed, missing, denied, unavailable, cancelled. Metadata never produces
@@ -515,14 +517,29 @@ Analyst/seal identity, not merely the self-declared public key. The nonce is a
 fresh 32-byte receipt nonce, unrelated to UNTRUSTED delimiters. No expiry claim
 or claim that a later receipt updates an earlier one is inferred.
 
+Before a remote check, the Analyst signs a global
+`remote-original-verification-admission-v1:` operation with hex(J({version,
+case_id,seal,source_manifest,object,method,transfer_bytes,policy,at,nonce})).
+The receipt's required `admission` is that operation's audit hash. The exact
+method/target/maximum and policy snapshot are fixed before network work; no
+receipt can retroactively authorize a GET. Include the signed admission in V9's
+operation-proof section. An admission for metadata does not authorize sha256.
+
+The shared broker maintains detached holds/usage under the same case/seal lock,
+starting from the *remaining* transfer/call allocation authenticated at sealing.
+Outstanding checks and earlier detached usage are subtracted across processes.
+This bookkeeping is outside the sealed chain; it does not grant another copy of
+the case budget. Unknown transfers retain/charge their admitted bound until
+reconciled, never release it just on timeout. Exhaustion blocks new checks;
+no implicit post-seal increase or model-token debt exception is introduced.
+
 A sealed chain is not appended/reopened. Store the receipt independently with
 the frozen seal hash; including one requires a *new* export file, never rewriting
 an existing signed export. Missing receipts are not proof of failure, and a
 valid receipt only attests observations at its stated time. Catalogue and scan
-credentials are never exported. A new original byte GET consumes the existing
-transfer budget through a detached admitted verification session, without
-rewriting the sealed case's budget ledger; its independently signed usage record
-is the receipt. No implicit post-seal budget grant is permitted.
+credentials are never exported. A new original byte GET consumes the
+remaining transfer allowance through that detached admitted session; the signed
+receipt is its usage record. The effective organization ceiling still applies.
 
 ## 9. Vectors and implementation tests
 
