@@ -422,15 +422,30 @@ fn assert_host_partitions(parser: &str) {
 #[cfg(feature = "parser-vpc-flow")]
 #[test]
 fn compact_flow_artifact_bytes_are_independent_of_worker_limit() {
+    assert_worker_artifacts("vpc-flow", 4);
+}
+
+#[cfg(feature = "parser-fdr")]
+#[test]
+fn fdr_artifact_bytes_are_independent_of_worker_limit() {
+    assert_worker_artifacts("fdr", 11);
+}
+
+#[cfg(any(feature = "parser-vpc-flow", feature = "parser-fdr"))]
+fn assert_worker_artifacts(parser: &str, expected_records: u64) {
     let source = tempfile::tempdir().unwrap();
-    fs::write(source.path().join("flows.log"), fixture("vpc-flow")).unwrap();
-    let mut lines = std::str::from_utf8(fixture("vpc-flow")).unwrap().lines();
-    let header = lines.next().unwrap();
+    fs::write(source.path().join("flows.log"), fixture(parser)).unwrap();
+    let mut lines = std::str::from_utf8(fixture(parser)).unwrap().lines();
+    let header = if parser == "vpc-flow" {
+        format!("{}\n", lines.next().unwrap())
+    } else {
+        String::new()
+    };
     let mut rows = lines.collect::<Vec<_>>();
     rows.reverse();
     fs::write(
         source.path().join("disordered.log"),
-        format!("{header}\n{}\n", rows.join("\n")),
+        format!("{header}{}\n", rows.join("\n")),
     )
     .unwrap();
     let mut expected = None;
@@ -445,7 +460,7 @@ fn compact_flow_artifact_bytes_are_independent_of_worker_limit() {
         for file in ["flows.log", "disordered.log"] {
             assert_eq!(
                 ingest_with_context(&engine, store.as_ref(), &case.id, source.path(), file, None),
-                4
+                expected_records
             );
         }
         let mut hashes = store
