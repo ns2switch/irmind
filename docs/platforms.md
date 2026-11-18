@@ -2,7 +2,7 @@
 
 This page is for people installing IRMind on Linux, macOS, or Windows, including headless SSH hosts. It covers source builds, release verification, keystore backends, and terminal behavior. Start with [getting started](getting-started.md) for the case workflow.
 
-Read the [Code signing policy](../CODE_SIGNING.md) for attribution, team roles,
+Read the [Code signing policy](../CODE_SIGNING.md) for current verification, team roles,
 privacy and the status of native platform signing.
 
 ## Build from source
@@ -120,8 +120,9 @@ The byte `0x0f` is covered by the real-binary PTY regression on the CI operating
 Developer ID signing and notarization for both macOS architectures are prepared but disabled. See the
 [maintainer setup](development/native-signing.md); current releases still lack
 Apple native signatures. No production secret or activation is required to use
-the existing Sigstore verification. The SignPath Foundation application has been
-submitted; approval and integration are pending. Windows Authenticode is not active.
+the existing Sigstore verification. Windows Authenticode signing remains pending;
+SignPath Foundation may be reevaluated after the public launch. A paid signing
+subscription is another future option, not an active service or sponsorship.
 
 Windows may show “Windows protected your PC”, an unrecognized-app warning or an
 unknown publisher. Windows 11 Smart App Control can block an unsigned file;

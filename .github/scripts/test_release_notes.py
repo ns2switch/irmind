@@ -6,7 +6,7 @@ import sys
 import tempfile
 import unittest
 
-from release_notes import ATTRIBUTION, FOOTER, POLICY_URL, append_policy
+from release_notes import FOOTER, POLICY_URL, append_policy
 
 
 class ReleaseNotesTests(unittest.TestCase):
@@ -15,7 +15,16 @@ class ReleaseNotesTests(unittest.TestCase):
         result = append_policy(notes)
         self.assertTrue(result.startswith(notes.rstrip() + "\n\n---\n\n"))
         self.assertIn(f"Code signing policy: {POLICY_URL}", result)
-        self.assertTrue(result.endswith(ATTRIBUTION + "\n"))
+        self.assertTrue(result.endswith(FOOTER + "\n"))
+
+    def test_old_sponsorship_credit_is_removed_without_changing_other_notes(self):
+        old_credit = "Free code signing provided by " + "a former service, certificate by its foundation"
+        notes = "Manual release notes.\n\n" + FOOTER + "\n\n" + old_credit + "\n"
+        result = append_policy(notes)
+        self.assertIn("Manual release notes.", result)
+        self.assertNotIn(old_credit, result)
+        self.assertEqual(result.count(FOOTER), 1)
+        self.assertEqual(append_policy(result), result)
 
     def test_publication_retry_does_not_duplicate_or_replace_notes(self):
         first = append_policy("Generated notes\n")

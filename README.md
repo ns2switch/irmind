@@ -58,8 +58,10 @@ brew upgrade ns2switch/irmind/irmind
 
 The formula installs the main binary and EVTX helper from GitHub Releases with pinned SHA-256 hashes, without compiling IRMind. See the [platform guide](docs/platforms.md#homebrew) for trust checks and preserving the creating version before upgrading a case.
 
-See the [Code signing policy](CODE_SIGNING.md) for attribution, team roles,
+See the [Code signing policy](CODE_SIGNING.md) for current verification, team roles,
 privacy and the status of native platform signing.
+Windows Authenticode signing remains pending; SignPath Foundation may be
+reevaluated after the public launch. There is no current signing sponsorship.
 
 Start with the [verified release instructions](docs/platforms.md#verify-a-release-before-installing). Download and verify the saved installer before running it; do not pipe a network script to a shell. Source builds are optional for [contributors](CONTRIBUTING.md).
 

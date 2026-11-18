@@ -71,8 +71,10 @@ not compatibility promises for the current executable.
   AUR, Nix, winget and Scoop remain open to community maintainers.
 - Activate prepared Developer ID/hardened-runtime signing and notarization only
   after the maintainer provisions the protected release environment and approves
-  activation. Windows SignPath application and release approvers are maintainer
-  tasks; Sigstore does not replace native OS signing or reputation.
+  activation. Windows Authenticode signing remains pending; SignPath Foundation
+  may be reevaluated after the public launch, alongside paid-service options.
+  Provider selection and activation remain maintainer tasks; Sigstore does not
+  replace native OS signing or reputation.
 - Record the remaining H5 procedure details and a connector against a real test
   environment, and confirm experimental EVTX behavior on Windows 11. Do not infer
   these observations from scripted synthetic tests.

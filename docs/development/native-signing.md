@@ -72,19 +72,17 @@ the stapled offline-distribution ticket; raw executables rely on online ticket
 lookup. Native validation on an ordinary quarantined Mac download remains required.
 See [Apple's notarization workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow).
 
-## Windows / SignPath
+## Windows Authenticode: future option
 
-The maintainer has submitted the SignPath Foundation application. Acceptance and
-integration configuration are pending; Authenticode is not active. The
-[code signing policy](../../CODE_SIGNING.md) identifies the team and requires
-manual approval of every signing request. The Foundation decides eligibility.
+Windows Authenticode signing remains pending. SignPath Foundation may be
+reevaluated after the public launch; a paid signing subscription is another
+future option. No service, certificate or sponsorship is currently in place.
+There are no active native Windows signing jobs or signing secrets in this setup.
 
-Provide the repository, MIT/Apache license, existing signed release URL, this
-project's code-signing policy, CI/build provenance and the two Windows executables
-(main and isolated helper). Wait for the organization's project/policy IDs and
-approved integration before adding credentials or a SignPath action. Native signing
-does not guarantee immediate SmartScreen reputation. Until then use the
-[Windows verification instructions](../platforms.md#windows), without disabling OS controls.
+Current `irmind.exe` and `irmind-evtx.exe` downloads may show SmartScreen warnings.
+Use [Sigstore, checksums and provenance](../platforms.md#windows), then the verified
+`install.ps1`; do not disable operating-system protections. The project's
+[code signing policy](../../CODE_SIGNING.md) states the current status and team roles.
 
 ## Check a native-signed candidate on macOS
 
@@ -107,50 +105,17 @@ cannot carry a stapled ticket; assess them with network access. Record the macOS
 version, candidate tag and outcomes. Current releases without native signing
 are not expected to pass these native assessments.
 
-## SignPath integration preparation (inactive)
+## Inactive Windows integration point
 
-The release workflow marks the integration point immediately before SBOM
-creation. A future dedicated signing job must run only for a published tag's
-push, use the protected `release` environment and submit both Windows executables
-from that run's GitHub Actions artifact. Every request requires Anibal Cañada's
-manual approval in SignPath. PRs and branch/manual rehearsals cannot request
-production signing. Replace the staged Windows files with the approved, verified
-Authenticode output before generating SHA256SUMS, Sigstore signatures and
-provenance. A rejected, timed-out or invalid request must fail publication.
+The release workflow keeps a comment-only integration point before SBOM generation.
+It does not invoke a signing service or reference its secrets. A future Foundation
+or paid-service integration requires a reviewed, commit-pinned action, maintainer
+approval and credentials provisioned separately in the protected `release`
+environment for tags only. Do not configure credentials now.
 
-No SignPath action runs today. After the
-Foundation approves the project and provides its configuration, prepare:
-
-| Environment `release` setting | Purpose |
-| --- | --- |
-| Secret `SIGNPATH_API_TOKEN` | Foundation-provided submission credential for this project; never the approver's interactive credentials. |
-| Variable `SIGNPATH_ORGANIZATION_ID` | Organization identifier. |
-| Variable `SIGNPATH_PROJECT_SLUG` | Approved project identifier. |
-| Variable `SIGNPATH_SIGNING_POLICY_SLUG` | Policy that requires manual approval for release signing. |
-| Variable `SIGNPATH_ARTIFACT_CONFIGURATION_SLUG` | Configuration restricting signing to the two project executables and their IRMind product/version metadata. |
-
-The identifiers are configuration, not private keys. The Foundation retains the
-certificate's signing key; no Windows PFX or certificate password belongs in this
-repository. The action can use the job's existing `GITHUB_TOKEN` to read its
-artifact and build metadata; no additional GitHub PAT is planned. Pin the official
-SignPath action to a reviewed full commit when the integration is implemented.
-See the [official GitHub integration](https://docs.signpath.io/trusted-build-systems/github).
-Setting any of these values alone does not activate signing: a reviewed workflow
-change and explicit maintainer activation are still required.
-
-Suggested project description:
-
-> IRMind is an open-source terminal assistant for defensive incident response
-> and forensic analysis. Analysts inspect local or explicitly configured remote
-> evidence. Policy and analyst approvals govern tool use, and case records are
-> signed. The Windows release contains the main CLI and an isolated EVTX decoder.
-> Builds run from reviewed source in pinned GitHub Actions workflows and include
-> checksums, Sigstore signatures, provenance and SBOMs.
-
-The [Foundation's conditions](https://signpath.org/terms) require explicit team
-roles, privacy disclosures, verifiable builds and approval of each signing
-request. [CODE_SIGNING.md](../../CODE_SIGNING.md) identifies the project roles
-and current signing status. The attribution identifies the intended Windows signing service; the policy explicitly states that integration is not active.
-Windows product-name/version metadata and SignPath artifact restrictions must
-be checked during integration; the policy alone does not establish compliance.
-Any integration credentials and activation require a separate maintainer action.
+Both Windows executables must come from that tag's build, carry matching product
+and version metadata, and be signed before hashes, Sigstore bundles and provenance
+are generated. Rejection, timeout or invalid native output must block publication
+once native signing is activated. A signing certificate does not guarantee
+immediate SmartScreen reputation. A provider decision and explicit activation
+review are still required; no integration is promised.
