@@ -25,6 +25,11 @@ const NETWORK_PARSERS: &[&str] = &[
 ];
 
 pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(all(feature = "mapping-guardduty", feature = "parser-guardduty"))]
+    registry.register(
+        Box::new(irmind_mod_mapping_guardduty::GuardDutyMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
     #[cfg(all(feature = "mapping-identity", feature = "parser-m365"))]
     registry.register(
         Box::new(irmind_mod_mapping_identity::IdentityMapping::m365()?),
@@ -264,6 +269,12 @@ mod tests {
         check_catalog(&registry);
     }
     fn register_identity_decoders(registry: &mut ModuleRegistry) {
+        #[cfg(all(feature = "mapping-guardduty", feature = "parser-guardduty"))]
+        registry
+            .add_source_decoder(Arc::new(
+                irmind_mod_parser_guardduty::GuardDutySourceDecoder,
+            ))
+            .unwrap();
         #[cfg(all(feature = "mapping-identity", feature = "parser-m365"))]
         registry
             .add_source_decoder(Arc::new(irmind_mod_parser_m365::M365SourceDecoder))
@@ -280,6 +291,9 @@ mod tests {
         assert_eq!(
             catalog.snapshots().unwrap().len(),
             2 + usize::from(cfg!(all(
+                feature = "mapping-guardduty",
+                feature = "parser-guardduty"
+            ))) + usize::from(cfg!(all(
                 feature = "mapping-identity",
                 feature = "parser-m365"
             ))) + usize::from(cfg!(all(

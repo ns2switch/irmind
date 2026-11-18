@@ -50,7 +50,7 @@ pub struct JsonFrames<'a> {
     position: u64,
     mode: Mode,
     wrapper_keys: BTreeSet<String>,
-    record_wrappers: bool,
+    record_wrappers: &'static [&'static str],
     wrapper_seen: bool,
 }
 impl<'a> JsonFrames<'a> {
@@ -61,15 +61,33 @@ impl<'a> JsonFrames<'a> {
             position: 0,
             mode: Mode::Roots,
             wrapper_keys: BTreeSet::new(),
-            record_wrappers: true,
+            record_wrappers: &["Records", "records", "events"],
             wrapper_seen: false,
         }
     }
     /// Formats with flat event objects must retain fields named `events` as data.
     #[must_use]
     pub fn without_record_wrappers(mut self) -> Self {
-        self.record_wrappers = false;
+        self.record_wrappers = &[];
         self
+    }
+    /// Source-specific outer arrays; bounded static keys are selected by a decoder,
+    /// never supplied by evidence or a model. Nested arrays remain original data.
+    pub fn with_record_array_keys(
+        mut self,
+        keys: &'static [&'static str],
+    ) -> Result<Self, AppError> {
+        if keys.len() > 8
+            || keys.iter().any(|key| {
+                key.is_empty()
+                    || key.len() > 64
+                    || !key.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+            })
+        {
+            return Err(invalid());
+        }
+        self.record_wrappers = keys;
+        Ok(self)
     }
     /// Content-only probe: a root record-array wrapper was structurally recognized.
     /// Inspecting a separate bounded sample never consumes the real input reader.
@@ -153,10 +171,7 @@ impl<'a> JsonFrames<'a> {
             if keys.len() > 1024 {
                 return Err(invalid());
             }
-            if self.record_wrappers
-                && matches!(key.as_str(), "Records" | "records" | "events")
-                && self.peek()? == Some(b'[')
-            {
+            if self.record_wrappers.contains(&key.as_str()) && self.peek()? == Some(b'[') {
                 if duplicates || bytes.1 || !valid_prefix(&bytes.0[..metadata_end]) {
                     return Err(invalid());
                 }
@@ -198,7 +213,7 @@ impl<'a> JsonFrames<'a> {
             let key = self.key(&mut bytes)?;
             if self.wrapper_keys.len() >= 1024
                 || !self.wrapper_keys.insert(key.clone())
-                || matches!(key.as_str(), "Records" | "records" | "events")
+                || self.record_wrappers.contains(&key.as_str())
             {
                 return Err(invalid());
             }

@@ -1,0 +1,14 @@
+{
+  "synthetic": true,
+  "events": [
+    "synthetic-guardduty-1"
+  ],
+  "entities": [
+    "alice",
+    "203.0.113.77"
+  ],
+  "techniques": [
+    "T1078.004"
+  ],
+  "confirmed_by_source": false
+}

@@ -84,3 +84,31 @@ fn cancellation_and_io_failure_are_not_successful_empty_input() {
             .is_err()
     );
 }
+
+#[test]
+fn source_specific_array_keys_preserve_nested_events_and_reject_duplicate_envelopes() {
+    let cancel = CancellationToken::new();
+    let mut input =
+        std::io::Cursor::new(br#"{"items":[{"events":[{"name":"original"}],"actor":"alice"}]}"#);
+    let mut frames = JsonFrames::new(&mut input, &cancel)
+        .with_record_array_keys(&["items"])
+        .unwrap();
+    let frame = frames.next_frame().unwrap().unwrap();
+    assert!(
+        std::str::from_utf8(frame.bytes())
+            .unwrap()
+            .contains("actor")
+    );
+    assert!(frames.next_frame().unwrap().is_none());
+    let mut input = std::io::Cursor::new(br#"{"Findings":[],"Findings":[]}"#);
+    let mut frames = JsonFrames::new(&mut input, &cancel)
+        .with_record_array_keys(&["Findings"])
+        .unwrap();
+    assert!(frames.next_frame().is_err());
+    let mut input = std::io::Cursor::new(b"[]");
+    assert!(
+        JsonFrames::new(&mut input, &cancel)
+            .with_record_array_keys(&["bad/key"])
+            .is_err()
+    );
+}

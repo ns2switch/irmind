@@ -107,6 +107,10 @@ fn ingest_with_context(
 fn fixture(parser: &str) -> &'static [u8] {
     match parser {
         "m365" => include_bytes!("../../testkit/fixtures/parser-m365/source/events.ndjson"),
+        #[cfg(feature = "parser-guardduty")]
+        "guardduty" => {
+            include_bytes!("../../testkit/fixtures/parser-guardduty/source/events.ndjson")
+        }
         "okta" => include_bytes!("../../testkit/fixtures/parser-okta/source/events.ndjson"),
         _ => unreachable!(),
     }
@@ -123,7 +127,12 @@ fn identity_failures_keep_roles_originals_and_signed_export() {
     let case = engine
         .create_case("Synthetic identity evidence", "Local only")
         .unwrap();
-    for (name, count) in [("m365", 8), ("okta", 7)] {
+    for (name, count) in [
+        ("m365", 8),
+        ("okta", 7),
+        #[cfg(feature = "parser-guardduty")]
+        ("guardduty", 2),
+    ] {
         let file = format!("{name}.ndjson");
         fs::write(originals.join(&file), fixture(name)).unwrap();
         assert_eq!(
@@ -177,7 +186,12 @@ fn one_gib_release_throughput() -> Result<(), &'static str> {
     if cfg!(debug_assertions) {
         return Err("Use --release for benchmarks");
     }
-    for name in ["m365", "okta"] {
+    for name in [
+        "m365",
+        "okta",
+        #[cfg(feature = "parser-guardduty")]
+        "guardduty",
+    ] {
         let root = tempfile::tempdir().unwrap();
         let originals = root.path().join("originals");
         fs::create_dir(&originals).unwrap();

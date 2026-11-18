@@ -4,6 +4,10 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+- Add an experimental GuardDuty decoder and mapping module for native API,
+  SDK/CLI and EventBridge exports. Source findings remain unconfirmed; original
+  observation times, exact severity and direction-aware endpoints are retained.
+
 - Add experimental Microsoft 365 Unified Audit Log and Okta System Log modules
   with separate bounded decoders and identified mapping tables. Purview CSV,
   PowerShell/API JSON, original parameters, precise UTC times, explicit outcomes

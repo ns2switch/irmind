@@ -12,6 +12,7 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 | --- | --- | --- | --- | --- |
 | Microsoft 365 Unified Audit Log | Purview CSV, Search-UnifiedAuditLog JSON, Management Activity API JSON | Native AuditData/Operation, CreationTime and workload; 98 | UTC time, actor, mailbox target when explicit, resource, source IP, user agent, workload, finite operation/outcome tables | experimental |
 | Okta System Log | API JSON arrays and JSON/NDJSON exports | eventType, uuid, actor and published time; 98 | Authentication, MFA, administration, policies and impersonation; actor/target and source IP | experimental |
+| AWS GuardDuty | API, CLI/console and EventBridge JSON | Native account, finding ID/type, region, resource and time; 98 | Unconfirmed source alert, actor/resource/IP roles, exact severity and original observation times | experimental |
 | Windows EVTX | Binary EVTX: Security, System, PowerShell, Sysmon | Valid EVTX header and checksum; 95 | UTC time at 100 ns precision, host, user, process, IP/port and real record offsets | available; experimental |
 | Linux | auth.log/secure, auditd, journald JSON, HTTP common/combined | Authentication tags, audit headers, journal fields or HTTP header; 95 | UTC time, host, user, process, command, IP/port, action/result; bounded audit correlation | experimental |
 | Syslog | RFC 5424 / RFC 3164, plain or gzip | PRI and timestamp/header shape; 95 / 90 | UTC time, host, application, PID, facility, severity, message and raw data | experimental |
@@ -220,3 +221,23 @@ Sources: [Microsoft audit schema](https://learn.microsoft.com/en-us/office/offic
 [Purview export](https://learn.microsoft.com/en-us/purview/audit-log-export-records),
 [Okta System Log](https://developer.okta.com/docs/api/openapi/okta-management/management/tags/systemlog),
 [Okta event catalog](https://developer.okta.com/docs/reference/api/event-types/).
+
+## GuardDuty exports
+
+Ingest the JSON from GetFindings, the AWS CLI `get-findings` output, a console
+finding export or an EventBridge GuardDuty event. The module recognizes the
+lower-camel-case wire format and the SDK/CLI's PascalCase format separately;
+it does not rewrite their original keys. Source-specific outer-array framing
+streams `findings`/`Findings` without consuming the first line as a sample.
+
+All finding types, including unknown ones, remain unconfirmed source alerts.
+Severity retains its exact decimal representation. Creation/update and
+first/last-observed fields remain in the original. API-call remote IPs have the
+source role; network-connection endpoints require the explicit connection
+direction. Unknown directions do not invent an endpoint role. Resource-specific
+fields not in the common schema remain searchable. No GuardDuty API connection
+or credential is created by local ingestion.
+
+Sources: [GetFindings wire schema](https://docs.aws.amazon.com/guardduty/latest/APIReference/API_GetFindings.html),
+[CLI output](https://docs.aws.amazon.com/cli/latest/reference/guardduty/get-findings.html),
+[finding details](https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_findings-summary.html).

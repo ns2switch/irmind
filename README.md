@@ -127,6 +127,7 @@ The normal build includes every current product module and both keystores. No re
 | Microsoft Entra ID | local parser + mapping | `parser-entra` (default) | experimental | [Entra](docs/parsers.md#microsoft-entra-id) |
 | Microsoft 365 audit | local parser + mapping | `parser-m365` (default) | experimental | [M365](docs/parsers.md) |
 | Okta System Log | local parser + mapping | `parser-okta` (default) | experimental | [Okta](docs/parsers.md) |
+| AWS GuardDuty | local parser + mapping | `parser-guardduty` (default) | experimental | [GuardDuty](docs/parsers.md#guardduty-exports) |
 | Kubernetes audit | local parser + mapping | `parser-kubernetes` (default) | experimental | [Cluster context](docs/parsers.md#kubernetes-and-falco-interpretation) |
 | Falco | local parser + mapping | `parser-falco` (default) | experimental | [Source alerts](docs/parsers.md#kubernetes-and-falco-interpretation) |
 | Linux logs | local parser | `parser-linux` (default) | experimental | [Linux](docs/modules.md#linux-logs) |

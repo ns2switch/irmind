@@ -17,7 +17,7 @@ pub fn decode_json_source(
     decode: &(impl Fn(SourceValue) -> Result<DecodedSourceFrame, AppError> + Sync),
     emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
 ) -> Result<ParseReport, AppError> {
-    decode_json_inner(input, identity, budget, false, decode, emit)
+    decode_json_inner(input, identity, budget, &[], decode, emit)
 }
 
 /// Original object rows or a root records array, with streaming bounded framing.
@@ -29,13 +29,31 @@ pub fn decode_json_envelope_source(
     decode: &(impl Fn(SourceValue) -> Result<DecodedSourceFrame, AppError> + Sync),
     emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
 ) -> Result<ParseReport, AppError> {
-    decode_json_inner(input, identity, budget, true, decode, emit)
+    decode_json_inner(
+        input,
+        identity,
+        budget,
+        &["Records", "records", "events"],
+        decode,
+        emit,
+    )
+}
+/// Decode a source-specific outer array without treating unrelated native arrays as envelopes.
+pub fn decode_json_named_envelope_source(
+    input: SourceInput<'_>,
+    identity: ParserIdentity<'_>,
+    budget: DecodeBudget,
+    keys: &'static [&'static str],
+    decode: &(impl Fn(SourceValue) -> Result<DecodedSourceFrame, AppError> + Sync),
+    emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+) -> Result<ParseReport, AppError> {
+    decode_json_inner(input, identity, budget, keys, decode, emit)
 }
 fn decode_json_inner(
     input: SourceInput<'_>,
     identity: ParserIdentity<'_>,
     budget: DecodeBudget,
-    record_wrappers: bool,
+    record_wrappers: &'static [&'static str],
     decode: &(impl Fn(SourceValue) -> Result<DecodedSourceFrame, AppError> + Sync),
     emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
 ) -> Result<ParseReport, AppError> {
@@ -53,9 +71,7 @@ fn decode_json_inner(
     )? {
         let mut limited = reader.take(MAX_SOURCE + 1);
         let mut frames = JsonFrames::new(&mut limited, metadata.cancel);
-        if !record_wrappers {
-            frames = frames.without_record_wrappers();
-        }
+        frames = frames.with_record_array_keys(record_wrappers)?;
         state.decode_frames(
             budget,
             || {
@@ -101,13 +117,14 @@ fn decode_json_inner(
 fn is_document(
     reader: &mut impl BufRead,
     source: &str,
-    record_wrappers: bool,
+    record_wrappers: &'static [&'static str],
     cancel: &crate::CancellationToken,
 ) -> Result<bool, AppError> {
     let prefix = reader.fill_buf().map_err(|_| invalid())?.trim_ascii_start();
-    if record_wrappers {
+    if !record_wrappers.is_empty() {
         let mut probe = std::io::Cursor::new(prefix);
-        let mut frames = JsonFrames::new(&mut probe, cancel);
+        let mut frames =
+            JsonFrames::new(&mut probe, cancel).with_record_array_keys(record_wrappers)?;
         let _ = frames.next_frame();
         if frames.record_wrapper_seen() {
             return Ok(true);

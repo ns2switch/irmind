@@ -14,6 +14,7 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 | --- | --- | --- | --- | --- |
 | Microsoft 365 Unified Audit Log | CSV de Purview, JSON de Search-UnifiedAuditLog y Management Activity API | AuditData/Operation, CreationTime y workload originales; 98 | Instante UTC, actor, buzón objetivo explícito, recurso, IP de origen, user agent, workload y tablas de operación/resultado | experimental |
 | Okta System Log | Arrays JSON de la API y exports JSON/NDJSON | eventType, uuid, actor e instante published; 98 | Autenticación, MFA, administración, políticas y suplantación; actor/objetivo e IP de origen | experimental |
+| AWS GuardDuty | JSON de API, CLI/consola y EventBridge | Cuenta, ID/tipo de hallazgo, región, recurso e instante originales; 98 | Alerta de origen sin confirmar, roles de actor/recurso/IP, severidad exacta e instantes originales | experimental |
 | JSON y logs de nube exportados | JSON/NDJSON; AWS, GCP, Azure y HuntEval | Campos reconocidos del registro | Instante, identidades, cuentas, recursos e IP | experimental |
 | GCP Cloud Audit Logs | LogEntry JSON/NDJSON; exportaciones de GKE | Servicio/método protoPayload e instante originales | Nanosegundos UTC, estado explícito, roles de principal, recurso y extremos; clúster GKE confirmado | experimental |
 | Microsoft Entra ID | JSON/NDJSON de Azure Monitor y filas-objeto de Log Analytics | Categoría o Type documentado e instante original | Accesos y auditoría, resultado explícito, tenant, actor, objetivo e IP | experimental |
@@ -224,3 +225,22 @@ Fuentes: [esquema de Microsoft](https://learn.microsoft.com/en-us/office/office-
 [exportación de Purview](https://learn.microsoft.com/en-us/purview/audit-log-export-records),
 [System Log de Okta](https://developer.okta.com/docs/api/openapi/okta-management/management/tags/systemlog),
 [catálogo de eventos de Okta](https://developer.okta.com/docs/reference/api/event-types/).
+
+## Exports de GuardDuty
+
+Ingiere el JSON de GetFindings, la salida `get-findings` de AWS CLI, un hallazgo
+exportado de la consola o un evento de GuardDuty de EventBridge. El módulo
+reconoce por separado las claves lowerCamelCase de la API y PascalCase del SDK/CLI,
+sin renombrar los campos originales. Las envolturas `findings`/`Findings` se leen en
+streaming; no se consume la primera línea como muestra.
+
+Todos los tipos de hallazgo, incluidos los desconocidos, son alertas de origen sin
+confirmar. Se conserva la severidad decimal exacta y los instantes de creación,
+actualización y primera/última observación. La IP remota de una llamada API tiene
+rol de origen; en conexiones de red se exige la dirección explícita. Una dirección
+desconocida no inventa el rol. Los campos específicos del recurso siguen siendo
+consultables. La ingesta local no crea ninguna conexión ni credencial de GuardDuty.
+
+Fuentes: [esquema GetFindings](https://docs.aws.amazon.com/guardduty/latest/APIReference/API_GetFindings.html),
+[salida CLI](https://docs.aws.amazon.com/cli/latest/reference/guardduty/get-findings.html),
+[detalles de hallazgos](https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_findings-summary.html).

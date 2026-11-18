@@ -5,6 +5,22 @@ use irmind_infra::LocalStore;
 use std::{path::Path, sync::Arc};
 fn registry() -> ModuleRegistry {
     let mut registry = ModuleRegistry::new();
+    #[cfg(feature = "parser-guardduty")]
+    {
+        registry
+            .register(
+                Box::new(irmind_mod_parser_guardduty::GuardDutyParser),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+        registry
+            .register(
+                Box::new(irmind_mod_mapping_guardduty::GuardDutyMapping::new().unwrap()),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+    }
+
     #[cfg(feature = "parser-m365")]
     {
         registry
