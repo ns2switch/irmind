@@ -1,0 +1,1 @@
+{"error":{"code":"PartialError","details":[{"code":"PartialQueryFailure","message":"Synthetic execution limit"}],"message":"Synthetic partial response"},"tables":[{"columns":[{"name":"UserPrincipalName","type":"string"}],"name":"PrimaryResult","rows":[["synthetic@example.invalid"]]}]}

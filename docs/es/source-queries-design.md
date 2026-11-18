@@ -1,4 +1,4 @@
-Traducción de docs/development/source-queries-design.md en el commit e4357d9893d36b3bd019b74c4cc10fc7db659dbc; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/source-queries-design.md en el commit c9e704f109dc19e13786967e9c0cec0a4ead0db2; si hay diferencias, prevalece la versión en inglés.
 
 # Consultas en origen para v0.6
 
@@ -7,7 +7,8 @@ Traducción de docs/development/source-queries-design.md en el commit e4357d9893
 **Estado: arquitectura aprobada con los ajustes siguientes; no implementada ni activada.**
 Se proponen consultas remotas de solo lectura mediante módulos independientes.
 No se activa ningún proveedor, se crean recursos, se añaden credenciales o
-dependencias ni se cambia un puerto o formato firmado actual. Los contratos de
+dependencias ni se cambia un puerto o formato firmado actual. En v0.6 solo consulta el principal; reverificación remota y consultas de hijos
+quedan aplazadas. Client secret de Entra aprobado; certificado para después. Los contratos de
 partida son el [pipeline de fuentes y mapeos](../development/source-mapping-design.md),
 el [esquema común](../development/common-event-schema.md), los
 [presupuestos](configuration.md) y los [subagentes](subagents-design.md).
@@ -374,7 +375,7 @@ no rescatar una envoltura inválida adivinando. Diferenciar truncado del servici
 adquirieron todos los eventos. Frame firmado de 1 MiB, ContentGuard y stream no
 cambian; el fichero completo nunca se convierte en mensaje para el modelo.
 
-## 6. Reverificación remota tras el sellado
+## 6. Reverificación remota tras el sellado — aplazada tras v0.6
 
 Comprobar originales con identidad inmutable firmada: VersionId S3, generación
 GCS o versión/snapshot Azure Blob, con ETag y tamaño. HEAD/metadatos contra la
@@ -397,7 +398,7 @@ bytes/coste y actor. Se guarda como producto de verificación adicional, sin
 sobrescribir exports. Su formato necesita el contrato posterior. Una tabla
 mutable no adquiere garantía de versión de objeto al sellar su resultado.
 
-## 7. Subagentes y límites del motor
+## 7. Subagentes y límites del motor — delegación de consultas aplazada tras v0.6
 
 El hijo de nube recibe fuentes de consulta configuradas exactas, hashes locales
 asignados, alcance reducido y reserva de escaneo. Solo el broker conserva

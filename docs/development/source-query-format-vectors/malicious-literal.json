@@ -1,0 +1,1 @@
+{"bigquery_binding":{"name":"p0","parameterType":{"type":"STRING"},"parameterValue":{"value":"alice' OR 1=1 --"}},"expected":"one_literal_no_added_syntax","predicate":{"field":"user.name","op":"eq","value":"alice' OR 1=1 --"}}
