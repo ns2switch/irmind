@@ -1,4 +1,4 @@
-Traducción de docs/development/source-queries-format-contract.md en el commit de17e7373ec7f5859c372bf176201b0b692d716d; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/source-queries-format-contract.md en el commit 9aaca2552a3393015ac190dc1227b64ac3806114; si hay diferencias, prevalece la versión en inglés.
 
 # Puertos de consultas, adquisición firmada y export V9
 
