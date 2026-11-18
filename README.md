@@ -179,7 +179,7 @@ See the [public roadmap](docs/development/roadmap.md) for scope and limits; thes
 
 ## Contributing and security
 
-One of the easiest ways to contribute is through [the skills repository](https://github.com/ns2switch/irmind-skills): improve investigation methods, describe required sources and false positives, or add synthetic evaluation episodes. No Rust is required.
+One of the easiest ways to contribute is through [the skills repository](https://github.com/ns2switch/irmind-skills): improve investigation methods, describe required sources and false positives, or add synthetic evaluation episodes. No Rust is required. See the [skill contribution guide](https://github.com/ns2switch/irmind-skills/blob/main/CONTRIBUTING.md).
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for the DCO and synthetic-data rules, and follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report vulnerabilities privately through [SECURITY.md](SECURITY.md). Do not include real incident data in issues or pull requests.
 
@@ -191,5 +191,3 @@ Licensed under either of
 - MIT license ([LICENSE-MIT](LICENSE-MIT)),
 
 at your option. Unless you explicitly state otherwise, a contribution intentionally submitted for inclusion is dual licensed under the same terms, without additional conditions.
-
-Propose a skill without Rust in [irmind-skills CONTRIBUTING](https://github.com/ns2switch/irmind-skills/blob/main/CONTRIBUTING.md): methodology, required sources, false positives and synthetic episodes.

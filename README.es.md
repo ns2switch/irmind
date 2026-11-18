@@ -176,7 +176,7 @@ La [hoja de ruta pública](docs/es/roadmap.md) describe intenciones, sin comprom
 
 ## Contribuir
 
-Una de las formas más sencillas de colaborar es hacerlo en [el repositorio de skills](https://github.com/ns2switch/irmind-skills): mejorar metodologías, describir las fuentes necesarias y los falsos positivos, o aportar episodios sintéticos de evaluación. No hace falta escribir Rust.
+Una de las formas más sencillas de colaborar es hacerlo en [el repositorio de skills](https://github.com/ns2switch/irmind-skills): mejorar metodologías, describir las fuentes necesarias y los falsos positivos, o aportar episodios sintéticos de evaluación. No hace falta escribir Rust. Consulta la [guía para contribuir skills](https://github.com/ns2switch/irmind-skills/blob/main/CONTRIBUTING.es.md).
 
 Consulta [CONTRIBUTING.es.md](CONTRIBUTING.es.md) para las reglas de DCO y datos sintéticos.
 
@@ -190,5 +190,3 @@ Consulta [CONTRIBUTING.es.md](CONTRIBUTING.es.md) para las reglas de DCO y datos
 - [Contribuciones](CONTRIBUTING.es.md) · [Código de conducta](CODE_OF_CONDUCT.es.md) · [Reporte privado de vulnerabilidades](SECURITY.md) · [Licencias](LICENSE-MIT)
 
 Licencia dual **MIT OR Apache-2.0**; consulta [LICENSE-MIT](LICENSE-MIT) y [LICENSE-APACHE](LICENSE-APACHE).
-
-Propón una skill sin Rust en [CONTRIBUTING de irmind-skills](https://github.com/ns2switch/irmind-skills/blob/main/CONTRIBUTING.es.md): metodología, fuentes necesarias, falsos positivos y episodios sintéticos.
