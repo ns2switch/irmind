@@ -38,7 +38,7 @@ pub(super) fn leaf(
         });
         return Ok(output);
     }
-    if matches!(headers.media.as_str(), "text/plain" | "text/html") {
+    if headers.media.starts_with("text/") {
         output.extend(text_frames(&decoded, headers, start, part, exact, cancel)?);
     }
     Ok(output)
@@ -73,6 +73,10 @@ fn text_frames(
             ),
             ("decoded_body_offset".into(), number(offset)?),
             ("charset".into(), SourceValue::Text(headers.charset.clone())),
+            (
+                "declared_type".into(),
+                SourceValue::Text(headers.media.clone()),
+            ),
             (
                 "following_bytes_hex".into(),
                 SourceValue::Text(irmind_app::hex(

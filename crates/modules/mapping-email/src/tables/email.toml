@@ -26,4 +26,3 @@ observation = { kind = "hash", role = "subject", scope = { kind = "global" } }
 [[fields]]
 source = ["size"]
 target = "file.size"
-

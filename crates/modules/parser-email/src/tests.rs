@@ -292,3 +292,19 @@ fn duplicate_dates_are_retained_without_choosing_an_event_time() {
         matches!(records[0].fields().field("decoded_headers").and_then(|h| h.field("date")), Some(SourceValue::Array(values)) if values.len() == 2)
     );
 }
+
+#[test]
+fn other_text_media_types_retain_the_complete_body_as_untrusted_text() {
+    let bytes = b"From: a@example.invalid\r\nSubject: synthetic\r\nMessage-ID: <calendar@example.invalid>\r\nContent-Type: text/calendar; charset=utf-8\r\n\r\nBEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n";
+    let (report, records) = decode(bytes).unwrap();
+    assert_eq!(report.accepted, 2);
+    let body = records[1].fields();
+    assert_eq!(
+        body.field("declared_type").and_then(SourceValue::as_text),
+        Some("text/calendar")
+    );
+    assert_eq!(
+        body.field("text").and_then(SourceValue::as_text),
+        Some("BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n")
+    );
+}
