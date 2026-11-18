@@ -591,6 +591,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashify"
+version = "0.2.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd1246c0e5493286aeb2dde35b1f4eb9c4ce00e628641210a5e553fc001a1f26"
+dependencies = [
+ "indexmap",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
 name = "hashlink"
 version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -780,6 +792,7 @@ dependencies = [
  "irmind-mapping-tables",
  "irmind-mod-mapping-cloud-flow",
  "irmind-mod-mapping-ecs",
+ "irmind-mod-mapping-email",
  "irmind-mod-mapping-entra",
  "irmind-mod-mapping-guardduty",
  "irmind-mod-mapping-identity",
@@ -789,6 +802,7 @@ dependencies = [
  "irmind-mod-parser-chainsaw",
  "irmind-mod-parser-declarative",
  "irmind-mod-parser-ecs",
+ "irmind-mod-parser-email",
  "irmind-mod-parser-entra",
  "irmind-mod-parser-eztools",
  "irmind-mod-parser-falco",
@@ -865,6 +879,16 @@ dependencies = [
 
 [[package]]
 name = "irmind-mod-mapping-ecs"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-build-manifest",
+ "irmind-domain",
+ "irmind-mapping-tables",
+]
+
+[[package]]
+name = "irmind-mod-mapping-email"
 version = "0.1.0"
 dependencies = [
  "irmind-app",
@@ -962,6 +986,15 @@ dependencies = [
  "irmind-app",
  "irmind-domain",
  "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-parser-email"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "mail-parser",
 ]
 
 [[package]]
@@ -1247,6 +1280,15 @@ name = "litemap"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47d9d19d1d6efa0109d2f65ff4c85cddd50bd572e5a00127ab10987290bcefae"
+
+[[package]]
+name = "mail-parser"
+version = "0.11.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ec00bda90c6e645a54506c630c2820cd6b1890cfd2b0a169b50f74b2b8c7c86"
+dependencies = [
+ "hashify",
+]
 
 [[package]]
 name = "memchr"

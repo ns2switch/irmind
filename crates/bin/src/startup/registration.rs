@@ -14,6 +14,7 @@
     feature = "mapping-identity",
     feature = "mapping-guardduty",
     feature = "mapping-cloud-flow",
+    feature = "mapping-email",
     feature = "mapping-falco",
 ))]
 mod mapping;
@@ -53,6 +54,7 @@ use super::{
     feature = "parser-okta",
     feature = "parser-guardduty",
     feature = "parser-vpc-flow",
+    feature = "parser-email",
     feature = "parser-azure-flow",
     feature = "parser-gcp-flow",
     feature = "parser-falco",
@@ -116,6 +118,7 @@ pub(super) fn configured_registry(
         feature = "parser-okta",
         feature = "parser-guardduty",
         feature = "parser-vpc-flow",
+        feature = "parser-email",
         feature = "parser-azure-flow",
         feature = "parser-gcp-flow",
         feature = "parser-falco",
@@ -182,6 +185,7 @@ pub(super) fn configured_registry(
     feature = "parser-okta",
     feature = "parser-guardduty",
     feature = "parser-vpc-flow",
+    feature = "parser-email",
     feature = "parser-azure-flow",
     feature = "parser-gcp-flow",
     feature = "parser-falco",
@@ -217,6 +221,7 @@ fn register_parsers(
         feature = "mapping-identity",
         feature = "mapping-guardduty",
         feature = "mapping-cloud-flow",
+        feature = "mapping-email",
         feature = "mapping-falco",
     ))]
     mapping::register(registry)?;
@@ -226,6 +231,7 @@ fn register_parsers(
         feature = "parser-okta",
         feature = "parser-guardduty",
         feature = "parser-vpc-flow",
+        feature = "parser-email",
         feature = "parser-azure-flow",
         feature = "parser-gcp-flow",
         feature = "parser-gcp-audit",
@@ -266,19 +272,27 @@ fn register_parsers(
     )?;
 
     #[cfg(feature = "parser-evtx")]
-    {
-        let helper = std::env::current_exe()?.with_file_name(if cfg!(windows) {
-            "irmind-evtx.exe"
-        } else {
-            "irmind-evtx"
-        });
-        let parser = irmind_mod_parser_evtx::EvtxParser::new(&helper, data_root);
-        let issue = parser.unavailable_reason().map(str::to_owned);
-        registry.register(Box::new(parser), &ModuleConfig::new())?;
-        if let Some(reason) = issue {
-            registry.mark_parser_unavailable("parser-evtx", reason.clone())?;
-            issues.insert("parser-evtx", reason);
-        }
+    register_evtx_parser(registry, issues, data_root)?;
+    Ok(())
+}
+
+#[cfg(feature = "parser-evtx")]
+fn register_evtx_parser(
+    registry: &mut ModuleRegistry,
+    issues: &mut BTreeMap<&'static str, String>,
+    data_root: &std::path::Path,
+) -> Result<()> {
+    let helper = std::env::current_exe()?.with_file_name(if cfg!(windows) {
+        "irmind-evtx.exe"
+    } else {
+        "irmind-evtx"
+    });
+    let parser = irmind_mod_parser_evtx::EvtxParser::new(&helper, data_root);
+    let issue = parser.unavailable_reason().map(str::to_owned);
+    registry.register(Box::new(parser), &ModuleConfig::new())?;
+    if let Some(reason) = issue {
+        registry.mark_parser_unavailable("parser-evtx", reason.clone())?;
+        issues.insert("parser-evtx", reason);
     }
     Ok(())
 }
@@ -708,6 +722,7 @@ fn register_chronicle(
     feature = "parser-okta",
     feature = "parser-guardduty",
     feature = "parser-vpc-flow",
+    feature = "parser-email",
     feature = "parser-azure-flow",
     feature = "parser-gcp-flow",
     feature = "parser-gcp-audit",
@@ -715,6 +730,11 @@ fn register_chronicle(
     feature = "parser-falco"
 ))]
 fn register_contextual_parsers(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(feature = "parser-email")]
+    registry.register(
+        Box::new(irmind_mod_parser_email::EmailParser),
+        &irmind_app::modules::ModuleConfig::new(),
+    )?;
     #[cfg(feature = "parser-vpc-flow")]
     registry.register(
         Box::new(irmind_mod_parser_vpc_flow::VpcFlowParser),

@@ -106,6 +106,8 @@ fn ingest_with_context(
 }
 fn fixture(parser: &str) -> &'static [u8] {
     match parser {
+        #[cfg(feature = "parser-email")]
+        "email" => include_bytes!("../../testkit/fixtures/parser-email/source/multipart.eml"),
         "m365" => include_bytes!("../../testkit/fixtures/parser-m365/source/events.ndjson"),
         #[cfg(feature = "parser-guardduty")]
         "guardduty" => {
@@ -138,6 +140,8 @@ fn identity_failures_keep_roles_originals_and_signed_export() {
         .create_case("Synthetic identity evidence", "Local only")
         .unwrap();
     for (name, count) in [
+        #[cfg(feature = "parser-email")]
+        ("email", 9),
         ("m365", 8),
         ("okta", 7),
         #[cfg(feature = "parser-guardduty")]

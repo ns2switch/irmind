@@ -36,3 +36,7 @@ helpers/evtx/vendor/winstructs/LICENSE text eol=lf
 
 # Preserve the exact reviewed third-party bytes on every platform, including scripts.
 vendor/** -text
+
+# Synthetic RFC 5322 fixtures retain their original transport line endings.
+crates/testkit/fixtures/parser-email/source/*.eml -text
+fuzz/seeds/parser_email/*.eml -text

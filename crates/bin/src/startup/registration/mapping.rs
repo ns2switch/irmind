@@ -25,37 +25,7 @@ const NETWORK_PARSERS: &[&str] = &[
 ];
 
 pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
-    #[cfg(all(feature = "mapping-cloud-flow", feature = "parser-vpc-flow"))]
-    registry.register(
-        Box::new(irmind_mod_mapping_cloud_flow::CloudFlowMapping::aws()?),
-        &ModuleConfig::new(),
-    )?;
-    #[cfg(all(feature = "mapping-cloud-flow", feature = "parser-gcp-flow"))]
-    registry.register(
-        Box::new(irmind_mod_mapping_cloud_flow::CloudFlowMapping::gcp()?),
-        &ModuleConfig::new(),
-    )?;
-    #[cfg(all(feature = "mapping-cloud-flow", feature = "parser-azure-flow"))]
-    for mapper in irmind_mod_mapping_cloud_flow::CloudFlowMapping::azure()? {
-        registry.register(Box::new(mapper), &ModuleConfig::new())?;
-    }
-
-    #[cfg(all(feature = "mapping-guardduty", feature = "parser-guardduty"))]
-    registry.register(
-        Box::new(irmind_mod_mapping_guardduty::GuardDutyMapping::new()?),
-        &ModuleConfig::new(),
-    )?;
-    #[cfg(all(feature = "mapping-identity", feature = "parser-m365"))]
-    registry.register(
-        Box::new(irmind_mod_mapping_identity::IdentityMapping::m365()?),
-        &ModuleConfig::new(),
-    )?;
-    #[cfg(all(feature = "mapping-identity", feature = "parser-okta"))]
-    registry.register(
-        Box::new(irmind_mod_mapping_identity::IdentityMapping::okta()?),
-        &ModuleConfig::new(),
-    )?;
-
+    register_export_mappings(registry)?;
     #[cfg(feature = "mapping-json-compat")]
     registry.register(Box::new(json_compatibility()?), &ModuleConfig::new())?;
     #[cfg(feature = "mapping-journald-compat")]
@@ -108,6 +78,47 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
     )?;
     Ok(())
 }
+fn register_export_mappings(registry: &mut ModuleRegistry) -> Result<()> {
+    let _ = &registry;
+    #[cfg(all(feature = "mapping-email", feature = "parser-email"))]
+    registry.register(
+        Box::new(irmind_mod_mapping_email::EmailMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(all(feature = "mapping-cloud-flow", feature = "parser-vpc-flow"))]
+    registry.register(
+        Box::new(irmind_mod_mapping_cloud_flow::CloudFlowMapping::aws()?),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(all(feature = "mapping-cloud-flow", feature = "parser-gcp-flow"))]
+    registry.register(
+        Box::new(irmind_mod_mapping_cloud_flow::CloudFlowMapping::gcp()?),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(all(feature = "mapping-cloud-flow", feature = "parser-azure-flow"))]
+    for mapper in irmind_mod_mapping_cloud_flow::CloudFlowMapping::azure()? {
+        registry.register(Box::new(mapper), &ModuleConfig::new())?;
+    }
+
+    #[cfg(all(feature = "mapping-guardduty", feature = "parser-guardduty"))]
+    registry.register(
+        Box::new(irmind_mod_mapping_guardduty::GuardDutyMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(all(feature = "mapping-identity", feature = "parser-m365"))]
+    registry.register(
+        Box::new(irmind_mod_mapping_identity::IdentityMapping::m365()?),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(all(feature = "mapping-identity", feature = "parser-okta"))]
+    registry.register(
+        Box::new(irmind_mod_mapping_identity::IdentityMapping::okta()?),
+        &ModuleConfig::new(),
+    )?;
+
+    Ok(())
+}
+
 #[cfg(any(
     feature = "mapping-kubernetes",
     feature = "mapping-falco",
@@ -284,6 +295,10 @@ mod tests {
         check_catalog(&registry);
     }
     fn register_identity_decoders(registry: &mut ModuleRegistry) {
+        #[cfg(all(feature = "mapping-email", feature = "parser-email"))]
+        registry
+            .add_source_decoder(Arc::new(irmind_mod_parser_email::EmailSourceDecoder))
+            .unwrap();
         #[cfg(all(feature = "mapping-cloud-flow", feature = "parser-vpc-flow"))]
         registry
             .add_source_decoder(Arc::new(irmind_mod_parser_vpc_flow::VpcFlowSourceDecoder))
@@ -320,6 +335,9 @@ mod tests {
         assert_eq!(
             catalog.snapshots().unwrap().len(),
             2 + usize::from(cfg!(all(
+                feature = "mapping-email",
+                feature = "parser-email"
+            ))) + usize::from(cfg!(all(
                 feature = "mapping-cloud-flow",
                 feature = "parser-vpc-flow"
             ))) + usize::from(cfg!(all(

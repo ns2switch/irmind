@@ -69,3 +69,13 @@ Apache-2.0, copyright The Apache Software Foundation. Their original
 patch hashes accompany the sources. See each directory's `IRMIND_PATCH.md` and
 `UPSTREAM.json`. The Arrow umbrella is replaced by the same versioned array,
 schema, select and ordering components; no local Arrow cast patch is required.
+
+## Email syntax library
+
+The experimental email decoder uses [mail-parser 0.11.9](https://github.com/stalwartlabs/mail-parser)
+from Stalwart Labs, with optional features disabled, and its compile-time
+[hashify 0.2.9](https://github.com/stalwartlabs/hashify) dependency. Both declare
+`Apache-2.0 OR MIT`; their source notices and licenses remain their own. IRMind
+uses the headers-only parser and bounded transport decoding, with its own MIME
+traversal and source limits. These dependencies do not supply network or execution
+capabilities to evidence. Release SBOMs record the exact resolved packages.

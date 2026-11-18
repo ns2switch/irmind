@@ -1,0 +1,13 @@
+{
+  "synthetic": true,
+  "expected_records": {
+    "multipart.eml": 9,
+    "headers.eml": 1,
+    "plain.eml": 3
+  },
+  "attachment_sha256": "11ad3315de32cfb12a45632958733354a43acd15156cbc5f8d9f82e29bd8d8e6",
+  "actor": "sender@example.invalid",
+  "target": "analyst@example.invalid",
+  "source_ip": "203.0.113.77",
+  "outcome": "unknown"
+}

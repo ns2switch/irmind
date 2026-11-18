@@ -5,6 +5,20 @@ use irmind_infra::LocalStore;
 use std::{path::Path, sync::Arc};
 fn registry() -> ModuleRegistry {
     let mut registry = ModuleRegistry::new();
+    #[cfg(feature = "parser-email")]
+    registry
+        .register(
+            Box::new(irmind_mod_parser_email::EmailParser),
+            &ModuleConfig::new(),
+        )
+        .unwrap();
+    #[cfg(feature = "mapping-email")]
+    registry
+        .register(
+            Box::new(irmind_mod_mapping_email::EmailMapping::new().unwrap()),
+            &ModuleConfig::new(),
+        )
+        .unwrap();
     #[cfg(feature = "parser-vpc-flow")]
     registry
         .register(

@@ -74,6 +74,12 @@ mod matrix {
     #[allow(clippy::too_many_lines)]
     fn each_fixture_has_one_unique_high_confidence_parser() -> Result<(), irmind_app::AppError> {
         let mut registry = ModuleRegistry::new();
+        #[cfg(feature = "parser-email")]
+        registry.register(
+            Box::new(irmind_mod_parser_email::EmailParser),
+            &ModuleConfig::new(),
+        )?;
+
         #[cfg(feature = "parser-vpc-flow")]
         registry.register(
             Box::new(irmind_mod_parser_vpc_flow::VpcFlowParser),
@@ -157,6 +163,25 @@ mod matrix {
         )?;
         let mut matrix: Matrix = std::collections::BTreeMap::new();
         for (name, sample, expected) in [
+            #[cfg(feature = "parser-email")]
+            (
+                "multipart.eml",
+                include_bytes!("../../testkit/fixtures/parser-email/source/multipart.eml")
+                    .as_slice(),
+                "parser-email",
+            ),
+            #[cfg(feature = "parser-email")]
+            (
+                "headers.eml",
+                include_bytes!("../../testkit/fixtures/parser-email/source/headers.eml").as_slice(),
+                "parser-email",
+            ),
+            #[cfg(feature = "parser-email")]
+            (
+                "plain.eml",
+                include_bytes!("../../testkit/fixtures/parser-email/source/plain.eml").as_slice(),
+                "parser-email",
+            ),
             #[cfg(feature = "parser-m365")]
             (
                 "m365.ndjson",
@@ -557,6 +582,7 @@ mod matrix {
             "parser-chainsaw" => [Some(45), None, None, None, None, Some(95), None, None],
             "parser-plaso" => [Some(45), None, None, None, None, None, Some(95), None],
             "parser-eztools" => [None, None, None, None, None, None, None, Some(95)],
+            "parser-email" => [None, None, None, None, None, None, None, None],
             _ => {
                 return Err(irmind_app::AppError::Policy(
                     "unknown parser fixture".into(),
@@ -572,6 +598,13 @@ mod matrix {
         Ok(())
     }
     fn assert_priority_scores(name: &str, sample: &[u8], expected: &str) {
+        #[cfg(feature = "parser-email")]
+        assert_eq!(
+            irmind_mod_parser_email::EmailParser
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            (expected == "parser-email").then_some(98)
+        );
         #[cfg(feature = "parser-vpc-flow")]
         assert_eq!(
             irmind_mod_parser_vpc_flow::VpcFlowParser

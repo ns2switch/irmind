@@ -2,7 +2,7 @@ use irmind_app::{
     AppError, FixedAppError, ParseReport, ParserIdentity, SourceDecoder,
     source_mapping::{
         DecodeBudget, DecodeInput, SourceFormatV1, SourceInput, SourceRecordV1, SourceValue,
-        framed::{DecodedSourceFrame, decode_json_envelope_source},
+        framed::{DecodedSourceFrame, decode_json_named_envelope_source},
         json::{JsonFrames, SourceJsonLimits, decode_json_fields},
     },
 };
@@ -57,13 +57,20 @@ impl SourceDecoder for OktaSourceDecoder {
         budget: DecodeBudget,
         emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
     ) -> Result<ParseReport, AppError> {
-        decode_json_envelope_source(input.into_reader(), self.identity(), budget, &prepare, emit)
+        decode_json_named_envelope_source(
+            input.into_reader(),
+            self.identity(),
+            budget,
+            &[],
+            &prepare,
+            emit,
+        )
     }
 }
 pub(super) fn detect(sample: &[u8]) -> Option<u8> {
     let cancel = irmind_app::CancellationToken::new();
     let mut reader = std::io::Cursor::new(sample);
-    let mut frames = JsonFrames::new(&mut reader, &cancel);
+    let mut frames = JsonFrames::new(&mut reader, &cancel).without_record_wrappers();
     let first = frames.next_frame().ok()??;
     let fields = decode_json_fields(first.bytes(), SourceJsonLimits::default()).ok()?;
     prepare(fields).ok().map(|_| 98)

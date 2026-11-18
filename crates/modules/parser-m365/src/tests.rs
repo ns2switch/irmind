@@ -137,3 +137,50 @@ fn a_single_line_document_over_four_mib_keeps_every_original_record() {
         (count, 0, count)
     );
 }
+
+#[test]
+fn native_events_array_is_original_data_not_an_outer_document() {
+    let first = FIXTURE.split(|b| *b == b'\n').next().unwrap();
+    let mut bytes = first.strip_suffix(b"}").unwrap().to_vec();
+    bytes.extend_from_slice(br#", "events": [{"synthetic_original_extension": true}]}"#);
+    irmind_testkit::run_log_parser_contract(
+        &M365Parser,
+        &M365SourceDecoder,
+        "source.json",
+        &bytes,
+        1,
+        None,
+    )
+    .unwrap();
+    let source = SourceReferenceV1::file("source.json").unwrap();
+    let cancel = CancellationToken::new();
+    let mut retained = false;
+    M365SourceDecoder
+        .decode_reader(
+            SourceInput {
+                metadata: SourceMetadata {
+                    source: &source,
+                    evidence_hash: irmind_app::sha256(&bytes),
+                    time_context: None,
+                    cluster_context: None,
+                    cancel: &cancel,
+                },
+                reader: &mut bytes.as_slice(),
+            },
+            &mut |record| {
+                record.inspect(|record| {
+                    if let Some(irmind_app::source_mapping::SourceValue::Array(values)) =
+                        record.fields().field("events")
+                    {
+                        retained = values
+                            .first()
+                            .and_then(|v| v.field("synthetic_original_extension"))
+                            == Some(&irmind_app::source_mapping::SourceValue::Boolean(true));
+                    }
+                });
+                Ok(())
+            },
+        )
+        .unwrap();
+    assert!(retained);
+}

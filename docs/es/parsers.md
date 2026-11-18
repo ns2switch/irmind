@@ -14,6 +14,7 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 | --- | --- | --- | --- | --- |
 | Microsoft 365 Unified Audit Log | CSV de Purview, JSON de Search-UnifiedAuditLog y Management Activity API | AuditData/Operation, CreationTime y workload originales; 98 | Instante UTC, actor, buzón objetivo explícito, recurso, IP de origen, user agent, workload y tablas de operación/resultado | experimental |
 | Okta System Log | Arrays JSON de la API y exports JSON/NDJSON | eventType, uuid, actor e instante published; 98 | Autenticación, MFA, administración, políticas y suplantación; actor/objetivo e IP de origen | experimental |
+| Correo RFC 5322 | Un `.eml` o volcado de cabeceras por fichero; MIME acotado | From y combinación de cabeceras nativas: 98; cabeceras mínimas: 70, elección del analista | Saltos Received ordenados, direcciones, cabeceras/bytes originales, URLs y metadatos/hashes de adjuntos; resultado desconocido | experimental |
 | AWS GuardDuty | JSON de API, CLI/consola y EventBridge | Cuenta, ID/tipo de hallazgo, región, recurso e instante originales; 98 | Alerta de origen sin confirmar, roles de actor/recurso/IP, severidad exacta e instantes originales | experimental |
 | AWS VPC Flow Logs | Texto con cabecera/personalizado o v2, gzip y mensajes CloudWatch | Cabecera nativa: 98; v2 sin cabecera: 70 y confirmación del analista | Extremos y roles, resultado explícito, bytes/paquetes, cuenta/región y host de instancia explícito | experimental |
 | Azure flow logs | Contenedores JSON VNet y NSG | Categoría del proveedor y estructura de flujos: 98 | Tupla original, instante preciso, extremos, resultado, contadores, suscripción y regla | experimental |
@@ -288,3 +289,55 @@ Fuentes: [AWS](https://docs.aws.amazon.com/vpc/latest/userguide/flow-log-records
 [Azure VNet](https://learn.microsoft.com/en-us/azure/network-watcher/vnet-flow-logs-overview),
 [Azure NSG](https://learn.microsoft.com/en-us/azure/network-watcher/nsg-flow-logs-overview),
 [GCP](https://docs.cloud.google.com/vpc/docs/about-flow-logs-records).
+
+## Exportaciones de correo
+
+Guarda el mensaje original como `.eml` desde el cliente de correo, con cabeceras
+completas y estructura MIME; usa un mensaje por fichero o selecciona un directorio.
+También se admiten volcados de solo cabeceras. IRMind no conecta con buzones, sigue
+enlaces, abre adjuntos ni descomprime archivos. Conserva los originales: firmar su
+hash en su ubicación no los copia implícitamente al caso.
+
+El decodificador conserva el orden y los bytes de las cabeceras, incluidos los
+saltos Received, From, To/Cc, Reply-To, Return-Path, Message-ID, Date,
+Authentication-Results, X-Originating-IP y cabeceras del proveedor. La biblioteca
+solo recibe el bloque acotado de cabeceras para interpretar buzones y parámetros.
+IRMind controla el recorrido MIME. El texto y el código fuente HTML literal se
+conservan por bloques; el HTML nunca se renderiza. Base64 y quoted-printable se
+decodifican una vez como transporte. Las URLs HTTP(S) son valores literales: no se
+redecodifican escapes de URL o entidades HTML ni se accede a la red. De los
+adjuntos solo se exponen tamaño decodificado, tipo declarado, nombre y SHA-256.
+Los mensajes `message/rfc822` adjuntos se tratan como archivos opacos.
+
+Límites: 32 MiB por fuente, 64 KiB por bloque de cabeceras, 1.024 cabeceras totales,
+16 contenedores multipart anidados y 256 partes MIME. El texto/HTML se divide en
+bloques de hasta 256 KiB respetando UTF-8 y conservando los bytes originales.
+Se admiten hasta 128 apariciones de URLs HTTP(S) por parte de texto, de hasta
+4.096 bytes cada una. Superar un límite estructural rechaza el mensaje completo,
+sin recortarlo silenciosamente. UTF-8 y US-ASCII se decodifican como texto; otros
+charsets conservan los bytes en hexadecimal con aviso de cobertura. Una
+codificación de transporte no admitida o MIME mal formado produce un error claro.
+Las cabeceras mínimas requieren elección del analista; el nombre del fichero no
+prueba el formato.
+
+El instante procede de Date solo con fecha válida y zona explícita admitida;
+si falta o no es válida, queda desconocido. No se usa el reloj ni el mtime.
+Una transformación MIME puede impedir indicar el offset original exacto de un
+subregistro. En ese caso, toda la fuente omite uniformemente los offsets de
+origen; las posiciones conocidas quedan en `source_byte_offset` y
+`header_offsets` relativos. `decoded_body_offset` no se presenta como posición
+del fichero. `mime_part_index` conserva la relación con la parte MIME.
+
+El mapeo incluye reglas finitas de correo/ficheros en TOML; el código nativo adapta
+las listas de buzones a observaciones validadas y conserva entidades de extracción
+para URLs y para `email_message`, identificada por el hash de la fuente. El primer
+From/To ocupa los roles tipados escalares; todas las direcciones siguen en las
+cabeceras originales consultables y en pares de extracción acotados, con un aviso
+para objetivos adicionales. Son afirmaciones de las cabeceras, no identidades
+verificadas. Authentication-Results sigue siendo contenido no confiable: IRMind no
+consulta DNS ni verifica SPF o DKIM, y no deduce éxito de ese campo. El resultado
+queda desconocido. No se añade ninguna identidad de vida de proceso ni permiso.
+
+Fuentes: [formato de mensaje](https://www.rfc-editor.org/rfc/rfc5322),
+[MIME](https://www.rfc-editor.org/rfc/rfc2046),
+[estado de autenticación declarado](https://www.rfc-editor.org/rfc/rfc8601).
