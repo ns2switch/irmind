@@ -1,10 +1,10 @@
-Traducción de docs/development/source-queries-design.md en el commit ee6b1f52beeca777b8aa53eca59a9edeb940574b; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/source-queries-design.md en el commit 28870d95daefc0171310008a272f087784dfe556; si hay diferencias, prevalece la versión en inglés.
 
 # Consultas en origen para v0.6
 
 [English](../development/source-queries-design.md)
 
-**Estado: diseño para revisión; no hay nada implementado ni activado por este documento.**
+**Estado: arquitectura aprobada con los ajustes siguientes; no implementada ni activada.**
 Se proponen consultas remotas de solo lectura mediante módulos independientes.
 No se activa ningún proveedor, se crean recursos, se añaden credenciales o
 dependencias ni se cambia un puerto o formato firmado actual. Los contratos de
@@ -22,7 +22,7 @@ el [esquema común](../development/common-event-schema.md), los
 | Después de esos contratos, en v0.6 | Log Analytics de Cloud Logging mediante `query-bigquery` | Dataset/vista enlazados previamente; mismos controles de ejecución, alcance y escaneo. La documentación llama ahora Observability Analytics a la interfaz. |
 | Posterior, con extensión explícita del diseño | `query-cloudtrail-lake` | Solo clientes existentes; estimación previa desconocida y sin equivalente documentado al tope de bytes por job de BigQuery. |
 | Posterior, condicionado al control del coste | `query-azure-data-explorer` | Clúster/base/tabla fijos y endpoint Kusto de consulta de solo lectura, sin gestión. |
-| Posterior, condicionado al control del coste | `query-azure-log-analytics` | Workspace y tablas fijos; Logs Query API v1 de Azure Monitor con KQL generado. |
+| v0.6, solo tablas Analytics | `query-azure-log-analytics` | Workspace y plan Analytics comprobados; Logs Query API v1 con KQL generado. Las credenciales cliente de Entra necesitan aprobación concreta aparte. |
 
 Son prioridades, no compromisos de release. AWS indica que **CloudTrail Lake no
 admite clientes nuevos desde el 2026-05-31**; no se recomienda para empezar.
@@ -47,13 +47,14 @@ reutilizan los tipos validados de campos y roles del esquema común.
 | Componente | Representación cerrada y límites propuestos |
 | --- | --- |
 | Fuente | Un `SourceId` configurado y un alias de dataset aprobado; antes de aprobar se resuelven cuenta/proyecto/workspace, región/ubicación y tabla inmutables. Sin comodines ni expresiones entre servicios. |
-| Tiempo | Intervalo UTC obligatorio `[from, to)`, no vacío y dentro del caso y del techo. Partir del máximo actual de 24 horas de las consultas SIEM; puede reducirse. Sin ventana implícita ni reloj del servidor. |
+| Tiempo | Intervalo UTC obligatorio `[from, to)`, no vacío y dentro del caso y del techo. Valor independiente propuesto por defecto en la política: 31 días (2.678.400 segundos), configurable bajo la cota de código del contrato concreto. Siguen mandando alcance, escaneo y aprobación; no hereda las 24 horas del SIEM. Las fuentes particionadas por fecha deben podar cada fecha incluida. Sin ventana implícita ni reloj del servidor. |
 | Filtros | AND de hasta 16 predicados: igualdad, pertenencia a conjunto de hasta 32 valores, rango tipado, prefijo literal y ausencia explícita. Sin expresiones booleanas arbitrarias, regex, funciones, subconsultas ni negación del alcance. |
 | Campos | Hasta 32 campos comunes permitidos: instante, categoría/tipo/acción/resultado, actor/objetivo, IP/puerto de origen/destino, host, nube y recurso. Cada backend declara su subconjunto exacto. |
 | Valores | Enums, enteros, IPs e instantes validados; texto de hasta 256 bytes UTF-8. Se rechazan controles e identificadores/Unicode inválidos. La puntuación literal sigue siendo un dato. |
 | Resultado | Eventos, cuenta exacta, cuenta por hasta dos campos o principales cuentas. Sin joins, UDFs, aritmética arbitraria, distinct aproximado, escrituras ni exportación a una ubicación elegida por el modelo. |
-| Filas | Máximo actual de 100 filas SIEM entre todas las páginas, reducible por política. Limitar filas no limita bytes escaneados. |
-| Trabajo | Se mantienen los límites actuales de llamadas, tiempo, respuesta, transferencia, guard y contexto; manda el menor. La admisión por bytes escaneados se añade. |
+| Filas de evidencia | Política de adquisición separada: hasta 100.000 filas o 100 MB (100.000.000 bytes decodificados), lo que llegue antes entre todas las páginas; reservar también filas y bytes retenidos por caso. Los límites del servicio/parser pueden reducirlo. No limita el escaneo. |
+| Vista del modelo | Solo el resumen acotado actual; nunca la adquisición completa. Timeline, búsqueda y entidades posteriores consultan localmente la fuente derivada. |
+| Trabajo | Se mantienen llamadas, guard, stream, registros, custodia y contexto. La adquisición dedicada transmite páginas/trozos acotados bajo la nueva política de evidencia, sin subir el límite de respuesta de las herramientas SIEM. Se añaden escaneo, tiempo total, frecuencia y retención por caso. |
 
 Ejemplo de datos, **no comando disponible ni definición instalable actual**:
 
@@ -70,7 +71,7 @@ Ejemplo de datos, **no comando disponible ni definición instalable actual**:
   ],
   "fields": ["@timestamp", "event.action", "user.target.name", "source.ip"],
   "result": "events",
-  "limit": 100
+  "limit": 100000
 }
 ```
 
@@ -124,7 +125,9 @@ del estado en un instante.
 no escaneo remoto. No se reinterpreta. Se proponen `scan_bytes_per_query`,
 `scan_bytes_per_case` y `scan_approval_threshold` en la política de organización,
 y asignaciones de caso firmadas que no superen el techo. Sin asignación no se
-habilita la función; no se amplía ningún valor de producción en silencio. El
+habilitan adaptadores facturados por escaneo. Analytics verificado usa admisión
+explícita sin cargo de consulta, nunca un escaneo ficticio de cero bytes. No se
+amplía ningún valor de producción en silencio. El
 modelo no puede modificar asignaciones.
 
 La unidad queda explícita: bytes procesados, facturados, de objetos y devueltos
@@ -142,7 +145,8 @@ coste no está disponible.
 | Security Lake | Mismo cutoff de Athena; particiones según el esquema registrado, no nombres de directorio supuestos. | Sin metadatos de partición, estimación desconocida, nunca cero. Lake Formation sigue aplicándose. |
 | Cloud Logging enlazado | Controles de BigQuery y comprobación de tabla/vista y limitaciones del dry run. | El administrador crea el enlace, nunca IRMind; proyecto de facturación explícito. |
 | CloudTrail Lake | `DescribeQuery` informa `BytesScanned` después; un rango temporal no garantiza un techo. | Soporte posterior condicionado a política revisada de coste desconocido; una firma no supera un techo duro. |
-| ADX / Azure Log Analytics | Límites de tiempo, filas, memoria y ejecución; estadísticas posteriores. No se establece aquí un tope duro equivalente de bytes ni dry run fiable. | No disponible con techo estricto de bytes. No confundir tamaño del resultado, coste de ingesta, extents o CPU con escaneo. |
+| Azure Log Analytics, solo Analytics | Verificar plan exacto y retención interactiva antes de cada ejecución; solo consultas ordinarias de lectura. El precio distingue este plan de los facturados por escaneo. | Admisión Analytics explícita con intervalo, filas, bytes retenidos y frecuencia. Registrar «sin cargo por consulta según el plan de la tabla»; bytes escaneados/facturados no disponibles salvo que se informen, nunca cero inventado. |
+| ADX / Basic / Auxiliary | Sin techo facturado imponible demostrado para ADX; Basic/Auxiliary quedan excluidos incluso con aprobación. | No disponibles por defecto; resultado, ingesta y CPU no sustituyen bytes escaneados. |
 
 Restricciones oficiales:
 [dry run de BigQuery](https://docs.cloud.google.com/bigquery/docs/running-queries),
@@ -179,12 +183,51 @@ se nombra el contador y `/budget`; la ampliación sigue firmada y bajo el techo.
 La caché local o del proveedor no implica coste cero: mandan las métricas
 informadas y se etiqueta su reutilización.
 
+### Admisión y contabilidad de Azure Analytics
+
+Los [precios oficiales de Azure Monitor, sección Query](https://azure.microsoft.com/en-us/pricing/details/monitor/)
+confirman consultas sin cargo en Analytics y cargos por GB escaneado en Basic y
+Auxiliary. Esto no hace gratuitas la ingesta, retención, exportación ni el
+workspace. La [guía de costes](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/cost-logs)
+distingue las búsquedas en retención a largo plazo. v0.6 excluye archivo/search
+jobs, tablas restauradas o de resultados, consultas entre tablas/recursos y
+funciones cuyas fuentes reales no se puedan enumerar.
+
+Antes de cada envío, leer la tabla configurada mediante
+[Tables Get, 2025-07-01](https://learn.microsoft.com/en-us/rest/api/loganalytics/tables/get?view=rest-loganalytics-2025-07-01):
+exigir `plan=Analytics` explícito, retención interactiva efectiva legible y estado
+de aprovisionamiento estable. Metadatos ausentes/desconocidos, Basic/Auxiliary o
+intervalo fuera de retención producen rechazo visible. Releer justo antes de
+enviar y registrar una observación posterior; un cambio invalida nuevas
+admisiones. Las API de metadatos y consulta no bloquean atómicamente el plan:
+registrar esa carrera, sin prometer protección ante un cambio de facturación
+externo durante la ejecución. Si la organización exige esa garantía, el módulo
+no está disponible.
+
+Prioridad: `SigninLogs`, `AADNonInteractiveUserSignInLogs`, `AuditLogs` y
+`AzureActivity`; resolver esquemas reales y contratos de mapeo Entra/Azure
+Activity, incluidas carencias de traducción exacta. Acotar `TimeGenerated` y el
+instante nativo si el mapeo lo exige, sin sustituir silenciosamente un eje por otro.
+
+Valores propuestos, reducibles: 31 días, 100.000 filas, 100 MB decodificados,
+180 segundos totales, una consulta simultánea y seis envíos por minuto móvil
+para workspace/credencial, compartidos entre principal e hijos. Los reintentos
+consumen frecuencia/llamadas; no dividir o reenviar consultas para eludir límites.
+Mandan los [límites del servicio](https://learn.microsoft.com/en-us/azure/azure-monitor/fundamentals/service-limits)
+si son menores. Escaneo desconocido queda `null` con motivo `not_reported` y base
+de precio `analytics_no_query_charge`. Sin descontar bytes ficticios ni mostrar
+coste cero de todo el workspace. Siguen retención, transferencia y herramientas.
+Este diseño no aprueba todavía el nuevo flujo de credenciales Entra.
+
 ## 4. Credenciales, alcance y permisos mínimos
 
 Credenciales, material de sesión y renovación solo en el keystore: nunca entorno,
 argumentos, configuración, SQL ni recibos. Reutilizar AWS SigV4 y RS256/OAuth de
-Google existentes cuando proceda; la autenticación Azure es una propuesta de
-flujo nuevo, no se activa aquí. TLS y nombre de host completos, con la opción
+Google existentes cuando proceda; la autenticación Azure requiere aprobación
+concreta: tenant/client y secreto en keystore, tokens de audiencias separadas
+para metadatos ARM y Logs Query, y acceso solo en memoria. Usar el
+[flujo client credentials de Entra](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/api/access-api);
+no se activa ningún secreto ni alternativa delegada o ambiental aquí. TLS y nombre de host completos, con la opción
 actual de CA por fuente. Sin descubrimiento ambiental. Endpoint y destino del
 resultado los configura el analista; se rechazan redirecciones que reenviarían
 autenticación a otro origen. Comprobar región, proyecto facturado y propietario
@@ -213,7 +256,7 @@ administrador, sin conceder borrado de objetos a IRMind.
 | BigQuery | Rol personalizado de ejecución con `bigquery.jobs.create` y Data Viewer en dataset/tabla o vista autorizada concretos. Sin Editor, creador de datasets ni Data Editor. Las pruebas deben confirmar lectura/cancelación de jobs propios sin job-administrator global. |
 | Cloud Logging enlazado | Permisos BigQuery y Logs View Accessor sobre la vista exacta cuando proceda. Sin Logging Admin ni creación del enlace. |
 | ADX | Database Viewer en una base dedicada; sin Admin ni Ingestor. Viewer lee ampliamente la base: usar separación o vistas restringidas gestionadas por el administrador si el alcance es menor. |
-| Azure Log Analytics | Lectura/query del workspace y lectura de datos de tablas con RBAC granular limitado a tablas/filas aprobadas. Preferir Log Analytics Data Reader con condiciones a Reader/Contributor amplios; sin sharedKeys, ingesta, search jobs ni escritura del workspace. |
+| Azure Log Analytics | `Microsoft.OperationalInsights/workspaces/tables/read` para verificar el plan, lectura/query del workspace y lectura de datos de tablas con RBAC granular limitado a tablas/filas aprobadas. Preferir Log Analytics Data Reader con condiciones a Reader/Contributor amplios; sin sharedKeys, ingesta, search jobs ni escritura del workspace. |
 
 Referencias:
 [acciones Athena](https://docs.aws.amazon.com/service-authorization/latest/reference/list_athena.html),
@@ -304,6 +347,32 @@ ni la verdad o completitud de la base remota. Reejecutar la consulta **no es
 reproducible**: cambian retención, eventos tardíos, permisos, motor y datos. Una
 reejecución crea evidencia nueva y comparación; no sustituye la anterior. La
 reconstrucción local de las respuestas conservadas es otra comprobación.
+
+### Traer una vez y analizar en local
+
+Adquisición y salida al modelo son superficies distintas. Reservar y conservar
+hasta las 100.000 filas / 100 MB aprobados por consulta, en streaming a ficheros
+privados del caso, e ingerir esos bytes exactos con decodificador y mapeo
+identificados. El contrato concreta otra asignación por caso (propuesta inicial:
+1.000.000 de filas / 1 GB), con techo y cambios firmados. El índice local conserva
+sus límites de disco/ingesta. Guardar envolturas, proyección, tipos, identidad de
+consulta/ejecución/página/fila y hashes: una selección de columnas no es el evento
+original completo. Incluir los campos que necesita el mapeo o rechazar la
+proyección incompatible; nunca fabricar campos ausentes.
+
+Devolver solo el resumen protegido actual: hash/ID de fuente, filas/bytes,
+intervalo, completitud/cobertura y vista previa acotada. Después, analista o
+agente usan timeline, búsqueda, entidades y lectura de evidencia sobre esa fuente
+local. Repetir herramientas locales **no genera otra consulta remota**. Otra
+adquisición requiere nuevo plan admitido y presupuestado, no una página oculta
+del resumen. Es el patrón recomendado para reducir coste.
+
+Detenerse al primer tope sin partir registros. Conservar un prefijo completo solo
+si la decodificación demuestra sus límites de fila, marcado parcial y con causa;
+no rescatar una envoltura inválida adivinando. Diferenciar truncado del servicio,
+`PartialError` y retención local. Una vista previa completa no prueba que se
+adquirieron todos los eventos. Frame firmado de 1 MiB, ContentGuard y stream no
+cambian; el fichero completo nunca se convierte en mensaje para el modelo.
 
 ## 6. Reverificación remota tras el sellado
 
@@ -410,11 +479,12 @@ credenciales. Nunca ejecutar automáticamente este procedimiento de pago.
    aprobar después puertos concretos y vectores de formato por separado.
 2. Compilador/admisión y verificación de recibos/export con fakes, sin cambiar
    límites ni fronteras de contenido no confiable.
-3. Athena CloudTrail y BigQuery bajo demanda en módulos/PRs propios, midiendo
-   planificación y decodificar/mapear/escribir resultados acotados en release.
+3. Athena CloudTrail, BigQuery bajo demanda y Azure Logs solo Analytics en PRs
+   por módulo; Azure necesita primero la aprobación concreta de autenticación.
+   Medir planificación y decodificar/mapear/escribir resultados en release.
 4. Security Lake y Logging enlazado con ejecutores probados y mapeos explícitos;
    publicar cobertura y observaciones de servicios reales por separado.
-5. Retomar CloudTrail Lake y Azure solo con contrato de coste demostrado. Un
+5. Retomar CloudTrail Lake y Azure Data Explorer solo con contrato de coste demostrado. Un
    HTTP exitoso no basta para afirmar soporte.
 
 Esta PR solo documenta. No cierra la validación del conector, autoriza gasto
