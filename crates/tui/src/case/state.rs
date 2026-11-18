@@ -399,7 +399,7 @@ mod tests {
     #[test]
     fn parser_prompt_uses_arrows_or_number_then_enter_and_escape_cancels() {
         let mut prompt = ParserPrompt {
-            descriptions: Default::default(),
+            descriptions: std::collections::BTreeMap::default(),
             source: "events.json".into(),
             candidates: vec![("parser-json".into(), 45), ("parser-ecs".into(), 45)],
             selected: 0,

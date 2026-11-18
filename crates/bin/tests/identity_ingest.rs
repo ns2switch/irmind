@@ -222,6 +222,17 @@ fn one_gib_release_throughput() -> Result<(), &'static str> {
     Ok(())
 }
 
+#[cfg(feature = "parser-vpc-flow")]
+#[test]
+#[ignore = "manual optimized 1 GiB VPC flow ingestion benchmark"]
+fn one_gib_release_vpc_throughput() -> Result<(), &'static str> {
+    if cfg!(debug_assertions) {
+        return Err("Use --release for benchmarks");
+    }
+    benchmark_source("vpc-flow");
+    Ok(())
+}
+
 #[cfg(all(feature = "parser-azure-flow", feature = "parser-gcp-flow"))]
 #[test]
 #[ignore = "manual optimized 1 GiB cloud JSON ingestion benchmark"]
