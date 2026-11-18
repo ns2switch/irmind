@@ -259,6 +259,11 @@ mod tests {
         registry
             .add_source_decoder(Arc::new(irmind_mod_parser_entra::EntraSourceDecoder))
             .unwrap();
+        register_identity_decoders(&mut registry);
+        register(&mut registry).unwrap();
+        check_catalog(&registry);
+    }
+    fn register_identity_decoders(registry: &mut ModuleRegistry) {
         #[cfg(all(feature = "mapping-identity", feature = "parser-m365"))]
         registry
             .add_source_decoder(Arc::new(irmind_mod_parser_m365::M365SourceDecoder))
@@ -267,8 +272,6 @@ mod tests {
         registry
             .add_source_decoder(Arc::new(irmind_mod_parser_okta::OktaSourceDecoder))
             .unwrap();
-        register(&mut registry).unwrap();
-        check_catalog(&registry);
     }
     fn check_catalog(registry: &ModuleRegistry) {
         let catalog = registry.mapping_catalog().unwrap();
