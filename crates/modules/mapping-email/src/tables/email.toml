@@ -27,6 +27,3 @@ observation = { kind = "hash", role = "subject", scope = { kind = "global" } }
 source = ["size"]
 target = "file.size"
 
-[[fields]]
-source = ["url"]
-target = "url.full"

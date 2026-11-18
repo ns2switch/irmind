@@ -2,6 +2,7 @@
 //! Finite email/file rules are declarative. Native glue handles RFC mailbox lists
 //! and literal URL extraction identities, which require bounded array handling.
 mod projection;
+mod urls;
 use irmind_app::{
     modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
     source_mapping::{

@@ -30,7 +30,7 @@ fn decode(mut bytes: &[u8]) -> Result<(irmind_app::ParseReport, Vec<SourceRecord
 #[test]
 fn mime_contracts_preserve_original_headers_and_attachment_hash() {
     for (name, bytes, count) in [
-        ("multipart.eml", MULTIPART, 9),
+        ("multipart.eml", MULTIPART, 7),
         (
             "headers.eml",
             include_bytes!("../../../testkit/fixtures/parser-email/source/headers.eml").as_slice(),
@@ -39,7 +39,7 @@ fn mime_contracts_preserve_original_headers_and_attachment_hash() {
         (
             "plain.eml",
             include_bytes!("../../../testkit/fixtures/parser-email/source/plain.eml").as_slice(),
-            3,
+            2,
         ),
     ] {
         irmind_testkit::run_log_parser_contract(
@@ -57,7 +57,7 @@ fn mime_contracts_preserve_original_headers_and_attachment_hash() {
 #[test]
 fn original_header_order_time_and_attachment_metadata_are_preserved() {
     let (report, records) = decode(MULTIPART).unwrap();
-    assert_eq!((report.accepted, report.rejected), (9, 0));
+    assert_eq!((report.accepted, report.rejected), (7, 0));
     let root = &records[0];
     assert_eq!(root.origin().offset(), None);
     assert!(records.iter().all(|r| r.origin().offset().is_none()));
@@ -130,28 +130,36 @@ fn original_header_order_time_and_attachment_metadata_are_preserved() {
 }
 
 #[test]
-fn decoded_urls_have_no_fabricated_offset_and_queries_are_not_decoded_twice() {
+fn transformed_body_offsets_are_unavailable_and_transport_is_decoded_once() {
     let (_, records) = decode(MULTIPART).unwrap();
-    let url = records
+    let text = records
         .iter()
-        .find(|r| {
-            r.fields().field("url").and_then(SourceValue::as_text)
-                == Some("https://portal.example.invalid/login?token=synthetic")
-        })
+        .find(|r| r.fields().field("text").is_some())
         .unwrap();
-    assert!(url.origin().offset().is_none());
+    assert!(text.origin().offset().is_none());
+    assert!(
+        text.fields()
+            .field("text")
+            .unwrap()
+            .as_text()
+            .unwrap()
+            .contains("https://portal.example.invalid/login?token=synthetic")
+    );
     let plain = include_bytes!("../../../testkit/fixtures/parser-email/source/plain.eml");
     let (_, records) = decode(plain).unwrap();
-    let url = records
+    let text = records
         .iter()
-        .find(|r| r.fields().field("url").is_some())
+        .find(|r| r.fields().field("text").is_some())
         .unwrap();
-    let value = url.fields().field("url").unwrap().as_text().unwrap();
-    assert!(value.contains("a%252Fb?x=one%26two"));
-    assert_eq!(
-        usize::try_from(url.origin().offset().unwrap()).unwrap(),
-        plain.windows(8).position(|w| w == b"HTTPS://").unwrap()
+    assert!(
+        text.fields()
+            .field("text")
+            .unwrap()
+            .as_text()
+            .unwrap()
+            .contains("a%252Fb?x=one%26two")
     );
+    assert!(text.origin().offset().is_some());
 }
 #[test]
 fn large_text_is_complete_and_utf8_boundaries_are_preserved() {
@@ -273,4 +281,14 @@ fn source_size_and_reader_cancellation_fail_without_emitting_records() {
     );
     assert!(matches!(result, Err(AppError::Cancelled)));
     assert!(!emitted);
+}
+
+#[test]
+fn duplicate_dates_are_retained_without_choosing_an_event_time() {
+    let bytes = b"From: a@example.invalid\r\nSubject: synthetic\r\nDate: Tue, 17 Nov 2026 12:00:00 +0000\r\nDate: Wed, 18 Nov 2026 13:00:00 +0000\r\n\r\nbody";
+    let (_, records) = decode(bytes).unwrap();
+    assert!(records.iter().all(|r| r.timestamp().is_none()));
+    assert!(
+        matches!(records[0].fields().field("decoded_headers").and_then(|h| h.field("date")), Some(SourceValue::Array(values)) if values.len() == 2)
+    );
 }

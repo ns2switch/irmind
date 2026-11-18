@@ -3,7 +3,6 @@ mod body;
 mod decode;
 mod headers;
 mod mime;
-mod urls;
 pub use decode::EmailSourceDecoder;
 use irmind_app::{
     AppError, LogParser, ParserConfidence, StreamingEventParser,

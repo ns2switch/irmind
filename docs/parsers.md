@@ -309,16 +309,18 @@ Embedded `message/rfc822` parts are treated as opaque attachments.
 
 Limits are 32 MiB per source, 64 KiB per header block, 1,024 headers in the message,
 16 nested multipart containers and 256 MIME parts. Plain/HTML source uses chunks
-of at most 256 KiB, preserving UTF-8 boundaries and the original bytes. Up to 128
-HTTP(S) URL occurrences per text part are admitted, each at most 4,096 bytes;
-exceeding a structural limit rejects the message rather than silently trimming it.
+of at most 256 KiB, preserving UTF-8 boundaries and the original bytes, with a
+bounded 4 KiB lookahead for mapping across chunk boundaries. Structural limits
+reject the message rather than silently trimming it. The pure mapping extracts
+up to 127 HTTP(S) URLs per text chunk, each at most 4,096 bytes; unsupported or
+excess values produce a coverage diagnostic while the original body is retained.
 UTF-8 and US-ASCII body text are decoded; other charsets retain original hex bytes
 with an explicit coverage notice. Unsupported transport encodings and malformed
 multipart structures fail clearly. Minimal recognized headers require analyst
 selection; a filename alone never proves the format.
 
 Timestamps use the original Date only with a validated explicit supported zone;
-missing, invalid or unsupported dates remain unknown. Neither the machine clock
+missing, duplicate, invalid or unsupported dates remain unknown. Neither the machine clock
 nor file mtime supplies an event time. MIME transformations may prevent an exact
 original byte offset for a subrecord. Such a source uses unavailable origin offsets
 consistently; known positions remain in `source_byte_offset` and relative

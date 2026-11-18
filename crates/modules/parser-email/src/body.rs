@@ -38,17 +38,6 @@ pub(super) fn leaf(
         });
         return Ok(output);
     }
-    for (offset, value) in crate::urls::extract(&decoded, cancel)? {
-        let SourceValue::Object(fields) = value else {
-            return Err(invalid());
-        };
-        output.push(PendingFrame {
-            kind: "url",
-            fields,
-            offset: exact.then_some(start + headers.body + offset),
-            part,
-        });
-    }
     if matches!(headers.media.as_str(), "text/plain" | "text/html") {
         output.extend(text_frames(&decoded, headers, start, part, exact, cancel)?);
     }
@@ -84,6 +73,12 @@ fn text_frames(
             ),
             ("decoded_body_offset".into(), number(offset)?),
             ("charset".into(), SourceValue::Text(headers.charset.clone())),
+            (
+                "following_bytes_hex".into(),
+                SourceValue::Text(irmind_app::hex(
+                    &decoded[end..(end + 4096).min(decoded.len())],
+                )),
+            ),
         ]);
         if textual {
             fields.insert(

@@ -7,7 +7,7 @@ fn email_mapping_contract_preserves_roles_and_unknown_outcome() {
         Arc::new(EmailMapping::new().unwrap()),
         "synthetic.eml",
         bytes,
-        9,
+        7,
     )
     .unwrap();
 }
@@ -77,4 +77,53 @@ fn claimed_sender_recipient_and_ip_have_roles_without_authentication_inference()
             .iter()
             .any(|(k, v)| k == "url" && v.contains("portal.example.invalid"))
     }));
+}
+
+#[test]
+fn url_crossing_text_chunk_boundary_is_mapped_once_without_decoding_escapes() {
+    use irmind_app::{
+        CancellationToken, SourceDecoder,
+        source_mapping::{SourceInput, SourceMetadata, SourceReferenceV1},
+    };
+    let header = b"From: sender@example.invalid\r\nTo: analyst@example.invalid\r\nMessage-ID: <boundary@example.invalid>\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n";
+    let url = "https://example.invalid/path?next=%252Fkeep%26x=1";
+    let mut bytes = header.to_vec();
+    bytes.extend(vec![b' '; 256 * 1024 - 4]);
+    bytes.extend_from_slice(url.as_bytes());
+    bytes.extend_from_slice(b" done");
+    let source = SourceReferenceV1::file("boundary.eml").unwrap();
+    let cancel = CancellationToken::new();
+    let mapper = EmailMapping::new().unwrap();
+    let mut urls = Vec::new();
+    irmind_mod_parser_email::EmailSourceDecoder
+        .decode_reader(
+            SourceInput {
+                metadata: SourceMetadata {
+                    source: &source,
+                    evidence_hash: irmind_app::sha256(&bytes),
+                    time_context: None,
+                    cluster_context: None,
+                    cancel: &cancel,
+                },
+                reader: &mut bytes.as_slice(),
+            },
+            &mut |record| {
+                record.inspect(|record| {
+                    let mapped = mapper.map(record).unwrap();
+                    urls.extend(
+                        mapped
+                            .record()
+                            .indexed
+                            .record
+                            .entities
+                            .iter()
+                            .filter(|(kind, _)| kind == "url")
+                            .map(|(_, value)| value.clone()),
+                    );
+                });
+                Ok(())
+            },
+        )
+        .unwrap();
+    assert_eq!(urls, [url]);
 }

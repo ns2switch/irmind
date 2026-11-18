@@ -64,6 +64,9 @@ pub(super) fn parse(bytes: &[u8], allow_empty: bool) -> Result<Headers, AppError
             .or_default()
             .push(values::value(&header.value, raw)?);
     }
+    if decoded.get("date").is_some_and(|values| values.len() != 1) {
+        out.time = None;
+    }
     out.fields.insert(
         "decoded_headers".into(),
         SourceValue::object(

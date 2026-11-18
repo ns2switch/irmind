@@ -312,16 +312,18 @@ Los mensajes `message/rfc822` adjuntos se tratan como archivos opacos.
 Límites: 32 MiB por fuente, 64 KiB por bloque de cabeceras, 1.024 cabeceras totales,
 16 contenedores multipart anidados y 256 partes MIME. El texto/HTML se divide en
 bloques de hasta 256 KiB respetando UTF-8 y conservando los bytes originales.
-Se admiten hasta 128 apariciones de URLs HTTP(S) por parte de texto, de hasta
-4.096 bytes cada una. Superar un límite estructural rechaza el mensaje completo,
-sin recortarlo silenciosamente. UTF-8 y US-ASCII se decodifican como texto; otros
+Se conservan además hasta 4 KiB siguientes para el mapeo entre bloques. Superar un
+límite estructural rechaza el mensaje completo, sin recortarlo silenciosamente.
+El mapeo puro extrae hasta 127 URLs HTTP(S) por bloque de texto, de hasta 4.096
+bytes cada una; valores no admitidos o excesivos producen un aviso de cobertura
+y los bytes originales del cuerpo se conservan. UTF-8 y US-ASCII se decodifican como texto; otros
 charsets conservan los bytes en hexadecimal con aviso de cobertura. Una
 codificación de transporte no admitida o MIME mal formado produce un error claro.
 Las cabeceras mínimas requieren elección del analista; el nombre del fichero no
 prueba el formato.
 
 El instante procede de Date solo con fecha válida y zona explícita admitida;
-si falta o no es válida, queda desconocido. No se usa el reloj ni el mtime.
+si falta, está duplicada o no es válida, queda desconocido. No se usa el reloj ni el mtime.
 Una transformación MIME puede impedir indicar el offset original exacto de un
 subregistro. En ese caso, toda la fuente omite uniformemente los offsets de
 origen; las posiciones conocidas quedan en `source_byte_offset` y

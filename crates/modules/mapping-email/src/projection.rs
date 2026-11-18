@@ -29,12 +29,26 @@ pub(super) fn project(
         &mut diagnostics,
     )?;
 
-    if let Some(url) = source.fields().field("url").and_then(SourceValue::as_text) {
-        record
-            .indexed
-            .record
-            .entities
-            .push(("url".into(), url.into()));
+    match crate::urls::extract(source.fields()) {
+        Ok(urls) => {
+            if let Some(first) = urls.first() {
+                context
+                    .try_insert(
+                        F::UrlFull,
+                        CommonValue::Text(EventText::new(first).map_err(bad)?),
+                    )
+                    .map_err(bad)?;
+            }
+            record
+                .indexed
+                .record
+                .entities
+                .extend(urls.into_iter().map(|url| ("url".into(), url)));
+        }
+        Err(MappingError::UnsupportedSourceValue) => {
+            diagnostics.push(MappingDiagnostic::UnsupportedValue);
+        }
+        Err(error) => return Err(error),
     }
     record.indexed.record.entities.sort();
     record.indexed.record.entities.dedup();
