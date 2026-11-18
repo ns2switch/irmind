@@ -1,4 +1,4 @@
-Traducción de docs/development/roadmap.md en el commit 0b79bea270e99a28756d123f51a045cf283cfd4a; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/roadmap.md en el commit df9a8bff2dfb803a6ce692b9ad5713f540b45057; si hay diferencias, prevalece la versión en inglés.
 
 # Hoja de ruta
 
@@ -71,9 +71,10 @@ binario actual.
   instaladores, Sigstore con identidad de tag, provenance y SBOM. AUR, Nix,
   winget y Scoop quedan abiertos a empaquetadores comunitarios.
 - Activar Developer ID, hardened runtime y notarización preparados solo tras
-  aportar el entorno protegido y aprobar la activación. SignPath y los
-  aprobadores de release corresponden a la persona mantenedora; Sigstore no
-  sustituye la firma nativa ni la reputación del sistema operativo.
+  aportar el entorno protegido y aprobar la activación. La firma Authenticode de
+  Windows sigue pendiente; se reevaluará SignPath Foundation tras el lanzamiento
+  público, junto a opciones de pago. Elegir proveedor y activar corresponde al
+  mantenedor; Sigstore no sustituye la firma nativa ni la reputación del SO.
 - Registrar los pasos pendientes de H5, un conector en un entorno real y EVTX
   experimental en Windows 11. No deducirlos de pruebas sintéticas scripted.
 - Medir y mejorar estrés, consultas de entidades densas y disco de co-observación
