@@ -1,4 +1,4 @@
-Traducción de docs/development/source-queries-design.md en el commit 28870d95daefc0171310008a272f087784dfe556; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/source-queries-design.md en el commit e4357d9893d36b3bd019b74c4cc10fc7db659dbc; si hay diferencias, prevalece la versión en inglés.
 
 # Consultas en origen para v0.6
 
