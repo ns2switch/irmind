@@ -183,11 +183,17 @@ def irmind_flag_citations(text: str) -> set[str]:
         # still receive strict validation; a repository named irmind-skills
         # is not an invocation of the irmind executable.
         external = re.match(
-            r"^\s*(?:\$ )?(?:ollama\s+(?:pull|create|show)\s|gcloud\s|gh\s+secret\s+set\s|docker\s+compose\s|curl\s|codesign\s|spctl\s|xcrun\s+stapler\s|"
+            r"^\s*(?:\$ )?(?:cargo(?:\s+\+[A-Za-z0-9_.-]+)?\s+(?:test|build|clippy|nextest\s+run)\s|ollama\s+(?:pull|create|show)\s|gcloud\s|gh\s+secret\s+set\s|docker\s+compose\s|curl\s|codesign\s|spctl\s|xcrun\s+stapler\s|"
             r"python3\s+(?:scripts/hunteval_benchmark\.py|tools/real-validation/lab\.py)\s)",
             line,
         )
         ownership_line = re.sub(r"--repo\s+[A-Za-z0-9_.-]+/irmind(?=\s|$)", "--repo REPOSITORY", line)
+        if re.match(r"^\s*(?:\$ )?cargo(?:\s+\+[A-Za-z0-9_.-]+)?\s", line):
+            # A Cargo package selector names the crate, not an executable.
+            ownership_line = re.sub(
+                r"(?<!\S)(?:(?:-p|--package)\s+|--package=)irmind(?=\s|$)",
+                "PACKAGE", ownership_line,
+            )
         if re.match(r"^\s*(?:\$ )?(?:codesign|spctl)\s", line):
             # Here the executable is the file being inspected, not a command.
             # Shell composition is still rejected by the mixed-line check.
