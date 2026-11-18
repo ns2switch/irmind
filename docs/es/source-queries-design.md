@@ -1,4 +1,4 @@
-Traducción de docs/development/source-queries-design.md en el commit f19f62a401f9700c2b9693456d5b8b6fd68d4839; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/source-queries-design.md en el commit aeeb2dd2bc330a00f82468bb0e90ac21ab295f93; si hay diferencias, prevalece la versión en inglés.
 
 # Consultas en origen para v0.6
 
@@ -79,6 +79,12 @@ un único AST de lectura con identificadores/operadores del adaptador versionado
 Un campo desconocido, fuente contradictoria, filtro no admitido o cuenta ausente
 produce un error concreto, nunca un reintento sin esa restricción. Un valor no
 puede introducir otra fuente.
+
+Los identificadores de la configuración firmada también pasan la gramática del
+servicio y la lista exacta permitida: una firma no convierte SQL en identificador.
+Al traducir un prefijo literal con LIKE se escapan `%`, `_` y el carácter de
+escape, o se usa un operador fijo de prefijo con semántica equivalente. Los
+parámetros no eliminan por sí solos la semántica de comodines.
 
 ### Traducción y completitud
 
@@ -367,7 +373,7 @@ sintéticas grabadas; nunca cuentas reales ni escaneos de pago. Suite mínima:
 - AST y peticiones golden por adaptador/filtro, parámetros estables y predicados
   de alcance iguales para llamadas del principal y de los hijos.
 - Valores maliciosos como `' OR 1=1 --`, backticks, `'; .drop table X`, pipes,
-  `workspace("other")`, saltos codificados y controles Unicode: rechazo o un único
+  `workspace("other")`, comodines/escape de LIKE, saltos codificados y controles Unicode: rechazo o un único
   literal, sin sintaxis adicional. Identificadores maliciosos se rechazan.
 - Sustitución de cuenta/proyecto/región/workspace, filtro semántico no soportado,
   metadatos manipulados, mapeo ausente, credencial/endpoint desconocidos.
