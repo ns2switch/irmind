@@ -1,4 +1,4 @@
-Traducción de docs/development/source-queries-design.md en el commit aeeb2dd2bc330a00f82468bb0e90ac21ab295f93; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/source-queries-design.md en el commit ee6b1f52beeca777b8aa53eca59a9edeb940574b; si hay diferencias, prevalece la versión en inglés.
 
 # Consultas en origen para v0.6
 
@@ -292,7 +292,10 @@ guard/stream. Resultados grandes usan assets acotados, no un frame enorme. No se
 añaden significados silenciosos al marcador de caso 4 ni al export V8: se propone
 la siguiente versión de caso/export con secciones explícitas, en otro contrato
 y con golden antes de implementar. El puerto sigue llamándose `export_case` y
-la verificación no exige credenciales ni nube.
+la verificación no exige credenciales ni nube. Se incluyen la fuente resuelta sin
+secretos, el snapshot de alcance/límites efectivos y las pruebas de admisión para
+comprobar los compromisos sin conexión: un hash de configuración no prueba por
+sí solo el respeto del techo. Nunca se exportan las credenciales con ese snapshot.
 
 Un tercero sin conexión verifica firmas, admisión/alcance, vínculos, hashes,
 completitud del resultado **retenido** y reconstrucción determinista de su
