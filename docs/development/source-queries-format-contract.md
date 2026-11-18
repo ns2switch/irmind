@@ -2,12 +2,12 @@
 
 [Español](../es/source-queries-format-contract.md)
 
-**Status: concrete contract proposal for review; no implementation or activation.**
+**Status: approved v0.6 contract with reduced scope; implementation follows separately.**
 Companion to the [source-query architecture](source-queries-design.md). This
 proposes application boundaries, case marker 5, export V9 and synthetic canonical
 vectors. No source, dependency, credential, existing golden or workflow changes
-are made by this document. The Entra credential flow and the proposed interfaces
-need concrete approval before implementation. Query modules remain independent.
+are made by this document. Entra client-secret credentials and SourceQueryExecutor are approved.
+Certificate credentials remain future work. Query modules remain independent.
 
 ## 1. Scope and unchanged boundaries
 
@@ -50,12 +50,12 @@ A missing predicate is never filled by removing a scope restriction.
 
 | Quantity | Proposed default / fixed bound |
 | --- | --- |
-| Interval | 31 days by organization policy; nonempty `[from,to)` inside case/task scope. Proposed compiled maximum 366 days; reducing it for a service is allowed. No implicit machine-clock window. |
+| Interval | 31 days by organization policy; nonempty `[from,to)` inside case scope. Proposed compiled maximum 366 days; reducing it for a service is allowed. No implicit machine-clock window. |
 | Filters / membership / projected fields | At most 16 / 32 / 32; values at most 256 UTF-8 bytes, validated by common-field type. Canonical filters sorted and unique; fields sorted by wire name. |
 | Query evidence | At most 100,000 rows and 100,000,000 decoded capture bytes; first reached wins. Requested `limit` can reduce the row cap. Existing per-record decoder limits remain. |
-| Case evidence | Proposed initial allocation 1,000,000 rows / 1,000,000,000 decoded capture bytes, reducible by organization and case. Counts include all acquisitions/children, not only active graph files. |
+| Case evidence | Proposed initial allocation 1,000,000 rows / 1,000,000,000 decoded capture bytes, reducible by organization and case. Counts include all principal acquisitions, not only active graph files. |
 | Scans | Separate nullable allocation `scan_bytes`, query ceiling and approval threshold; no enabled scan-priced module without explicit organization/case allocation. No monetary default is invented. |
-| Azure execution | 180 seconds end-to-end, one outstanding query and six submissions per rolling minute per workspace/credential, shared by parent/children. Retries count. Other modules use the smaller configured/provider deadline. |
+| Azure execution | 180 seconds end-to-end, one outstanding query and six submissions per rolling minute per workspace/credential, shared across principal requests and processes. Retries count. Other modules use the smaller configured/provider deadline. |
 | Wire/control data | At most 128 KiB canonical query record; existing SignedEntry frame at most 1 MiB including envelope/signature. Check final serialized size before signing. Depth at most 32, at most 4,096 nodes, no unbounded map/string allocation. |
 | Capture streaming | At most 64 KiB transport chunks and 512 KiB export chunks. At most 4,096 response pages per acquisition; opaque cursors at most 4 KiB, never exported or shown to the model. Oversized individual rows are rejected, not split. |
 | Model view | Existing guarded tool-summary limit, independent of retained rows/bytes. Guard 1,000,000 bytes, stream 2,000,000 bytes and signed frame 1 MiB are unchanged. |
@@ -129,13 +129,6 @@ pub trait SourceQueryExecutor: Send + Sync {
         -> Result<CancelObservationV1, AppError>;
 }
 
-#[async_trait]
-pub trait RemoteOriginalVerifier: Send + Sync {
-    async fn verify(&self, lease: &AdmittedOriginalVerification,
-        target: &FrozenRemoteOriginalV1, method: RemoteVerificationMethodV1,
-        cancel: &CancellationToken)
-        -> Result<RemoteVerificationObservationV1, AppError>;
-}
 ```
 
 `SourceQueryModuleV1` declares stable id/version, exact supported field/filter and
@@ -151,13 +144,13 @@ runs require their own source-restricted AuthorizedCall; policy, TLS, deadlines
 and call/rate accounting apply. No preflight executes a real query or creates a
 provider resource that costs money without admission.
 
-`AdmittedSourceQuery` and `AdmittedOriginalVerification` are private-field,
-non-deserializable application capabilities, created only by the broker after
-policy/scope/approval/reservation checks. Each binds case, optional task, source,
-plan/seal/object identity, exact effective limits, allocation revision, actor and
-operation phase. They contain no signer/Analyst key. A module must reject a lease
-for a different module, source, task, phase or compiled plan. Every HTTP request
-is checked against that lease, including retries/poll/fetch/cancel.
+`AdmittedSourceQuery` has private fields and no deserializer. Only the broker
+creates it after policy/scope/approval/reservation checks. It binds case, source,
+plan, limits, allocation revision, actor and operation phase, never a signer or
+Analyst key. v0.6 rejects any non-null task_id with
+`SourceQueriesUnavailableForSubagents` before preflight, reservation or network.
+The module rejects a lease for another module/source/phase/compiled plan. Every
+HTTP request checks the lease, including retries/poll/fetch/cancel.
 
 `QueryExecutionRef` binds plan, attempt and opaque native job ID, not a model URL.
 `QueryResultCursor` is minted by the engine from a validated response and bound
@@ -174,19 +167,10 @@ unknown; unknown is not an ordinary retryable transport error. Reconcile or
 cancel can return `unsupported` honestly. No fictitious job status or successful
 cancellation is synthesized for a synchronous API lacking that facility.
 
-Remote verification methods are closed `metadata` and `sha256`. The target is
-loaded from signed object identity, never a model-supplied URI. The lease binds
-the exact immutable S3 VersionId, GCS generation or Azure Blob version/snapshot,
-expected size/ETag/hash, case seal and transfer ceiling. The port performs the
-version-conditional metadata request and, only for sha256 admission, streamed
-GET/hash with before/after metadata checks. It returns observations, never a
-signed verdict. Absence of immutable version fails `ExactVersionUnavailable`;
-there is no fallback to the current live object.
-
 ### Wiring and storage
 
-Propose optional `EnginePorts::with_source_queries(SourceQueryPorts)` with two
-executor/verifier module maps. Existing `EnginePorts::new` remains unchanged;
+Propose optional `EnginePorts::with_source_queries(SourceQueryPorts)` with one
+executor module map. Existing `EnginePorts::new` remains unchanged;
 absence is `SourceQueriesUnavailable`, never fallback. Module keys are unique,
 feature-gated and registered explicitly. Existing HTTP, AWS SigV4 and Google
 keystore-backed OAuth/RS256 are reused before considering SDKs.
@@ -208,13 +192,11 @@ exact-plan approvals defined here. A normal Read decision alone never submits
 it. No tool can change its source configuration, table plan, allocation or
 credential. Existing SIEM tools retain their own 24-hour/row contracts.
 
-Only the included cloud child initially gains this declared tool: propose cloud
-built-in type version 2, with a new compiled inventory hash and the same type
-snapshot codec. Other types remain unchanged and cannot use the new tool by
-omission or alias. Version 2 query-resource plans bind that inventory. These
-additions are concrete contract review points, not permissions added by this PR.
-Remote-original verification stays an explicit analyst operation, not a model
-or child tool; no ordinary model read can contact the cloud after sealing.
+In v0.6 only the principal agent can use source_query. All six child types and
+their existing inventory/snapshot formats remain unchanged; no child receives
+this tool. A direct or aliased child attempt is rejected before any remote work.
+The future cloud type V2, SubagentPlanV2 and remote-original verification are
+[deferred beyond v0.6](source-queries-deferred.md).
 
 ## 4. Budget broker, approvals and uncertain jobs
 
@@ -225,35 +207,17 @@ frequency/concurrency and scan-approval threshold. Case changes use a new
 Analyst-signed `SourceQueryBudgetV1`; allocations cannot exceed organization
 ceilings or revoke already used/reserved resources by setting an impossible cap.
 
-One broker serializes admission across processes and parent/children under the
+One broker serializes admission across principal requests and processes under the
 existing case/plan coordination locks. Used + outstanding reservations + new
 reservation must fit every relevant dimension. Do not hold those locks while
 waiting for UI/network. Scan allocations never reinterpret `cloud_bytes`, which
 keeps its object-transfer meaning. Query response traffic/retention is separately
-accounted; a sha256 remote-original GET still reserves `cloud_bytes`.
+accounted. Post-seal remote-original verification is not included in v0.6.
 
-To bind remote source assignments and complete-plan reservations, propose
-`SubagentPlanV2` (new audit label/domain `irmind-subagent-plan-v2`): retain every
-V1 member and add required `query_resources`; `format_version` becomes 2.
-The V2 payload uses J and its new domain; the V1 byte codec is not reinterpreted. It is an array sorted
-by existing task ID, each entry `{task_id,sources,scope,scan_bytes,retained_rows,
-retained_bytes}`; sources are sorted unique configured source IDs (at most 32 per
-task), never substituted for local evidence hashes. Task IDs retain their current
-calculation and do not hash this parent plan. Existing plan approval, reservation
-and checkpoint schemas reference the new plan identity through their existing
-hash fields; their byte codecs do not change. Thus consent covers the *entire*
-query allocation before any child starts. A child with no query_resources entry
-cannot run remote queries. This V2 plan and the expanded whole-plan threshold
-are explicit review points, not silent changes to a published V1 format.
-
-A source query consumes ordinary tool-call budget as well as scan/retention
-resources. A child reserves its portion from the same case pool. For the proposed
-extension of the whole-plan 25% rule, compare complete-plan scan, retained-row
-and retained-byte reservations against remaining respective allocations; crossing
-any applicable dimension needs Analyst-signed plan consent. Zero remaining with
-positive demand is rejection; Analytics with no scan demand does not invent a
-zero-over-zero fraction. Existing tokens/calls/bytes thresholds and the
-confirm-all-plans preference still apply. No child approves its own plan/query.
+Source queries consume ordinary principal tool-call budget plus their independent
+scan/retention allocations. Existing subagent limits and the whole-plan 25% rule
+remain unchanged: no query allocation is delegated in v0.6. Exhausted case
+allocations reject before network work; no token-debt exception applies.
 
 Exact-plan approval is required above the scan threshold, for unreliable scan
 estimates and whenever existing external-query policy requires it. Analytics
@@ -447,7 +411,7 @@ coverage gaps are different counters/flags. All malformed rows are reported with
 the existing bounded, tainted rejection samples.
 
 Publish capture, SourceQueryResultV1, manifests, mapping/Parquet receipts and
-retention settlement atomically in the appropriate main/child transaction after
+retention settlement atomically in the principal case transaction after
 hash and final-frame checks. Earlier execution/scan-usage receipts remain even
 if local admission rolls back. Prepared files on failed append are removed or
 unreferenced and cleaned diagnostically; no half-admitted source is visible.
@@ -460,114 +424,68 @@ then use that source locally under existing scopes, samples and deadlines. They
 must not trigger additional network queries. Local pages do not spend remote scan
 budget. A requested new remote acquisition is a distinct signed/budgeted plan.
 
-## 8. Export V9, seal and detached re-verification
+## 8. Export V9 and seal
 
-V9 retains the current V8 body order through catalog proofs and branch chunks.
-The existing signed-operation section additionally carries exactly the global
-source-query adoption proofs referenced by exported plans and verification
-admissions referenced by detached receipts: case operations in
-their existing order, then unique global proofs sorted by operation hash.
-This is an explicit V9 admission rule; V8 does not acquire it. Verify the
-unchanged operation challenge/signature against the expected Analyst, parse only
-`source-query-configuration-v1` or `remote-original-verification-admission-v1`,
-and match its source/policy bytes to the plan or its exact verification target.
-A missing, unrelated or other-key adoption invalidates verification. These
-signatures authenticate a referenced operation, not the completeness of the
-installation's entire global history. Export no unrelated global configuration.
+Retain V8 body order through catalog proofs and subagent branch chunks. The
+signed-operation section additionally includes exactly the Analyst-signed
+source-query-configuration-v1 adoption proofs referenced by exported plans:
+case operations in their existing order, then unique global proofs sorted by
+operation hash. Verify the unchanged signature challenge and expected Analyst,
+then match adopted source/policy bytes to each plan. Missing/unrelated/other-key
+proofs invalidate verification; do not export unrelated global configuration.
 
-After branch chunks append two mandatory big-endian u64 counts, each possibly zero:
+After branch chunks append **one** mandatory big-endian u64 query-capture count,
+possibly zero. There is **no detached-receipt count, not even a zero**, in v0.6 V9.
+Captures are sorted by SHA-256. Each has a canonical descriptor frame
+`{capture_sha256,bytes,chunks}`, then exactly that many raw byte frames, at most
+512 KiB each. Reject unreferenced/duplicate/missing captures, changed lengths,
+reordered chunks, mismatched hashes/counts, overflow and trailing bytes.
 
-1. Query-capture count. Entries sorted by capture SHA-256; a canonical descriptor
-   frame `{capture_sha256,bytes,chunks}` then exactly `chunks` raw byte frames of
-   at most 512 KiB. Reject duplicate/unreferenced captures, a missing required
-   capture, reordered chunks, wrong total length/hash or count overflow.
-2. Detached remote-verification count. Entries sorted by receipt ID; each is one
-   bounded signed receipt frame defined below. Unused count is still encoded.
+Query captures are required even when external originals are omitted; do not
+emit them twice in the optional-originals section, which covers external File
+originals. The inventory must match verified SourceQueryResultV1 entries in the
+principal chain. Children have no source-query receipts in v0.6. All existing
+branch/skill/catalog/Parquet verification remains mandatory and bounded.
 
-Query captures are mandatory even when external originals are omitted. They are
-not emitted a second time in the optional-originals section; that section covers
-external File originals. A case with no source queries still writes both zero
-counts. Total captures must match SourceQueryResultV1 references in the verified
-main/branch event graph; a descriptor/count alone is not trusted. Evidence files
-and all existing V8 proof sections remain bounded and hash-checked. Trailing
-bytes, unknown versions and unsupported required sections are errors.
+Seal inventory V2 bytes/algorithm remain unchanged. The authenticated chain
+anchors query records/capture commitments before sealing. The Parquet inventory
+count is not a query-capture count. Offline verification proves IRMind's signed
+admission, linkage, retained bytes and deterministic local decode/map replay,
+not the truth/completeness of the remote service or a cloud-provider signature.
+Re-running the remote query is a new acquisition, not reconstruction.
 
-Seal inventory V2 canonical bytes/algorithm stay unchanged. Query plans,
-reservations, receipts and capture commitments are anchored by the authenticated
-chain/checkpoints before the seal; new capture bytes are checked against those
-entries. Do not reinterpret the seal's Parquet-artifact count as a query-capture
-count. Offline verification proves IRMind's admission, signatures, linkage,
-retained bytes and deterministic decode/map reconstruction, not completeness or
-truth of the mutable remote service and not a provider signature. Re-running a
-query is a new acquisition, never verification by reconstruction of remote data.
-
-Detached `RemoteOriginalVerificationV1` has required canonical fields
-`version,case_id,admission,seal,source_manifest,object,method,observed_at,outcome,observed,
-sha256,transfer_bytes,reason,nonce`. `object` binds the exact immutable version;
-`method` is metadata or sha256. Outcomes are identity_match, digest_match,
-changed, missing, denied, unavailable, cancelled. Metadata never produces
-digest_match. Opaque ETag equality is not a SHA-256 check; an ambiguous 403 is
-never missing. Hash mismatch is changed even if ETag/size are equal.
-
-Envelope `{payload,public_key,signature}` uses hex canonical J(payload), Analyst
-public-key hex and Ed25519 signature hex. Signing challenge is
-`"irmind-remote-original-verification-v1" || 00 || u64(len(J)) || J`.
-Receipt ID is SHA-256 of that challenge. Verify the key against the expected case
-Analyst/seal identity, not merely the self-declared public key. The nonce is a
-fresh 32-byte receipt nonce, unrelated to UNTRUSTED delimiters. No expiry claim
-or claim that a later receipt updates an earlier one is inferred.
-
-Before a remote check, the Analyst signs a global
-`remote-original-verification-admission-v1:` operation with hex(J({version,
-case_id,seal,source_manifest,object,method,transfer_bytes,policy,at,nonce})).
-The receipt's required `admission` is that operation's audit hash. The exact
-method/target/maximum and policy snapshot are fixed before network work; no
-receipt can retroactively authorize a GET. Include the signed admission in V9's
-operation-proof section. An admission for metadata does not authorize sha256.
-
-The shared broker maintains detached holds/usage under the same case/seal lock,
-starting from the *remaining* transfer/call allocation authenticated at sealing.
-Outstanding checks and earlier detached usage are subtracted across processes.
-This bookkeeping is outside the sealed chain; it does not grant another copy of
-the case budget. Unknown transfers retain/charge their admitted bound until
-reconciled, never release it just on timeout. Exhaustion blocks new checks;
-no implicit post-seal increase or model-token debt exception is introduced.
-
-A sealed chain is not appended/reopened. Store the receipt independently with
-the frozen seal hash; including one requires a *new* export file, never rewriting
-an existing signed export. Missing receipts are not proof of failure, and a
-valid receipt only attests observations at its stated time. Catalogue and scan
-credentials are never exported. A new original byte GET consumes the
-remaining transfer allowance through that detached admitted session; the signed
-receipt is its usage record. The effective organization ceiling still applies.
+RemoteOriginalVerifier, RemoteOriginalVerificationV1, its admission operation and
+its export section are preserved as [future design](source-queries-deferred.md),
+not accepted in the v0.6 parser or enabled by this contract.
 
 ## 9. Vectors and implementation tests
 
 [Vector inventory and method](source-query-format-vectors/README.md) fixes:
 
-- Case marker 5, V9 magic and both empty extension counts.
+- Case marker 5, V9 magic and one empty capture count.
 - Exact-plan/approval/reservation/observation/result/settlement identities,
   canonical preimages, a complete derived capture, page commitment and V9 tail.
 - Analytics eligibility with null scan metrics, a rejected Basic plan and a
   partial result; malicious literal remains data.
-- An Ed25519 detached metadata receipt with a **public synthetic test key** and
-  a wrong-key signature, never a production catalog/signing key.
+- Public synthetic Analyst/Agent signatures using the unchanged audit challenge.
 - Mutation vectors for altered query after approval, changed allocation/source,
-  missing/reordered pages, changed capture, fabricated zero scans, cross-task
-  reservation, duplicate settlement and metadata misrepresented as hash proof.
+  missing/reordered pages, changed capture, fabricated zero scans, rejected child
+  attempts and duplicate settlement.
 
 Vectors are format examples/reference calculations only. They do not claim an
 executor, verifier or all current application admission logic has been implemented.
 The implementation must add tests for every failure above plus source-specific
 HTTP contracts, malformed/oversized streaming records, no system temporaries,
 disk exhaustion, cancellation/blocked callbacks, rollback and crash recovery,
-concurrent parent/child oversubscription, malicious obedient model attempts,
-exact-version races and offline V9 reconstruction. Golden tests must also run
+concurrent principal oversubscription, malicious obedient model attempts,
+child rejection and offline V9 reconstruction. Golden tests must also run
 with serde_json/preserve_order and 1/N workers without changing current golden.
 
 No real cloud calls, billable dry runs or credentials in CI. Release benchmarks
 measure compiler/preflight and retained-result decode/map/write separately from
 fake-service latency; optional real-service validation stays an analyst action.
-Implementation starts only after this contract's ports, new labels/case/export,
-credential flow and vectors are reviewed. This proposal does not itself enable
+Implementation order: shared types/compiler/admission/broker/records/capture and
+case 5/export V9 with no captures; Athena; BigQuery; Analytics-only Azure; then
+budget/status-bar/docs and optional per-service real validation. Each step has
+its own PR and fake-service contracts. New dependencies still require approval. This proposal does not itself enable
 any module or introduce a dependency.

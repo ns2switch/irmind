@@ -5,7 +5,9 @@
 **Status: architecture approved with the adjustments below; not implemented or enabled.**
 This proposes remote, read-only evidence queries through independently selectable
 modules. It does not enable a provider, provision cloud resources, add credentials
-or dependencies, or change a current port or signed format. The
+or dependencies, or change a current port or signed format. In v0.6 only the principal agent may query; remote-original re-verification and
+query-enabled subagents are deferred. The client-secret Entra flow is approved;
+certificate authentication remains future work. The
 [source/mapping pipeline](source-mapping-design.md),
 [common schema](common-event-schema.md), [budget controls](../configuration.md)
 and [subagent design](subagents-design.md) remain the starting contracts.
@@ -391,7 +393,7 @@ claim all matching events were acquired because the model preview is complete.
 The signed frame remains 1 MiB, ContentGuard and stream limits are unchanged,
 and the full evidence file never becomes a model message.
 
-## 6. Remote re-verification after sealing
+## 6. Remote re-verification after sealing — deferred after v0.6
 
 Recheck only object originals with a signed immutable identity: S3 VersionId,
 GCS generation or Azure Blob version/snapshot plus the recorded ETag and length.
@@ -416,7 +418,7 @@ product; do not overwrite an existing export. Its transport/verification format
 also needs the later concrete contract. Queries over mutable tables do not gain
 object-version guarantees merely because their results were sealed.
 
-## 7. Subagents and engine boundaries
+## 7. Subagents and engine boundaries — query delegation deferred after v0.6
 
 A cloud child receives exact configured query sources as well as its permitted
 local source hashes, a narrower scope and a scan reservation. The engine broker
