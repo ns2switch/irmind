@@ -1,0 +1,56 @@
+[
+  {
+    "name": "target_and_context_join",
+    "target": "18446744073709551615",
+    "context": "18446744073709551615",
+    "same_tenant": true,
+    "same_host": true,
+    "join": true
+  },
+  {
+    "name": "different_tenant",
+    "same_tenant": false,
+    "same_host": true,
+    "join": false
+  },
+  {
+    "name": "different_host",
+    "same_tenant": true,
+    "same_host": false,
+    "join": false
+  },
+  {
+    "name": "reused_os_pid",
+    "raw_pid": "4242",
+    "target_ids": [
+      "10",
+      "11"
+    ],
+    "join": false
+  },
+  {
+    "name": "source_record_scope_is_distinct",
+    "same_native_value": true,
+    "join": false
+  },
+  {
+    "name": "invalid_native_ids",
+    "values": [
+      "-1",
+      "1.5",
+      "1e3",
+      "18446744073709551616",
+      "",
+      "0"
+    ],
+    "provider_observation": false
+  },
+  {
+    "name": "canonical_native_ids",
+    "inputs": [
+      "00042",
+      "42"
+    ],
+    "canonical": "42"
+  }
+]
