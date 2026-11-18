@@ -13,6 +13,10 @@ and export V8 sections are unchanged; keep the producing version for a case.
   validated unsigned decimal IDs. OS PIDs remain record scoped and Sysmon
   ProcessGuid keeps its existing lifetime scope.
 
+- Add experimental Falcon FDR JSONL/gzip decoding and separate finite mapping
+  tables, with tenant/sensor-native process identity and host partitions. Unknown
+  source types remain searchable without a guessed classification.
+
 - Add experimental Microsoft Defender Advanced Hunting CSV/JSON and Streaming
   export decoding with included finite mapping tables, host partitions and
   record-scoped process/parent observations. AlertInfo and AlertEvidence remain

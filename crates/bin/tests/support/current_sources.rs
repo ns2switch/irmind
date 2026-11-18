@@ -5,6 +5,20 @@ use irmind_infra::LocalStore;
 use std::{path::Path, sync::Arc};
 fn registry() -> ModuleRegistry {
     let mut registry = ModuleRegistry::new();
+    #[cfg(feature = "parser-fdr")]
+    registry
+        .register(
+            Box::new(irmind_mod_parser_fdr::FdrParser),
+            &ModuleConfig::new(),
+        )
+        .unwrap();
+    #[cfg(feature = "mapping-fdr")]
+    registry
+        .register(
+            Box::new(irmind_mod_mapping_fdr::FdrMapping::new().unwrap()),
+            &ModuleConfig::new(),
+        )
+        .unwrap();
     #[cfg(feature = "parser-defender")]
     registry
         .register(

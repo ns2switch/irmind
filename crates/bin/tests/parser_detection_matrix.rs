@@ -74,6 +74,11 @@ mod matrix {
     #[allow(clippy::too_many_lines)]
     fn each_fixture_has_one_unique_high_confidence_parser() -> Result<(), irmind_app::AppError> {
         let mut registry = ModuleRegistry::new();
+        #[cfg(feature = "parser-fdr")]
+        registry.register(
+            Box::new(irmind_mod_parser_fdr::FdrParser),
+            &ModuleConfig::new(),
+        )?;
         #[cfg(feature = "parser-defender")]
         registry.register(
             Box::new(irmind_mod_parser_defender::DefenderParser),
@@ -168,6 +173,12 @@ mod matrix {
         )?;
         let mut matrix: Matrix = std::collections::BTreeMap::new();
         for (name, sample, expected) in [
+            #[cfg(feature = "parser-fdr")]
+            (
+                "fdr-events.ndjson",
+                include_bytes!("../../testkit/fixtures/parser-fdr/source/events.ndjson").as_slice(),
+                "parser-fdr",
+            ),
             #[cfg(feature = "parser-defender")]
             (
                 "defender-events.ndjson",
@@ -592,7 +603,7 @@ mod matrix {
             "parser-linux" | "parser-zeek" | "parser-suricata" | "parser-kubernetes"
             | "parser-falco" | "parser-gcp-audit" | "parser-entra" | "parser-m365"
             | "parser-okta" | "parser-guardduty" | "parser-vpc-flow" | "parser-azure-flow"
-            | "parser-gcp-flow" | "parser-defender" => [
+            | "parser-gcp-flow" | "parser-defender" | "parser-fdr" => [
                 if matches!(sample.first(), Some(b'{' | b'[')) {
                     Some(45)
                 } else {
@@ -630,6 +641,13 @@ mod matrix {
         Ok(())
     }
     fn assert_priority_scores(name: &str, sample: &[u8], expected: &str) {
+        #[cfg(feature = "parser-fdr")]
+        assert_eq!(
+            irmind_mod_parser_fdr::FdrParser
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            (expected == "parser-fdr").then_some(98)
+        );
         #[cfg(feature = "parser-defender")]
         assert_eq!(
             irmind_mod_parser_defender::DefenderParser

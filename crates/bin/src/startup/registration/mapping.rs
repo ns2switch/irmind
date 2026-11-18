@@ -79,6 +79,11 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
     Ok(())
 }
 fn register_export_mappings(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(all(feature = "mapping-fdr", feature = "parser-fdr"))]
+    registry.register(
+        Box::new(irmind_mod_mapping_fdr::FdrMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
     #[cfg(all(feature = "mapping-defender", feature = "parser-defender"))]
     registry.register(
         Box::new(irmind_mod_mapping_defender::DefenderMapping::new()?),
@@ -300,6 +305,10 @@ mod tests {
         check_catalog(&registry);
     }
     fn register_identity_decoders(registry: &mut ModuleRegistry) {
+        #[cfg(all(feature = "mapping-fdr", feature = "parser-fdr"))]
+        registry
+            .add_source_decoder(Arc::new(irmind_mod_parser_fdr::FdrSourceDecoder))
+            .unwrap();
         #[cfg(all(feature = "mapping-defender", feature = "parser-defender"))]
         registry
             .add_source_decoder(Arc::new(irmind_mod_parser_defender::DefenderSourceDecoder))
@@ -343,31 +352,40 @@ mod tests {
         assert!(catalog.supports_decoder("parser-linux", "linux-source-v1"));
         assert_eq!(
             catalog.snapshots().unwrap().len(),
-            2 + usize::from(cfg!(all(
-                feature = "mapping-defender",
-                feature = "parser-defender"
-            ))) + usize::from(cfg!(all(
-                feature = "mapping-email",
-                feature = "parser-email"
-            ))) + usize::from(cfg!(all(
-                feature = "mapping-cloud-flow",
-                feature = "parser-vpc-flow"
-            ))) + usize::from(cfg!(all(
-                feature = "mapping-cloud-flow",
-                feature = "parser-gcp-flow"
-            ))) + 2 * usize::from(cfg!(all(
-                feature = "mapping-cloud-flow",
-                feature = "parser-azure-flow"
-            ))) + usize::from(cfg!(all(
-                feature = "mapping-guardduty",
-                feature = "parser-guardduty"
-            ))) + usize::from(cfg!(all(
-                feature = "mapping-identity",
-                feature = "parser-m365"
-            ))) + usize::from(cfg!(all(
-                feature = "mapping-identity",
-                feature = "parser-okta"
-            ))) + 4 * usize::from(cfg!(feature = "mapping-entra"))
+            2 + usize::from(cfg!(all(feature = "mapping-fdr", feature = "parser-fdr")))
+                + usize::from(cfg!(all(
+                    feature = "mapping-defender",
+                    feature = "parser-defender"
+                )))
+                + usize::from(cfg!(all(
+                    feature = "mapping-email",
+                    feature = "parser-email"
+                )))
+                + usize::from(cfg!(all(
+                    feature = "mapping-cloud-flow",
+                    feature = "parser-vpc-flow"
+                )))
+                + usize::from(cfg!(all(
+                    feature = "mapping-cloud-flow",
+                    feature = "parser-gcp-flow"
+                )))
+                + 2 * usize::from(cfg!(all(
+                    feature = "mapping-cloud-flow",
+                    feature = "parser-azure-flow"
+                )))
+                + usize::from(cfg!(all(
+                    feature = "mapping-guardduty",
+                    feature = "parser-guardduty"
+                )))
+                + usize::from(cfg!(all(
+                    feature = "mapping-identity",
+                    feature = "parser-m365"
+                )))
+                + usize::from(cfg!(all(
+                    feature = "mapping-identity",
+                    feature = "parser-okta"
+                )))
+                + 4 * usize::from(cfg!(feature = "mapping-entra"))
                 + 2 * usize::from(cfg!(feature = "mapping-gcp-audit"))
                 + 3 * usize::from(cfg!(feature = "mapping-falco"))
                 + 3 * usize::from(cfg!(feature = "mapping-kubernetes"))

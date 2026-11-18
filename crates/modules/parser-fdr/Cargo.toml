@@ -1,0 +1,14 @@
+[package]
+name = "irmind-mod-parser-fdr"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+[dependencies]
+irmind-app = { path = "../../app", version = "0.1.0" }
+irmind-domain = { path = "../../domain", version = "0.1.0" }
+flate2 = { version = "=1.1.10", default-features = false, features = ["miniz_oxide"] }
+[dev-dependencies]
+irmind-testkit = { path = "../../testkit", version = "0.1.0" }
+[lints]
+workspace = true

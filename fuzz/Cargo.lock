@@ -795,6 +795,7 @@ dependencies = [
  "irmind-mod-mapping-ecs",
  "irmind-mod-mapping-email",
  "irmind-mod-mapping-entra",
+ "irmind-mod-mapping-fdr",
  "irmind-mod-mapping-guardduty",
  "irmind-mod-mapping-identity",
  "irmind-mod-mapping-kubernetes",
@@ -808,6 +809,7 @@ dependencies = [
  "irmind-mod-parser-entra",
  "irmind-mod-parser-eztools",
  "irmind-mod-parser-falco",
+ "irmind-mod-parser-fdr",
  "irmind-mod-parser-gcp-audit",
  "irmind-mod-parser-gcp-flow",
  "irmind-mod-parser-guardduty",
@@ -911,6 +913,16 @@ dependencies = [
 
 [[package]]
 name = "irmind-mod-mapping-entra"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-build-manifest",
+ "irmind-domain",
+ "irmind-mapping-tables",
+]
+
+[[package]]
+name = "irmind-mod-mapping-fdr"
 version = "0.1.0"
 dependencies = [
  "irmind-app",
@@ -1038,6 +1050,15 @@ dependencies = [
 name = "irmind-mod-parser-falco"
 version = "0.1.0"
 dependencies = [
+ "irmind-app",
+ "irmind-domain",
+]
+
+[[package]]
+name = "irmind-mod-parser-fdr"
+version = "0.1.0"
+dependencies = [
+ "flate2",
  "irmind-app",
  "irmind-domain",
 ]

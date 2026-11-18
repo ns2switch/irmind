@@ -2262,6 +2262,7 @@ dependencies = [
  "crossterm",
  "directories",
  "ed25519-dalek",
+ "flate2",
  "futures-util",
  "irmind-app",
  "irmind-domain",
@@ -2286,6 +2287,7 @@ dependencies = [
  "irmind-mod-mapping-entra",
  "irmind-mod-mapping-evtx",
  "irmind-mod-mapping-falco",
+ "irmind-mod-mapping-fdr",
  "irmind-mod-mapping-gcp-audit",
  "irmind-mod-mapping-guardduty",
  "irmind-mod-mapping-identity",
@@ -2307,6 +2309,7 @@ dependencies = [
  "irmind-mod-parser-evtx",
  "irmind-mod-parser-eztools",
  "irmind-mod-parser-falco",
+ "irmind-mod-parser-fdr",
  "irmind-mod-parser-gcp-audit",
  "irmind-mod-parser-gcp-flow",
  "irmind-mod-parser-guardduty",
@@ -2749,6 +2752,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-mapping-fdr"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-build-manifest",
+ "irmind-domain",
+ "irmind-mapping-tables",
+ "irmind-mod-parser-fdr",
+ "irmind-testkit",
+]
+
+[[package]]
 name = "irmind-mod-mapping-gcp-audit"
 version = "0.1.0"
 dependencies = [
@@ -2982,6 +2997,16 @@ dependencies = [
 name = "irmind-mod-parser-falco"
 version = "0.1.0"
 dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-testkit",
+]
+
+[[package]]
+name = "irmind-mod-parser-fdr"
+version = "0.1.0"
+dependencies = [
+ "flate2",
  "irmind-app",
  "irmind-domain",
  "irmind-testkit",

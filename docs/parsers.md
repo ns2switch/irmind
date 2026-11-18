@@ -12,6 +12,7 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 | --- | --- | --- | --- | --- |
 | Microsoft 365 Unified Audit Log | Purview CSV, Search-UnifiedAuditLog JSON, Management Activity API JSON | Native AuditData/Operation, CreationTime and workload; 98 | UTC time, actor, mailbox target when explicit, resource, source IP, user agent, workload, finite operation/outcome tables | experimental |
 | Okta System Log | API JSON arrays and JSON/NDJSON exports | eventType, uuid, actor and published time; 98 | Authentication, MFA, administration, policies and impersonation; actor/target and source IP | experimental |
+| CrowdStrike FDR | JSONL, plain or gzip | Native event_simpleName, cid, aid and timestamp; 98 | Process IDs separated by tenant/sensor, record-scoped PIDs, endpoint roles, DNS/authentication and finite file/registry rules | experimental |
 | Microsoft Defender | Advanced Hunting CSV/JSON and Streaming JSON | Native Timestamp, DeviceId/ActionType or AlertId, plus source layout: 98 | Process/parent, file, registry, network and logon; AlertInfo/AlertEvidence remain unconfirmed | experimental |
 | RFC 5322 email | One `.eml` or header dump per file; bounded MIME parts | From plus native header combination: 98; minimal headers: 70, analyst choice | Ordered Received hops, addresses, raw headers/body bytes, literal URLs and attachment metadata/hashes; email outcome stays unknown | experimental |
 | AWS GuardDuty | API, CLI/console and EventBridge JSON | Native account, finding ID/type, region, resource and time; 98 | Unconfirmed source alert, actor/resource/IP roles, exact severity and original observation times | experimental |
@@ -377,3 +378,31 @@ Sources: [Advanced Hunting tables](https://learn.microsoft.com/en-us/defender-xd
 [process fields](https://learn.microsoft.com/en-us/defender-xdr/advanced-hunting-deviceprocessevents-table),
 [network fields](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/devicenetworkevents),
 [Network Protection interpretation](https://learn.microsoft.com/en-us/defender-endpoint/network-protection).
+
+## CrowdStrike Falcon Data Replicator
+
+`parser-fdr` decodes native JSON lines downloaded from the FDR S3 data feed, in
+plain text or gzip. Export/download with the provider's tools, then ingest the
+local file; this parser does not contact CrowdStrike or fetch S3 objects. The
+[provider's FDR integration guide](https://www.crowdstrike.com/wp-content/uploads/2021/06/CrowdStrike-Falcon-Data-Replicator-Technical-Add-On-Guide.pdf)
+describes the feed and event filtering. Preserve `event_simpleName`, `timestamp`,
+`cid`, `aid` and the original event fields. Native `timestamp` is milliseconds;
+other original time fields remain available without reducing their precision.
+
+The independent `mapping-fdr` module uses included finite TOML definitions for
+ProcessRollup2/SyntheticProcessRollup2, NetworkConnectIP4/6, NetworkListenIP4/6,
+DnsRequest, UserLogon/UserLogonFailed2, PeFileWritten and registry/ASEP updates.
+The [provider's FDR dashboards](https://library.humio.com/integrations/integrations-crowdstrike-fdr-crowdstrike-fdr.html)
+document process/context joins, endpoints, DNS, file writes and ASEP fields.
+Names with no finite rule remain original searchable records, without invented
+classification; rename variants without a confirmed field contract stay
+unclassified. Optional values that cannot be validated produce a coverage notice.
+Source detections do not become analyst-confirmed findings.
+
+Native Falcon process IDs use the explicit `cid` plus `aid` namespace. OS PIDs
+remain local to the source record; no Sysmon-style lifetime is inferred.
+`aid` supplies the host partition, including its bounded overflow bucket; `cid`
+is identity metadata, not a cloud account. Compressed streams have no invented
+physical record offsets. Line, JSON depth/field, source and cancellation limits
+apply to both encodings. See the [compressed admission proposal](development/fdr-compressed-admission.md)
+for the current gzip staging limitation.
