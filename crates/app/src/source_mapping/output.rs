@@ -1,3 +1,4 @@
+mod provider_process;
 mod time;
 use super::{MappingError, SourceRecordV1};
 use crate::{CommonGraphRecord, IndexedGraphRecord};
@@ -148,6 +149,7 @@ impl MappingOutput {
                     .cluster_identity()
                     .is_none_or(|id| !id.matches_qualified(&partition.cluster)))
             || !valid_acquisition(source, common.context(), &partition)
+            || !provider_process::valid(source, &common, &partition)
             || diagnostics.len() > 8
         {
             return Err(MappingError::InvalidOutput);

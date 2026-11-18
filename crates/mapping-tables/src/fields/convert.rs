@@ -9,6 +9,23 @@ impl CompiledField {
         let bad = || MappingError::UnsupportedSourceValue;
         let text = || value.as_text().ok_or_else(bad);
         match self.conversion {
+            Conversion::U64Id => {
+                let raw = match value {
+                    SourceValue::Text(v) => v.as_str(),
+                    SourceValue::Number(v) => v.as_str(),
+                    _ => return Err(bad()),
+                };
+                if raw.is_empty() || raw.len() > 128 || !raw.bytes().all(|b| b.is_ascii_digit()) {
+                    return Err(bad());
+                }
+                let id = raw.parse::<u64>().map_err(|_| bad())?;
+                if id == 0 {
+                    return Err(bad());
+                }
+                Ok(CommonValue::Text(
+                    EventText::identifier(&id.to_string()).map_err(|_| bad())?,
+                ))
+            }
             Conversion::Decimal => Ok(CommonValue::Unsigned(text()?.parse().map_err(|_| bad())?)),
             Conversion::Hex => Ok(CommonValue::Unsigned(
                 u64::from_str_radix(text()?.strip_prefix("0x").unwrap_or(text()?), 16)

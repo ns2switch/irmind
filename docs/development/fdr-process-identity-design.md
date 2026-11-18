@@ -1,6 +1,6 @@
 # Falcon FDR process identity
 
-Status: proposed contract; no implementation. [Español](../es/development/fdr-process-identity-design.md).
+Status: approved contract; implementation in this change. [Español](../es/development/fdr-process-identity-design.md).
 
 ## Requirement and current boundary
 
@@ -66,7 +66,7 @@ The original fields and their lexical representation remain unchanged.
 This is a signed-format extension requiring a new scope variant and new golden
 vectors. The ordered scope JSON is shown in [scope.json](fdr-process-vectors/scope.json),
 with [SHA-256](fdr-process-vectors/scope.sha256) and [positive/negative cases](fdr-process-vectors/cases.json).
-These are proposal vectors, not a claim that the runtime already accepts them.
+The implementation also fixes a [full event golden](fdr-process-vectors/event.json) and a [vector inventory](fdr-process-vectors/SHA256SUMS).
 
 The existing V3 columns already store the canonical scope descriptor; no Parquet
 column, artifact envelope, seal or export section is added. Existing scope bytes

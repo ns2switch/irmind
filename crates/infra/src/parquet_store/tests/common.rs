@@ -76,6 +76,7 @@ fn mapping_owned_unclassified_projection_writes_checked_schemas_and_precision() 
 mod compaction;
 mod extrema;
 mod mapped;
+mod provider_process;
 #[test]
 #[allow(clippy::too_many_lines)]
 fn common_queries_keep_roles_pid_scopes_and_closed_filters() {

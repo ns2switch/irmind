@@ -17,6 +17,11 @@ impl EntityObservation {
     ) -> Result<Self, EventSchemaError> {
         if !compatible(entity.kind().as_str(), role, field.as_str())
             || !kind_role(entity.kind(), role)
+            || (matches!(entity.scope(), EntityIdentityScope::ProviderProcess { .. })
+                && !matches!(
+                    field,
+                    CommonField::ProcessEntityId | CommonField::ProcessParentEntityId
+                ))
         {
             return Err(EventSchemaError::InvalidObservation);
         }
@@ -172,6 +177,11 @@ impl BoundedObservations {
                     return Err(EventSchemaError::InvalidObservation);
                 }
             }
+            if let EntityIdentityScope::ProviderProcess { host, .. } = observation.entity.scope()
+                && !matches!(context.get(CommonField::HostId), Some(super::CommonValue::Text(value)) if value == host)
+            {
+                return Err(EventSchemaError::InvalidObservation);
+            }
             if let EntityIdentityScope::Cluster { cluster, .. } = observation.entity.scope() {
                 let Some(super::CommonValue::Text(value)) =
                     context.get(CommonField::IrmindClusterIdentity)
@@ -219,6 +229,13 @@ impl BoundedObservations {
     }
     pub(super) fn validate_origin(&self, origin: &EventOrigin) -> Result<(), EventSchemaError> {
         for value in &self.0 {
+            if matches!(
+                value.entity.scope(),
+                EntityIdentityScope::ProviderProcess { .. }
+            ) && (origin.parser() != "parser-fdr" || origin.parser_version() != "fdr-source-v1")
+            {
+                return Err(EventSchemaError::InvalidOrigin);
+            }
             if let EntityIdentityScope::SourceRecord { source, record } = value.entity.scope()
                 && (source != origin.source() || *record != origin.record())
             {

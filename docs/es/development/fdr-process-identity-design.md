@@ -1,6 +1,6 @@
 # Identidad de procesos de Falcon FDR
 
-Estado: contrato propuesto; sin implementación. [English](../../development/fdr-process-identity-design.md).
+Estado: contrato aprobado; implementación en este cambio. [English](../../development/fdr-process-identity-design.md).
 
 ## Requisito y límite actual
 
@@ -58,8 +58,8 @@ en TOML finito. No se añade E/S, red, reloj, estado global ni lenguaje arbitrar
 Es una ampliación del formato firmado que requiere variante y golden nuevos.
 Los [bytes de ámbito](../../development/fdr-process-vectors/scope.json), su
 [SHA-256](../../development/fdr-process-vectors/scope.sha256) y los
-[casos](../../development/fdr-process-vectors/cases.json) son vectores propuestos,
-no una afirmación de soporte en el motor actual.
+[casos](../../development/fdr-process-vectors/cases.json) se acompañan de un [evento golden](../../development/fdr-process-vectors/event.json)
+y su [inventario](../../development/fdr-process-vectors/SHA256SUMS).
 
 V3 ya almacena el descriptor canónico de ámbito: no se añaden columnas, sobres,
 secciones de export ni cambios de sello. Los bytes y golden actuales se conservan;

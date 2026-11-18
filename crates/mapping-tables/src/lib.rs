@@ -4,6 +4,7 @@ mod compile;
 mod definition;
 mod fields;
 mod map;
+mod provider_process;
 use irmind_app::source_mapping::{
     MappingError, MappingManifest, MappingOutput, SourceMapper, SourceRecordV1, SourceSelector,
 };
@@ -55,3 +56,6 @@ pub use fields::copy_common_value;
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod cluster_tests;
+
+#[cfg(test)]
+mod provider_process_tests;

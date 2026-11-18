@@ -109,6 +109,11 @@ pub enum EntityIdentityScope {
         source: EvidenceHash,
         record: u64,
     },
+    ProviderProcess {
+        provider: super::ProcessIdentityProvider,
+        tenant: EventText,
+        host: EventText,
+    },
     ProcessLifetime {
         host: EventText,
         lifetime: EventText,
@@ -142,6 +147,17 @@ impl EntityIdentityScope {
             Self::SourceRecord { source, record } => {
                 ("source_record", source.as_str(), "", "", *record)
             }
+            Self::ProviderProcess {
+                provider,
+                tenant,
+                host,
+            } => (
+                "provider_process",
+                provider.as_str(),
+                tenant.as_str(),
+                host.as_str(),
+                0,
+            ),
             Self::ProcessLifetime { host, lifetime } => {
                 ("process_lifetime", host.as_str(), lifetime.as_str(), "", 0)
             }
@@ -184,6 +200,13 @@ impl EntityIdentityScope {
             Self::Host(_) | Self::Account(_) if kind == ObservedEntityKind::Process => {
                 return Err(EventSchemaError::InvalidObservation);
             }
+            Self::ProviderProcess { tenant, host, .. }
+                if kind != ObservedEntityKind::Process
+                    || !super::provider_process::valid_id(tenant.as_str())
+                    || !super::provider_process::valid_id(host.as_str()) =>
+            {
+                return Err(EventSchemaError::InvalidObservation);
+            }
             Self::ProcessLifetime { .. } if kind != ObservedEntityKind::Process => {
                 return Err(EventSchemaError::InvalidObservation);
             }
@@ -194,6 +217,7 @@ impl EntityIdentityScope {
             Self::Cluster { namespace, .. } => [namespace.as_ref(), None],
             Self::Host(value) | Self::Account(value) => [Some(value), None],
             Self::ProcessLifetime { host, lifetime } => [Some(host), Some(lifetime)],
+            Self::ProviderProcess { tenant, host, .. } => [Some(tenant), Some(host)],
         };
         if values
             .into_iter()
@@ -219,6 +243,11 @@ impl ObservedEntity {
         scope: EntityIdentityScope,
     ) -> Result<Self, EventSchemaError> {
         scope.validate(kind)?;
+        if matches!(scope, EntityIdentityScope::ProviderProcess { .. })
+            && !super::provider_process::canonical_id(value)
+        {
+            return Err(EventSchemaError::InvalidValue);
+        }
         let canonical = match kind {
             ObservedEntityKind::Ip => value
                 .parse::<std::net::IpAddr>()
@@ -283,6 +312,11 @@ impl ObservedEntity {
             EntityIdentityScope::ProcessLifetime { host, lifetime } => {
                 96 + host.json_bytes() + lifetime.json_bytes()
             }
+            EntityIdentityScope::ProviderProcess {
+                provider,
+                tenant,
+                host,
+            } => 128 + provider.as_str().len() + tenant.json_bytes() + host.json_bytes(),
         };
         256 + self.value.json_bytes() + scope
     }

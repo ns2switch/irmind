@@ -105,6 +105,7 @@ pub(super) enum Conversion {
     #[default]
     Copy,
     Decimal,
+    U64Id,
     Hex,
     Ip,
     Domain,
@@ -136,6 +137,11 @@ pub(super) enum Scope {
     Global,
     Host(Vec<String>),
     Account(Vec<String>),
+    ProviderProcess {
+        provider: String,
+        tenant: Vec<String>,
+        host: Vec<String>,
+    },
     ProcessLifetime {
         host: Vec<String>,
         lifetime: Vec<String>,
@@ -170,6 +176,7 @@ fn observation_budget(o: &Observation) -> usize {
     o.when.iter().map(|c| c.path.len() + 1).sum::<usize>()
         + match o.scope {
             Scope::ProcessLifetime { .. } => 66,
+            Scope::ProviderProcess { .. } => 97,
             Scope::Cluster { .. } => 34,
             _ => 0,
         }

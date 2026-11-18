@@ -91,11 +91,17 @@ impl TableMapping {
                 continue;
             }
             let Some(original) = field.path.resolve(source.fields()) else {
+                if field.requires_provider_identity {
+                    return Err(MappingError::UnsupportedSourceValue);
+                }
                 continue;
             };
             if matches!(original, irmind_app::source_mapping::SourceValue::Null)
                 || field.omits(original)
             {
+                if field.requires_provider_identity {
+                    return Err(MappingError::UnsupportedSourceValue);
+                }
                 continue;
             }
             let value = field.convert(original)?;
