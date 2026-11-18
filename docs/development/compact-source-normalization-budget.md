@@ -6,7 +6,7 @@
 
 This proposal changes resource admission for the new VPC flow decoder. It does
 not change signed formats, mapping semantics, stable order or source verification.
-The existing implementation remains in force until the proposal is implemented.
+The additive preflight is implemented alongside the new decoder; existing decoders retain their admission.
 
 The optimized 1 GiB compact VPC ingestion test fails with
 `StorageNormalizedStagingSpace`. The source has a native column header and repeats
@@ -87,7 +87,7 @@ read-only. No new `LargeCaseStore` method or external dependency is needed.
 
 This explicitly raises the normalized-byte allowance for the new VPC decoder,
 from 16× physical input to 32× decoded input. It also raises its disk reservation;
-1 GiB of decoded input requires roughly 32 GiB plus margins. Insufficient case
+1 GiB of decoded input has a roughly 32 GiB normalized allowance. The existing complete-group formula also reserves sort-fallback scratch, so a one-source group needs roughly 64 GiB plus margins. Insufficient case
 filesystem space must fail before normalization. High-compression gzip inputs no
 longer receive a reservation based only on their smaller compressed file size.
 An input whose actual normalized representation exceeds the new allowance still
@@ -110,7 +110,7 @@ The new decoder identity already identifies the implementation used for a source
 - Cancellation during preflight writes no spool, artifact or signed source manifest.
 - Insufficient space prevents normalized writes; an actual quota overrun rolls back
   completely in ordered and disordered paths, including object-storage downloads.
-- Source mutation between preflight and ingestion cannot publish a verified source.
+- Source mutation cannot publish records with a stale signed source hash; test both replacement after preflight and mutation during actual ingestion.
 - Compare output bytes and commitments with 1/2/4/N workers and all current goldens.
 - Repeat the unpadded 1 GiB VPC release benchmark, including gzip separately, then
   report successful throughput, peak memory and case-local staging peak. Recheck

@@ -56,3 +56,22 @@ impl<R: Read> Read for Bounded<'_, R> {
         Ok(count)
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    #[test]
+    fn decoded_ceiling_and_cancellation_are_enforced_between_reads() {
+        let cancel = CancellationToken::new();
+        let mut reader = bounded(Cursor::new(b"synthetic"), &cancel);
+        reader.limit = 3;
+        assert!(reader.read_to_end(&mut Vec::new()).is_err());
+        assert!(reader.exceeded());
+        let cancel = CancellationToken::new();
+        let mut reader = bounded(Cursor::new(b"synthetic"), &cancel);
+        assert_eq!(reader.read(&mut [0u8; 2]).unwrap(), 2);
+        cancel.cancel();
+        assert!(reader.read(&mut [0u8; 2]).is_err());
+    }
+}

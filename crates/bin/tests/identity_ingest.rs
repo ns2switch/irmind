@@ -383,3 +383,56 @@ fn flow_host_partitions_preserve_overflow_values() {
         );
     }
 }
+
+#[cfg(feature = "parser-vpc-flow")]
+#[test]
+fn compact_flow_artifact_bytes_are_independent_of_worker_limit() {
+    let source = tempfile::tempdir().unwrap();
+    fs::write(source.path().join("flows.log"), fixture("vpc-flow")).unwrap();
+    let mut lines = std::str::from_utf8(fixture("vpc-flow")).unwrap().lines();
+    let header = lines.next().unwrap();
+    let mut rows = lines.collect::<Vec<_>>();
+    rows.reverse();
+    fs::write(
+        source.path().join("disordered.log"),
+        format!("{header}\n{}\n", rows.join("\n")),
+    )
+    .unwrap();
+    let mut expected = None;
+    for cap in [1, 2, 4, 7] {
+        let root = tempfile::tempdir().unwrap();
+        let store = Arc::new(current_sources::open(root.path()));
+        store.set_parallel_worker_limit(std::num::NonZeroU16::new(cap));
+        let engine = engine(&store);
+        let case = engine
+            .create_case("Synthetic worker equivalence", "Local only")
+            .unwrap();
+        for file in ["flows.log", "disordered.log"] {
+            assert_eq!(
+                ingest_with_context(&engine, store.as_ref(), &case.id, source.path(), file, None),
+                4
+            );
+        }
+        let mut hashes = store
+            .entries(&case.id)
+            .unwrap()
+            .iter()
+            .filter(|entry| entry.kind == AuditEventKind::ParquetArtifactV3)
+            .map(|entry| {
+                let artifact = irmind_domain::ParquetArtifactV3::decode(&entry.payload).unwrap();
+                (
+                    artifact.core().schema.as_str().to_owned(),
+                    artifact.core().sha256.as_str().to_owned(),
+                )
+            })
+            .collect::<Vec<_>>();
+        hashes.sort();
+        assert!(!hashes.is_empty());
+        if let Some(expected) = &expected {
+            assert_eq!(&hashes, expected);
+        } else {
+            expected = Some(hashes);
+        }
+        engine.verify(&case.id).unwrap();
+    }
+}

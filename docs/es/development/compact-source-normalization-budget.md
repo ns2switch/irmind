@@ -6,7 +6,7 @@
 
 La propuesta modifica la admisión de recursos del nuevo decodificador VPC, sin
 cambiar formatos firmados, mapeos, orden estable ni verificación de fuentes.
-La implementación vigente sigue activa mientras no se implemente la propuesta.
+El preflight aditivo se implementa con el nuevo decodificador; los demás mantienen su admisión.
 
 La ingesta release de 1 GiB de VPC falla con `StorageNormalizedStagingSpace`.
 La entrada tiene cabecera nativa y repite un registro sintético de 131 bytes,
@@ -78,7 +78,8 @@ No hacen falta otro método de LargeCaseStore ni dependencias externas nuevas.
 
 Es una ampliación explícita de la cuota del nuevo VPC: de 16× la entrada física
 a 32× la entrada descomprimida. También aumenta la reserva de disco: 1 GiB
-requiere unos 32 GiB más márgenes. Sin espacio suficiente se falla antes de
+tiene unos 32 GiB de cuota normalizada. La fórmula vigente del grupo también
+reserva scratch de ordenación: un grupo de una fuente necesita unos 64 GiB más márgenes. Sin espacio suficiente se falla antes de
 normalizar. Gzip deja de reservar según su menor tamaño comprimido. Una fuente
 que exceda la nueva cuota se rechaza completa; no se garantiza que toda entrada
 sintácticamente válida quepa. La cuota es igual en la ruta directa y la ordenada.
@@ -99,7 +100,7 @@ modifica la admisión, no los registros emitidos.
 - Cancelación previa sin spools, artefactos ni manifiestos publicados.
 - Falta de espacio sin escribir; exceso real con rollback completo en ambas rutas,
   también al descargar desde object storage.
-- Mutación tras preflight sin publicación de una fuente verificada.
+- Reemplazo tras preflight y mutación durante la ingesta sin publicar registros con un hash de fuente firmado desfasado.
 - Bytes y compromisos idénticos con 1/2/4/N trabajadores y golden vigentes intactos.
 - Repetir 1 GiB release sin relleno y gzip por separado; medir throughput correcto,
   memoria y pico de staging. Repetir 1/64/1.024/1.025 hosts y consultar el último

@@ -74,6 +74,15 @@ impl DecodeBudget {
 /// committing. Implementations retain their own stricter resource limits.
 pub trait SourceDecoder: Send + Sync {
     fn identity(&self) -> ParserIdentity<'_>;
+    /// Optional bounded resource preflight. The coordinator rewinds the same
+    /// read-only file and authenticates actual ingestion independently.
+    fn normalized_source_budget(
+        &self,
+        _file: &mut File,
+        _cancel: &CancellationToken,
+    ) -> Result<Option<super::NormalizedSourceBudget>, AppError> {
+        Ok(None)
+    }
     fn source_parallelism(&self) -> crate::SourceParallelism {
         crate::SourceParallelism::Concurrent
     }

@@ -12,6 +12,7 @@ pub(super) struct Replay<'a, 'source> {
     pub(super) store: &'a ParquetStore,
     pub(super) request: &'a MappedIngestRequest<'source>,
     pub(super) cancel: &'a CancellationToken,
+    pub(super) budgets: &'a BTreeMap<String, u64>,
 }
 
 impl Replay<'_, '_> {
@@ -33,7 +34,13 @@ impl Replay<'_, '_> {
         };
         let mut sources = Vec::new();
         for paths in self.request.relative_paths.chunks(workers) {
-            let inputs = self.store.direct_inputs(self.request, paths, workers)?;
+            let inputs = self.store.direct_inputs(
+                self.request,
+                paths,
+                workers,
+                self.budgets,
+                self.cancel,
+            )?;
             let plan = read::plan(self.store, self.request, inputs, hints, self.cancel)?;
             self.replay_plan(plan, writing, allocator, &mut sources)?;
         }

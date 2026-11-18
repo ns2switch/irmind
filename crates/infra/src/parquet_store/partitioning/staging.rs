@@ -31,23 +31,35 @@ pub(super) struct StagedSource {
 }
 
 impl ParquetStore {
+    #[cfg(test)]
     pub(super) fn staging_inputs(
         &self,
         case: &CaseId,
         root: &Path,
         paths: &[String],
     ) -> Result<Vec<Input>, AppError> {
+        self.staging_inputs_reserved(case, root, paths, None, &CancellationToken::new())
+    }
+    pub(super) fn staging_inputs_reserved(
+        &self,
+        case: &CaseId,
+        root: &Path,
+        paths: &[String],
+        budgets: Option<&std::collections::BTreeMap<String, u64>>,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<Input>, AppError> {
         let mut inputs = Vec::new();
         let mut required = MARGIN;
         for path in paths {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
             let file = Self::open_source(root, path)?;
-            let budget = file
-                .metadata()
-                .map_err(storage)?
-                .len()
-                .checked_mul(EXPANSION_RESERVATION)
-                .and_then(|n| n.checked_add(MAX_STAGED_ROW))
-                .ok_or_else(no_space)?;
+            let physical = file.metadata().map_err(storage)?.len();
+            let budget = match budgets {
+                Some(budgets) => *budgets.get(path).ok_or_else(invalid_source)?,
+                None => standard_allowance(physical)?,
+            };
             required = required.checked_add(budget).ok_or_else(no_space)?;
             inputs.push(Input {
                 file,
@@ -59,6 +71,38 @@ impl ParquetStore {
         let dir = self.spool_dir(case)?;
         check_space(fs4::available_space(&dir).map_err(storage)?, required)?;
         Ok(inputs)
+    }
+    pub(super) fn normalized_allowance(
+        &self,
+        file: &mut File,
+        parser: &dyn StreamingEventParser,
+        path: &str,
+        cancel: &CancellationToken,
+    ) -> Result<(u64, u64), AppError> {
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
+        let physical = file.metadata().map_err(storage)?.len();
+        let id = parser.identity_for_source(path)?;
+        let decoder = self
+            .mapping_catalog
+            .as_ref()
+            .ok_or_else(invalid_source)?
+            .decoder(id.name, id.version)
+            .map_err(irmind_app::source_mapping::MappingError::into_app)?;
+        file.rewind().map_err(storage)?;
+        let result = decoder.normalized_source_budget(file, cancel);
+        let rewind = file.rewind().map_err(storage);
+        let declared = source_preflight_result(result, path)?;
+        rewind?;
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
+        let budget = match declared {
+            Some(budget) => budget.allowance()?,
+            None => standard_allowance(physical)?,
+        };
+        Ok((physical, budget))
     }
 
     #[cfg(test)]
@@ -154,4 +198,31 @@ pub(super) fn check_space(available: u64, required: u64) -> Result<(), AppError>
 }
 pub(super) fn no_space() -> AppError {
     AppError::Fixed(irmind_app::FixedAppError::StorageNormalizedStagingSpace)
+}
+
+pub(super) fn standard_allowance(physical: u64) -> Result<u64, AppError> {
+    physical
+        .checked_mul(EXPANSION_RESERVATION)
+        .and_then(|n| n.checked_add(MAX_STAGED_ROW))
+        .ok_or_else(no_space)
+}
+#[cfg(test)]
+#[path = "staging/budget_tests.rs"]
+mod budget_tests;
+
+fn source_preflight_result(
+    result: Result<Option<irmind_app::source_mapping::NormalizedSourceBudget>, AppError>,
+    path: &str,
+) -> Result<Option<irmind_app::source_mapping::NormalizedSourceBudget>, AppError> {
+    use irmind_app::{FixedAppError, RejectedSource, SourceFailureReason};
+    let reason = match result {
+        Err(AppError::Fixed(FixedAppError::SourceFormat)) => SourceFailureReason::Format,
+        Err(AppError::Fixed(FixedAppError::SourceLimit)) => SourceFailureReason::Limit,
+        other => return other,
+    };
+    Err(AppError::SourceFailure(RejectedSource::try_new(
+        path.into(),
+        reason,
+        vec![],
+    )?))
 }

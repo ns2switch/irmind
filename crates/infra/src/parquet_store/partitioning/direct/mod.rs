@@ -37,7 +37,7 @@ impl ParquetStore {
             ..*request
         };
         let workers = self.workers.count();
-        self.preflight_direct_group(request, workers, cancel)?;
+        let budgets = self.preflight_direct_group(request, workers, cancel)?;
         let mut allocator =
             super::Allocator::from_signed_iter(request.committed_artifacts.iter(), request.limits)?;
         let hash = group_identity(request, identity);
@@ -50,7 +50,14 @@ impl ParquetStore {
         let Speculation {
             mut sources,
             disorder,
-        } = self.speculate_group(request, workers, &mut writing, &mut allocator, cancel)?;
+        } = self.speculate_group(
+            request,
+            workers,
+            &mut writing,
+            &mut allocator,
+            &budgets,
+            cancel,
+        )?;
         if let Some((path, source_hash)) = disorder {
             drop(writing);
             writing = DirectWriting::new(hash, identity, routes, self.profile.clone());
@@ -62,6 +69,7 @@ impl ParquetStore {
                 store: self,
                 request,
                 cancel,
+                budgets: &budgets,
             }
             .group(
                 sources,
@@ -96,12 +104,13 @@ impl ParquetStore {
         workers: usize,
         writing: &mut DirectWriting,
         allocator: &mut super::Allocator,
+        budgets: &std::collections::BTreeMap<String, u64>,
         cancel: &CancellationToken,
     ) -> Result<Speculation, AppError> {
         let mut sources = Vec::new();
         let mut disorder = None;
         for paths in request.relative_paths.chunks(workers) {
-            let inputs = self.direct_inputs(request, paths, workers)?;
+            let inputs = self.direct_inputs(request, paths, workers, budgets, cancel)?;
             match self.stream_direct_chunk(request, inputs, writing, allocator, cancel)? {
                 super::ordered::DirectChunk::Ordered(chunk) => sources.extend(chunk),
                 super::ordered::DirectChunk::NeedsSort {
@@ -123,8 +132,16 @@ impl ParquetStore {
         request: &MappedIngestRequest<'_>,
         paths: &[String],
         workers: usize,
+        budgets: &std::collections::BTreeMap<String, u64>,
+        cancel: &CancellationToken,
     ) -> Result<Vec<super::staging::Input>, AppError> {
-        let mut inputs = self.staging_inputs(request.case_id, request.source_root, paths)?;
+        let mut inputs = self.staging_inputs_reserved(
+            request.case_id,
+            request.source_root,
+            paths,
+            Some(budgets),
+            cancel,
+        )?;
         let count = inputs.len().max(1);
         for (index, input) in inputs.iter_mut().enumerate() {
             // Account for the existing source worker and distribute spare slots
@@ -189,37 +206,36 @@ impl ParquetStore {
         request: &MappedIngestRequest<'_>,
         workers: usize,
         cancel: &CancellationToken,
-    ) -> Result<(), AppError> {
+    ) -> Result<std::collections::BTreeMap<String, u64>, AppError> {
+        let mut budgets = std::collections::BTreeMap::new();
         let mut sizes = Vec::new();
+        let mut total = 0u64;
         for source in request.relative_paths {
-            if cancel.is_cancelled() {
-                return Err(AppError::Cancelled);
-            }
-            sizes.push(
-                Self::open_source(request.source_root, source)?
-                    .metadata()
-                    .map_err(crate::parquet_store::storage)?
-                    .len(),
-            );
+            let mut file = Self::open_source(request.source_root, source)?;
+            let (physical, budget) =
+                self.normalized_allowance(&mut file, request.parser, source, cancel)?;
+            // Preserve the historical group formula for default decoders, while
+            // including the full expanded reservation for compact-source profiles.
+            let expanded = budget
+                .checked_sub(super::staging::MAX_STAGED_ROW)
+                .ok_or_else(invalid_source)?;
+            total = total
+                .checked_add(expanded)
+                .and_then(|n| n.checked_add(if request.copy_original { physical } else { 0 }))
+                .ok_or_else(invalid_source)?;
+            sizes.push(expanded);
+            budgets.insert(source.clone(), budget);
         }
-        let total = sizes.iter().try_fold(0u64, |total, size| {
-            total.checked_add(*size).ok_or_else(invalid_source)
-        })?;
         sizes.sort_unstable_by(|a, b| b.cmp(a));
         let scratch = sizes
             .into_iter()
             .take(workers)
-            .try_fold(0u64, |total, size| {
-                total.checked_add(size).ok_or_else(invalid_source)
+            .try_fold(0u64, |sum, size| {
+                sum.checked_add(size).ok_or_else(invalid_source)
             })?;
         let required = total
-            .checked_mul(if request.copy_original { 17 } else { 16 })
-            .and_then(|bytes| {
-                scratch
-                    .checked_mul(16)
-                    .and_then(|extra| bytes.checked_add(extra))
-            })
-            .and_then(|bytes| bytes.checked_add(5 * 64 * 1024 * 1024))
+            .checked_add(scratch)
+            .and_then(|n| n.checked_add(5 * 64 * 1024 * 1024))
             .ok_or_else(invalid_source)?;
         if fs4::available_space(self.spool_dir(request.case_id)?)
             .map_err(crate::parquet_store::storage)?
@@ -227,7 +243,7 @@ impl ParquetStore {
         {
             return Err(AppError::Storage("not enough free case storage for the complete direct group and bounded sort fallback".into()));
         }
-        Ok(())
+        Ok(budgets)
     }
     fn direct_group_paths(
         request: &MappedIngestRequest<'_>,

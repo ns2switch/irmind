@@ -116,6 +116,13 @@ fn prepare(
     })
 }
 impl SourceDecoder for VpcFlowSourceDecoder {
+    fn normalized_source_budget(
+        &self,
+        file: &mut std::fs::File,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<Option<irmind_app::source_mapping::NormalizedSourceBudget>, AppError> {
+        crate::normalization::preflight(file, cancel).map(Some)
+    }
     fn identity(&self) -> ParserIdentity<'_> {
         ParserIdentity {
             name: "parser-vpc-flow",

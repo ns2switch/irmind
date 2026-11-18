@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 mod decode;
 mod gzip;
+mod normalization;
 pub use decode::VpcFlowSourceDecoder;
 use irmind_app::{
     AppError, LogParser, ParserConfidence, StreamingEventParser,
