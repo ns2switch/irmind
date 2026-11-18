@@ -172,9 +172,11 @@ fn identity_failures_keep_roles_originals_and_signed_export() {
 }
 #[test]
 #[ignore = "manual optimized 1 GiB source ingestion benchmark"]
-fn one_gib_release_throughput() {
+fn one_gib_release_throughput() -> Result<(), &'static str> {
     use std::io::{BufWriter, Write};
-    assert!(!cfg!(debug_assertions), "Use --release for benchmarks");
+    if cfg!(debug_assertions) {
+        return Err("Use --release for benchmarks");
+    }
     for name in ["m365", "okta"] {
         let root = tempfile::tempdir().unwrap();
         let originals = root.path().join("originals");
@@ -215,8 +217,9 @@ fn one_gib_release_throughput() {
         let seconds = started.elapsed().as_secs_f64();
         println!(
             "IDENTITY_BENCH parser={name} bytes={bytes} records={count} seconds={seconds:.3} MiB_per_second={:.3}",
-            bytes as f64 / 1048576.0 / seconds
+            f64::from(u32::try_from(bytes).unwrap()) / 1_048_576.0 / seconds
         );
         engine.verify(&case.id).unwrap();
     }
+    Ok(())
 }
