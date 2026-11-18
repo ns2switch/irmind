@@ -303,7 +303,11 @@ evidence assets, never one oversized audit frame. Current case marker 4 and
 export V8 do not silently acquire new semantics: propose the next case/export
 format with explicit query-acquisition sections in a separate contract and
 golden review before implementation. Do not change the `export_case` port name
-or make verification depend on credentials/cloud access.
+or make verification depend on credentials/cloud access. Include the nonsecret
+resolved source binding, effective scope/limit snapshot and admission proofs
+needed to check the commitments offline; a configuration hash alone does not
+prove that the query respected its ceiling. Never export the underlying
+credential material with that snapshot.
 
 An offline third party can verify signatures, approval/scope admission, execution
 links, byte hashes, completeness of the **retained** result set and deterministic
