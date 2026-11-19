@@ -52,6 +52,10 @@ pub(super) fn module_statuses(
 }
 
 const PARSER_STATUSES: &[(&str, bool)] = &[
+    (
+        "parser-google-workspace",
+        cfg!(feature = "parser-google-workspace"),
+    ),
     ("parser-macos", cfg!(feature = "parser-macos")),
     ("parser-fdr", cfg!(feature = "parser-fdr")),
     ("parser-defender", cfg!(feature = "parser-defender")),

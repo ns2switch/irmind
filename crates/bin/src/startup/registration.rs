@@ -14,6 +14,7 @@
     feature = "mapping-identity",
     feature = "mapping-guardduty",
     feature = "mapping-cloud-flow",
+    feature = "mapping-google-workspace",
     feature = "mapping-macos",
     feature = "mapping-fdr",
     feature = "mapping-defender",
@@ -57,6 +58,7 @@ use super::{
     feature = "parser-okta",
     feature = "parser-guardduty",
     feature = "parser-vpc-flow",
+    feature = "parser-google-workspace",
     feature = "parser-macos",
     feature = "parser-fdr",
     feature = "parser-defender",
@@ -124,6 +126,7 @@ pub(super) fn configured_registry(
         feature = "parser-okta",
         feature = "parser-guardduty",
         feature = "parser-vpc-flow",
+        feature = "parser-google-workspace",
         feature = "parser-macos",
         feature = "parser-fdr",
         feature = "parser-defender",
@@ -194,6 +197,7 @@ pub(super) fn configured_registry(
     feature = "parser-okta",
     feature = "parser-guardduty",
     feature = "parser-vpc-flow",
+    feature = "parser-google-workspace",
     feature = "parser-macos",
     feature = "parser-fdr",
     feature = "parser-defender",
@@ -233,6 +237,7 @@ fn register_parsers(
         feature = "mapping-identity",
         feature = "mapping-guardduty",
         feature = "mapping-cloud-flow",
+        feature = "mapping-google-workspace",
         feature = "mapping-macos",
         feature = "mapping-fdr",
         feature = "mapping-defender",
@@ -246,6 +251,7 @@ fn register_parsers(
         feature = "parser-okta",
         feature = "parser-guardduty",
         feature = "parser-vpc-flow",
+        feature = "parser-google-workspace",
         feature = "parser-macos",
         feature = "parser-fdr",
         feature = "parser-defender",
@@ -740,6 +746,7 @@ fn register_chronicle(
     feature = "parser-okta",
     feature = "parser-guardduty",
     feature = "parser-vpc-flow",
+    feature = "parser-google-workspace",
     feature = "parser-macos",
     feature = "parser-fdr",
     feature = "parser-defender",
@@ -751,6 +758,11 @@ fn register_chronicle(
     feature = "parser-falco"
 ))]
 fn register_contextual_parsers(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(feature = "parser-google-workspace")]
+    registry.register(
+        Box::new(irmind_mod_parser_google_workspace::GoogleWorkspaceParser),
+        &ModuleConfig::new(),
+    )?;
     #[cfg(feature = "parser-macos")]
     registry.register(
         Box::new(irmind_mod_parser_macos::MacosParser),

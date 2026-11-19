@@ -1,0 +1,323 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "google-workspace-native-events"
+version = "google-workspace-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-google-workspace"
+parser_versions = ["google-workspace-source-v1"]
+format = "google-workspace-activity"
+format_version = "google-workspace-source-v1"
+action = ["event", "name"]
+
+[[fields]]
+source = ["activity", "id", "applicationName"]
+target = "cloud.service.name"
+
+[[fields]]
+source = ["activity", "id", "customerId"]
+target = "cloud.account.id"
+
+[[fields]]
+source = ["activity", "actor", "email"]
+target = "user.name"
+omit_text = ["", "-"]
+observation = { kind = "user", role = "actor", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["activity", "actor", "profileId"]
+target = "user.id"
+omit_text = ["", "105250506097979753968"]
+observation = { kind = "user", role = "actor", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["activity", "ipAddress"]
+target = "source.ip"
+omit_text = ["", "-"]
+conversion = "ip"
+observation = { kind = "ip", role = "source", scope = { kind = "source_record" } }
+
+[[rules]]
+categories = ["authentication"]
+types = ["start"]
+outcome = "success"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "login" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "login_success" }
+
+[[rules]]
+categories = ["authentication"]
+types = ["start"]
+outcome = "failure"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "login" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "login_failure" }
+
+[[rules]]
+categories = ["authentication"]
+types = ["start"]
+outcome = "success"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "saml" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "login_success" }
+
+[[rules]]
+categories = ["authentication"]
+types = ["start"]
+outcome = "failure"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "saml" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "login_failure" }
+
+[[rules]]
+categories = ["session"]
+types = ["end"]
+outcome = "unknown"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "login" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "logout" }
+
+[[rules]]
+categories = ["authentication"]
+types = ["info"]
+outcome = "unknown"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "login" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "login_challenge" }
+
+[[rules]]
+categories = ["iam"]
+types = ["creation"]
+outcome = "unknown"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "admin" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "CREATE_USER" }
+
+[[rules]]
+categories = ["iam"]
+types = ["deletion"]
+outcome = "unknown"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "admin" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "DELETE_USER" }
+
+[[rules]]
+categories = ["iam"]
+types = ["change"]
+outcome = "unknown"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "admin" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "SUSPEND_USER" }
+
+[[rules]]
+categories = ["iam"]
+types = ["change"]
+outcome = "unknown"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "admin" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "UNSUSPEND_USER" }
+
+[[rules]]
+categories = ["iam"]
+types = ["change"]
+outcome = "unknown"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "admin" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "CHANGE_PASSWORD" }
+
+[[rules]]
+categories = ["iam"]
+types = ["admin"]
+outcome = "unknown"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "admin" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "ASSIGN_ROLE" }
+
+[[rules]]
+categories = ["iam"]
+types = ["admin"]
+outcome = "unknown"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "admin" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "REVOKE_ROLE" }
+
+[[rules]]
+categories = ["configuration"]
+types = ["change"]
+outcome = "unknown"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "admin" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "CHANGE_APPLICATION_SETTING" }
+
+[[rules]]
+categories = ["iam"]
+types = ["allowed"]
+outcome = "success"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "token" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "authorize" }
+
+[[rules]]
+categories = ["iam"]
+types = ["change"]
+outcome = "unknown"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "token" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "revoke" }
+
+[[rules]]
+categories = ["iam"]
+types = ["denied"]
+outcome = "failure"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "token" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "deny" }
+
+[[rules]]
+categories = ["file"]
+types = ["access"]
+outcome = "unknown"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "drive" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "download" }
+
+[[rules]]
+categories = ["file"]
+types = ["change"]
+outcome = "unknown"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "drive" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "change_user_access" }
+
+[[rules]]
+categories = ["file"]
+types = ["change"]
+outcome = "unknown"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "drive" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "change_document_access_scope" }
+
+[[rules]]
+categories = ["file"]
+types = ["change"]
+outcome = "unknown"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "drive" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "change_document_visibility" }
+
+[[rules]]
+categories = ["file"]
+types = ["change"]
+outcome = "unknown"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "drive" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "shared_drive_membership_change" }
+
+[[rules]]
+categories = ["iam"]
+types = ["change"]
+outcome = "unknown"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "user_accounts" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "2sv_enroll" }
+
+[[rules]]
+categories = ["iam"]
+types = ["change"]
+outcome = "unknown"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "user_accounts" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "2sv_disable" }
+
+[[rules]]
+categories = ["iam"]
+types = ["change"]
+outcome = "unknown"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "user_accounts" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "password_edit" }
+
+[[rules]]
+categories = ["email"]
+types = ["info"]
+outcome = "unknown"
+[[rules.when]]
+path = ["activity", "id", "applicationName"]
+predicate = { op = "text", value = "gmail" }
+[[rules.when]]
+path = ["event", "name"]
+predicate = { op = "text", value = "delivery" }

@@ -12,6 +12,7 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 | --- | --- | --- | --- | --- |
 | Microsoft 365 Unified Audit Log | Purview CSV, Search-UnifiedAuditLog JSON, Management Activity API JSON | Native AuditData/Operation, CreationTime and workload; 98 | UTC time, actor, mailbox target when explicit, resource, source IP, user agent, workload, finite operation/outcome tables | experimental |
 | Okta System Log | API JSON arrays and JSON/NDJSON exports | eventType, uuid, actor and published time; 98 | Authentication, MFA, administration, policies and impersonation; actor/target and source IP | experimental |
+| Google Workspace Reports API | JSON pages, arrays, objects and NDJSON | Native activity ID, application, time and events, 98 | Login, SAML, administration, OAuth, Drive and Gmail with original fields | experimental |
 | macOS Unified Log and eslogger | JSON arrays, objects and NDJSON | Native Unified Log fields or Endpoint Security envelope and schema, 98 | Process, file, authentication, session, mounts and selected security notifications | experimental |
 | CrowdStrike FDR | JSONL, plain or gzip | Native event_simpleName, cid, aid and timestamp; 98 | Process IDs separated by tenant/sensor, record-scoped PIDs, endpoint roles, DNS/authentication and finite file/registry rules | experimental |
 | Microsoft Defender | Advanced Hunting CSV/JSON and Streaming JSON | Native Timestamp, DeviceId/ActionType or AlertId, plus source layout: 98 | Process/parent, file, registry, network and logon; AlertInfo/AlertEvidence remain unconfirmed | experimental |
@@ -447,3 +448,22 @@ record scoped and the text of Unified Log messages stays original evidence.
 Unknown event types and schemas retain their original fields. XProtect detection
 notifications remain unconfirmed findings. The precision of an exported
 timestamp is retained, including the nanosecond remainder where supplied.
+
+## Google Workspace Reports API
+
+Collect a bounded period with the Admin SDK Reports API v1 `activities.list`
+using an audit-read identity. Save each response page as JSON. Alternatively,
+save individual activities as a JSON array or NDJSON. Retain the collection
+window, requested application and pagination record with the originals.
+IRMind reads the saved files locally. [Google Reports API reference](https://developers.google.com/workspace/admin/reports/reference/rest/v1/activities/list)
+
+Each activity yields one record per member of its `events` array, up to 128
+members. The input offset points at the original activity, and the event ordinal
+distinguishes records within the indexed source. The activity ID, actor and
+each event's original parameter arrays stay in evidence.
+
+The included mappings cover login and SAML outcomes, administrator and account
+changes, OAuth consent, Drive downloads and sharing, and Gmail delivery
+subtypes when provided. Use the Gmail native event code to distinguish manual
+forwards (10) and automatic forwards (11). Unknown events remain searchable
+as original data. [Google Gmail activity reference](https://developers.google.com/workspace/admin/reports/v1/appendix/activity/gmail)

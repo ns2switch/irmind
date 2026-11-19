@@ -14,6 +14,7 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 | --- | --- | --- | --- | --- |
 | Microsoft 365 Unified Audit Log | CSV de Purview, JSON de Search-UnifiedAuditLog y Management Activity API | AuditData/Operation, CreationTime y workload originales; 98 | Instante UTC, actor, buzón objetivo explícito, recurso, IP de origen, user agent, workload y tablas de operación/resultado | experimental |
 | Okta System Log | Arrays JSON de la API y exports JSON/NDJSON | eventType, uuid, actor e instante published; 98 | Autenticación, MFA, administración, políticas y suplantación; actor/objetivo e IP de origen | experimental |
+| Reports API de Google Workspace | Páginas, arrays y objetos JSON, y NDJSON | ID de actividad, aplicación, instante y eventos nativos, 98 | Login, SAML, administración, OAuth, Drive y Gmail con campos originales | experimental |
 | Unified Log y eslogger de macOS | Arrays y objetos JSON, y NDJSON | Campos nativos de Unified Log o envoltura y esquema de Endpoint Security, 98 | Proceso, fichero, autenticación, sesión, montajes y notificaciones de seguridad seleccionadas | experimental |
 | CrowdStrike FDR | JSONL, texto o gzip | event_simpleName, cid, aid e instante nativos; 98 | ID de proceso separados por tenant/sensor, PID por registro, extremos de red, DNS/autenticación y tablas de fichero/registro | experimental |
 | Microsoft Defender | CSV/JSON de Advanced Hunting y JSON de Streaming | Timestamp nativo, DeviceId/ActionType o AlertId y estructura: 98 | Proceso/padre, fichero, registro, red y acceso; AlertInfo/AlertEvidence no confirmados | experimental |
@@ -450,3 +451,23 @@ se conservan como evidencia original. Los tipos y esquemas desconocidos
 mantienen sus campos originales. Las detecciones de XProtect son hallazgos sin
 confirmar. El instante conserva la precisión exportada y el resto en
 nanosegundos cuando está disponible.
+
+## Reports API de Google Workspace
+
+Recoge un intervalo acotado con `activities.list` de la Reports API v1 del
+Admin SDK, con una identidad autorizada para leer la auditoría. Guarda cada
+página de respuesta como JSON. También puedes guardar las actividades
+individuales como array JSON o NDJSON. Registra el intervalo, la aplicación
+consultada y la paginación con los originales. IRMind lee los ficheros
+guardados en local. [Referencia de la Reports API de Google](https://developers.google.com/workspace/admin/reports/reference/rest/v1/activities/list)
+
+Cada actividad produce un registro por miembro de `events`, hasta un máximo
+de 128. El offset apunta a la actividad original y el ordinal distingue los
+registros en la fuente indexada. El ID, el actor y los arrays originales de
+parámetros de cada evento quedan en la evidencia.
+
+Los mapeos incluidos cubren resultados de login y SAML, cambios administrativos
+y de cuentas, consentimientos OAuth, descargas y compartición de Drive, y
+subtipos de entrega de Gmail cuando están presentes. Distingue los reenvíos
+manuales (10) y automáticos (11) con el código nativo de Gmail. Los eventos
+desconocidos conservan sus datos originales y se pueden buscar. [Referencia de actividad de Gmail](https://developers.google.com/workspace/admin/reports/v1/appendix/activity/gmail)

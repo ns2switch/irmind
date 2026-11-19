@@ -5,6 +5,23 @@ use irmind_infra::LocalStore;
 use std::{path::Path, sync::Arc};
 fn registry() -> ModuleRegistry {
     let mut registry = ModuleRegistry::new();
+    #[cfg(feature = "parser-google-workspace")]
+    {
+        registry
+            .register(
+                Box::new(irmind_mod_parser_google_workspace::GoogleWorkspaceParser),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+        registry
+            .register(
+                Box::new(
+                    irmind_mod_mapping_google_workspace::GoogleWorkspaceMapping::new().unwrap(),
+                ),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+    }
     #[cfg(feature = "parser-macos")]
     {
         registry

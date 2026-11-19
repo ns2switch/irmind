@@ -13,6 +13,10 @@ and export V8 sections are unchanged; keep the producing version for a case.
   validated unsigned decimal IDs. OS PIDs remain record scoped and Sysmon
   ProcessGuid keeps its existing lifetime scope.
 
+- Add experimental Google Workspace Reports API source decoding, including
+  response pages and multi-event activities. Preserve native parameter arrays
+  and map documented authentication, OAuth, administration, Drive and Gmail events.
+
 - Add experimental macOS Unified Log and eslogger JSON export decoders with
   separate finite mappings. Preserve exact timestamp precision, native fields
   and schema versions. Unknown versions remain searchable without classification.
