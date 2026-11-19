@@ -16,7 +16,15 @@ fuzz_target!(|bytes: &[u8]| {
             metadata: SourceMetadata {
                 source: &source,
                 evidence_hash: sha256(bytes),
-                time_context: Some(&irmind_app::ParserTimeContext::new(2026, 0, false, irmind_app::ParserTimeBasis::Analyst).expect("fixed context")),
+                time_context: Some(
+                    &irmind_app::ParserTimeContext::new(
+                        2026,
+                        0,
+                        false,
+                        irmind_app::ParserTimeBasis::Analyst,
+                    )
+                    .expect("fixed context"),
+                ),
                 cluster_context: None,
                 cancel: &cancel,
             },
