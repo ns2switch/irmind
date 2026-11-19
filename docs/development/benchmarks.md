@@ -2132,3 +2132,10 @@ cargo test --locked --release -p irmind --test identity_ingest one_gib_release_g
 
 AddressSanitizer exercised detection and bounded decoding on 3,161,311 inputs
 in 601 seconds without a sanitizer finding.
+
+### GitHub audit log ingestion
+
+The signed-ingest benchmark used 1,073,741,875 bytes of synthetic native NDJSON
+and indexed 3,024,625 records in 65.372 s (15.664 MiB/s). The build used the
+release profile. Case verification also passed after timing stopped. CSV and
+JSON exports are covered separately by the parser and signed-ingest contracts.

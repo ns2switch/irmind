@@ -14,6 +14,7 @@
     feature = "mapping-identity",
     feature = "mapping-guardduty",
     feature = "mapping-cloud-flow",
+    feature = "mapping-github-audit",
     feature = "mapping-google-workspace",
     feature = "mapping-macos",
     feature = "mapping-fdr",
@@ -58,6 +59,7 @@ use super::{
     feature = "parser-okta",
     feature = "parser-guardduty",
     feature = "parser-vpc-flow",
+    feature = "parser-github-audit",
     feature = "parser-google-workspace",
     feature = "parser-macos",
     feature = "parser-fdr",
@@ -126,6 +128,7 @@ pub(super) fn configured_registry(
         feature = "parser-okta",
         feature = "parser-guardduty",
         feature = "parser-vpc-flow",
+        feature = "parser-github-audit",
         feature = "parser-google-workspace",
         feature = "parser-macos",
         feature = "parser-fdr",
@@ -145,6 +148,12 @@ pub(super) fn configured_registry(
         feature = "parser-suricata",
     ))]
     register_parsers(&mut registry, &mut config_issues, data_root)?;
+    #[cfg(any(
+        feature = "parser-github-audit",
+        feature = "parser-google-workspace",
+        feature = "parser-macos"
+    ))]
+    register_offline_exports(&mut registry)?;
 
     register_llm(
         cli,
@@ -197,6 +206,7 @@ pub(super) fn configured_registry(
     feature = "parser-okta",
     feature = "parser-guardduty",
     feature = "parser-vpc-flow",
+    feature = "parser-github-audit",
     feature = "parser-google-workspace",
     feature = "parser-macos",
     feature = "parser-fdr",
@@ -237,6 +247,7 @@ fn register_parsers(
         feature = "mapping-identity",
         feature = "mapping-guardduty",
         feature = "mapping-cloud-flow",
+        feature = "mapping-github-audit",
         feature = "mapping-google-workspace",
         feature = "mapping-macos",
         feature = "mapping-fdr",
@@ -251,8 +262,6 @@ fn register_parsers(
         feature = "parser-okta",
         feature = "parser-guardduty",
         feature = "parser-vpc-flow",
-        feature = "parser-google-workspace",
-        feature = "parser-macos",
         feature = "parser-fdr",
         feature = "parser-defender",
         feature = "parser-email",
@@ -746,8 +755,6 @@ fn register_chronicle(
     feature = "parser-okta",
     feature = "parser-guardduty",
     feature = "parser-vpc-flow",
-    feature = "parser-google-workspace",
-    feature = "parser-macos",
     feature = "parser-fdr",
     feature = "parser-defender",
     feature = "parser-email",
@@ -758,16 +765,6 @@ fn register_chronicle(
     feature = "parser-falco"
 ))]
 fn register_contextual_parsers(registry: &mut ModuleRegistry) -> Result<()> {
-    #[cfg(feature = "parser-google-workspace")]
-    registry.register(
-        Box::new(irmind_mod_parser_google_workspace::GoogleWorkspaceParser),
-        &ModuleConfig::new(),
-    )?;
-    #[cfg(feature = "parser-macos")]
-    registry.register(
-        Box::new(irmind_mod_parser_macos::MacosParser),
-        &ModuleConfig::new(),
-    )?;
     #[cfg(feature = "parser-fdr")]
     registry.register(
         Box::new(irmind_mod_parser_fdr::FdrParser),
@@ -831,6 +828,30 @@ fn register_contextual_parsers(registry: &mut ModuleRegistry) -> Result<()> {
     #[cfg(feature = "parser-falco")]
     registry.register(
         Box::new(irmind_mod_parser_falco::FalcoParser::default()),
+        &ModuleConfig::new(),
+    )?;
+    Ok(())
+}
+
+#[cfg(any(
+    feature = "parser-github-audit",
+    feature = "parser-google-workspace",
+    feature = "parser-macos"
+))]
+fn register_offline_exports(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(feature = "parser-github-audit")]
+    registry.register(
+        Box::new(irmind_mod_parser_github_audit::GitHubAuditParser),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(feature = "parser-google-workspace")]
+    registry.register(
+        Box::new(irmind_mod_parser_google_workspace::GoogleWorkspaceParser),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(feature = "parser-macos")]
+    registry.register(
+        Box::new(irmind_mod_parser_macos::MacosParser),
         &ModuleConfig::new(),
     )?;
     Ok(())

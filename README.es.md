@@ -145,6 +145,7 @@ La compilación normal incluye todos los módulos de producto actuales y ambos l
 | Microsoft Entra ID | parser y mapeo locales | `parser-entra` (por defecto) | experimental | [Entra](docs/es/parsers.md#microsoft-entra-id) |
 | Microsoft 365 audit | parser y mapeo locales | `parser-m365` (por defecto) | experimental | [M365](docs/es/parsers.md) |
 | Okta System Log | parser y mapeo locales | `parser-okta` (por defecto) | experimental | [Okta](docs/es/parsers.md) |
+| Auditoría de GitHub | parser y mapeo locales | `parser-github-audit`, `mapping-github-audit` (por defecto) | experimental | [Auditoría de GitHub](docs/es/parsers.md#auditoría-de-github) |
 | Reports API de Google Workspace | parser y mapeo locales | `parser-google-workspace`, `mapping-google-workspace` (por defecto) | experimental | [Google Workspace](docs/es/parsers.md#reports-api-de-google-workspace) |
 | Unified Log y eslogger de macOS | parser y mapeo locales | `parser-macos`, `mapping-macos` (por defecto) | experimental | [Exports de macOS](docs/es/parsers.md#exports-de-macos) |
 | CrowdStrike FDR | parser y mapeo locales | `parser-fdr`, `mapping-fdr` (por defecto) | experimental | [FDR](docs/es/parsers.md#crowdstrike-falcon-data-replicator) |

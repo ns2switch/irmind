@@ -14,6 +14,7 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 | --- | --- | --- | --- | --- |
 | Microsoft 365 Unified Audit Log | CSV de Purview, JSON de Search-UnifiedAuditLog y Management Activity API | AuditData/Operation, CreationTime y workload originales; 98 | Instante UTC, actor, buzón objetivo explícito, recurso, IP de origen, user agent, workload y tablas de operación/resultado | experimental |
 | Okta System Log | Arrays JSON de la API y exports JSON/NDJSON | eventType, uuid, actor e instante published; 98 | Autenticación, MFA, administración, políticas y suplantación; actor/objetivo e IP de origen | experimental |
+| Auditoría de GitHub | CSV y JSON de organización o empresa, NDJSON nativo del streaming | Acción, fecha e identidad o ámbito de auditoría nativos, 98 | Membresía, tokens, claves, acceso a repositorios y configuración de Actions | experimental |
 | Reports API de Google Workspace | Páginas, arrays y objetos JSON, y NDJSON | ID de actividad, aplicación, instante y eventos nativos, 98 | Login, SAML, administración, OAuth, Drive y Gmail con campos originales | experimental |
 | Unified Log y eslogger de macOS | Arrays y objetos JSON, y NDJSON | Campos nativos de Unified Log o envoltura y esquema de Endpoint Security, 98 | Proceso, fichero, autenticación, sesión, montajes y notificaciones de seguridad seleccionadas | experimental |
 | CrowdStrike FDR | JSONL, texto o gzip | event_simpleName, cid, aid e instante nativos; 98 | ID de proceso separados por tenant/sensor, PID por registro, extremos de red, DNS/autenticación y tablas de fichero/registro | experimental |
@@ -471,3 +472,20 @@ y de cuentas, consentimientos OAuth, descargas y compartición de Drive, y
 subtipos de entrega de Gmail cuando están presentes. Distingue los reenvíos
 manuales (10) y automáticos (11) con el código nativo de Gmail. Los eventos
 desconocidos conservan sus datos originales y se pueden buscar. [Referencia de actividad de Gmail](https://developers.google.com/workspace/admin/reports/v1/appendix/activity/gmail)
+
+## Auditoría de GitHub
+
+Desde la auditoría de la organización o empresa, selecciona un intervalo acotado
+y exporta JSON o CSV. Para el streaming, recoge los registros JSON nativos en el
+destino configurado. Guarda las descargas originales y el alcance de recogida.
+Descomprime una entrega comprimida antes de ingerir su NDJSON como fuente
+separada. La presencia de IPs de origen y eventos de Git depende del export y
+de la configuración de auditoría. [Exportación de auditoría de organización](https://docs.github.com/en/enterprise-cloud@latest/organizations/keeping-your-organization-secure/managing-security-settings-for-your-organization/reviewing-the-audit-log-for-your-organization) · [Exportación de auditoría de empresa](https://docs.github.com/en/enterprise-cloud@latest/admin/monitoring-activity-in-your-enterprise/reviewing-audit-logs-for-your-enterprise/exporting-audit-log-activity-for-your-enterprise)
+
+El módulo conserva el instante, actor, organización, repositorio, agente de
+usuario e IP de origen cuando están presentes. Mapea cambios de roles y
+accesos, tokens y claves, transferencias, visibilidad y borrados de repositorios,
+descargas de Git y políticas y metadatos de secretos de Actions. Los valores
+`hashed_token`, `token_scopes` y `programmatic_access_type` quedan como evidencia
+original. El decodificador no llama a GitHub y mantiene las acciones desconocidas
+en la búsqueda. [Referencia de eventos de auditoría de GitHub](https://docs.github.com/en/organizations/keeping-your-organization-secure/managing-security-settings-for-your-organization/audit-log-events-for-your-organization)

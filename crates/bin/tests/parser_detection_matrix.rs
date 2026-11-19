@@ -74,6 +74,11 @@ mod matrix {
     #[allow(clippy::too_many_lines)]
     fn each_fixture_has_one_unique_high_confidence_parser() -> Result<(), irmind_app::AppError> {
         let mut registry = ModuleRegistry::new();
+        #[cfg(feature = "parser-github-audit")]
+        registry.register(
+            Box::new(irmind_mod_parser_github_audit::GitHubAuditParser),
+            &ModuleConfig::new(),
+        )?;
         #[cfg(feature = "parser-google-workspace")]
         registry.register(
             Box::new(irmind_mod_parser_google_workspace::GoogleWorkspaceParser),
@@ -183,6 +188,27 @@ mod matrix {
         )?;
         let mut matrix: Matrix = std::collections::BTreeMap::new();
         for (name, sample, expected) in [
+            #[cfg(feature = "parser-github-audit")]
+            (
+                "github-stream.ndjson",
+                include_bytes!("../../testkit/fixtures/parser-github-audit/source/stream.ndjson")
+                    .as_slice(),
+                "parser-github-audit",
+            ),
+            #[cfg(feature = "parser-github-audit")]
+            (
+                "github-export.json",
+                include_bytes!("../../testkit/fixtures/parser-github-audit/source/export.json")
+                    .as_slice(),
+                "parser-github-audit",
+            ),
+            #[cfg(feature = "parser-github-audit")]
+            (
+                "github-export.csv",
+                include_bytes!("../../testkit/fixtures/parser-github-audit/source/export.csv")
+                    .as_slice(),
+                "parser-github-audit",
+            ),
             #[cfg(feature = "parser-google-workspace")]
             (
                 "workspace-events.ndjson",
@@ -656,7 +682,8 @@ mod matrix {
             | "parser-defender"
             | "parser-fdr"
             | "parser-macos"
-            | "parser-google-workspace" => [
+            | "parser-google-workspace"
+            | "parser-github-audit" => [
                 if matches!(sample.first(), Some(b'{' | b'[')) {
                     Some(45)
                 } else {
@@ -693,7 +720,14 @@ mod matrix {
         }
         Ok(())
     }
-    fn assert_priority_scores(name: &str, sample: &[u8], expected: &str) {
+    fn assert_export_scores(name: &str, sample: &[u8], expected: &str) {
+        #[cfg(feature = "parser-github-audit")]
+        assert_eq!(
+            irmind_mod_parser_github_audit::GitHubAuditParser
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            (expected == "parser-github-audit").then_some(98)
+        );
         #[cfg(feature = "parser-google-workspace")]
         assert_eq!(
             irmind_mod_parser_google_workspace::GoogleWorkspaceParser
@@ -708,6 +742,9 @@ mod matrix {
                 .map(irmind_app::ParserConfidence::value),
             (expected == "parser-macos").then_some(98)
         );
+    }
+    fn assert_priority_scores(name: &str, sample: &[u8], expected: &str) {
+        assert_export_scores(name, sample, expected);
         #[cfg(feature = "parser-fdr")]
         assert_eq!(
             irmind_mod_parser_fdr::FdrParser

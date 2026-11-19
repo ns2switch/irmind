@@ -5,6 +5,21 @@ use irmind_infra::LocalStore;
 use std::{path::Path, sync::Arc};
 fn registry() -> ModuleRegistry {
     let mut registry = ModuleRegistry::new();
+    #[cfg(feature = "parser-github-audit")]
+    {
+        registry
+            .register(
+                Box::new(irmind_mod_parser_github_audit::GitHubAuditParser),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+        registry
+            .register(
+                Box::new(irmind_mod_mapping_github_audit::GitHubAuditMapping::new().unwrap()),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+    }
     #[cfg(feature = "parser-google-workspace")]
     {
         registry
