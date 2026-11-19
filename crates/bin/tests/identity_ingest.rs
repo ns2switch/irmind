@@ -587,107 +587,11 @@ fn host_partition_input(parser: &str, hosts: usize) -> String {
 
 #[cfg(feature = "parser-fdr")]
 #[test]
-#[ignore = "manual optimized parser throughput benchmark"]
-fn one_gib_release_fdr_throughput() -> Result<(), &'static str> {
-    if cfg!(debug_assertions) {
-        return Err("benchmark requires --release");
-    }
-    benchmark_source("fdr");
-    Ok(())
-}
-
-#[cfg(feature = "parser-fdr")]
-#[test]
 #[ignore = "manual optimized host-cardinality ingestion check"]
 fn fdr_host_partitions_preserve_overflow_values() {
     assert_host_partitions("fdr");
 }
 
 #[cfg(feature = "parser-fdr")]
-#[test]
-#[ignore = "manual optimized compressed admission characterization"]
-#[allow(clippy::too_many_lines)]
-fn fdr_gzip_admission_characterization() -> Result<(), &'static str> {
-    use std::io::Write;
-    if cfg!(debug_assertions) {
-        return Err("requires --release");
-    }
-    let root = tempfile::tempdir().unwrap();
-    let originals = root.path().join("originals");
-    fs::create_dir(&originals).unwrap();
-    let row = fixture("fdr").split(|b| *b == b'\n').next().unwrap();
-    let records = 150_000_u64;
-    let mut writer = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
-    for _ in 0..records {
-        writer.write_all(row).unwrap();
-        writer.write_all(b"\n").unwrap();
-    }
-    let gzip = writer.finish().unwrap();
-    let physical = gzip.len() as u64;
-    let decoded = (row.len() as u64 + 1) * records;
-    fs::write(originals.join("source.gz"), &gzip).unwrap();
-    let store = Arc::new(current_sources::open(&root.path().join("data")));
-    let engine = engine(&store);
-    let case = engine
-        .create_case("Synthetic gzip admission", "local only")
-        .unwrap();
-    let catalog = current_sources::catalog();
-    let selected = catalog
-        .select_source(ParserSelectionRequest {
-            source: "source.gz",
-            sample: &gzip[..gzip.len().min(65536)],
-            parser_override: None,
-            forced: false,
-            time_context: None,
-            cluster_context: None,
-        })
-        .unwrap();
-    let result = LargeCaseUseCases {
-        engine: &engine,
-        store: store.as_ref(),
-        parser: selected.parser.as_ref(),
-    }
-    .ingest_local_batch_selected(
-        &case.id,
-        &originals,
-        &["source.gz".into()],
-        false,
-        &BTreeMap::from([("source.gz".into(), selected.selection)]),
-        &CancellationToken::new(),
-    );
-    println!(
-        "FDR_GZIP_ADMISSION physical_bytes={physical} decoded_bytes={decoded} records={records} default_allowance={} result={result:?}",
-        physical * 16 + 64 * 1024 * 1024
-    );
-    assert!(result.is_err());
-    assert!(
-        !store
-            .entries(&case.id)
-            .unwrap()
-            .iter()
-            .any(|e| e.kind == AuditEventKind::ParquetArtifactV3)
-    );
-    let mut plain =
-        std::io::BufWriter::new(fs::File::create(originals.join("source.ndjson")).unwrap());
-    for _ in 0..records {
-        plain.write_all(row).unwrap();
-        plain.write_all(b"\n").unwrap();
-    }
-    plain.flush().unwrap();
-    drop(plain);
-    let plain_case = engine
-        .create_case("Synthetic plain admission", "local only")
-        .unwrap();
-    let plain_accepted = ingest_with_context(
-        &engine,
-        store.as_ref(),
-        &plain_case.id,
-        &originals,
-        "source.ndjson",
-        None,
-    );
-    assert_eq!(plain_accepted, records);
-    engine.verify(&plain_case.id).unwrap();
-    println!("FDR_GZIP_CONTROL plain_bytes={decoded} records={plain_accepted} verification=passed");
-    Ok(())
-}
+#[path = "support/fdr_admission.rs"]
+mod fdr_admission;

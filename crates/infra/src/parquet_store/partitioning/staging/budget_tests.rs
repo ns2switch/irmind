@@ -19,10 +19,16 @@ fn default_decoder_keeps_historical_allowance_and_rewinds() {
         )
         .unwrap();
     assert_eq!(size, bytes.len() as u64);
-    assert_eq!(budget, size * 16 + MAX_STAGED_ROW);
+    assert_eq!(budget.normalized_bytes, size * 16 + MAX_STAGED_ROW);
+    assert_eq!(budget.decoded_byte_ceiling, None);
     assert_eq!(file.stream_position().unwrap(), 0);
-    assert!(check_space(budget - 1, budget).is_err());
-    assert!(check_space(budget, budget).is_ok());
+    assert!(matches!(
+        check_space(budget.normalized_bytes - 1, budget.normalized_bytes),
+        Err(AppError::Fixed(irmind_app::FixedAppError::StorageCaseStagingCapacity {
+            required, available
+        })) if required == budget.normalized_bytes && available == required - 1
+    ));
+    assert!(check_space(budget.normalized_bytes, budget.normalized_bytes).is_ok());
     assert!(standard_allowance(u64::MAX).is_err());
 }
 #[test]
@@ -44,7 +50,11 @@ fn compact_decoder_uses_approved_allowance_and_cancellation_rewinds_without_spoo
     let (_, budget) = store
         .normalized_allowance(&mut file, &parser, "flows.log", &CancellationToken::new())
         .unwrap();
-    assert_eq!(budget, bytes.len() as u64 * 32 + MAX_STAGED_ROW);
+    assert_eq!(
+        budget.normalized_bytes,
+        bytes.len() as u64 * 32 + MAX_STAGED_ROW
+    );
+    assert_eq!(budget.decoded_byte_ceiling, None);
     assert_eq!(file.stream_position().unwrap(), 0);
     let before = std::fs::read_dir(dir.path()).unwrap().count();
     let cancel = CancellationToken::new();
@@ -87,4 +97,35 @@ fn only_source_format_and_source_limits_allow_exclusion_retries() -> Result<(), 
         ))
     ));
     Ok(())
+}
+
+#[test]
+fn decoded_json_reservation_is_restricted_to_the_current_fdr_decoder() {
+    let budget =
+        NormalizedSourceBudget::try_new(1024, NormalizedExpansionProfile::DecodedJson16).unwrap();
+    let fdr = irmind_app::ParserIdentity {
+        name: "parser-fdr",
+        version: "fdr-source-v1",
+    };
+    let reservation = reserve_profile(fdr, budget).unwrap();
+    assert_eq!(reservation.decoded_byte_ceiling, Some(1024));
+    assert_eq!(reservation.normalized_bytes, 1024 * 16 + MAX_STAGED_ROW);
+    for name in [
+        "parser-json",
+        "parser-vpc-flow",
+        "parser-alb",
+        "parser-s3-access",
+    ] {
+        assert!(reserve_profile(irmind_app::ParserIdentity { name, ..fdr }, budget).is_err());
+    }
+    assert!(
+        reserve_profile(
+            irmind_app::ParserIdentity {
+                version: "fdr-source-v2",
+                ..fdr
+            },
+            budget
+        )
+        .is_err()
+    );
 }

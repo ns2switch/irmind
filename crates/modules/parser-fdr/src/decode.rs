@@ -1,8 +1,8 @@
 use irmind_app::{
-    AppError, FixedAppError, ParseReport, ParserIdentity, SourceDecoder,
+    AppError, CancellationToken, FixedAppError, ParseReport, ParserIdentity, SourceDecoder,
     source_mapping::{
-        DecodeBudget, DecodeInput, SourceFormatV1, SourceInput, SourceMetadata, SourceRecordV1,
-        SourceValue,
+        DecodeBudget, DecodeInput, NormalizedSourceBudget, SourceFormatV1, SourceInput,
+        SourceMetadata, SourceRecordV1, SourceValue,
         framed::{DecodedSourceFrame, SourceFrameEmitter, text_frame},
         json::{JsonFrames, SourceJsonLimits, decode_json_fields},
     },
@@ -10,10 +10,10 @@ use irmind_app::{
 use irmind_domain::{IndexedInstant, IndexedTime, Tainted, TimePrecision};
 use std::{
     collections::BTreeMap,
-    io::{BufRead, BufReader, Read},
+    io::{BufReader, Read},
 };
 pub struct FdrSourceDecoder;
-const MAX_SOURCE: u64 = 50 * 1024 * 1024 * 1024;
+pub(super) const MAX_SOURCE: u64 = NormalizedSourceBudget::MAX_DECODED_BYTES;
 fn invalid() -> AppError {
     AppError::Fixed(FixedAppError::SourceFormat)
 }
@@ -61,6 +61,14 @@ impl SourceDecoder for FdrSourceDecoder {
             version: "fdr-source-v1",
         }
     }
+    fn normalized_source_budget(
+        &self,
+        file: &mut std::fs::File,
+        cancel: &CancellationToken,
+    ) -> Result<Option<NormalizedSourceBudget>, AppError> {
+        crate::normalization::preflight(file, cancel).map(Some)
+    }
+
     fn decode_reader(
         &self,
         input: SourceInput<'_>,
@@ -74,16 +82,21 @@ impl SourceDecoder for FdrSourceDecoder {
         budget: DecodeBudget,
         emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
     ) -> Result<ParseReport, AppError> {
-        let input = input.into_reader();
-        let mut reader = BufReader::new(input.reader);
-        if reader
-            .fill_buf()
-            .map_err(|_| invalid())?
-            .starts_with(&[0x1f, 0x8b])
-        {
-            let compressed = crate::gzip::bounded(reader, input.metadata.cancel);
+        let mut input = input.into_reader();
+        let cancel = input.metadata.cancel;
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
+        let (prefix, count) = crate::gzip::prefix(&mut input.reader).map_err(|_| invalid())?;
+        let reader = prefix[..count].chain(input.reader);
+        let ceiling = budget
+            .decoded_byte_ceiling()
+            .unwrap_or(MAX_SOURCE)
+            .min(MAX_SOURCE);
+        if prefix == [0x1f, 0x8b] {
+            let compressed = crate::gzip::bounded(reader, cancel, MAX_SOURCE);
             let gzip = flate2::read::MultiGzDecoder::new(compressed);
-            let mut decoded = crate::gzip::bounded(gzip, input.metadata.cancel);
+            let mut decoded = crate::gzip::bounded(gzip, cancel, ceiling);
             let mut callback_failed = false;
             let result = lines(&mut decoded, input.metadata, true, budget, &mut |record| {
                 let result = emit(record);
@@ -93,7 +106,7 @@ impl SourceDecoder for FdrSourceDecoder {
             if callback_failed {
                 return result;
             }
-            if input.metadata.cancel.is_cancelled() {
+            if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
             }
             if decoded.exceeded() || decoded.inner().get_ref().exceeded() {
@@ -101,10 +114,27 @@ impl SourceDecoder for FdrSourceDecoder {
             }
             result
         } else {
-            lines(&mut reader, input.metadata, false, budget, emit)
+            let mut plain = crate::gzip::bounded(reader, cancel, ceiling);
+            let mut callback_failed = false;
+            let result = lines(&mut plain, input.metadata, false, budget, &mut |record| {
+                let result = emit(record);
+                callback_failed |= result.is_err();
+                result
+            });
+            if callback_failed {
+                return result;
+            }
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            if plain.exceeded() {
+                return Err(AppError::Fixed(FixedAppError::SourceLimit));
+            }
+            result
         }
     }
 }
+
 fn lines(
     reader: &mut dyn Read,
     metadata: SourceMetadata<'_>,

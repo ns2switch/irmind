@@ -32,6 +32,10 @@ pub enum FixedAppError {
         "storage: not enough space for bounded normalized staging in the case directory (including safety margin)"
     )]
     StorageNormalizedStagingSpace,
+    #[error(
+        "storage: case staging needs {required} bytes including safety margin, but only {available} bytes are available"
+    )]
+    StorageCaseStagingCapacity { required: u64, available: u64 },
 
     #[error(transparent)]
     Definition(crate::DefinitionError),

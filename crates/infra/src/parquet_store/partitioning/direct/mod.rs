@@ -5,9 +5,10 @@ mod read;
 #[cfg(test)]
 mod tests;
 use super::super::{AppError, CancellationToken, ParquetStore, invalid_source};
+use super::staging::SourceReservation;
 use crate::parquet_store::writer::direct::DirectWriting;
 use irmind_app::{MappedIngestRequest, PreparedMappedGroup, PreparedMappedIngest};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 const RAW_GROUP_TARGET: u64 = 512 * 1024 * 1024;
 
 struct Speculation {
@@ -104,7 +105,7 @@ impl ParquetStore {
         workers: usize,
         writing: &mut DirectWriting,
         allocator: &mut super::Allocator,
-        budgets: &std::collections::BTreeMap<String, u64>,
+        budgets: &BTreeMap<String, SourceReservation>,
         cancel: &CancellationToken,
     ) -> Result<Speculation, AppError> {
         let mut sources = Vec::new();
@@ -132,7 +133,7 @@ impl ParquetStore {
         request: &MappedIngestRequest<'_>,
         paths: &[String],
         workers: usize,
-        budgets: &std::collections::BTreeMap<String, u64>,
+        budgets: &BTreeMap<String, SourceReservation>,
         cancel: &CancellationToken,
     ) -> Result<Vec<super::staging::Input>, AppError> {
         let mut inputs = self.staging_inputs_reserved(
@@ -151,7 +152,8 @@ impl ParquetStore {
             input.decode_budget = irmind_app::source_mapping::DecodeBudget::new(
                 slots,
                 slots.get() * (64 * 1024 * 1024),
-            );
+            )
+            .with_decoded_byte_ceiling(input.decode_budget.decoded_byte_ceiling());
         }
         Ok(inputs)
     }
@@ -206,17 +208,18 @@ impl ParquetStore {
         request: &MappedIngestRequest<'_>,
         workers: usize,
         cancel: &CancellationToken,
-    ) -> Result<std::collections::BTreeMap<String, u64>, AppError> {
-        let mut budgets = std::collections::BTreeMap::new();
+    ) -> Result<BTreeMap<String, SourceReservation>, AppError> {
+        let mut budgets = BTreeMap::new();
         let mut sizes = Vec::new();
         let mut total = 0u64;
         for source in request.relative_paths {
             let mut file = Self::open_source(request.source_root, source)?;
-            let (physical, budget) =
+            let (physical, reservation) =
                 self.normalized_allowance(&mut file, request.parser, source, cancel)?;
             // Preserve the historical group formula for default decoders, while
             // including the full expanded reservation for compact-source profiles.
-            let expanded = budget
+            let expanded = reservation
+                .normalized_bytes
                 .checked_sub(super::staging::MAX_STAGED_ROW)
                 .ok_or_else(invalid_source)?;
             total = total
@@ -224,7 +227,7 @@ impl ParquetStore {
                 .and_then(|n| n.checked_add(if request.copy_original { physical } else { 0 }))
                 .ok_or_else(invalid_source)?;
             sizes.push(expanded);
-            budgets.insert(source.clone(), budget);
+            budgets.insert(source.clone(), reservation);
         }
         sizes.sort_unstable_by(|a, b| b.cmp(a));
         let scratch = sizes
@@ -237,12 +240,11 @@ impl ParquetStore {
             .checked_add(scratch)
             .and_then(|n| n.checked_add(5 * 64 * 1024 * 1024))
             .ok_or_else(invalid_source)?;
-        if fs4::available_space(self.spool_dir(request.case_id)?)
-            .map_err(crate::parquet_store::storage)?
-            < required
-        {
-            return Err(AppError::Storage("not enough free case storage for the complete direct group and bounded sort fallback".into()));
-        }
+        super::staging::check_space(
+            fs4::available_space(self.spool_dir(request.case_id)?)
+                .map_err(crate::parquet_store::storage)?,
+            required,
+        )?;
         Ok(budgets)
     }
     fn direct_group_paths(

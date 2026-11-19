@@ -1,6 +1,6 @@
 use super::*;
 use irmind_app::{
-    CancellationToken,
+    CancellationToken, SourceDecoder as _,
     source_mapping::{SourceRecordV1, SourceValue},
 };
 use std::io::Write;
@@ -117,4 +117,62 @@ fn gzip_crc_and_cancellation_reject_the_complete_source() {
     );
     assert!(matches!(result, Err(irmind_app::AppError::Cancelled)));
     assert_eq!(count, 1);
+}
+
+#[test]
+fn changed_gzip_on_the_same_file_handle_hits_its_original_decoded_ceiling() {
+    use irmind_app::source_mapping::{
+        DecodeBudget, DecodeInput, SourceInput, SourceMetadata, SourceReferenceV1,
+    };
+    use std::io::Seek as _;
+
+    let original_dir = tempfile::tempdir().unwrap();
+    let mut file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(original_dir.path().join("source.gz"))
+        .unwrap();
+    let original = gzip(FIXTURE);
+    file.write_all(&original).unwrap();
+    let cancel = CancellationToken::new();
+    let preflight = FdrSourceDecoder
+        .normalized_source_budget(&mut file, &cancel)
+        .unwrap()
+        .unwrap();
+    assert_eq!(preflight.decoded_bytes(), FIXTURE.len() as u64);
+
+    // Replace the contents behind the already-open handle. Both gzip
+    // members are valid, but the second member was not admitted.
+    file.seek(std::io::SeekFrom::End(0)).unwrap();
+    file.write_all(&original).unwrap();
+    file.rewind().unwrap();
+    let mut emitted = 0;
+    let source = SourceReferenceV1::file("source.gz").unwrap();
+    let result = FdrSourceDecoder.decode_with_budget(
+        DecodeInput::Reader(SourceInput {
+            metadata: SourceMetadata {
+                source: &source,
+                evidence_hash: irmind_app::sha256(&original),
+                time_context: None,
+                cluster_context: None,
+                cancel: &cancel,
+            },
+            reader: &mut file,
+        }),
+        DecodeBudget::sequential().with_decoded_byte_ceiling(Some(preflight.decoded_bytes())),
+        &mut |_| {
+            emitted += 1;
+            Ok(())
+        },
+    );
+    assert!(matches!(
+        result,
+        Err(AppError::Fixed(irmind_app::FixedAppError::SourceLimit))
+    ));
+    assert!(emitted <= 11);
+    assert_eq!(
+        rows(&[original.as_slice(), &original].concat()).0.accepted,
+        22
+    );
 }

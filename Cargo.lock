@@ -2441,6 +2441,7 @@ dependencies = [
  "irmind-mod-mapping-journald-compat",
  "irmind-mod-mapping-json-compat",
  "irmind-mod-parser-azure-flow",
+ "irmind-mod-parser-fdr",
  "irmind-mod-parser-gcp-flow",
  "irmind-mod-parser-json",
  "irmind-mod-parser-linux",
@@ -3010,6 +3011,7 @@ dependencies = [
  "irmind-app",
  "irmind-domain",
  "irmind-testkit",
+ "tempfile",
 ]
 
 [[package]]

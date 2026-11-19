@@ -4,6 +4,9 @@ use super::super::{
     SourceManifestV1, StreamingEventParser, invalid_source, storage,
 };
 use super::temporary::DiskLease;
+use irmind_app::source_mapping::{
+    DecodeBudget, NormalizedExpansionProfile, NormalizedSourceBudget,
+};
 use std::io::{Read, Seek, SeekFrom};
 mod row_spool;
 pub(super) use row_spool::RowSpool;
@@ -11,6 +14,12 @@ pub(super) use row_spool::RowSpool;
 const EXPANSION_RESERVATION: u64 = 16;
 const MARGIN: u64 = 64 * 1024 * 1024;
 pub(super) const MAX_STAGED_ROW: u64 = 64 * 1024 * 1024;
+
+#[derive(Clone, Copy)]
+pub(super) struct SourceReservation {
+    pub(super) normalized_bytes: u64,
+    pub(super) decoded_byte_ceiling: Option<u64>,
+}
 
 pub(super) struct Input {
     pub file: File,
@@ -45,7 +54,7 @@ impl ParquetStore {
         case: &CaseId,
         root: &Path,
         paths: &[String],
-        budgets: Option<&std::collections::BTreeMap<String, u64>>,
+        budgets: Option<&std::collections::BTreeMap<String, SourceReservation>>,
         cancel: &CancellationToken,
     ) -> Result<Vec<Input>, AppError> {
         let mut inputs = Vec::new();
@@ -56,16 +65,22 @@ impl ParquetStore {
             }
             let file = Self::open_source(root, path)?;
             let physical = file.metadata().map_err(storage)?.len();
-            let budget = match budgets {
+            let reservation = match budgets {
                 Some(budgets) => *budgets.get(path).ok_or_else(invalid_source)?,
-                None => standard_allowance(physical)?,
+                None => SourceReservation {
+                    normalized_bytes: standard_allowance(physical)?,
+                    decoded_byte_ceiling: None,
+                },
             };
-            required = required.checked_add(budget).ok_or_else(no_space)?;
+            required = required
+                .checked_add(reservation.normalized_bytes)
+                .ok_or_else(no_space)?;
             inputs.push(Input {
                 file,
                 path: path.clone(),
-                budget,
-                decode_budget: irmind_app::source_mapping::DecodeBudget::sequential(),
+                budget: reservation.normalized_bytes,
+                decode_budget: DecodeBudget::sequential()
+                    .with_decoded_byte_ceiling(reservation.decoded_byte_ceiling),
             });
         }
         let dir = self.spool_dir(case)?;
@@ -78,7 +93,7 @@ impl ParquetStore {
         parser: &dyn StreamingEventParser,
         path: &str,
         cancel: &CancellationToken,
-    ) -> Result<(u64, u64), AppError> {
+    ) -> Result<(u64, SourceReservation), AppError> {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
@@ -98,11 +113,14 @@ impl ParquetStore {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        let budget = match declared {
-            Some(budget) => budget.allowance()?,
-            None => standard_allowance(physical)?,
+        let reservation = match declared {
+            Some(budget) => reserve_profile(id, budget)?,
+            None => SourceReservation {
+                normalized_bytes: standard_allowance(physical)?,
+                decoded_byte_ceiling: None,
+            },
         };
-        Ok((physical, budget))
+        Ok((physical, reservation))
     }
 
     #[cfg(test)]
@@ -192,7 +210,12 @@ pub(super) fn source_sample(file: &mut File) -> Result<Vec<u8>, AppError> {
 
 pub(super) fn check_space(available: u64, required: u64) -> Result<(), AppError> {
     if available < required {
-        return Err(no_space());
+        return Err(AppError::Fixed(
+            irmind_app::FixedAppError::StorageCaseStagingCapacity {
+                required,
+                available,
+            },
+        ));
     }
     Ok(())
 }
@@ -210,10 +233,29 @@ pub(super) fn standard_allowance(physical: u64) -> Result<u64, AppError> {
 #[path = "staging/budget_tests.rs"]
 mod budget_tests;
 
+fn reserve_profile(
+    id: irmind_app::ParserIdentity<'_>,
+    budget: NormalizedSourceBudget,
+) -> Result<SourceReservation, AppError> {
+    let decoded_byte_ceiling = match budget.profile() {
+        NormalizedExpansionProfile::CompactFlow32 if id.name == "parser-vpc-flow" => None,
+        NormalizedExpansionProfile::DecodedJson16
+            if id.name == "parser-fdr" && id.version == "fdr-source-v1" =>
+        {
+            Some(budget.decoded_bytes())
+        }
+        _ => return Err(invalid_source()),
+    };
+    Ok(SourceReservation {
+        normalized_bytes: budget.allowance()?,
+        decoded_byte_ceiling,
+    })
+}
+
 fn source_preflight_result(
-    result: Result<Option<irmind_app::source_mapping::NormalizedSourceBudget>, AppError>,
+    result: Result<Option<NormalizedSourceBudget>, AppError>,
     path: &str,
-) -> Result<Option<irmind_app::source_mapping::NormalizedSourceBudget>, AppError> {
+) -> Result<Option<NormalizedSourceBudget>, AppError> {
     use irmind_app::{FixedAppError, RejectedSource, SourceFailureReason};
     let reason = match result {
         Err(AppError::Fixed(FixedAppError::SourceFormat)) => SourceFailureReason::Format,

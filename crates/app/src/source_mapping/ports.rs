@@ -39,11 +39,13 @@ impl<'a> DecodeInput<'a> {
     }
 }
 
-/// Scheduling allowance only. The source worker counts toward this budget.
+/// Source decoding budget. The source worker counts toward the scheduling
+/// allowance. A verified admission pass can also set a decoded-byte ceiling.
 #[derive(Clone, Copy)]
 pub struct DecodeBudget {
     workers: std::num::NonZeroUsize,
     queued_bytes: usize,
+    decoded_byte_ceiling: Option<u64>,
 }
 
 impl DecodeBudget {
@@ -51,6 +53,7 @@ impl DecodeBudget {
         Self {
             workers: std::num::NonZeroUsize::MIN,
             queued_bytes: 0,
+            decoded_byte_ceiling: None,
         }
     }
 
@@ -58,7 +61,18 @@ impl DecodeBudget {
         Self {
             workers,
             queued_bytes,
+            decoded_byte_ceiling: None,
         }
+    }
+
+    #[must_use]
+    pub const fn with_decoded_byte_ceiling(mut self, ceiling: Option<u64>) -> Self {
+        self.decoded_byte_ceiling = ceiling;
+        self
+    }
+
+    pub const fn decoded_byte_ceiling(self) -> Option<u64> {
+        self.decoded_byte_ceiling
     }
 
     pub const fn workers(self) -> usize {
