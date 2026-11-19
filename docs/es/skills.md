@@ -6,7 +6,7 @@ Esta página ayuda a los analistas a aplicar un método de investigación repeti
 
 ## Proponer una mejora
 
-La fuente de las skills incluidas es [ns2switch/irmind-skills](https://github.com/ns2switch/irmind-skills). Su directorio `core/` contiene los 15 paquetes incluidos, sus recursos y episodios sintéticos de evaluación separados. Propón las mejoras allí; llegan a IRMind mediante una PR de sincronización revisada y una release de IRMind. No hace falta Rust: puedes aportar metodología, fuentes necesarias, falsos positivos y episodios sintéticos de evaluación.
+La fuente de las skills incluidas es [ns2switch/irmind-skills](https://github.com/ns2switch/irmind-skills). Su directorio `core/` contiene los 23 paquetes incluidos, sus recursos y episodios sintéticos de evaluación separados. Propón las mejoras allí; llegan a IRMind mediante una PR de sincronización revisada y una release de IRMind. No hace falta Rust: puedes aportar metodología, fuentes necesarias, falsos positivos y episodios sintéticos de evaluación.
 
 Los paquetes comunitarios viven en `catalog/`. Se instalan explícitamente con `/skills install catalog:<name>` desde un catálogo de producción firmado; no pueden sustituir un nombre del núcleo. IRMind v0.5.4 incorpora la clave pública de producción; los paquetes del catálogo se publican por separado. Ambas vías usan el mismo compilador acotado de skills y pruebas locales con modelo scripted.
 
@@ -14,7 +14,7 @@ Este repositorio mantiene una [copia local fijada](../../skills/upstream.json). 
 
 ## Usar un método incluido
 
-Abre un caso, configura un modelo en `/settings model` y escribe `/` para ver los métodos activos. El binario incluye 15 métodos. Todos son experimentales y se prueban con episodios sintéticos; no validan por sí solos una conclusión forense.
+Abre un caso, configura un modelo en `/settings model` y escribe `/` para ver los métodos activos. El binario incluye 23 métodos. Todos son experimentales y se prueban con episodios sintéticos; no validan por sí solos una conclusión forense.
 
 | Comando | Para qué sirve | Fuentes necesarias | Cobertura |
 | --- | --- | --- | --- |
@@ -33,6 +33,16 @@ Abre un caso, configura un modelo en `/settings model` y escribe `/` para ver lo
 | `/malware-execution-triage` | Origen, ejecución y actividad observada de un binario. | Sysmon 1/3/11 y PECmd/AmcacheParser u otras exportaciones DFIR. | Parcial: presencia en Amcache no prueba ejecución; los artefactos binarios necesitan exportación. |
 | `/k8s-cluster-compromise` | Acceso a la API, intentos de leer secrets, cuentas de servicio y cambios RBAC. | Auditoría Kubernetes nativa/EKS/AKS, exportaciones Cloud Audit de GKE; Falco k8s_audit opcional. | Resultados de API e identidades con ámbito de clúster; el contenido de bindings requiere originales verificados. El estado RBAC efectivo y los cuerpos omitidos siguen siendo lagunas. |
 | `/k8s-workload-compromise` | Peticiones de pods de riesgo, indicios de exec/attach y correlación en ejecución. | Auditoría Kubernetes y Falco JSON con metadatos de pod/contenedor. | Especificaciones originales y observaciones en ejecución; una petición aceptada o un indicador de privilegio no prueban ejecución, escape ni criptominería. |
+| `/m365-bec` | Cuentas comprometidas, reglas de buzón, reenvío y consentimiento a aplicaciones. | Purview o Microsoft 365 Unified Audit Log y exportaciones de acceso y auditoría de Entra ID. | El acceso a correo y el envío dependen de la licencia y la recogida. El cambio de una regla por sí solo no demuestra que se reenviara un mensaje. |
+| `/phishing-email-triage` | Origen, autenticación, URLs, adjuntos y alcance de la campaña. | Mensajes RFC 5322 o cabeceras exportadas. La auditoría de correo, el proxy o DNS pueden corroborar entregas y clics. | El HTML se mantiene inerte. Una URL, un hash de adjunto o un salto Received no demuestran ejecución ni clic. |
+| `/okta-identity-compromise` | Accesos anómalos, cambios de MFA y administradores y reutilización de sesiones. | JSON de actividad de Okta System Log. | Se mapean eventos documentados de autenticación e identidad. Consulta los originales para factores, políticas y sesiones. |
+| `/endpoint-edr-triage` | Relaciones entre procesos, ejecución y actividad de red o ficheros. | Defender Advanced Hunting o Streaming API, FDR o canales pertinentes de EVTX/Sysmon. | La correlación usa identidades del proveedor y de la fuente. Un PID reutilizado no basta para relacionar procesos. |
+| `/macos-compromise` | Ejecución, persistencia y autenticación en macOS. | Unified Log JSON o NDJSON y eslogger JSON. | Los detalles de TCC, cuarentena y LaunchAgents dependen de los registros recogidos. IRMind lee las exportaciones. |
+| `/google-workspace-compromise` | Autenticación, OAuth, reenvío de correo y acceso a Drive. | JSON de actividad de Reports API para las aplicaciones pertinentes. | Algunos detalles de Gmail y tipos de actividad dependen de qué aplicaciones y eventos se exportaron. |
+| `/github-supply-chain` | Uso de tokens, acceso y visibilidad de repositorios y cambios en Actions. | Auditoría GitHub de organización o empresa en JSON/CSV o flujo JSON. | Los eventos Git y los datos del token dependen de la exportación. Un cambio de permisos por sí solo no demuestra exfiltración. |
+| `/web-server-compromise` | Peticiones web sospechosas y ejecución corroborada en el endpoint. | Accesos de IIS, nginx, Apache o ALB y evidencia de procesos cuando exista. | Una respuesta HTTP permite verificar que se atendió una petición. Corrobora la ejecución con evidencia de procesos o ficheros. |
+
+Los métodos de AWS pueden contrastar CloudTrail con hallazgos de GuardDuty, VPC Flow Logs y registros de acceso a S3. Los de Azure y GCP pueden usar los registros de flujo de sus nubes. El método de red también cubre Route 53 Resolver y el registro de depuración de Windows DNS Server. Recoge esas fuentes cuando proceda. Las ausencias siguen limitando las conclusiones.
 
 
 Consulta la [guía de parsers](parsers.md) y la [configuración de módulos](modules.md) antes de recoger datos. Las skills solo declaran las herramientas locales que necesitan. Ninguna ejecuta recolectores, accede a proveedores, instala mapeos ni amplía el alcance.

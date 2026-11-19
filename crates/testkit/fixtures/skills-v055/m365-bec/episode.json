@@ -1,0 +1,94 @@
+{
+  "format_version": 1,
+  "skill": "m365-bec",
+  "files": [
+    {
+      "file": "m365.ndjson",
+      "parser": "parser-m365"
+    },
+    {
+      "file": "entra.ndjson",
+      "parser": "parser-entra"
+    }
+  ],
+  "cluster": null,
+  "selected_source": 0,
+  "expected_file": "v055-new-core.json",
+  "script": [
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "skill_read",
+          "args": {
+            "name": "m365-bec"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "graph_summary",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "text_search",
+          "args": {
+            "query": "New-InboxRule",
+            "limit": "20",
+            "event_category": "email",
+            "event_outcome": "success",
+            "entity_role": "actor"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "raw_records",
+          "args": {
+            "hash": "$source:0",
+            "index": "1",
+            "view": "original"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "case_add_finding",
+          "args": {
+            "kind": "hypothesis",
+            "value": "The synthetic mailbox rule was created successfully. The initiating identity and mailbox target are distinct.",
+            "evidence_hash": "$source:0",
+            "supporting_evidence": "$source:0"
+          }
+        },
+        {
+          "tool": "case_add_finding",
+          "args": {
+            "kind": "technique",
+            "value": "T1114.003",
+            "technique_id": "T1114.003",
+            "evidence_hash": "$source:0"
+          }
+        }
+      ]
+    },
+    {
+      "text": "The synthetic mailbox rule was created successfully. The initiating identity and mailbox target are distinct. Evidence: $source:0",
+      "calls": []
+    }
+  ]
+}

@@ -2,13 +2,13 @@
 format = "irmind-skill-v1"
 name = "aws-s3-data-exfiltration"
 description = "Review S3 exposure, permission changes and unusual object reads without equating access with exfiltration."
-version = "0.1.0"
+version = "0.1.1"
 author = "IRMind contributors"
 license = "MIT OR Apache-2.0"
 target_schema = "irmind-common-event-v1"
 tools = ["graph_summary", "text_search", "entity_timeline", "raw_records", "case_add_finding"]
-sources = ["parser-json"]
-categories = ["api", "file", "configuration", "iam"]
+sources = ["parser-json", "parser-s3-access", "parser-vpc-flow", "parser-guardduty"]
+categories = ["api", "file", "configuration", "iam", "network"]
 invocable = true
 +++
 # AWS S3 data exfiltration
@@ -67,3 +67,7 @@ identifies methodology, not evidence of an incident.
 - S3 CloudTrail events (official source; see the public skills guide for the link).
 - Object data events (official source; see the public skills guide for the link).
 - ATT&CK T1530 (official source; see the public skills guide for the link).
+
+## Corroborate with additional collected sources
+
+Use server access text to compare successful object requests with bytes sent and the original bucket/key, requester and request ID. Object Size alone does not measure bytes delivered. VPC Flow Logs add directional connection and transfer evidence, with no object identities. Review GuardDuty only as source leads. Align account, role, time and the scope of each collection before combining evidence. Keep best-effort access logging gaps visible.

@@ -2,13 +2,13 @@
 format = "irmind-skill-v1"
 name = "gcp-service-account-abuse"
 description = "Review service-account keys, impersonation, IAM changes and unfamiliar use in Cloud Audit Logs."
-version = "0.1.1"
+version = "0.1.2"
 author = "IRMind contributors"
 license = "MIT OR Apache-2.0"
 target_schema = "irmind-common-event-v1"
 tools = ["graph_summary", "text_search", "entity_timeline", "raw_records", "case_add_finding"]
-sources = ["parser-gcp-audit", "parser-ecs"]
-categories = ["iam", "authentication", "api"]
+sources = ["parser-gcp-audit", "parser-ecs", "parser-gcp-flow"]
+categories = ["iam", "authentication", "api", "network"]
 invocable = true
 +++
 # GCP service account abuse
@@ -66,3 +66,7 @@ identifies methodology, not evidence of an incident.
 
 - IAM audit logging (official source; see the public skills guide for the link).
 - ATT&CK additional cloud credentials (official source; see the public skills guide for the link).
+
+## Corroborate with additional collected sources
+
+Add native VPC Flow LogEntry exports when the project and relevant interval are covered. Compare source, destination and reported byte counts to the activity window. Retain sampling and aggregation context. The source of a flow and the service-account identity remain separate observations until corroborated.

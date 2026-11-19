@@ -1,0 +1,2 @@
+source,native_input,investigation_fields,coverage_limits
+parser-google-workspace,Reports API activities,"Login, OAuth, admin, Drive, Gmail and SAML observations",Applications and details depend on retention and tenant edition

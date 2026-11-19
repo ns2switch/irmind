@@ -1,0 +1,114 @@
+{
+  "format_version": 1,
+  "skill": "aws-credential-compromise",
+  "files": [
+    {
+      "file": "hunteval-aws-iam-001.json",
+      "parser": "parser-json"
+    },
+    {
+      "file": "guardduty.ndjson",
+      "parser": "parser-guardduty"
+    },
+    {
+      "file": "flows.log",
+      "parser": "parser-vpc-flow"
+    },
+    {
+      "file": "s3.log",
+      "parser": "parser-s3-access"
+    }
+  ],
+  "cluster": null,
+  "selected_source": 0,
+  "expected_file": "initial.json",
+  "script": [
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "skill_read",
+          "args": {
+            "name": "aws-credential-compromise"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "graph_summary",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "text_search",
+          "args": {
+            "query": "AssumeRole",
+            "limit": "20"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "raw_records",
+          "args": {
+            "hash": "$source:0",
+            "index": "0",
+            "view": "original"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "text_search",
+          "args": {
+            "query": "REST.GET.OBJECT",
+            "event_category": "web",
+            "event_outcome": "success",
+            "entity_role": "actor",
+            "limit": "20"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "case_add_finding",
+          "args": {
+            "kind": "hypothesis",
+            "value": "Recorded IAM policy attachment and role assumption",
+            "evidence_hash": "$source:0",
+            "supporting_evidence": "$source:0"
+          }
+        },
+        {
+          "tool": "case_add_finding",
+          "args": {
+            "kind": "technique",
+            "value": "T1098",
+            "technique_id": "T1098",
+            "evidence_hash": "$source:0"
+          }
+        }
+      ]
+    },
+    {
+      "text": "Recorded IAM policy attachment and role assumption Evidence: $source:0",
+      "calls": []
+    }
+  ]
+}

@@ -2,13 +2,13 @@
 format = "irmind-skill-v1"
 name = "azure-entra-identity-compromise"
 description = "Review Entra sign-ins, MFA and OAuth changes, role grants and application credentials with explicit coverage gaps."
-version = "0.1.1"
+version = "0.1.2"
 author = "IRMind contributors"
 license = "MIT OR Apache-2.0"
 target_schema = "irmind-common-event-v1"
 tools = ["graph_summary", "text_search", "entity_timeline", "raw_records", "case_add_finding"]
-sources = ["parser-entra", "parser-ecs", "parser-json"]
-categories = ["authentication", "iam", "configuration"]
+sources = ["parser-entra", "parser-ecs", "parser-json", "parser-azure-flow"]
+categories = ["authentication", "iam", "configuration", "network"]
 invocable = true
 +++
 # Azure Entra identity compromise
@@ -69,3 +69,7 @@ identifies methodology, not evidence of an incident.
 - Download Entra logs (official source; see the public skills guide for the link).
 - Audit activities (official source; see the public skills guide for the link).
 - ATT&CK additional cloud credentials (official source; see the public skills guide for the link).
+
+## Corroborate with additional collected sources
+
+When Azure VNet or NSG flow exports are available, align subscription, resource, client IP and UTC flow interval with Entra audit records. Query network events and keep source/destination roles distinct. A VNet accept decision describes the reported network control outcome. Link it to an account only with independent identity evidence.

@@ -1,0 +1,89 @@
+{
+  "format_version": 1,
+  "skill": "google-workspace-compromise",
+  "files": [
+    {
+      "file": "workspace.ndjson",
+      "parser": "parser-google-workspace"
+    }
+  ],
+  "cluster": null,
+  "selected_source": 0,
+  "expected_file": "v055-new-core.json",
+  "script": [
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "skill_read",
+          "args": {
+            "name": "google-workspace-compromise"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "graph_summary",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "text_search",
+          "args": {
+            "query": "ASSIGN_ROLE",
+            "limit": "20",
+            "event_category": "iam",
+            "entity_role": "actor"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "raw_records",
+          "args": {
+            "hash": "$source:0",
+            "index": "0",
+            "view": "original"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "case_add_finding",
+          "args": {
+            "kind": "hypothesis",
+            "value": "The synthetic Workspace admin event records an administrator role assignment to the named delegated account.",
+            "evidence_hash": "$source:0",
+            "supporting_evidence": "$source:0"
+          }
+        },
+        {
+          "tool": "case_add_finding",
+          "args": {
+            "kind": "technique",
+            "value": "T1098.003",
+            "technique_id": "T1098.003",
+            "evidence_hash": "$source:0"
+          }
+        }
+      ]
+    },
+    {
+      "text": "The synthetic Workspace admin event records an administrator role assignment to the named delegated account. Evidence: $source:0",
+      "calls": []
+    }
+  ]
+}

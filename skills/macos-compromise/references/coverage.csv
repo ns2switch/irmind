@@ -1,0 +1,3 @@
+source,native_input,investigation_fields,coverage_limits
+parser-macos,eslogger Endpoint Security JSON,"Process, authentication, and file events where recorded",Coverage depends on subscriptions and schema version
+parser-macos,Unified Log JSON or NDJSON,Subsystem context and event messages,Presence and redaction depend on acquisition

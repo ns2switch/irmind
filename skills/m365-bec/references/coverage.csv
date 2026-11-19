@@ -1,0 +1,3 @@
+source,native_input,investigation_fields,coverage_limits
+parser-m365,Unified Audit Log,Mailbox rules and forwarding; mail access; delegated and OAuth activity,Workload and retention dependent
+parser-entra,Sign-in and audit tables,"Identity, MFA, conditional access and IAM changes",Visibility varies by tenant and enabled diagnostics

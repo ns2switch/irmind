@@ -25,13 +25,9 @@ mod tests {
     use irmind_app::ContentGuard as _;
 
     #[test]
-    fn published_initial_package_identities_remain_unchanged() {
+    fn unchanged_initial_packages_keep_their_published_identities() {
         let packages = bundled_skill_candidates().unwrap();
         for (name, hash) in [
-            (
-                "aws-credential-compromise",
-                "bef2b28e3722ee1c2eda76c835f4e83b99e6395ea00583ed85f90b78553a35ef",
-            ),
             (
                 "linux-triage",
                 "be4a83e88922a5b0fec026cd96d7b3d8eaf6e9f81487e5a60fca411d4d9f42e5",
@@ -52,7 +48,7 @@ mod tests {
     #[test]
     fn bundled_methods_use_the_shared_compiler_guard_and_immutable_package_contract() {
         let methods = bundled_skill_candidates().unwrap();
-        assert_eq!(methods.len(), 15);
+        assert_eq!(methods.len(), 23);
         let names: Vec<_> = methods
             .iter()
             .map(|m| m.metadata().name().as_str())
@@ -63,14 +59,22 @@ mod tests {
                 "aws-credential-compromise",
                 "aws-s3-data-exfiltration",
                 "azure-entra-identity-compromise",
+                "endpoint-edr-triage",
                 "gcp-service-account-abuse",
+                "github-supply-chain",
+                "google-workspace-compromise",
                 "k8s-cluster-compromise",
                 "k8s-workload-compromise",
                 "linux-persistence",
                 "linux-triage",
                 "linux-webshell",
+                "m365-bec",
+                "macos-compromise",
                 "malware-execution-triage",
                 "network-c2-beaconing",
+                "okta-identity-compromise",
+                "phishing-email-triage",
+                "web-server-compromise",
                 "windows-lateral-movement",
                 "windows-persistence",
                 "windows-ransomware",
@@ -86,7 +90,8 @@ mod tests {
             let version = match method.metadata().name().as_str() {
                 "gcp-service-account-abuse"
                 | "network-c2-beaconing"
-                | "azure-entra-identity-compromise" => "0.1.1",
+                | "azure-entra-identity-compromise" => "0.1.2",
+                "aws-credential-compromise" | "aws-s3-data-exfiltration" => "0.1.1",
                 _ => "0.1.0",
             };
             assert_eq!(method.metadata().version().as_str(), version);
