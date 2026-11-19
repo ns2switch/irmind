@@ -62,6 +62,7 @@ impl TableMapping {
         provenance: MappingProvenance,
     ) -> Result<Self, MappingError> {
         validate_interpreter(&definition, &provenance)?;
+        super::provider_process::validate_definition(&definition)?;
         if definition.source_contract != SOURCE_RECORD_V1
             || definition.rules.len() > 256
             || definition.fields.len() > 64

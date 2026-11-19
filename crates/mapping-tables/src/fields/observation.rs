@@ -22,6 +22,11 @@ enum CompiledScope {
     SourceRecord,
     Host(SourcePath),
     Account(SourcePath),
+    ProviderProcess {
+        provider: irmind_domain::ProcessIdentityProvider,
+        tenant: SourcePath,
+        host: SourcePath,
+    },
     ProcessLifetime {
         host: SourcePath,
         lifetime: SourcePath,
@@ -44,34 +49,17 @@ impl CompiledObservation {
                 .collect::<Result<_, _>>()?,
             kind: ObservedEntityKind::parse(&value.kind).map_err(invalid)?,
             role: EntityRole::parse(&value.role).map_err(invalid)?,
-            scope: match value.scope {
-                Scope::Global => CompiledScope::Global,
-                Scope::SourceRecord => CompiledScope::SourceRecord,
-                Scope::Host(keys) => CompiledScope::Host(path(&keys)?),
-                Scope::Account(keys) => CompiledScope::Account(path(&keys)?),
-                Scope::Cluster {
-                    namespace,
-                    service_account_principal,
-                } => {
-                    if namespace.is_some() && service_account_principal.is_some() {
-                        return Err(MappingError::InvalidDefinition);
-                    }
-                    CompiledScope::Cluster {
-                        namespace: namespace.as_deref().map(path).transpose()?,
-                        principal: service_account_principal.as_deref().map(path).transpose()?,
-                    }
-                }
-                Scope::ProcessLifetime { host, lifetime } => CompiledScope::ProcessLifetime {
-                    host: path(&host)?,
-                    lifetime: path(&lifetime)?,
-                },
-            },
+            scope: CompiledScope::compile(value.scope)?,
         };
-        let dummy = match result.kind {
-            ObservedEntityKind::Ip => "203.0.113.1",
-            ObservedEntityKind::Domain => "example.test",
-            ObservedEntityKind::Hash => "00000000000000000000000000000000",
-            _ => "synthetic",
+        let dummy = if matches!(&result.scope, CompiledScope::ProviderProcess { .. }) {
+            "1"
+        } else {
+            match result.kind {
+                ObservedEntityKind::Ip => "203.0.113.1",
+                ObservedEntityKind::Domain => "example.test",
+                ObservedEntityKind::Hash => "00000000000000000000000000000000",
+                _ => "synthetic",
+            }
         };
         let scope = match &result.scope {
             CompiledScope::Cluster {
@@ -90,6 +78,14 @@ impl CompiledObservation {
                 },
             )
             .map_err(invalid)?,
+            CompiledScope::ProviderProcess { provider, .. } => {
+                EntityIdentityScope::provider_process(
+                    *provider,
+                    "00000000000000000000000000000001",
+                    "00000000000000000000000000000100",
+                )
+                .map_err(invalid)?
+            }
             CompiledScope::ProcessLifetime { .. } => EntityIdentityScope::ProcessLifetime {
                 host: EventText::identifier("host").map_err(invalid)?,
                 lifetime: EventText::identifier("lifetime").map_err(invalid)?,
@@ -163,6 +159,16 @@ impl CompiledObservation {
             },
             CompiledScope::Host(p) => EntityIdentityScope::Host(named(p)?),
             CompiledScope::Account(p) => EntityIdentityScope::Account(named(p)?),
+            CompiledScope::ProviderProcess {
+                provider,
+                tenant,
+                host,
+            } => EntityIdentityScope::provider_process(
+                *provider,
+                named(tenant)?.as_str(),
+                named(host)?.as_str(),
+            )
+            .map_err(|_| bad())?,
             CompiledScope::ProcessLifetime { host, lifetime } => {
                 EntityIdentityScope::ProcessLifetime {
                     host: named(host)?,
@@ -176,5 +182,42 @@ impl CompiledObservation {
             field,
         )
         .map_err(|_| bad())
+    }
+}
+
+impl CompiledScope {
+    fn compile(value: Scope) -> Result<Self, MappingError> {
+        Ok(match value {
+            Scope::Global => CompiledScope::Global,
+            Scope::SourceRecord => CompiledScope::SourceRecord,
+            Scope::Host(keys) => CompiledScope::Host(path(&keys)?),
+            Scope::Account(keys) => CompiledScope::Account(path(&keys)?),
+            Scope::Cluster {
+                namespace,
+                service_account_principal,
+            } => {
+                if namespace.is_some() && service_account_principal.is_some() {
+                    return Err(MappingError::InvalidDefinition);
+                }
+                CompiledScope::Cluster {
+                    namespace: namespace.as_deref().map(path).transpose()?,
+                    principal: service_account_principal.as_deref().map(path).transpose()?,
+                }
+            }
+            Scope::ProviderProcess {
+                provider,
+                tenant,
+                host,
+            } => CompiledScope::ProviderProcess {
+                provider: irmind_domain::ProcessIdentityProvider::parse(&provider)
+                    .map_err(invalid)?,
+                tenant: path(&tenant)?,
+                host: path(&host)?,
+            },
+            Scope::ProcessLifetime { host, lifetime } => CompiledScope::ProcessLifetime {
+                host: path(&host)?,
+                lifetime: path(&lifetime)?,
+            },
+        })
     }
 }

@@ -92,3 +92,6 @@ pub fn encode_identity_scope(scope: &EntityIdentityScope) -> Result<String, AppE
 pub fn decode_identity_scope(input: &str) -> Result<EntityIdentityScope, AppError> {
     codec::decode_scope(input)
 }
+
+#[cfg(test)]
+mod provider_process_tests;

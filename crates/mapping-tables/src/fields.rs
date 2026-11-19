@@ -19,6 +19,7 @@ pub(super) struct CompiledField {
     pub conversion: Conversion,
     pub observation: Option<CompiledObservation>,
     pub observations: Vec<CompiledObservation>,
+    pub requires_provider_identity: bool,
     conditions: Vec<irmind_app::source_mapping::SelectorCondition>,
     omit_text: BTreeSet<String>,
 }
@@ -37,6 +38,11 @@ pub(super) fn compile_fields(fields: Vec<Field>) -> Result<Vec<CompiledField>, M
             {
                 return Err(MappingError::InvalidDefinition);
             }
+            let requires_provider_identity = f
+                .observation
+                .iter()
+                .chain(&f.observations)
+                .any(|o| matches!(o.scope, super::definition::Scope::ProviderProcess { .. }));
             let observation = f
                 .observation
                 .map(|o| CompiledObservation::compile(o, target))
@@ -45,6 +51,7 @@ pub(super) fn compile_fields(fields: Vec<Field>) -> Result<Vec<CompiledField>, M
                 path: indexed_path(&f.source, f.source_index)?,
                 target,
                 conversion: f.conversion,
+                requires_provider_identity,
                 observation,
                 observations: f
                     .observations
@@ -92,6 +99,7 @@ fn compatible(kind: CommonFieldType, conversion: Conversion) -> bool {
     use Conversion as C;
     match conversion {
         C::Copy => !matches!(kind, T::Time | T::DnsAnswers),
+        C::U64Id => matches!(kind, T::Text),
         C::Decimal | C::Hex => matches!(kind, T::Unsigned | T::Port | T::Pid | T::HttpStatus),
         C::Ip => kind == T::Ip,
         C::Domain | C::KubernetesServiceAccountName => kind == T::Text,

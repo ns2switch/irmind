@@ -24,6 +24,11 @@ enum WireScope {
         source: String,
         record: u64,
     },
+    ProviderProcess {
+        provider: String,
+        tenant: String,
+        host: String,
+    },
     ProcessLifetime {
         host: String,
         lifetime: String,
@@ -47,6 +52,15 @@ impl From<&EntityIdentityScope> for WireScope {
             EntityIdentityScope::SourceRecord { source, record } => Self::SourceRecord {
                 source: source.as_str().into(),
                 record: *record,
+            },
+            EntityIdentityScope::ProviderProcess {
+                provider,
+                tenant,
+                host,
+            } => Self::ProviderProcess {
+                provider: provider.as_str().into(),
+                tenant: tenant.as_str().into(),
+                host: host.as_str().into(),
             },
             EntityIdentityScope::ProcessLifetime { host, lifetime } => Self::ProcessLifetime {
                 host: host.as_str().into(),
@@ -78,6 +92,16 @@ impl WireScope {
                 source: EvidenceHash::parse(&source).map_err(|_| invalid())?,
                 record,
             },
+            Self::ProviderProcess {
+                provider,
+                tenant,
+                host,
+            } => EntityIdentityScope::provider_process(
+                irmind_domain::ProcessIdentityProvider::parse(&provider).map_err(|_| invalid())?,
+                &tenant,
+                &host,
+            )
+            .map_err(|_| invalid())?,
             Self::ProcessLifetime { host, lifetime } => EntityIdentityScope::ProcessLifetime {
                 host: identifier(&host)?,
                 lifetime: identifier(&lifetime)?,

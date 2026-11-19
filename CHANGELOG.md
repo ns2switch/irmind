@@ -4,6 +4,15 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+**Format impact:** Add a bounded provider-process scope descriptor and finite
+mapping primitives for native FDR IDs. Older binaries do not interpret these new
+scope values/definitions. Existing scope bytes, V3 columns, case marker 4, seals
+and export V8 sections are unchanged; keep the producing version for a case.
+
+- Keep provider-native process IDs separate by provider, tenant and host, with
+  validated unsigned decimal IDs. OS PIDs remain record scoped and Sysmon
+  ProcessGuid keeps its existing lifetime scope.
+
 - Add experimental Microsoft Defender Advanced Hunting CSV/JSON and Streaming
   export decoding with included finite mapping tables, host partitions and
   record-scoped process/parent observations. AlertInfo and AlertEvidence remain

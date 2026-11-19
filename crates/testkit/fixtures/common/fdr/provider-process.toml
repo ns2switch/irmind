@@ -1,0 +1,42 @@
+# Synthetic scope-contract fixture, not the production FDR mapping catalog.
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-synthetic-fdr-scope"
+version = "1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-fdr"
+parser_versions = ["fdr-source-v1"]
+format = "falcon-fdr"
+format_version = "fdr-source-v1"
+action = ["event_simpleName"]
+[partition]
+host = ["aid"]
+[[fields]]
+source = ["aid"]
+target = "host.id"
+[[fields]]
+source = ["RemoteAddressIP4"]
+target = "destination.ip"
+observation = { kind = "ip", role = "destination", scope = { kind = "global" } }
+[[rules]]
+categories = ["process"]
+types = ["info"]
+[[rules.when]]
+path = ["event_simpleName"]
+predicate = { op = "text", value = "ProcessRollup2" }
+[[rules.fields]]
+source = ["TargetProcessId"]
+target = "process.entity_id"
+conversion = "u64_id"
+observation = { kind = "process", role = "subject", scope = { kind = "provider_process", path = { provider = "crowdstrike-fdr", tenant = ["cid"], host = ["aid"] } } }
+[[rules]]
+categories = ["network"]
+types = ["connection"]
+[[rules.when]]
+path = ["event_simpleName"]
+predicate = { op = "text", value = "NetworkConnectIP4" }
+[[rules.fields]]
+source = ["ContextProcessId"]
+target = "process.entity_id"
+conversion = "u64_id"
+observation = { kind = "process", role = "subject", scope = { kind = "provider_process", path = { provider = "crowdstrike-fdr", tenant = ["cid"], host = ["aid"] } } }
