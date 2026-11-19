@@ -81,14 +81,19 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("ack");
         let listeners = Listeners::bind().unwrap();
-        let missing = wait_ack(&listeners, &[1; 32], &path, Duration::from_millis(20)).unwrap_err();
+        let nonce = protocol::test_nonce();
+        let missing = wait_ack(&listeners, &nonce, &path, Duration::from_millis(20)).unwrap_err();
         assert_eq!(missing.kind(), io::ErrorKind::PermissionDenied);
         assert_eq!(missing.to_string(), diag::CHILD_ACK_TIMEOUT);
-        std::fs::write(&path, protocol::receipt(&[2; 32], false)).unwrap();
-        let wrong = wait_ack(&listeners, &[1; 32], &path, Duration::from_millis(20)).unwrap_err();
+        std::fs::write(
+            &path,
+            protocol::receipt(&protocol::mismatched_nonce(nonce), false),
+        )
+        .unwrap();
+        let wrong = wait_ack(&listeners, &nonce, &path, Duration::from_millis(20)).unwrap_err();
         assert_eq!(wrong.kind(), io::ErrorKind::PermissionDenied);
         assert_eq!(wrong.to_string(), "receipt nonce mismatch");
-        std::fs::write(&path, protocol::receipt(&[1; 32], false)).unwrap();
-        wait_ack(&listeners, &[1; 32], &path, Duration::from_millis(20)).unwrap();
+        std::fs::write(&path, protocol::receipt(&nonce, false)).unwrap();
+        wait_ack(&listeners, &nonce, &path, Duration::from_millis(20)).unwrap();
     }
 }

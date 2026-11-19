@@ -210,14 +210,32 @@ fn receipt_failure(input: &[u8], complete: bool) -> ReceiptFailure {
     ReceiptFailure::NonceMismatch
 }
 #[cfg(test)]
+pub(crate) fn test_nonce() -> [u8; 32] {
+    use std::hash::{BuildHasher as _, RandomState};
+
+    // The operating-system RNG remains the only source of production nonces.
+    // This fixture needs opaque bytes for comparisons and no additional crate.
+    let state = RandomState::new();
+    std::array::from_fn(|index| state.hash_one(index).to_le_bytes()[0])
+}
+
+#[cfg(test)]
+pub(crate) fn mismatched_nonce(mut nonce: [u8; 32]) -> [u8; 32] {
+    nonce[0] ^= 1;
+    nonce
+}
+
+#[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used)]
     use super::*;
     #[test]
     fn messages_bind_nonce_version_mode_and_strict_bounds() {
+        let nonce = test_nonce();
+        let wrong_nonce = mismatched_nonce(nonce);
         let ticket = Ticket {
             witness: true,
-            nonce: [7; 32],
+            nonce,
             sid: vec![1, 0, 0, 0, 0, 0, 0, 5],
             ports: [1234, 2345],
         };
@@ -225,17 +243,17 @@ mod tests {
         assert!(Ticket::parse(&vec![b'a'; 1025]).is_err());
         assert!(Ticket::parse(ticket.encode().replace("witness", "decode").as_bytes()).is_err());
         assert!(Ticket::parse(ticket.encode().replace(POLICY, "unknown").as_bytes()).is_err());
-        assert!(parse_ready(ready(&[1; 32], [1234, 2345]).as_bytes(), &[2; 32]).is_err());
-        assert!(parse_ready(ready(&[1; 32], [0, 1]).as_bytes(), &[1; 32]).is_err());
-        assert!(check_receipt(receipt(&[1; 32], false).as_bytes(), &[1; 32], true).is_err());
-        assert!(check_receipt(receipt(&[1; 32], true).as_bytes(), &[2; 32], true).is_err());
+        assert!(parse_ready(ready(&nonce, [1234, 2345]).as_bytes(), &wrong_nonce).is_err());
+        assert!(parse_ready(ready(&nonce, [0, 1]).as_bytes(), &nonce).is_err());
+        assert!(check_receipt(receipt(&nonce, false).as_bytes(), &nonce, true).is_err());
+        assert!(check_receipt(receipt(&nonce, true).as_bytes(), &wrong_nonce, true).is_err());
     }
     #[test]
     fn receipt_rejections_are_specific_and_keep_exact_byte_admission() {
-        let nonce = [7; 32];
+        let nonce = test_nonce();
         let complete = receipt(&nonce, true);
         let wrong_kind = receipt(&nonce, false);
-        let wrong_nonce = receipt(&[8; 32], true);
+        let wrong_nonce = receipt(&mismatched_nonce(nonce), true);
         let oversized = vec![b'x'; MAX_MESSAGE + 1];
         for (bytes, expected) in [
             (b"".as_slice(), ReceiptFailure::Missing),
