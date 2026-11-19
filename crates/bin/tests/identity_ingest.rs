@@ -372,10 +372,7 @@ fn one_gib_release_windows_dns_throughput() -> Result<(), &'static str> {
 #[cfg(feature = "parser-windows-dns")]
 fn benchmark_rotated(name: &str) {
     use irmind_app::{ParserTimeBasis, ParserTimeContext};
-    use std::io::{BufWriter, Read, Write};
 
-    const GIB: u64 = 1024 * 1024 * 1024;
-    const ROTATION: u64 = 4 * 1024 * 1024;
     let bench_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target");
     let root = tempfile::Builder::new()
         .prefix("irmind-rotated-bench-")
@@ -389,51 +386,14 @@ fn benchmark_rotated(name: &str) {
         .create_case("Synthetic rotated logs", "Local only")
         .unwrap();
 
-    let (header, record, per_row) = benchmark_lines(name);
-    let catalog = current_sources::catalog();
-    let mut selections = BTreeMap::new();
-    let mut files = Vec::new();
-    let mut bytes = 0;
-    let mut count = 0;
     let time_context = (name == "windows-dns")
         .then(|| ParserTimeContext::new(2026, 0, false, ParserTimeBasis::Command).unwrap());
-    while bytes < GIB {
-        let file = format!("{name}-{:04}.log", files.len());
-        let rotation = if name == "windows-dns" {
-            format!("Log rotation {}\n", files.len())
-        } else {
-            format!("#Remark: Synthetic rotation {}\n", files.len())
-        };
-        let mut writer = BufWriter::new(fs::File::create(originals.join(&file)).unwrap());
-        writer.write_all(&header).unwrap();
-        writer.write_all(rotation.as_bytes()).unwrap();
-        let mut written = (header.len() + rotation.len()) as u64;
-        while written < ROTATION {
-            writer.write_all(&record).unwrap();
-            written += record.len() as u64;
-            count += per_row;
-        }
-        writer.flush().unwrap();
-        bytes += written;
-        let mut sample = Vec::new();
-        fs::File::open(originals.join(&file))
-            .unwrap()
-            .take(65_536)
-            .read_to_end(&mut sample)
-            .unwrap();
-        let selected = catalog
-            .select_source(ParserSelectionRequest {
-                source: &file,
-                sample: &sample,
-                parser_override: None,
-                forced: false,
-                time_context,
-                cluster_context: None,
-            })
-            .unwrap();
-        selections.insert(file.clone(), selected.selection);
-        files.push(file);
-    }
+    let PreparedRotations {
+        files,
+        selections,
+        bytes,
+        records: count,
+    } = prepare_rotations(name, &originals, time_context);
     let base_parser = current_sources::parser(&format!("parser-{name}"));
     let parser = match time_context {
         Some(context) => base_parser.with_time_context(&context).unwrap(),
@@ -474,6 +434,86 @@ fn benchmark_rotated(name: &str) {
         f64::from(u32::try_from(bytes).unwrap()) / 1_048_576.0 / seconds
     );
     engine.verify(&case.id).unwrap();
+}
+
+#[cfg(feature = "parser-windows-dns")]
+struct PreparedRotations {
+    files: Vec<String>,
+    selections: BTreeMap<String, irmind_app::ParserSelection>,
+    bytes: u64,
+    records: u64,
+}
+
+#[cfg(feature = "parser-windows-dns")]
+fn prepare_rotations(
+    name: &str,
+    originals: &std::path::Path,
+    time_context: Option<irmind_app::ParserTimeContext>,
+) -> PreparedRotations {
+    use std::io::Read as _;
+
+    const GIB: u64 = 1024 * 1024 * 1024;
+    let (header, record, per_row) = benchmark_lines(name);
+    let catalog = current_sources::catalog();
+    let mut selections = BTreeMap::new();
+    let mut files = Vec::new();
+    let mut bytes = 0;
+    let mut records = 0;
+    while bytes < GIB {
+        let file = format!("{name}-{:04}.log", files.len());
+        let rotation = if name == "windows-dns" {
+            format!("Log rotation {}\n", files.len())
+        } else {
+            format!("#Remark: Synthetic rotation {}\n", files.len())
+        };
+        let path = originals.join(&file);
+        let (rotation_bytes, rows) = write_rotation(&path, &header, &rotation, &record);
+        bytes += rotation_bytes;
+        records += rows * per_row;
+        let mut sample = Vec::new();
+        fs::File::open(path)
+            .unwrap()
+            .take(65_536)
+            .read_to_end(&mut sample)
+            .unwrap();
+        let selected = catalog
+            .select_source(ParserSelectionRequest {
+                source: &file,
+                sample: &sample,
+                parser_override: None,
+                forced: false,
+                time_context,
+                cluster_context: None,
+            })
+            .unwrap();
+        selections.insert(file.clone(), selected.selection);
+        files.push(file);
+    }
+    PreparedRotations {
+        files,
+        selections,
+        bytes,
+        records,
+    }
+}
+
+#[cfg(feature = "parser-windows-dns")]
+fn write_rotation(path: &std::path::Path, header: &[u8], name: &str, row: &[u8]) -> (u64, u64) {
+    use std::io::{BufWriter, Write};
+
+    const ROTATION: u64 = 4 * 1024 * 1024;
+    let mut writer = BufWriter::new(fs::File::create(path).unwrap());
+    writer.write_all(header).unwrap();
+    writer.write_all(name.as_bytes()).unwrap();
+    let mut bytes = (header.len() + name.len()) as u64;
+    let mut rows = 0;
+    while bytes < ROTATION {
+        writer.write_all(row).unwrap();
+        bytes += row.len() as u64;
+        rows += 1;
+    }
+    writer.flush().unwrap();
+    (bytes, rows)
 }
 
 fn benchmark_source(name: &str) {
