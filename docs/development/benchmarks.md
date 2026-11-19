@@ -2167,3 +2167,16 @@ logs in 256 rotations. It indexed 6,468,096 records in 283.520 s
 A compact single 1 GiB file reached the ordinary per-source normalization
 allowance. The rotation benchmark uses the same native data rows and keeps the
 existing admission limit.
+
+### AWS load balancer access logs
+
+Each test used approximately 1 GiB of synthetic original text on the release
+ingestion path. Verification passed after timing each case.
+
+| Layout | Input bytes | Records | Ingestion s | MiB/s |
+| --- | ---: | ---: | ---: | ---: |
+| Application Load Balancer | 1,073,741,840 | 2,025,928 | 57.704 | 17.746 |
+| Classic Load Balancer | 1,073,742,004 | 5,017,486 | 117.211 | 8.736 |
+
+The gzip contract verifies the identical decoded fields, retained source
+ordinals, unavailable physical offsets and rejection of corrupt members.

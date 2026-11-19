@@ -79,36 +79,7 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
     Ok(())
 }
 fn register_export_mappings(registry: &mut ModuleRegistry) -> Result<()> {
-    #[cfg(feature = "mapping-elb")]
-    registry.register(
-        Box::new(irmind_mod_mapping_elb::ElbMapping::new()?),
-        &ModuleConfig::new(),
-    )?;
-    #[cfg(feature = "mapping-iis-w3c")]
-    registry.register(
-        Box::new(irmind_mod_mapping_iis_w3c::IisW3cMapping::new()?),
-        &ModuleConfig::new(),
-    )?;
-    #[cfg(feature = "mapping-windows-dns")]
-    registry.register(
-        Box::new(irmind_mod_mapping_windows_dns::WindowsDnsMapping::new()?),
-        &ModuleConfig::new(),
-    )?;
-    #[cfg(feature = "mapping-route53")]
-    registry.register(
-        Box::new(irmind_mod_mapping_route53::Route53Mapping::new()?),
-        &ModuleConfig::new(),
-    )?;
-    #[cfg(feature = "mapping-github-audit")]
-    registry.register(
-        Box::new(irmind_mod_mapping_github_audit::GitHubAuditMapping::new()?),
-        &ModuleConfig::new(),
-    )?;
-    #[cfg(feature = "mapping-google-workspace")]
-    registry.register(
-        Box::new(irmind_mod_mapping_google_workspace::GoogleWorkspaceMapping::new()?),
-        &ModuleConfig::new(),
-    )?;
+    register_web_and_identity_exports(registry)?;
     #[cfg(feature = "mapping-macos")]
     registry.register(
         Box::new(irmind_mod_mapping_macos::MacosMapping::new()?),
@@ -161,6 +132,41 @@ fn register_export_mappings(registry: &mut ModuleRegistry) -> Result<()> {
         &ModuleConfig::new(),
     )?;
 
+    Ok(())
+}
+
+fn register_web_and_identity_exports(registry: &mut ModuleRegistry) -> Result<()> {
+    let _ = &registry;
+    #[cfg(feature = "mapping-elb")]
+    registry.register(
+        Box::new(irmind_mod_mapping_elb::ElbMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(feature = "mapping-iis-w3c")]
+    registry.register(
+        Box::new(irmind_mod_mapping_iis_w3c::IisW3cMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(feature = "mapping-windows-dns")]
+    registry.register(
+        Box::new(irmind_mod_mapping_windows_dns::WindowsDnsMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(feature = "mapping-route53")]
+    registry.register(
+        Box::new(irmind_mod_mapping_route53::Route53Mapping::new()?),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(feature = "mapping-github-audit")]
+    registry.register(
+        Box::new(irmind_mod_mapping_github_audit::GitHubAuditMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
+    #[cfg(feature = "mapping-google-workspace")]
+    registry.register(
+        Box::new(irmind_mod_mapping_google_workspace::GoogleWorkspaceMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
     Ok(())
 }
 
