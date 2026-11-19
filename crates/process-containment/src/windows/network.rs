@@ -1,5 +1,6 @@
 #![cfg(windows)]
 mod child;
+mod diagnostics;
 #[cfg(feature = "launcher")]
 mod exchange;
 mod files;

@@ -138,11 +138,76 @@ pub(crate) fn receipt(nonce: &[u8; 32], complete: bool) -> String {
         hex(nonce)
     )
 }
-pub(crate) fn check_receipt(input: &[u8], nonce: &[u8; 32], complete: bool) -> io::Result<()> {
-    if input != receipt(nonce, complete).as_bytes() {
-        return Err(denied());
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ReceiptFailure {
+    Missing,
+    TooLong,
+    Framing,
+    NonAscii,
+    UnexpectedMessage,
+    NonceEncoding,
+    NonceMismatch,
+}
+
+impl ReceiptFailure {
+    pub(crate) const fn description(self) -> &'static str {
+        match self {
+            Self::Missing => "receipt missing",
+            Self::TooLong => "receipt exceeds the frame limit",
+            Self::Framing => "receipt must end with a single newline",
+            Self::NonAscii => "receipt contains non-ASCII bytes",
+            Self::UnexpectedMessage => "unexpected receipt type or protocol version",
+            Self::NonceEncoding => "invalid receipt nonce encoding",
+            Self::NonceMismatch => "receipt nonce mismatch",
+        }
     }
-    Ok(())
+}
+
+impl std::fmt::Display for ReceiptFailure {
+    fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        out.write_str(self.description())
+    }
+}
+
+impl std::error::Error for ReceiptFailure {}
+
+pub(crate) fn check_receipt(input: &[u8], nonce: &[u8; 32], complete: bool) -> io::Result<()> {
+    let canonical = receipt(nonce, complete);
+    if input == canonical.as_bytes() {
+        return Ok(());
+    }
+    let failure = receipt_failure(input, complete);
+    Err(io::Error::new(io::ErrorKind::PermissionDenied, failure))
+}
+
+fn receipt_failure(input: &[u8], complete: bool) -> ReceiptFailure {
+    if input.is_empty() {
+        return ReceiptFailure::Missing;
+    }
+    if input.len() > MAX_MESSAGE {
+        return ReceiptFailure::TooLong;
+    }
+    if !input.is_ascii() {
+        return ReceiptFailure::NonAscii;
+    }
+    let Some(line) = input.strip_suffix(b"\n") else {
+        return ReceiptFailure::Framing;
+    };
+    if line.contains(&b'\n') {
+        return ReceiptFailure::Framing;
+    }
+    let header: &[u8] = if complete {
+        b"irmind-network-complete-v1 "
+    } else {
+        b"irmind-network-ack-v1 "
+    };
+    let Some(nonce) = line.strip_prefix(header) else {
+        return ReceiptFailure::UnexpectedMessage;
+    };
+    if nonce.len() != 64 || !nonce.iter().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')) {
+        return ReceiptFailure::NonceEncoding;
+    }
+    ReceiptFailure::NonceMismatch
 }
 #[cfg(test)]
 mod tests {
@@ -164,5 +229,35 @@ mod tests {
         assert!(parse_ready(ready(&[1; 32], [0, 1]).as_bytes(), &[1; 32]).is_err());
         assert!(check_receipt(receipt(&[1; 32], false).as_bytes(), &[1; 32], true).is_err());
         assert!(check_receipt(receipt(&[1; 32], true).as_bytes(), &[2; 32], true).is_err());
+    }
+    #[test]
+    fn receipt_rejections_are_specific_and_keep_exact_byte_admission() {
+        let nonce = [7; 32];
+        let complete = receipt(&nonce, true);
+        let wrong_kind = receipt(&nonce, false);
+        let wrong_nonce = receipt(&[8; 32], true);
+        let oversized = vec![b'x'; MAX_MESSAGE + 1];
+        for (bytes, expected) in [
+            (b"".as_slice(), ReceiptFailure::Missing),
+            (&oversized, ReceiptFailure::TooLong),
+            (complete.trim_end().as_bytes(), ReceiptFailure::Framing),
+            (b"\xff\n", ReceiptFailure::NonAscii),
+            (wrong_kind.as_bytes(), ReceiptFailure::UnexpectedMessage),
+            (
+                b"irmind-network-complete-v1 INVALID\n",
+                ReceiptFailure::NonceEncoding,
+            ),
+            (wrong_nonce.as_bytes(), ReceiptFailure::NonceMismatch),
+        ] {
+            let error = check_receipt(bytes, &nonce, true).unwrap_err();
+            assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+            assert_eq!(
+                error
+                    .get_ref()
+                    .and_then(|inner| inner.downcast_ref::<ReceiptFailure>()),
+                Some(&expected)
+            );
+        }
+        check_receipt(complete.as_bytes(), &nonce, true).unwrap();
     }
 }
