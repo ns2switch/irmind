@@ -7,6 +7,12 @@ pub enum MappingError {
     UnsupportedDecoder,
     DuplicateIdentity,
     UnsupportedVersion,
+    Capacity {
+        limit: usize,
+        count: usize,
+        decoder: Option<(String, String)>,
+        modules: std::collections::BTreeMap<String, usize>,
+    },
     Overlap {
         first: String,
         second: String,
@@ -31,6 +37,25 @@ impl std::fmt::Display for MappingError {
             Self::DuplicateIdentity => f.write_str("mapping catalog contains a duplicate identity"),
             Self::UnsupportedVersion => {
                 f.write_str("mapping selects an unregistered decoder version")
+            }
+            Self::Capacity {
+                limit,
+                count,
+                decoder,
+                modules,
+            } => {
+                write!(
+                    f,
+                    "mapping limit exceeded ({count} mappings, limit {limit})"
+                )?;
+                if let Some((name, version)) = decoder {
+                    write!(f, " for decoder {name} {version}")?;
+                }
+                f.write_str(". Contributions by mapping module")?;
+                for (module, count) in modules {
+                    write!(f, " {module}={count}")?;
+                }
+                Ok(())
             }
             Self::Overlap {
                 first,

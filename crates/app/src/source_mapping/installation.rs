@@ -268,9 +268,16 @@ fn preflight(
     if active {
         effective.insert(candidate.identity().id().into(), candidate.clone());
     }
-    if effective.len() > 64 {
-        return Err(MappingError::InvalidManifest);
+    let retained_active = current
+        .iter()
+        .filter(|installed| {
+            installed.active && installed.manifest.identity().id() != candidate.identity().id()
+        })
+        .count();
+    if retained_active + usize::from(active) > 64 {
+        return Err(MappingError::InvalidDefinition);
     }
+    super::catalog::capacity::validate_capacity(effective.values())?;
     let manifests = effective.values().collect::<Vec<_>>();
     for (i, first) in manifests.iter().enumerate() {
         for second in &manifests[i + 1..] {

@@ -224,3 +224,5 @@ mod workers;
 mod partition_order;
 
 mod cluster;
+
+mod expanded_catalog;

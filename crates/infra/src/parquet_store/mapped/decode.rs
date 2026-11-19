@@ -28,6 +28,7 @@ impl ParquetStore {
             cancel: input.cancel,
         };
         let id = parser.identity_for_source(input.relative_path)?;
+        let catalog = catalog.for_decoder(id);
         let decoder = catalog
             .decoder(id.name, id.version)
             .map_err(irmind_app::source_mapping::MappingError::into_app)?;
@@ -41,8 +42,8 @@ impl ParquetStore {
                 .checked_mul(49)
                 .ok_or_else(invalid_source)?,
         )?;
-        let routes = projection_routes(catalog)?;
-        let mut acc = SourceRecordAccumulator::new(metadata, id, input.size, catalog)?;
+        let routes = projection_routes(&catalog)?;
+        let mut acc = SourceRecordAccumulator::new(metadata, id, input.size, &catalog)?;
         let mut tuple_writer = std::io::BufWriter::new(tuples.as_file_mut());
         let report = super::prepare::decode_projected(
             self,

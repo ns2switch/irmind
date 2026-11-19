@@ -49,3 +49,9 @@ profiles are read in their signed form.
   after retry. Reproduce the artifact bytes and verify the export.
 - Existing signed vectors and reconstruction remain byte-identical.
   Run the same tests with `serde_json/preserve_order`.
+
+Direct ingestion already groups consecutive sources by exact decoder
+identity and acquisition context. A direct group therefore has one
+candidate set. It keeps the existing source-count and raw-byte boundaries,
+with the exact same scoped catalog for ordered streaming, external-sort
+fallback, and retries. Reconstruction uses the signed profile as written.
