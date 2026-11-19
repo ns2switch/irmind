@@ -86,7 +86,7 @@ jobs:
       fail-fast: false
       max-parallel: 2
       matrix:
-        target: [parser_google_workspace, parser_macos, parser_fdr, parser_defender, parser_email, parser_m365, parser_okta, parser_guardduty, parser_vpc_flow, parser_azure_flow, parser_gcp_flow]
+        target: [parser_github_audit, parser_google_workspace, parser_macos, parser_fdr, parser_defender, parser_email, parser_m365, parser_okta, parser_guardduty, parser_vpc_flow, parser_azure_flow, parser_gcp_flow]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:

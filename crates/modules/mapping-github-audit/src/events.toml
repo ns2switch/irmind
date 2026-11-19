@@ -1,0 +1,209 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-github-audit"
+version = "github-audit-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-github-audit"
+parser_versions = ["github-audit-source-v1"]
+action = ["action"]
+
+[[fields]]
+source = ["actor"]
+target = "user.name"
+omit_text = [""]
+observation = { kind = "user", role = "actor", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["user"]
+target = "user.target.name"
+omit_text = [""]
+observation = { kind = "user", role = "target", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["actor_ip"]
+target = "source.ip"
+omit_text = [""]
+conversion = "ip"
+observation = { kind = "ip", role = "source", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["org"]
+target = "cloud.account.id"
+omit_text = [""]
+
+[[fields]]
+source = ["repo"]
+target = "irmind.resource.id"
+omit_text = [""]
+observation = { kind = "resource", role = "target", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["_document_id"]
+target = "irmind.source_event.id"
+omit_text = [""]
+
+[[fields]]
+source = ["user_agent"]
+target = "user_agent.original"
+omit_text = [""]
+
+[[rules]]
+categories = ["iam"]
+types = ["creation"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "org.add_member" }
+
+[[rules]]
+categories = ["iam"]
+types = ["change"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "org.update_member" }
+
+[[rules]]
+categories = ["iam"]
+types = ["deletion"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "org.remove_member" }
+
+[[rules]]
+categories = ["iam"]
+types = ["creation"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "repo.add_member" }
+
+[[rules]]
+categories = ["iam"]
+types = ["deletion"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "repo.remove_member" }
+
+[[rules]]
+categories = ["iam"]
+types = ["creation"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "personal_access_token.create" }
+
+[[rules]]
+categories = ["iam"]
+types = ["info"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "personal_access_token.request_created" }
+
+[[rules]]
+categories = ["iam"]
+types = ["change"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "personal_access_token.credential_regenerated" }
+
+[[rules]]
+categories = ["iam"]
+types = ["creation"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "public_key.create" }
+
+[[rules]]
+categories = ["iam"]
+types = ["deletion"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "public_key.delete" }
+
+[[rules]]
+categories = ["configuration"]
+types = ["change"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "repo.access" }
+
+[[rules]]
+categories = ["configuration"]
+types = ["deletion"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "repo.destroy" }
+
+[[rules]]
+categories = ["configuration"]
+types = ["change"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "repo.transfer" }
+
+[[rules]]
+categories = ["configuration"]
+types = ["change"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "repo.transfer_outgoing" }
+
+[[rules]]
+categories = ["file"]
+types = ["access"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "repo.download_zip" }
+
+[[rules]]
+categories = ["file"]
+types = ["access"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "git.clone" }
+
+[[rules]]
+categories = ["file"]
+types = ["access"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "git.fetch" }
+
+[[rules]]
+categories = ["configuration"]
+types = ["creation"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "repo.create_actions_secret" }
+
+[[rules]]
+categories = ["configuration"]
+types = ["change"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "repo.update_actions_secret" }
+
+[[rules]]
+categories = ["configuration"]
+types = ["deletion"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "repo.remove_actions_secret" }
+
+[[rules]]
+categories = ["configuration"]
+types = ["change"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "repo.update_actions_settings" }
+
+[[rules]]
+categories = ["configuration"]
+types = ["change"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "repo.update_actions_access_settings" }
+
+[[rules]]
+categories = ["configuration"]
+types = ["change"]
+[[rules.when]]
+path = ["action"]
+predicate = { op = "text", value = "repo.set_workflow_permission_can_approve_pr" }

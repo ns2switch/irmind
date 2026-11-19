@@ -1,0 +1,10 @@
+{
+  "synthetic": true,
+  "records": 4,
+  "clone_record": 0,
+  "source_ip": "203.0.113.77",
+  "repository": "synthetic-lab/example",
+  "actions_secret_update_record": 1,
+  "membership_target": "synthetic-contributor",
+  "unclassified_record": 3
+}

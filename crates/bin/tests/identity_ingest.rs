@@ -106,6 +106,14 @@ fn ingest_with_context(
 }
 fn fixture(parser: &str) -> &'static [u8] {
     match parser {
+        #[cfg(feature = "parser-github-audit")]
+        "github-audit" => {
+            include_bytes!("../../testkit/fixtures/parser-github-audit/source/stream.ndjson")
+        }
+        #[cfg(feature = "parser-github-audit")]
+        "github-audit-csv" => {
+            include_bytes!("../../testkit/fixtures/parser-github-audit/source/export.csv")
+        }
         #[cfg(feature = "parser-google-workspace")]
         "google-workspace" => {
             include_bytes!("../../testkit/fixtures/parser-google-workspace/source/events.ndjson")
@@ -144,6 +152,10 @@ fn fixture(parser: &str) -> &'static [u8] {
     }
 }
 const IDENTITY_SOURCES: &[(&str, u64)] = &[
+    #[cfg(feature = "parser-github-audit")]
+    ("github-audit", 4),
+    #[cfg(feature = "parser-github-audit")]
+    ("github-audit-csv", 2),
     #[cfg(feature = "parser-google-workspace")]
     ("google-workspace", 9),
     #[cfg(feature = "parser-macos")]
@@ -304,6 +316,17 @@ fn one_gib_release_google_workspace_throughput() -> Result<(), &'static str> {
     Ok(())
 }
 
+#[cfg(feature = "parser-github-audit")]
+#[test]
+#[ignore = "manual optimized 1 GiB GitHub audit log ingestion benchmark"]
+fn one_gib_release_github_audit_throughput() -> Result<(), &'static str> {
+    if cfg!(debug_assertions) {
+        return Err("Use --release for benchmarks");
+    }
+    benchmark_source("github-audit");
+    Ok(())
+}
+
 fn benchmark_source(name: &str) {
     use std::io::{BufWriter, Write};
     let bench_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target");
@@ -367,6 +390,7 @@ fn benchmark_lines(name: &str) -> (Vec<u8>, Vec<u8>, u64) {
         && name != "fdr"
         && !name.starts_with("macos-")
         && name != "google-workspace"
+        && name != "github-audit"
     {
         value["synthetic_padding"] = serde_json::json!("x".repeat(1024));
     }

@@ -12,6 +12,7 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 | --- | --- | --- | --- | --- |
 | Microsoft 365 Unified Audit Log | Purview CSV, Search-UnifiedAuditLog JSON, Management Activity API JSON | Native AuditData/Operation, CreationTime and workload; 98 | UTC time, actor, mailbox target when explicit, resource, source IP, user agent, workload, finite operation/outcome tables | experimental |
 | Okta System Log | API JSON arrays and JSON/NDJSON exports | eventType, uuid, actor and published time; 98 | Authentication, MFA, administration, policies and impersonation; actor/target and source IP | experimental |
+| GitHub audit log | Organization and enterprise CSV and JSON, native streamed NDJSON | Native action, time and audit identity/scope, 98 | Membership, tokens, keys, repository access and Actions configuration | experimental |
 | Google Workspace Reports API | JSON pages, arrays, objects and NDJSON | Native activity ID, application, time and events, 98 | Login, SAML, administration, OAuth, Drive and Gmail with original fields | experimental |
 | macOS Unified Log and eslogger | JSON arrays, objects and NDJSON | Native Unified Log fields or Endpoint Security envelope and schema, 98 | Process, file, authentication, session, mounts and selected security notifications | experimental |
 | CrowdStrike FDR | JSONL, plain or gzip | Native event_simpleName, cid, aid and timestamp; 98 | Process IDs separated by tenant/sensor, record-scoped PIDs, endpoint roles, DNS/authentication and finite file/registry rules | experimental |
@@ -467,3 +468,20 @@ changes, OAuth consent, Drive downloads and sharing, and Gmail delivery
 subtypes when provided. Use the Gmail native event code to distinguish manual
 forwards (10) and automatic forwards (11). Unknown events remain searchable
 as original data. [Google Gmail activity reference](https://developers.google.com/workspace/admin/reports/v1/appendix/activity/gmail)
+
+## GitHub audit log
+
+In the organization or enterprise audit log, select a bounded time range and
+export JSON or CSV. For audit log streaming, collect the native JSON records from
+the configured destination. Save the original downloads and collection scope.
+Unpack a compressed delivery before ingesting its NDJSON as a separate source.
+Visibility of source IPs and Git events depends on the export and audit
+settings. [GitHub organization audit export](https://docs.github.com/en/enterprise-cloud@latest/organizations/keeping-your-organization-secure/managing-security-settings-for-your-organization/reviewing-the-audit-log-for-your-organization) · [GitHub enterprise audit export](https://docs.github.com/en/enterprise-cloud@latest/admin/monitoring-activity-in-your-enterprise/reviewing-audit-logs-for-your-enterprise/exporting-audit-log-activity-for-your-enterprise)
+
+The module preserves the native event time, actor, organization, repository,
+user agent and source IP when present. It maps documented role and access
+changes, token and key events, repository transfers, visibility and removals,
+Git downloads, and Actions policies and secret metadata. Values such as
+`hashed_token`, `token_scopes` and `programmatic_access_type` are original
+evidence fields. The decoder makes no GitHub request and keeps unknown actions
+searchable. [GitHub's audit event reference](https://docs.github.com/en/organizations/keeping-your-organization-secure/managing-security-settings-for-your-organization/audit-log-events-for-your-organization)

@@ -2289,6 +2289,7 @@ dependencies = [
  "irmind-mod-mapping-falco",
  "irmind-mod-mapping-fdr",
  "irmind-mod-mapping-gcp-audit",
+ "irmind-mod-mapping-github-audit",
  "irmind-mod-mapping-google-workspace",
  "irmind-mod-mapping-guardduty",
  "irmind-mod-mapping-identity",
@@ -2314,6 +2315,7 @@ dependencies = [
  "irmind-mod-parser-fdr",
  "irmind-mod-parser-gcp-audit",
  "irmind-mod-parser-gcp-flow",
+ "irmind-mod-parser-github-audit",
  "irmind-mod-parser-google-workspace",
  "irmind-mod-parser-guardduty",
  "irmind-mod-parser-hayabusa",
@@ -2782,6 +2784,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-mapping-github-audit"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-mapping-tables",
+ "irmind-mod-parser-github-audit",
+ "irmind-testkit",
+]
+
+[[package]]
 name = "irmind-mod-mapping-google-workspace"
 version = "0.1.0"
 dependencies = [
@@ -3053,6 +3066,15 @@ dependencies = [
 
 [[package]]
 name = "irmind-mod-parser-gcp-flow"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-testkit",
+]
+
+[[package]]
+name = "irmind-mod-parser-github-audit"
 version = "0.1.0"
 dependencies = [
  "irmind-app",
