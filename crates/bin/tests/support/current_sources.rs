@@ -5,6 +5,21 @@ use irmind_infra::LocalStore;
 use std::{path::Path, sync::Arc};
 fn registry() -> ModuleRegistry {
     let mut registry = ModuleRegistry::new();
+    #[cfg(feature = "parser-s3-access")]
+    {
+        registry
+            .register(
+                Box::new(irmind_mod_parser_s3_access::S3AccessParser),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+        registry
+            .register(
+                Box::new(irmind_mod_mapping_s3_access::S3AccessMapping::new().unwrap()),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+    }
     #[cfg(feature = "parser-elb")]
     {
         registry

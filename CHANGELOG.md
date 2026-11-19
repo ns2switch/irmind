@@ -13,6 +13,8 @@ and export V8 sections are unchanged; keep the producing version for a case.
   validated unsigned decimal IDs. OS PIDs remain record scoped and Sysmon
   ProcessGuid keeps its existing lifetime scope.
 
+- Add experimental Amazon S3 server access logs with the original request,
+  response status and bytes, and distinct requester and bucket roles.
 - Add experimental AWS Application and Classic Load Balancer access logs in
   bounded text and gzip, with original request and backend fields.
 - Add experimental IIS W3C access logs with header-selected columns and an HTTP

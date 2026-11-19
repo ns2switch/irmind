@@ -15,6 +15,7 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 | Windows DNS Server debug | Packet summary text | Log creation header and packet columns, 79 or 98 | Query, type, response code and remote IP by packet direction | experimental |
 | IIS W3C | Extended access log text | `#Fields` timestamp and HTTP columns, 98 | Method, path, original query string, status, bytes, client and server | experimental |
 | AWS ALB and Classic ELB | Access log text and gzip | Native timestamp, endpoint and request columns, 98 | Method, URL and query string, status, bytes and client/backend addresses | experimental |
+| Amazon S3 server access | Text | Canonical bucket owner, bracketed timestamp and native request fields, 98 | Requester, IP, bucket, operation, request path and query, HTTP status and response bytes | experimental |
 | Route 53 VPC Resolver | JSON, NDJSON | Version 1.x, query, client and VPC or profile, 98 | DNS question, type, class, client, port, response code, account and Region | experimental |
 | GitHub audit log | Organization and enterprise CSV and JSON, native streamed NDJSON | Native action, time and audit identity/scope, 98 | Membership, tokens, keys, repository access and Actions configuration | experimental |
 | Google Workspace Reports API | JSON pages, arrays, objects and NDJSON | Native activity ID, application, time and events, 98 | Login, SAML, administration, OAuth, Drive and Gmail with original fields | experimental |
@@ -496,6 +497,10 @@ rejects the whole file and reports the minimum bytes needed when it stopped.
 ## AWS load balancer access logs
 
 Enable S3 delivery for [Application Load Balancer logs](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html) or [Classic Load Balancer logs](https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/access-log-collection.html). Ingest the original gzip or text files. Plain records carry physical byte offsets. Gzip records retain source hash and ordinal. Compressed and decoded streams each have a 2 GiB limit, with the ordinary case workspace reservation. Future trailing fields remain searchable, and escaped request targets are preserved without URL decoding.
+
+## S3 server access logs
+
+Enable [server access logging](https://docs.aws.amazon.com/AmazonS3/latest/userguide/enable-server-access-logging.html) and copy the native log text from the destination bucket. Review the original operation, response code, requester, bucket and request ID together. The query string and object key retain the original escapes. The HTTP response byte count comes from Bytes Sent. Object Size remains an original field. A request URI with a unique field boundary can contain literal quotes. Ambiguous delimiters are counted as rejected records. The [provider format](https://docs.aws.amazon.com/AmazonS3/latest/userguide/LogFormat.html) describes these limitations and best-effort delivery.
 
 ## Route 53 VPC Resolver
 

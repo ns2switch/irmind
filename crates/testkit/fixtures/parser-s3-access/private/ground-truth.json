@@ -1,0 +1,8 @@
+{
+  "synthetic": true,
+  "source": "access.log",
+  "expected_records": 3,
+  "outcomes": ["success", "failure", "unknown"],
+  "query": "q=%2522",
+  "source_ip": "203.0.113.77"
+}

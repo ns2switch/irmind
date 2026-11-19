@@ -2180,3 +2180,10 @@ ingestion path. Verification passed after timing each case.
 
 The gzip contract verifies the identical decoded fields, retained source
 ordinals, unavailable physical offsets and rejection of corrupt members.
+
+### Amazon S3 server access log ingestion
+
+A release build ingested 1,073,742,108 bytes of synthetic S3 text
+and indexed 2,451,466 records in 74.384 s (13.766 MiB/s).
+The timed path includes signed ingestion. Case verification passed
+after timing stopped.
