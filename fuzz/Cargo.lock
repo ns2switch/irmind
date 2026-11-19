@@ -818,6 +818,7 @@ dependencies = [
  "irmind-mod-parser-kubernetes",
  "irmind-mod-parser-linux",
  "irmind-mod-parser-m365",
+ "irmind-mod-parser-macos",
  "irmind-mod-parser-ocsf",
  "irmind-mod-parser-okta",
  "irmind-mod-parser-plaso",
@@ -1129,6 +1130,14 @@ dependencies = [
 
 [[package]]
 name = "irmind-mod-parser-m365"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+]
+
+[[package]]
+name = "irmind-mod-parser-macos"
 version = "0.1.0"
 dependencies = [
  "irmind-app",

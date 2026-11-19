@@ -1,0 +1,27 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-macos-unified"
+version = "macos-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-macos"
+parser_versions = ["macos-source-v1"]
+format = "macos-unified-log"
+format_version = "log-show-json"
+action = ["eventType"]
+
+[[fields]]
+source = ["processImagePath"]
+target = "process.executable"
+omit_text = ["", "-", "<private>"]
+
+[[fields]]
+source = ["processID"]
+target = "process.pid"
+observation = { kind = "process", role = "subject", scope = { kind = "source_record" } }
+
+[[rules]]
+categories = ["host"]
+types = ["info"]
+[[rules.when]]
+path = ["eventType"]
+predicate = { op = "text", value = "logEvent" }

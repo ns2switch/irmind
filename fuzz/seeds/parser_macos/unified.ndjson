@@ -1,0 +1,2 @@
+{"timestamp":"2026-01-03 10:12:15.123456+0000","eventType":"logEvent","eventMessage":"Synthetic login test","processImagePath":"/usr/libexec/example-service","processID":302,"userID":501,"subsystem":"org.example.synthetic","category":"test"}
+{"timestamp":"2026-01-03 10:12:17.654321+0000","eventType":"futureEventType","eventMessage":"Synthetic novel event type","processImagePath":"/usr/bin/example","processID":303,"userID":501,"bootUUID":"00000000-0000-4000-8000-000000000001"}

@@ -1,0 +1,61 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-macos-authentication"
+version = "macos-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-macos"
+parser_versions = ["macos-source-v1"]
+format = "macos-eslogger"
+format_version = "1"
+native_type = "authentication"
+
+[[when]]
+path = ["action_type"]
+predicate = { op = "number", value = "1" }
+
+[[fields]]
+source = ["process", "executable", "path"]
+target = "process.executable"
+omit_text = ["", "-", "<private>"]
+
+[[fields]]
+source = ["process", "audit_token", "pid"]
+target = "process.pid"
+observation = { kind = "process", role = "subject", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["process", "ppid"]
+target = "process.parent.pid"
+observation = { kind = "process", role = "parent", scope = { kind = "source_record" } }
+
+[[rules]]
+categories = ["authentication"]
+types = ["info"]
+outcome = "success"
+[[rules.when]]
+path = ["event", "authentication", "success"]
+predicate = { op = "boolean", value = true }
+
+[[rules]]
+categories = ["authentication"]
+types = ["info"]
+outcome = "failure"
+[[rules.when]]
+path = ["event", "authentication", "success"]
+predicate = { op = "boolean", value = false }
+
+[[rules]]
+categories = ["authentication"]
+types = ["info"]
+outcome = "unknown"
+[[rules.when]]
+path = ["event", "authentication", "success"]
+predicate = { op = "missing" }
+
+[[rules]]
+categories = ["authentication"]
+types = ["info"]
+outcome = "unknown"
+[[rules.when]]
+path = ["event", "authentication", "success"]
+predicate = { op = "null" }

@@ -14,6 +14,7 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 | --- | --- | --- | --- | --- |
 | Microsoft 365 Unified Audit Log | CSV de Purview, JSON de Search-UnifiedAuditLog y Management Activity API | AuditData/Operation, CreationTime y workload originales; 98 | Instante UTC, actor, buzón objetivo explícito, recurso, IP de origen, user agent, workload y tablas de operación/resultado | experimental |
 | Okta System Log | Arrays JSON de la API y exports JSON/NDJSON | eventType, uuid, actor e instante published; 98 | Autenticación, MFA, administración, políticas y suplantación; actor/objetivo e IP de origen | experimental |
+| Unified Log y eslogger de macOS | Arrays y objetos JSON, y NDJSON | Campos nativos de Unified Log o envoltura y esquema de Endpoint Security, 98 | Proceso, fichero, autenticación, sesión, montajes y notificaciones de seguridad seleccionadas | experimental |
 | CrowdStrike FDR | JSONL, texto o gzip | event_simpleName, cid, aid e instante nativos; 98 | ID de proceso separados por tenant/sensor, PID por registro, extremos de red, DNS/autenticación y tablas de fichero/registro | experimental |
 | Microsoft Defender | CSV/JSON de Advanced Hunting y JSON de Streaming | Timestamp nativo, DeviceId/ActionType o AlertId y estructura: 98 | Proceso/padre, fichero, registro, red y acceso; AlertInfo/AlertEvidence no confirmados | experimental |
 | Correo RFC 5322 | Un `.eml` o volcado de cabeceras por fichero; MIME acotado | From y combinación de cabeceras nativas: 98; cabeceras mínimas: 70, elección del analista | Saltos Received ordenados, direcciones, cabeceras/bytes originales, URLs y metadatos/hashes de adjuntos; resultado desconocido | experimental |
@@ -414,3 +415,38 @@ usa 1 GiB sin relleno en build release: 2.329.158 registros, 63,340 s y
 muestra local, no una comparación de aceleración. El fuzzing ASan completa
 1.121.240 ejecuciones en 601 s sin fallos. Las pruebas con 1/64/1.024/1.025 hosts
 mantienen el límite de 64 y conservan los valores originales en el desbordamiento.
+
+## Exports de macOS
+
+Exporta desde un Mac un intervalo acotado con el comando del sistema `log`.
+Elige el estilo de array JSON o de registros JSON por línea. El segundo
+ejemplo lee un archivo existente. Guarda el export y registra por separado el
+host y el intervalo de recogida. IRMind
+lee el export JSON. Los formatos binarios nativos `.logarchive` y `tracev3`
+quedan fuera de la entrada del parser. [Guía de Apple para consultar Unified Log](https://developer.apple.com/documentation/os/viewing-log-messages)
+
+```sh
+log show --last 1h --timezone UTC --style ndjson > unified.ndjson
+log show --archive case.logarchive --last 1h --timezone UTC --style json > unified.json
+```
+
+Consulta los nombres de eventos de Endpoint Security que admite la versión de
+macOS del recolector. El analista ejecuta `eslogger` como superusuario desde una
+terminal autorizada para acceso total al disco y detiene la recogida al final del
+intervalo. IRMind lee el JSON guardado y conserva las versiones del esquema y del
+mensaje. IRMind no ejecuta los recolectores. [Demostración de eslogger de Apple](https://developer.apple.com/videos/play/wwdc2022/110345/)
+
+```sh
+man eslogger
+sudo eslogger exec fork exit open create rename unlink openssh_login openssh_logout > endpoint.ndjson
+```
+
+Las tablas incluidas interpretan notificaciones del esquema 1. Cubren inicio y
+fin de procesos, actividad de ficheros, autenticación, inicio y cierre de sesión,
+SSH, sudo y su, montajes, TCC, XProtect y Gatekeeper cuando el sistema emite esos
+eventos. Los resultados de acceso explícitos se distinguen como éxito, fallo o
+desconocido. Los PID conservan su ámbito de registro y los mensajes de Unified Log
+se conservan como evidencia original. Los tipos y esquemas desconocidos
+mantienen sus campos originales. Las detecciones de XProtect son hallazgos sin
+confirmar. El instante conserva la precisión exportada y el resto en
+nanosegundos cuando está disponible.

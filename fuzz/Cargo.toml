@@ -12,6 +12,7 @@ export = ["dep:irmind-infra"]
 cargo-fuzz = true
 
 [dependencies]
+irmind-mod-parser-macos = { path = "../crates/modules/parser-macos", version = "0.1.0" }
 irmind-mod-parser-fdr = { path = "../crates/modules/parser-fdr", version = "0.1.0" }
 irmind-mod-mapping-fdr = { path = "../crates/modules/mapping-fdr", version = "0.1.0" }
 irmind-mod-parser-defender = { path = "../crates/modules/parser-defender", version = "0.1.0" }
@@ -288,6 +289,13 @@ bench = false
 [[bin]]
 name = "parser_fdr"
 path = "fuzz_targets/parser_fdr.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_macos"
+path = "fuzz_targets/parser_macos.rs"
 test = false
 doc = false
 bench = false

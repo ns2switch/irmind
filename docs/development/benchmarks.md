@@ -2096,3 +2096,21 @@ include their preflight, hashing, decoding, mapping, Parquet and signing.
 Gzip finishes 3.55 seconds sooner in this pair. The corpus is highly
 compressible, and the timings are one sample per encoding. Both cases pass
 signed verification after timing.
+
+### macOS JSON exports
+
+The optimized ingestion test writes one synthetic GiB per format using the
+standard decoder, mapping and custody path. It verifies the case after each
+measurement. The inputs reuse the small fixtures and remain local.
+
+| Export | Input bytes | Records | Ingestion s | MiB/s |
+| --- | ---: | ---: | ---: | ---: |
+| Unified Log NDJSON | 1,073,741,900 | 4,436,950 | 56.157 | 18.234 |
+| Endpoint Security eslogger NDJSON | 1,073,741,878 | 3,365,962 | 39.993 | 25.605 |
+
+```sh
+cargo test --locked --release -p irmind --test identity_ingest one_gib_release_macos_throughput -- --ignored --nocapture
+```
+
+AddressSanitizer fuzzing covered detection and bounded decoding for 601 seconds
+and executed 5,326,114 inputs without a sanitizer finding.

@@ -183,7 +183,7 @@ def irmind_flag_citations(text: str) -> set[str]:
         # still receive strict validation; a repository named irmind-skills
         # is not an invocation of the irmind executable.
         external = re.match(
-            r"^\s*(?:\$ )?(?:cargo(?:\s+\+[A-Za-z0-9_.-]+)?\s+(?:test|build|clippy|nextest\s+run)\s|ollama\s+(?:pull|create|show)\s|gcloud\s|gh\s+secret\s+set\s|docker\s+compose\s|curl\s|codesign\s|spctl\s|xcrun\s+stapler\s|"
+            r"^\s*(?:\$ )?(?:cargo(?:\s+\+[A-Za-z0-9_.-]+)?\s+(?:test|build|clippy|nextest\s+run)\s|ollama\s+(?:pull|create|show)\s|gcloud\s|gh\s+secret\s+set\s|docker\s+compose\s|curl\s|codesign\s|spctl\s|xcrun\s+stapler\s|log\s+show\s|"
             r"python3\s+(?:scripts/hunteval_benchmark\.py|tools/real-validation/lab\.py)\s)",
             line,
         )

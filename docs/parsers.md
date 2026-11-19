@@ -12,6 +12,7 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 | --- | --- | --- | --- | --- |
 | Microsoft 365 Unified Audit Log | Purview CSV, Search-UnifiedAuditLog JSON, Management Activity API JSON | Native AuditData/Operation, CreationTime and workload; 98 | UTC time, actor, mailbox target when explicit, resource, source IP, user agent, workload, finite operation/outcome tables | experimental |
 | Okta System Log | API JSON arrays and JSON/NDJSON exports | eventType, uuid, actor and published time; 98 | Authentication, MFA, administration, policies and impersonation; actor/target and source IP | experimental |
+| macOS Unified Log and eslogger | JSON arrays, objects and NDJSON | Native Unified Log fields or Endpoint Security envelope and schema, 98 | Process, file, authentication, session, mounts and selected security notifications | experimental |
 | CrowdStrike FDR | JSONL, plain or gzip | Native event_simpleName, cid, aid and timestamp; 98 | Process IDs separated by tenant/sensor, record-scoped PIDs, endpoint roles, DNS/authentication and finite file/registry rules | experimental |
 | Microsoft Defender | Advanced Hunting CSV/JSON and Streaming JSON | Native Timestamp, DeviceId/ActionType or AlertId, plus source layout: 98 | Process/parent, file, registry, network and logon; AlertInfo/AlertEvidence remain unconfirmed | experimental |
 | RFC 5322 email | One `.eml` or header dump per file; bounded MIME parts | From plus native header combination: 98; minimal headers: 70, analyst choice | Ordered Received hops, addresses, raw headers/body bytes, literal URLs and attachment metadata/hashes; email outcome stays unknown | experimental |
@@ -413,3 +414,36 @@ post-ingest verification passes outside the timed interval. It is one local
 sample, not a speedup comparison. AddressSanitizer completes 1,121,240 executions
 in 601 s without failures. The 1/64/1,024/1,025-host tests keep the cap of 64 and
 retain original values in overflow.
+
+## macOS exports
+
+Export a bounded window from a Mac with the system `log` command. Choose the
+JSON array or line-delimited JSON style. The second example reads an existing
+archive. Keep the export and record the host and collection window separately. IRMind consumes the JSON
+export. The native binary formats `.logarchive` and `tracev3` are outside this
+parser's input. [Apple's guide to viewing Unified Log messages](https://developer.apple.com/documentation/os/viewing-log-messages)
+
+```sh
+log show --last 1h --timezone UTC --style ndjson > unified.ndjson
+log show --archive case.logarchive --last 1h --timezone UTC --style json > unified.json
+```
+
+Use the list of Endpoint Security event names shipped with the collector's macOS
+version. The analyst runs `eslogger` as superuser from a terminal they have
+granted Full Disk Access and stops the collection at the end of the window.
+IRMind reads the saved JSON and preserves the outer schema and message versions.
+It does not start either Apple collector. [Apple's eslogger walkthrough](https://developer.apple.com/videos/play/wwdc2022/110345/)
+
+```sh
+man eslogger
+sudo eslogger exec fork exit open create rename unlink openssh_login openssh_logout > endpoint.ndjson
+```
+
+The included tables interpret schema-1 notifications. They cover process
+start/exit, file activity, authentication, login/logout, SSH, sudo and su,
+mounts, TCC, XProtect and Gatekeeper where the selected OS emits those events.
+Explicit login results map to success, failure or unknown. Process IDs stay
+record scoped and the text of Unified Log messages stays original evidence.
+Unknown event types and schemas retain their original fields. XProtect detection
+notifications remain unconfirmed findings. The precision of an exported
+timestamp is retained, including the nanosecond remainder where supplied.

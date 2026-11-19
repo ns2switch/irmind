@@ -52,6 +52,7 @@ pub(super) fn module_statuses(
 }
 
 const PARSER_STATUSES: &[(&str, bool)] = &[
+    ("parser-macos", cfg!(feature = "parser-macos")),
     ("parser-fdr", cfg!(feature = "parser-fdr")),
     ("parser-defender", cfg!(feature = "parser-defender")),
     ("parser-email", cfg!(feature = "parser-email")),

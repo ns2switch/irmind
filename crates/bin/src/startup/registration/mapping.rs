@@ -79,6 +79,11 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
     Ok(())
 }
 fn register_export_mappings(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(feature = "mapping-macos")]
+    registry.register(
+        Box::new(irmind_mod_mapping_macos::MacosMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
     #[cfg(all(feature = "mapping-fdr", feature = "parser-fdr"))]
     registry.register(
         Box::new(irmind_mod_mapping_fdr::FdrMapping::new()?),
@@ -305,6 +310,10 @@ mod tests {
         check_catalog(&registry);
     }
     fn register_identity_decoders(registry: &mut ModuleRegistry) {
+        #[cfg(feature = "parser-macos")]
+        registry
+            .add_source_decoder(Arc::new(irmind_mod_parser_macos::MacosSourceDecoder))
+            .unwrap();
         #[cfg(all(feature = "mapping-fdr", feature = "parser-fdr"))]
         registry
             .add_source_decoder(Arc::new(irmind_mod_parser_fdr::FdrSourceDecoder))
@@ -351,8 +360,13 @@ mod tests {
         assert!(catalog.supports_decoder("parser-json", "json-source-v1"));
         assert!(catalog.supports_decoder("parser-linux", "linux-source-v1"));
         assert_eq!(
+            catalog.supports_decoder("parser-macos", "macos-source-v1"),
+            cfg!(feature = "parser-macos")
+        );
+        assert_eq!(
             catalog.snapshots().unwrap().len(),
-            2 + usize::from(cfg!(all(feature = "mapping-fdr", feature = "parser-fdr")))
+            2 + usize::from(cfg!(feature = "mapping-macos"))
+                + usize::from(cfg!(all(feature = "mapping-fdr", feature = "parser-fdr")))
                 + usize::from(cfg!(all(
                     feature = "mapping-defender",
                     feature = "parser-defender"
