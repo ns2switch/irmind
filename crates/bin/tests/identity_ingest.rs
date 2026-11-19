@@ -73,7 +73,7 @@ fn ingest_with_context(
             sample: &sample,
             parser_override: None,
             forced: false,
-            time_context: time_context.as_ref(),
+            time_context,
             cluster_context,
         })
         .unwrap();
@@ -366,9 +366,116 @@ fn one_gib_release_windows_dns_throughput() -> Result<(), &'static str> {
     if cfg!(debug_assertions) {
         return Err("source throughput benchmarks require a release build");
     }
-    benchmark_source("windows-dns");
+    benchmark_rotated("windows-dns");
     Ok(())
 }
+#[cfg(feature = "parser-windows-dns")]
+fn benchmark_rotated(name: &str) {
+    use irmind_app::{ParserTimeBasis, ParserTimeContext};
+    use std::io::{BufWriter, Read, Write};
+
+    const GIB: u64 = 1024 * 1024 * 1024;
+    const ROTATION: u64 = 4 * 1024 * 1024;
+    let bench_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target");
+    let root = tempfile::Builder::new()
+        .prefix("irmind-rotated-bench-")
+        .tempdir_in(bench_root)
+        .unwrap();
+    let originals = root.path().join("originals");
+    fs::create_dir(&originals).unwrap();
+    let store = Arc::new(current_sources::open(&root.path().join("data")));
+    let engine = engine(&store);
+    let case = engine
+        .create_case("Synthetic rotated logs", "Local only")
+        .unwrap();
+
+    let (header, record, per_row) = benchmark_lines(name);
+    let catalog = current_sources::catalog();
+    let mut selections = BTreeMap::new();
+    let mut files = Vec::new();
+    let mut bytes = 0;
+    let mut count = 0;
+    let time_context = (name == "windows-dns")
+        .then(|| ParserTimeContext::new(2026, 0, false, ParserTimeBasis::Command).unwrap());
+    while bytes < GIB {
+        let file = format!("{name}-{:04}.log", files.len());
+        let rotation = if name == "windows-dns" {
+            format!("Log rotation {}\n", files.len())
+        } else {
+            format!("#Remark: Synthetic rotation {}\n", files.len())
+        };
+        let mut writer = BufWriter::new(fs::File::create(originals.join(&file)).unwrap());
+        writer.write_all(&header).unwrap();
+        writer.write_all(rotation.as_bytes()).unwrap();
+        let mut written = (header.len() + rotation.len()) as u64;
+        while written < ROTATION {
+            writer.write_all(&record).unwrap();
+            written += record.len() as u64;
+            count += per_row;
+        }
+        writer.flush().unwrap();
+        bytes += written;
+        let mut sample = Vec::new();
+        fs::File::open(originals.join(&file))
+            .unwrap()
+            .take(65_536)
+            .read_to_end(&mut sample)
+            .unwrap();
+        let selected = catalog
+            .select_source(ParserSelectionRequest {
+                source: &file,
+                sample: &sample,
+                parser_override: None,
+                forced: false,
+                time_context,
+                cluster_context: None,
+            })
+            .unwrap();
+        selections.insert(file.clone(), selected.selection);
+        files.push(file);
+    }
+    let base_parser = current_sources::parser(&format!("parser-{name}"));
+    let parser = match time_context {
+        Some(context) => base_parser.with_time_context(&context).unwrap(),
+        None => base_parser,
+    };
+    let started = std::time::Instant::now();
+    let ingested = LargeCaseUseCases {
+        engine: &engine,
+        store: store.as_ref(),
+        parser: parser.as_ref(),
+    }
+    .ingest_local_batch_selected(
+        &case.id,
+        &originals,
+        &files,
+        false,
+        &selections,
+        &CancellationToken::new(),
+    )
+    .unwrap();
+    let seconds = started.elapsed().as_secs_f64();
+    assert_eq!(ingested.len(), files.len());
+    let sets = store
+        .entries(&case.id)
+        .unwrap()
+        .into_iter()
+        .filter(|entry| entry.kind == AuditEventKind::SourceRecordSetV1)
+        .map(|entry| {
+            irmind_domain::SourceRecordSetV1::decode(&entry.payload)
+                .unwrap()
+                .records()
+        })
+        .sum::<u64>();
+    assert_eq!(sets, count);
+    println!(
+        "ROTATED_SOURCE_BENCH parser={name} files={} bytes={bytes} records={count} seconds={seconds:.3} MiB_per_second={:.3}",
+        files.len(),
+        f64::from(u32::try_from(bytes).unwrap()) / 1_048_576.0 / seconds
+    );
+    engine.verify(&case.id).unwrap();
+}
+
 fn benchmark_source(name: &str) {
     use std::io::{BufWriter, Write};
     let bench_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target");

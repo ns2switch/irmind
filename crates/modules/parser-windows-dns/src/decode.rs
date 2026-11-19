@@ -50,7 +50,6 @@ fn decode_packet(bytes: &[u8], context: ParserTimeContext) -> Result<DecodedSour
         .ok_or_else(invalid)?;
     let timestamp = IndexedTime::from_rfc3339(&datetime, true).map_err(|_| invalid())?;
     let mut fields = vec![
-        ("line", raw.to_owned()),
         ("date", packet.date.to_owned()),
         ("clock", packet.clock.to_owned()),
         ("meridiem", packet.meridiem.to_owned()),
