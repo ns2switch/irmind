@@ -106,3 +106,68 @@ fn mixed_order_group_only_creates_row_spools_for_disordered_sources() {
     let spool = store.case_dir(&id).unwrap().join("spool");
     assert_eq!(std::fs::read_dir(spool).unwrap().count(), 0);
 }
+
+#[test]
+fn fdr_direct_group_aborts_when_the_gzip_grows_after_admission() {
+    use irmind_app::{SourceFailureReason, source_mapping::MappingCatalog};
+    use irmind_mod_parser_fdr::FdrSourceDecoder;
+    use std::{fs, io::Write as _, sync::Arc};
+
+    let root = tempfile::tempdir().unwrap();
+    let case = irmind_domain::CaseId::parse("11111111-1111-1111-1111-111111111111").unwrap();
+    let cancel = CancellationToken::new();
+    let name = "source.gz";
+    let paths = [name.into()];
+    let source = root.path().join(name);
+    let gzip = include_bytes!("../../../../../../fuzz/seeds/parser_fdr/synthetic.ndjson.gz");
+    fs::write(&source, gzip).unwrap();
+    let catalog =
+        Arc::new(MappingCatalog::freeze(vec![Arc::new(FdrSourceDecoder)], vec![]).unwrap());
+    let parser = catalog
+        .decoder_selection("parser-fdr", "fdr-source-v1")
+        .unwrap();
+    let store = ParquetStore::open_mapped(&root.path().join("case-data"), catalog.clone()).unwrap();
+    let request = MappedIngestRequest {
+        case_id: &case,
+        source_root: root.path(),
+        relative_paths: &paths,
+        copy_original: false,
+        parser: &parser,
+        committed_artifacts: CommittedArtifacts::Slice(&[]),
+        limits: irmind_app::PartitionLimits::default(),
+    };
+    let reservations = store.preflight_direct_group(&request, 4, &cancel).unwrap();
+
+    // Expand the valid original after preflight and before hashing/normalizing.
+    let mut mutated = fs::OpenOptions::new().append(true).open(&source).unwrap();
+    mutated.write_all(gzip).unwrap();
+    drop(mutated);
+
+    let inputs = store
+        .direct_inputs(&request, &paths, 4, &reservations, &cancel)
+        .unwrap();
+    let identity = request.parser.identity_for_source(name).unwrap();
+    let routes = crate::parquet_store::mapped::projection_routes_for_direct(&catalog)
+        .unwrap()
+        .into_iter()
+        .map(|(mapping, route)| (route, mapping))
+        .collect();
+    let mut writer = DirectWriting::new(group_identity(&request, identity), identity, routes, None);
+    let mut allocator = super::super::Allocator::from_signed(&[], request.limits).unwrap();
+    let failure = store
+        .stream_direct_chunk(&request, inputs, &mut writer, &mut allocator, &cancel)
+        .err()
+        .unwrap();
+    assert!(
+        matches!(&failure, AppError::SourceFailure(rejected)
+            if rejected.source() == name && rejected.reason() == SourceFailureReason::Limit),
+        "{failure:?}"
+    );
+    drop(writer);
+    assert_eq!(
+        fs::read_dir(store.spool_dir(&case).unwrap())
+            .unwrap()
+            .count(),
+        0
+    );
+}

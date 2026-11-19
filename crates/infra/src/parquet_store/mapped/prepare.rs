@@ -62,7 +62,8 @@ pub(super) fn decode_projected(
     input.decode_budget = DecodeBudget::new(
         NonZeroUsize::new(budget.workers() - lanes).ok_or_else(invalid_source)?,
         budget.queued_bytes() - lanes * LANE_BYTES,
-    );
+    )
+    .with_decoded_byte_ceiling(budget.decoded_byte_ceiling());
     let transform = acc.preparer();
     let prepare = |sources, send: &mut dyn FnMut(Vec<_>, bool) -> Result<(), AppError>| {
         batches::prepare(sources, send, |source| {

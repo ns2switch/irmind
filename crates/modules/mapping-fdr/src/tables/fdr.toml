@@ -1,0 +1,427 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "fdr-native-events"
+version = "fdr-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-fdr"
+parser_versions = ["fdr-source-v1"]
+format = "falcon-fdr"
+format_version = "fdr-source-v1"
+action = ["event_simpleName"]
+[partition]
+host = ["aid"]
+
+[[fields]]
+source = ["aid"]
+target = "host.id"
+omit_text = ["", "-"]
+observation = { kind = "host", role = "observer", scope = { kind = "account", path = ["cid"] } }
+
+[[fields]]
+source = ["ComputerName"]
+target = "host.name"
+omit_text = ["", "-"]
+
+[[rules]]
+categories = ["process"]
+types = ["start"]
+outcome = "unknown"
+[[rules.when]]
+path = ["event_simpleName"]
+predicate = { op = "text", value = "ProcessRollup2" }
+
+[[rules.fields]]
+source = ["TargetProcessId"]
+target = "process.entity_id"
+omit_text = ["", "-"]
+conversion = "u64_id"
+observation = { kind = "process", role = "subject", scope = { kind = "provider_process", path = { provider = "crowdstrike-fdr", tenant = ["cid"], host = ["aid"] } } }
+
+[[rules.fields]]
+source = ["ParentProcessId"]
+target = "process.parent.entity_id"
+omit_text = ["", "-"]
+conversion = "u64_id"
+observation = { kind = "process", role = "parent", scope = { kind = "provider_process", path = { provider = "crowdstrike-fdr", tenant = ["cid"], host = ["aid"] } } }
+[[rules.fields.when]]
+path = ["ParentProcessId"]
+predicate = { op = "present" }
+
+[[rules.fields]]
+source = ["RawProcessId"]
+target = "process.pid"
+omit_text = ["", "-"]
+conversion = "decimal"
+observation = { kind = "process", role = "subject", scope = { kind = "source_record" } }
+
+[[rules.fields]]
+source = ["ImageFileName"]
+target = "process.executable"
+omit_text = ["", "-"]
+
+[[rules.fields]]
+source = ["CommandLine"]
+target = "process.command_line"
+omit_text = ["", "-"]
+
+[[rules.fields]]
+source = ["ParentBaseFileName"]
+target = "process.parent.name"
+omit_text = ["", "-"]
+
+[[rules.fields]]
+source = ["UserSid"]
+target = "user.id"
+omit_text = ["", "-"]
+observation = { kind = "user", role = "actor", scope = { kind = "source_record" } }
+
+[[rules.fields]]
+source = ["UserName"]
+target = "user.name"
+omit_text = ["", "-"]
+
+[[rules.fields]]
+source = ["MD5HashData"]
+target = "process.hash.md5"
+omit_text = ["", "-"]
+conversion = "md5"
+
+[[rules.fields]]
+source = ["SHA256HashData"]
+target = "process.hash.sha256"
+omit_text = ["", "-"]
+conversion = "sha256"
+
+[[rules]]
+categories = ["process"]
+types = ["start"]
+outcome = "unknown"
+[[rules.when]]
+path = ["event_simpleName"]
+predicate = { op = "text", value = "SyntheticProcessRollup2" }
+
+[[rules.fields]]
+source = ["TargetProcessId"]
+target = "process.entity_id"
+omit_text = ["", "-"]
+conversion = "u64_id"
+observation = { kind = "process", role = "subject", scope = { kind = "provider_process", path = { provider = "crowdstrike-fdr", tenant = ["cid"], host = ["aid"] } } }
+
+[[rules.fields]]
+source = ["ParentProcessId"]
+target = "process.parent.entity_id"
+omit_text = ["", "-"]
+conversion = "u64_id"
+observation = { kind = "process", role = "parent", scope = { kind = "provider_process", path = { provider = "crowdstrike-fdr", tenant = ["cid"], host = ["aid"] } } }
+[[rules.fields.when]]
+path = ["ParentProcessId"]
+predicate = { op = "present" }
+
+[[rules.fields]]
+source = ["RawProcessId"]
+target = "process.pid"
+omit_text = ["", "-"]
+conversion = "decimal"
+observation = { kind = "process", role = "subject", scope = { kind = "source_record" } }
+
+[[rules.fields]]
+source = ["ImageFileName"]
+target = "process.executable"
+omit_text = ["", "-"]
+
+[[rules.fields]]
+source = ["CommandLine"]
+target = "process.command_line"
+omit_text = ["", "-"]
+
+[[rules.fields]]
+source = ["ParentBaseFileName"]
+target = "process.parent.name"
+omit_text = ["", "-"]
+
+[[rules.fields]]
+source = ["UserSid"]
+target = "user.id"
+omit_text = ["", "-"]
+observation = { kind = "user", role = "actor", scope = { kind = "source_record" } }
+
+[[rules.fields]]
+source = ["UserName"]
+target = "user.name"
+omit_text = ["", "-"]
+
+[[rules.fields]]
+source = ["MD5HashData"]
+target = "process.hash.md5"
+omit_text = ["", "-"]
+conversion = "md5"
+
+[[rules.fields]]
+source = ["SHA256HashData"]
+target = "process.hash.sha256"
+omit_text = ["", "-"]
+conversion = "sha256"
+
+[[rules]]
+categories = ["network"]
+types = ["connection"]
+outcome = "unknown"
+[[rules.when]]
+path = ["event_simpleName"]
+predicate = { op = "text", value = "NetworkConnectIP4" }
+
+[[rules.fields]]
+source = ["ContextProcessId"]
+target = "process.entity_id"
+omit_text = ["", "-"]
+conversion = "u64_id"
+observation = { kind = "process", role = "subject", scope = { kind = "provider_process", path = { provider = "crowdstrike-fdr", tenant = ["cid"], host = ["aid"] } } }
+
+[[rules.fields]]
+source = ["LocalAddressIP4"]
+target = "source.ip"
+omit_text = ["", "-"]
+conversion = "ip"
+observation = { kind = "ip", role = "source", scope = { kind = "global" } }
+
+[[rules.fields]]
+source = ["LocalPort"]
+target = "source.port"
+omit_text = ["", "-"]
+conversion = "decimal"
+
+[[rules.fields]]
+source = ["RemoteAddressIP4"]
+target = "destination.ip"
+omit_text = ["", "-"]
+conversion = "ip"
+observation = { kind = "ip", role = "destination", scope = { kind = "global" } }
+
+[[rules.fields]]
+source = ["RemotePort"]
+target = "destination.port"
+omit_text = ["", "-"]
+conversion = "decimal"
+
+[[rules]]
+categories = ["network"]
+types = ["connection"]
+outcome = "unknown"
+[[rules.when]]
+path = ["event_simpleName"]
+predicate = { op = "text", value = "NetworkConnectIP6" }
+
+[[rules.fields]]
+source = ["ContextProcessId"]
+target = "process.entity_id"
+omit_text = ["", "-"]
+conversion = "u64_id"
+observation = { kind = "process", role = "subject", scope = { kind = "provider_process", path = { provider = "crowdstrike-fdr", tenant = ["cid"], host = ["aid"] } } }
+
+[[rules.fields]]
+source = ["LocalAddressIP6"]
+target = "source.ip"
+omit_text = ["", "-"]
+conversion = "ip"
+observation = { kind = "ip", role = "source", scope = { kind = "global" } }
+
+[[rules.fields]]
+source = ["LocalPort"]
+target = "source.port"
+omit_text = ["", "-"]
+conversion = "decimal"
+
+[[rules.fields]]
+source = ["RemoteAddressIP6"]
+target = "destination.ip"
+omit_text = ["", "-"]
+conversion = "ip"
+observation = { kind = "ip", role = "destination", scope = { kind = "global" } }
+
+[[rules.fields]]
+source = ["RemotePort"]
+target = "destination.port"
+omit_text = ["", "-"]
+conversion = "decimal"
+
+[[rules]]
+categories = ["network"]
+types = ["start"]
+outcome = "unknown"
+[[rules.when]]
+path = ["event_simpleName"]
+predicate = { op = "text", value = "NetworkListenIP4" }
+
+[[rules.fields]]
+source = ["ContextProcessId"]
+target = "process.entity_id"
+omit_text = ["", "-"]
+conversion = "u64_id"
+observation = { kind = "process", role = "subject", scope = { kind = "provider_process", path = { provider = "crowdstrike-fdr", tenant = ["cid"], host = ["aid"] } } }
+
+[[rules.fields]]
+source = ["LocalAddressIP4"]
+target = "source.ip"
+omit_text = ["", "-"]
+conversion = "ip"
+observation = { kind = "ip", role = "source", scope = { kind = "global" } }
+
+[[rules.fields]]
+source = ["LocalPort"]
+target = "source.port"
+omit_text = ["", "-"]
+conversion = "decimal"
+
+[[rules]]
+categories = ["network"]
+types = ["start"]
+outcome = "unknown"
+[[rules.when]]
+path = ["event_simpleName"]
+predicate = { op = "text", value = "NetworkListenIP6" }
+
+[[rules.fields]]
+source = ["ContextProcessId"]
+target = "process.entity_id"
+omit_text = ["", "-"]
+conversion = "u64_id"
+observation = { kind = "process", role = "subject", scope = { kind = "provider_process", path = { provider = "crowdstrike-fdr", tenant = ["cid"], host = ["aid"] } } }
+
+[[rules.fields]]
+source = ["LocalAddressIP6"]
+target = "source.ip"
+omit_text = ["", "-"]
+conversion = "ip"
+observation = { kind = "ip", role = "source", scope = { kind = "global" } }
+
+[[rules.fields]]
+source = ["LocalPort"]
+target = "source.port"
+omit_text = ["", "-"]
+conversion = "decimal"
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+outcome = "unknown"
+[[rules.when]]
+path = ["event_simpleName"]
+predicate = { op = "text", value = "DnsRequest" }
+
+[[rules.fields]]
+source = ["ContextProcessId"]
+target = "process.entity_id"
+omit_text = ["", "-"]
+conversion = "u64_id"
+observation = { kind = "process", role = "subject", scope = { kind = "provider_process", path = { provider = "crowdstrike-fdr", tenant = ["cid"], host = ["aid"] } } }
+
+[[rules.fields]]
+source = ["DomainName"]
+target = "dns.question.name"
+omit_text = ["", "-"]
+conversion = "domain"
+observation = { kind = "domain", role = "subject", scope = { kind = "global" } }
+
+[[rules]]
+categories = ["authentication"]
+types = ["start"]
+outcome = "success"
+[[rules.when]]
+path = ["event_simpleName"]
+predicate = { op = "text", value = "UserLogon" }
+
+[[rules.fields]]
+source = ["UserName"]
+target = "user.target.name"
+omit_text = ["", "-"]
+observation = { kind = "user", role = "target", scope = { kind = "source_record" } }
+
+[[rules.fields]]
+source = ["UserSid"]
+target = "user.target.id"
+omit_text = ["", "-"]
+
+[[rules.fields]]
+source = ["LogonDomain"]
+target = "user.target.domain"
+omit_text = ["", "-"]
+
+[[rules.fields]]
+source = ["RemoteAddressIP4"]
+target = "source.ip"
+omit_text = ["", "-"]
+conversion = "ip"
+observation = { kind = "ip", role = "source", scope = { kind = "global" } }
+
+[[rules]]
+categories = ["authentication"]
+types = ["start"]
+outcome = "failure"
+[[rules.when]]
+path = ["event_simpleName"]
+predicate = { op = "text", value = "UserLogonFailed2" }
+
+[[rules.fields]]
+source = ["UserName"]
+target = "user.target.name"
+omit_text = ["", "-"]
+observation = { kind = "user", role = "target", scope = { kind = "source_record" } }
+
+[[rules.fields]]
+source = ["UserSid"]
+target = "user.target.id"
+omit_text = ["", "-"]
+
+[[rules.fields]]
+source = ["LogonDomain"]
+target = "user.target.domain"
+omit_text = ["", "-"]
+
+[[rules.fields]]
+source = ["RemoteAddressIP4"]
+target = "source.ip"
+omit_text = ["", "-"]
+conversion = "ip"
+observation = { kind = "ip", role = "source", scope = { kind = "global" } }
+
+[[rules]]
+categories = ["file"]
+types = ["change"]
+outcome = "unknown"
+[[rules.when]]
+path = ["event_simpleName"]
+predicate = { op = "text", value = "PeFileWritten" }
+
+[[rules.fields]]
+source = ["TargetFileName"]
+target = "file.path"
+omit_text = ["", "-"]
+observation = { kind = "file", role = "target", scope = { kind = "source_record" } }
+
+[[rules]]
+categories = ["registry"]
+types = ["change"]
+outcome = "unknown"
+[[rules.when]]
+path = ["event_simpleName"]
+predicate = { op = "text", value = "AsepValueUpdate" }
+
+[[rules.fields]]
+source = ["RegObjectName"]
+target = "registry.key"
+omit_text = ["", "-"]
+observation = { kind = "registry", role = "target", scope = { kind = "source_record" } }
+
+[[rules]]
+categories = ["registry"]
+types = ["change"]
+outcome = "unknown"
+[[rules.when]]
+path = ["event_simpleName"]
+predicate = { op = "text", value = "RegGenericValueUpdate" }
+
+[[rules.fields]]
+source = ["RegObjectName"]
+target = "registry.key"
+omit_text = ["", "-"]
+observation = { kind = "registry", role = "target", scope = { kind = "source_record" } }

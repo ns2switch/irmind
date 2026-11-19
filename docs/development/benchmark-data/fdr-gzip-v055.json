@@ -1,0 +1,26 @@
+{
+  "build": "release",
+  "implementation_commit": "9a7c4626b6e29171981b8a27a7ae4f16b953a254",
+  "decoder": "parser-fdr/fdr-source-v1",
+  "corpus": "identical repeated synthetic ProcessRollup2 records; no padding",
+  "samples_per_encoding": 1,
+  "decoded_bytes": 1073741838,
+  "records": 2329158,
+  "timing_includes": ["selection", "source preflight", "hashing", "decoding", "mapping", "Parquet", "signed publication"],
+  "timing_excludes": ["corpus generation", "post-ingest verification", "separately timed preflight"],
+  "gzip_preflight_count_buffer_bytes": 16384,
+  "jsonl": {
+    "physical_bytes": 1073741838,
+    "ingest_seconds": 71.876970,
+    "decoded_mib_per_second": 14.247,
+    "separate_preflight_seconds": 0.000006,
+    "verification": "passed"
+  },
+  "gzip": {
+    "physical_bytes": 14589561,
+    "ingest_seconds": 68.322552,
+    "decoded_mib_per_second": 14.988,
+    "separate_preflight_seconds": 0.289254,
+    "verification": "passed"
+  }
+}

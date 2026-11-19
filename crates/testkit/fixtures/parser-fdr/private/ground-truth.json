@@ -1,0 +1,17 @@
+{
+  "synthetic": true,
+  "records": 11,
+  "authentication_failure_record": 7,
+  "target": "synthetic-user",
+  "source_ip": "203.0.113.77",
+  "provider_process_id": "4294967338",
+  "process_network_records": [
+    0,
+    2,
+    3,
+    4,
+    5
+  ],
+  "tenant": "00000000000000000000000000000001",
+  "host": "00000000000000000000000000000100"
+}

@@ -30,6 +30,7 @@ toml = "0.9"
 tempfile = "3"
 
 [dev-dependencies]
+irmind-mod-parser-fdr = { path = "../modules/parser-fdr", version = "0.1.0" }
 irmind-mod-parser-azure-flow = { path = "../modules/parser-azure-flow", version = "0.1.0" }
 irmind-mod-parser-gcp-flow = { path = "../modules/parser-gcp-flow", version = "0.1.0" }
 irmind-mod-parser-vpc-flow = { path = "../modules/parser-vpc-flow", version = "0.1.0" }

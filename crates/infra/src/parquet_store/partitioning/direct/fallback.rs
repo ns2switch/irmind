@@ -1,5 +1,9 @@
 //! Rebuild a provisional mixed-order group. Only disordered sources get a row spool.
-use super::super::{Allocator, ordered::DirectChunk, staging::Input};
+use super::super::{
+    Allocator,
+    ordered::DirectChunk,
+    staging::{Input, SourceReservation},
+};
 use super::{
     AppError, CancellationToken, DirectWriting, MappedIngestRequest, ParquetStore, invalid_source,
     read::{self, OrderHints, Plan},
@@ -12,7 +16,7 @@ pub(super) struct Replay<'a, 'source> {
     pub(super) store: &'a ParquetStore,
     pub(super) request: &'a MappedIngestRequest<'source>,
     pub(super) cancel: &'a CancellationToken,
-    pub(super) budgets: &'a BTreeMap<String, u64>,
+    pub(super) budgets: &'a BTreeMap<String, SourceReservation>,
 }
 
 impl Replay<'_, '_> {

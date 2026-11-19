@@ -106,6 +106,8 @@ fn ingest_with_context(
 }
 fn fixture(parser: &str) -> &'static [u8] {
     match parser {
+        #[cfg(feature = "parser-fdr")]
+        "fdr" => include_bytes!("../../testkit/fixtures/parser-fdr/source/events.ndjson"),
         #[cfg(feature = "parser-defender")]
         "defender" => include_bytes!("../../testkit/fixtures/parser-defender/source/events.ndjson"),
         #[cfg(feature = "parser-email")]
@@ -146,6 +148,8 @@ fn identity_failures_keep_roles_originals_and_signed_export() {
         ("email", 7),
         #[cfg(feature = "parser-defender")]
         ("defender", 9),
+        #[cfg(feature = "parser-fdr")]
+        ("fdr", 11),
         ("m365", 8),
         ("okta", 7),
         #[cfg(feature = "parser-guardduty")]
@@ -177,6 +181,7 @@ fn identity_failures_keep_roles_originals_and_signed_export() {
             .unwrap()
             .len(),
         2 + usize::from(cfg!(feature = "parser-defender"))
+            + usize::from(cfg!(feature = "parser-fdr"))
     );
     engine.verify(&case.id).unwrap();
     let parser = current_sources::parser("parser-m365");
@@ -310,7 +315,7 @@ fn benchmark_lines(name: &str) -> (Vec<u8>, Vec<u8>, u64) {
         return (header, row, 1);
     }
     let mut value: serde_json::Value = serde_json::from_slice(first).unwrap();
-    if !name.starts_with("azure-") && name != "gcp-flow" && name != "defender" {
+    if !name.starts_with("azure-") && name != "gcp-flow" && name != "defender" && name != "fdr" {
         value["synthetic_padding"] = serde_json::json!("x".repeat(1024));
     }
     let mut row = serde_json::to_vec(&value).unwrap();
@@ -334,7 +339,11 @@ fn flow_host_partitions_preserve_overflow_values() {
 fn defender_host_partitions_preserve_overflow_values() {
     assert_host_partitions("defender");
 }
-#[cfg(any(feature = "parser-vpc-flow", feature = "parser-defender"))]
+#[cfg(any(
+    feature = "parser-vpc-flow",
+    feature = "parser-defender",
+    feature = "parser-fdr"
+))]
 fn assert_host_partitions(parser: &str) {
     use irmind_domain::{ParquetArtifactV3, ScopePartitionKey, ScopePartitionValue};
     for hosts in [1usize, 64, 1024, 1025] {
@@ -383,7 +392,11 @@ fn assert_host_partitions(parser: &str) {
         }
         assert_eq!(ordinary.len(), hosts.min(64));
         assert_eq!(overflow.contains("cardinality"), hosts > 64);
-        let last = format!("i-synthetic-{:04}", hosts - 1);
+        let last = if parser == "fdr" {
+            format!("{hosts:032x}")
+        } else {
+            format!("i-synthetic-{:04}", hosts - 1)
+        };
         let result = store.text_search(&case.id, &last, 1).unwrap();
         assert!(result.contains("source="), "{result}");
         let source_hash = entries
@@ -409,15 +422,30 @@ fn assert_host_partitions(parser: &str) {
 #[cfg(feature = "parser-vpc-flow")]
 #[test]
 fn compact_flow_artifact_bytes_are_independent_of_worker_limit() {
+    assert_worker_artifacts("vpc-flow", 4);
+}
+
+#[cfg(feature = "parser-fdr")]
+#[test]
+fn fdr_artifact_bytes_are_independent_of_worker_limit() {
+    assert_worker_artifacts("fdr", 11);
+}
+
+#[cfg(any(feature = "parser-vpc-flow", feature = "parser-fdr"))]
+fn assert_worker_artifacts(parser: &str, expected_records: u64) {
     let source = tempfile::tempdir().unwrap();
-    fs::write(source.path().join("flows.log"), fixture("vpc-flow")).unwrap();
-    let mut lines = std::str::from_utf8(fixture("vpc-flow")).unwrap().lines();
-    let header = lines.next().unwrap();
+    fs::write(source.path().join("flows.log"), fixture(parser)).unwrap();
+    let mut lines = std::str::from_utf8(fixture(parser)).unwrap().lines();
+    let header = if parser == "vpc-flow" {
+        format!("{}\n", lines.next().unwrap())
+    } else {
+        String::new()
+    };
     let mut rows = lines.collect::<Vec<_>>();
     rows.reverse();
     fs::write(
         source.path().join("disordered.log"),
-        format!("{header}\n{}\n", rows.join("\n")),
+        format!("{header}{}\n", rows.join("\n")),
     )
     .unwrap();
     let mut expected = None;
@@ -432,7 +460,7 @@ fn compact_flow_artifact_bytes_are_independent_of_worker_limit() {
         for file in ["flows.log", "disordered.log"] {
             assert_eq!(
                 ingest_with_context(&engine, store.as_ref(), &case.id, source.path(), file, None),
-                4
+                expected_records
             );
         }
         let mut hashes = store
@@ -524,7 +552,11 @@ fn one_gib_release_defender_throughput() -> Result<(), &'static str> {
     Ok(())
 }
 
-#[cfg(any(feature = "parser-vpc-flow", feature = "parser-defender"))]
+#[cfg(any(
+    feature = "parser-vpc-flow",
+    feature = "parser-defender",
+    feature = "parser-fdr"
+))]
 fn host_partition_input(parser: &str, hosts: usize) -> String {
     let mut text = String::new();
     if parser == "vpc-flow" {
@@ -541,10 +573,25 @@ fn host_partition_input(parser: &str, hosts: usize) -> String {
         let row = fixture(parser).split(|b| *b == b'\n').next().unwrap();
         let mut row: serde_json::Value = serde_json::from_slice(row).unwrap();
         for host in 0..hosts {
-            row["DeviceId"] = serde_json::json!(format!("i-synthetic-{host:04}"));
+            if parser == "fdr" {
+                row["aid"] = serde_json::json!(format!("{:032x}", host + 1));
+            } else {
+                row["DeviceId"] = serde_json::json!(format!("i-synthetic-{host:04}"));
+            }
             text.push_str(&serde_json::to_string(&row).unwrap());
             text.push('\n');
         }
     }
     text
 }
+
+#[cfg(feature = "parser-fdr")]
+#[test]
+#[ignore = "manual optimized host-cardinality ingestion check"]
+fn fdr_host_partitions_preserve_overflow_values() {
+    assert_host_partitions("fdr");
+}
+
+#[cfg(feature = "parser-fdr")]
+#[path = "support/fdr_admission.rs"]
+mod fdr_admission;

@@ -145,6 +145,7 @@ La compilación normal incluye todos los módulos de producto actuales y ambos l
 | Microsoft Entra ID | parser y mapeo locales | `parser-entra` (por defecto) | experimental | [Entra](docs/es/parsers.md#microsoft-entra-id) |
 | Microsoft 365 audit | parser y mapeo locales | `parser-m365` (por defecto) | experimental | [M365](docs/es/parsers.md) |
 | Okta System Log | parser y mapeo locales | `parser-okta` (por defecto) | experimental | [Okta](docs/es/parsers.md) |
+| CrowdStrike FDR | parser y mapeo locales | `parser-fdr`, `mapping-fdr` (por defecto) | experimental | [FDR](docs/es/parsers.md#crowdstrike-falcon-data-replicator) |
 | Exports de Microsoft Defender | parser y mapeo locales | `parser-defender`, `mapping-defender` (por defecto) | experimental | [Defender](docs/es/parsers.md#exports-de-microsoft-defender) |
 | Exportaciones de correo | parser y mapeo local | `parser-email`, `mapping-email` (por defecto) | experimental | [Correo](docs/es/parsers.md#exportaciones-de-correo) |
 | AWS GuardDuty | parser y mapeo locales | `parser-guardduty` (por defecto) | experimental | [GuardDuty](docs/es/parsers.md#exports-de-guardduty) |

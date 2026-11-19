@@ -14,6 +14,7 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 | --- | --- | --- | --- | --- |
 | Microsoft 365 Unified Audit Log | CSV de Purview, JSON de Search-UnifiedAuditLog y Management Activity API | AuditData/Operation, CreationTime y workload originales; 98 | Instante UTC, actor, buzón objetivo explícito, recurso, IP de origen, user agent, workload y tablas de operación/resultado | experimental |
 | Okta System Log | Arrays JSON de la API y exports JSON/NDJSON | eventType, uuid, actor e instante published; 98 | Autenticación, MFA, administración, políticas y suplantación; actor/objetivo e IP de origen | experimental |
+| CrowdStrike FDR | JSONL, texto o gzip | event_simpleName, cid, aid e instante nativos; 98 | ID de proceso separados por tenant/sensor, PID por registro, extremos de red, DNS/autenticación y tablas de fichero/registro | experimental |
 | Microsoft Defender | CSV/JSON de Advanced Hunting y JSON de Streaming | Timestamp nativo, DeviceId/ActionType o AlertId y estructura: 98 | Proceso/padre, fichero, registro, red y acceso; AlertInfo/AlertEvidence no confirmados | experimental |
 | Correo RFC 5322 | Un `.eml` o volcado de cabeceras por fichero; MIME acotado | From y combinación de cabeceras nativas: 98; cabeceras mínimas: 70, elección del analista | Saltos Received ordenados, direcciones, cabeceras/bytes originales, URLs y metadatos/hashes de adjuntos; resultado desconocido | experimental |
 | AWS GuardDuty | JSON de API, CLI/consola y EventBridge | Cuenta, ID/tipo de hallazgo, región, recurso e instante originales; 98 | Alerta de origen sin confirmar, roles de actor/recurso/IP, severidad exacta e instantes originales | experimental |
@@ -379,3 +380,37 @@ Fuentes: [tablas](https://learn.microsoft.com/en-us/defender-xdr/advanced-huntin
 [proceso](https://learn.microsoft.com/en-us/defender-xdr/advanced-hunting-deviceprocessevents-table),
 [red](https://learn.microsoft.com/en-us/azure/azure-monitor/reference/tables/devicenetworkevents),
 [interpretación de Network Protection](https://learn.microsoft.com/en-us/defender-endpoint/network-protection).
+
+## CrowdStrike Falcon Data Replicator
+
+`parser-fdr` decodifica líneas JSON nativas descargadas del feed S3 de FDR, en
+texto o gzip. Exporta o descarga con las herramientas del proveedor e ingiere el
+fichero local; este parser no consulta CrowdStrike ni descarga objetos S3. La
+[guía FDR del proveedor](https://www.crowdstrike.com/wp-content/uploads/2021/06/CrowdStrike-Falcon-Data-Replicator-Technical-Add-On-Guide.pdf)
+describe el feed y sus filtros. Conserva `event_simpleName`, `timestamp`, `cid`,
+`aid` y los campos originales. `timestamp` nativo usa milisegundos; los demás
+instantes originales conservan su precisión.
+
+El módulo separado `mapping-fdr` usa definiciones TOML finitas para procesos,
+conexiones y escuchas IPv4/6, DNS, inicios de sesión correctos/fallidos,
+PeFileWritten y cambios de registro/ASEP. Los
+[dashboards FDR del proveedor](https://library.humio.com/integrations/integrations-crowdstrike-fdr-crowdstrike-fdr.html)
+documentan las uniones de proceso/contexto y esos campos. Los tipos sin regla
+conservan su original consultable, sin clasificación inventada; las variantes de
+renombrado sin contrato confirmado quedan sin clasificar. Un valor opcional no
+válido produce un aviso de cobertura. Ninguna detección confirma un hallazgo.
+
+Los ID nativos de Falcon usan `cid` más `aid`; los PID siguen limitados al
+registro y no se infiere una vida de proceso como en Sysmon. `aid` fija la
+partición de host con su desbordamiento acotado; `cid` es identidad, no cuenta de
+nube. En gzip no se inventan offsets físicos. Se mantienen los límites de línea,
+profundidad/campos JSON, fuente y cancelación. La
+[admisión de FDR comprimido](development/fdr-compressed-admission.md) describe el
+techo decodificado exclusivo de FDR, la validación de CRC y la reserva de disco.
+
+La muestra sintética de [rendimiento FDR](../development/benchmark-data/fdr-v055.json)
+usa 1 GiB sin relleno en build release: 2.329.158 registros, 63,340 s y
+16,167 MiB/s; la verificación posterior pasa fuera del tiempo medido. Es una
+muestra local, no una comparación de aceleración. El fuzzing ASan completa
+1.121.240 ejecuciones en 601 s sin fallos. Las pruebas con 1/64/1.024/1.025 hosts
+mantienen el límite de 64 y conservan los valores originales en el desbordamiento.
