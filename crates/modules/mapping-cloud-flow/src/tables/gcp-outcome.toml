@@ -1,0 +1,15 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "cloud-flow-gcp-outcome"
+version = "cloud-flow-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-gcp-flow"
+parser_versions = ["gcp-flow-source-v1"]
+format = "gcp-vpc-flow"
+format_version = "gcp-flow-source-v1"
+
+[[rules]]
+outcome = "failure"
+[[rules.when]]
+path = ["jsonPayload", "disposition"]
+predicate = { op = "text", value = "DROPPED" }

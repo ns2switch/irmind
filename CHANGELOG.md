@@ -4,6 +4,10 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+- Add experimental AWS VPC, Azure VNet/NSG and GCP VPC flow export modules with
+  separate decoders and network mapping tables. Preserve native timestamps,
+  counters and endpoint roles; headerless AWS layouts require analyst selection.
+
 - Add an experimental GuardDuty decoder and mapping module for native API,
   SDK/CLI and EventBridge exports. Source findings remain unconfirmed; original
   observation times, exact severity and direction-aware endpoints are retained.

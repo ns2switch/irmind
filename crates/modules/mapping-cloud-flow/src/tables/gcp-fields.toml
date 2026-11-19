@@ -1,0 +1,49 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "cloud-flow-gcp-fields"
+version = "cloud-flow-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-gcp-flow"
+parser_versions = ["gcp-flow-source-v1"]
+format = "gcp-vpc-flow"
+format_version = "gcp-flow-source-v1"
+
+action = ["jsonPayload", "disposition"]
+
+[[rules]]
+categories = ["network"]
+types = ["connection"]
+outcome = "unknown"
+
+[[fields]]
+source = ["jsonPayload", "connection", "src_ip"]
+target = "source.ip"
+omit_text = ["", "-"]
+observation = { kind = "ip", role = "source", scope = { kind = "global" } }
+
+[[fields]]
+source = ["jsonPayload", "connection", "dest_ip"]
+target = "destination.ip"
+omit_text = ["", "-"]
+observation = { kind = "ip", role = "destination", scope = { kind = "global" } }
+
+[[fields]]
+source = ["jsonPayload", "connection", "src_port"]
+target = "source.port"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["jsonPayload", "connection", "dest_port"]
+target = "destination.port"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["resource", "labels", "project_id"]
+target = "cloud.project.id"
+omit_text = ["", "-"]
+observation = { kind = "project", role = "subject", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["resource", "labels", "location"]
+target = "cloud.region"
+omit_text = ["", "-"]

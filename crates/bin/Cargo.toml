@@ -7,6 +7,7 @@ license.workspace = true
 
 [features]
 default = [
+    "parser-vpc-flow", "parser-azure-flow", "parser-gcp-flow", "mapping-cloud-flow",
     "parser-guardduty", "mapping-guardduty",
     "parser-m365", "parser-okta", "mapping-identity",
     "parser-gcp-audit", "mapping-gcp-audit",
@@ -76,7 +77,17 @@ storage-azure = ["dep:irmind-mod-storage-object", "irmind-mod-storage-object/azu
 parser-guardduty = ["dep:irmind-mod-parser-guardduty", "mapping-guardduty"]
 mapping-guardduty = ["dep:irmind-mod-mapping-guardduty"]
 
+parser-vpc-flow = ["dep:irmind-mod-parser-vpc-flow", "mapping-cloud-flow"]
+parser-azure-flow = ["dep:irmind-mod-parser-azure-flow", "mapping-cloud-flow"]
+parser-gcp-flow = ["dep:irmind-mod-parser-gcp-flow", "mapping-cloud-flow"]
+mapping-cloud-flow = ["dep:irmind-mod-mapping-cloud-flow"]
+
 [dependencies]
+irmind-mod-parser-vpc-flow = { path = "../modules/parser-vpc-flow", version = "0.1.0", optional = true }
+irmind-mod-parser-azure-flow = { path = "../modules/parser-azure-flow", version = "0.1.0", optional = true }
+irmind-mod-parser-gcp-flow = { path = "../modules/parser-gcp-flow", version = "0.1.0", optional = true }
+irmind-mod-mapping-cloud-flow = { path = "../modules/mapping-cloud-flow", version = "0.1.0", optional = true }
+
 irmind-mod-parser-guardduty = { path = "../modules/parser-guardduty", version = "0.1.0", optional = true }
 irmind-mod-mapping-guardduty = { path = "../modules/mapping-guardduty", version = "0.1.0", optional = true }
 

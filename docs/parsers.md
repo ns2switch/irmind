@@ -13,6 +13,9 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 | Microsoft 365 Unified Audit Log | Purview CSV, Search-UnifiedAuditLog JSON, Management Activity API JSON | Native AuditData/Operation, CreationTime and workload; 98 | UTC time, actor, mailbox target when explicit, resource, source IP, user agent, workload, finite operation/outcome tables | experimental |
 | Okta System Log | API JSON arrays and JSON/NDJSON exports | eventType, uuid, actor and published time; 98 | Authentication, MFA, administration, policies and impersonation; actor/target and source IP | experimental |
 | AWS GuardDuty | API, CLI/console and EventBridge JSON | Native account, finding ID/type, region, resource and time; 98 | Unconfirmed source alert, actor/resource/IP roles, exact severity and original observation times | experimental |
+| AWS VPC Flow Logs | Headered/custom and standard v2 text, gzip, CloudWatch messages | Native column header: 98; headerless v2: 70 and analyst confirmation | Network endpoints/roles, explicit disposition, bytes/packets, account/region and explicit instance host | experimental |
+| Azure flow logs | VNet and NSG JSON containers | Provider category and native flow structure: 98 | Original tuple, precise native epoch, endpoints, explicit disposition, counters, subscription and rule | experimental |
+| GCP VPC Flow Logs | Cloud Logging JSON/NDJSON and entries envelopes | VPC flow logName, connection fields and timestamp: 98 | Endpoint roles, project, observer VM, bytes/packets; missing disposition remains unknown | experimental |
 | Windows EVTX | Binary EVTX: Security, System, PowerShell, Sysmon | Valid EVTX header and checksum; 95 | UTC time at 100 ns precision, host, user, process, IP/port and real record offsets | available; experimental |
 | Linux | auth.log/secure, auditd, journald JSON, HTTP common/combined | Authentication tags, audit headers, journal fields or HTTP header; 95 | UTC time, host, user, process, command, IP/port, action/result; bounded audit correlation | experimental |
 | Syslog | RFC 5424 / RFC 3164, plain or gzip | PRI and timestamp/header shape; 95 / 90 | UTC time, host, application, PID, facility, severity, message and raw data | experimental |
@@ -241,3 +244,45 @@ or credential is created by local ingestion.
 Sources: [GetFindings wire schema](https://docs.aws.amazon.com/guardduty/latest/APIReference/API_GetFindings.html),
 [CLI output](https://docs.aws.amazon.com/cli/latest/reference/guardduty/get-findings.html),
 [finding details](https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_findings-summary.html).
+
+## Cloud network flow exports
+
+Export AWS VPC Flow Logs from S3 as plain text or gzip, retaining the configured
+column header for custom formats. CloudWatch `events`/`logEvents` message exports
+are also supported. A headerless file requires an explicit analyst selection of
+`parser-vpc-flow`, confirming the standard 14-field version 2 layout. The TUI
+shows this requirement in the parser selection panel; unattended detection does
+not ingest it automatically. Use a header for any custom layout. Unknown columns
+remain in the original decoded record. Only an explicit `instance-id` supplies a
+host partition; an interface ID is not assumed to identify a host.
+
+Export Azure VNet or NSG flow-log JSON from the configured storage account without
+rewriting its nested `flows` and `flowTuples`. VNet tuple timestamps are epoch
+milliseconds; NSG tuple timestamps are epoch seconds. Versions 2/4/5 of VNet and
+1/2 of NSG are recognized. An unknown version is retained once as an unclassified
+network record without applying a known tuple layout. Expanded tuples do not
+invent byte offsets within an escaped JSON string. Rule, resource and original
+tuple fields remain searchable. A MAC address does not become a host identity.
+
+Export GCP Cloud Logging entries retaining `logName`, `timestamp`, `resource` and
+`jsonPayload.connection`; the source log must identify `vpc_flows`. Preserve the
+native `src_instance`, `dest_instance` and `reporter` fields for host attribution.
+An explicit `DROPPED` disposition maps to failure. The absence of this field does
+not prove acceptance. GCP sampled/estimated payload-byte counters, Azure delta
+counters and AWS flow counters retain their provider semantics; they are not
+interchangeable billing or packet-capture measurements.
+
+All three families use separate decoders and mapping modules. Finite outcome
+and field tables are included declaratively; native glue validates different
+numeric representations and expands bounded Azure tuples. These are local
+exports, not live connectors. Record/source limits, taint, source hashes and
+signed parser/mapping provenance apply. Compact or gzip inputs can exceed the
+normalized-size allowance even below the source-size limit. VPC uses a bounded
+32× decoded-byte allowance, with a read-only gzip counting preflight and full
+group/sort disk reservation. Other modules retain their existing allowance. A
+quota overrun rejects the source/group rather than silently dropping records.
+
+Sources: [AWS flow record fields](https://docs.aws.amazon.com/vpc/latest/userguide/flow-log-records.html),
+[Azure VNet flow format](https://learn.microsoft.com/en-us/azure/network-watcher/vnet-flow-logs-overview),
+[Azure NSG flow format](https://learn.microsoft.com/en-us/azure/network-watcher/nsg-flow-logs-overview),
+[GCP flow records](https://docs.cloud.google.com/vpc/docs/about-flow-logs-records).

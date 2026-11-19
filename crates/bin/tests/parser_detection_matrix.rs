@@ -74,6 +74,21 @@ mod matrix {
     #[allow(clippy::too_many_lines)]
     fn each_fixture_has_one_unique_high_confidence_parser() -> Result<(), irmind_app::AppError> {
         let mut registry = ModuleRegistry::new();
+        #[cfg(feature = "parser-vpc-flow")]
+        registry.register(
+            Box::new(irmind_mod_parser_vpc_flow::VpcFlowParser),
+            &ModuleConfig::new(),
+        )?;
+        #[cfg(feature = "parser-azure-flow")]
+        registry.register(
+            Box::new(irmind_mod_parser_azure_flow::AzureFlowParser),
+            &ModuleConfig::new(),
+        )?;
+        #[cfg(feature = "parser-gcp-flow")]
+        registry.register(
+            Box::new(irmind_mod_parser_gcp_flow::GcpFlowParser),
+            &ModuleConfig::new(),
+        )?;
         #[cfg(feature = "parser-guardduty")]
         registry.register(
             Box::new(irmind_mod_parser_guardduty::GuardDutyParser),
@@ -209,6 +224,69 @@ mod matrix {
                 include_bytes!("../../testkit/fixtures/parser-guardduty/source/eventbridge.json")
                     .as_slice(),
                 "parser-guardduty",
+            ),
+            #[cfg(feature = "parser-vpc-flow")]
+            (
+                "vpc-flow-custom.log",
+                include_bytes!("../../testkit/fixtures/parser-vpc-flow/source/custom.log")
+                    .as_slice(),
+                "parser-vpc-flow",
+            ),
+            #[cfg(feature = "parser-vpc-flow")]
+            (
+                "vpc-flow-cloudwatch.json",
+                include_bytes!("../../testkit/fixtures/parser-vpc-flow/source/cloudwatch.json")
+                    .as_slice(),
+                "parser-vpc-flow",
+            ),
+            #[cfg(feature = "parser-azure-flow")]
+            (
+                "azure-flow-vnet.json",
+                include_bytes!("../../testkit/fixtures/parser-azure-flow/source/vnet.json")
+                    .as_slice(),
+                "parser-azure-flow",
+            ),
+            #[cfg(feature = "parser-azure-flow")]
+            (
+                "azure-flow-vnet-v5.json",
+                include_bytes!("../../testkit/fixtures/parser-azure-flow/source/vnet-v5.json")
+                    .as_slice(),
+                "parser-azure-flow",
+            ),
+            #[cfg(feature = "parser-azure-flow")]
+            (
+                "azure-flow-nsg-v1.json",
+                include_bytes!("../../testkit/fixtures/parser-azure-flow/source/nsg-v1.json")
+                    .as_slice(),
+                "parser-azure-flow",
+            ),
+            #[cfg(feature = "parser-azure-flow")]
+            (
+                "azure-flow-nsg-v2.json",
+                include_bytes!("../../testkit/fixtures/parser-azure-flow/source/nsg-v2.json")
+                    .as_slice(),
+                "parser-azure-flow",
+            ),
+            #[cfg(feature = "parser-azure-flow")]
+            (
+                "azure-flow-future.ndjson",
+                include_bytes!("../../testkit/fixtures/parser-azure-flow/source/future.ndjson")
+                    .as_slice(),
+                "parser-azure-flow",
+            ),
+            #[cfg(feature = "parser-gcp-flow")]
+            (
+                "gcp-flow-events.ndjson",
+                include_bytes!("../../testkit/fixtures/parser-gcp-flow/source/events.ndjson")
+                    .as_slice(),
+                "parser-gcp-flow",
+            ),
+            #[cfg(feature = "parser-gcp-flow")]
+            (
+                "gcp-flow-entries.json",
+                include_bytes!("../../testkit/fixtures/parser-gcp-flow/source/entries.json")
+                    .as_slice(),
+                "parser-gcp-flow",
             ),
             #[cfg(feature = "parser-syslog")]
             (
@@ -456,7 +534,8 @@ mod matrix {
             "parser-syslog" => [None; 8],
             "parser-linux" | "parser-zeek" | "parser-suricata" | "parser-kubernetes"
             | "parser-falco" | "parser-gcp-audit" | "parser-entra" | "parser-m365"
-            | "parser-okta" | "parser-guardduty" => [
+            | "parser-okta" | "parser-guardduty" | "parser-vpc-flow" | "parser-azure-flow"
+            | "parser-gcp-flow" => [
                 if matches!(sample.first(), Some(b'{' | b'[')) {
                     Some(45)
                 } else {
@@ -493,6 +572,27 @@ mod matrix {
         Ok(())
     }
     fn assert_priority_scores(name: &str, sample: &[u8], expected: &str) {
+        #[cfg(feature = "parser-vpc-flow")]
+        assert_eq!(
+            irmind_mod_parser_vpc_flow::VpcFlowParser
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            (expected == "parser-vpc-flow").then_some(98)
+        );
+        #[cfg(feature = "parser-azure-flow")]
+        assert_eq!(
+            irmind_mod_parser_azure_flow::AzureFlowParser
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            (expected == "parser-azure-flow").then_some(98)
+        );
+        #[cfg(feature = "parser-gcp-flow")]
+        assert_eq!(
+            irmind_mod_parser_gcp_flow::GcpFlowParser
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            (expected == "parser-gcp-flow").then_some(98)
+        );
         #[cfg(feature = "parser-guardduty")]
         assert_eq!(
             irmind_mod_parser_guardduty::GuardDutyParser

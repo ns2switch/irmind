@@ -1,0 +1,33 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "cloud-flow-azure-vnet-outcome"
+version = "cloud-flow-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-azure-flow"
+parser_versions = ["azure-flow-source-v1"]
+format = "azure-vnet-flow"
+format_version = "azure-flow-source-v1"
+
+[[rules]]
+outcome = "success"
+[[rules.when]]
+path = ["columns", "flowState"]
+predicate = { op = "text", value = "B" }
+
+[[rules]]
+outcome = "success"
+[[rules.when]]
+path = ["columns", "flowState"]
+predicate = { op = "text", value = "C" }
+
+[[rules]]
+outcome = "success"
+[[rules.when]]
+path = ["columns", "flowState"]
+predicate = { op = "text", value = "E" }
+
+[[rules]]
+outcome = "failure"
+[[rules.when]]
+path = ["columns", "flowState"]
+predicate = { op = "text", value = "D" }

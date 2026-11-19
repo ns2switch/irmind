@@ -115,3 +115,58 @@ pub fn decode_source(
         emit,
     )
 }
+
+/// Compare canonical original fields, provenance and rejection accounting across budgets.
+pub fn run_decode_budget_contract(
+    decoder: &dyn SourceDecoder,
+    name: &str,
+    fixture: &[u8],
+) -> Result<(), AppError> {
+    use irmind_app::source_mapping::{DecodeBudget, DecodeInput};
+    if fixture.len() > 64 * 1024 {
+        return Err(contract_error());
+    }
+    let reference = SourceReferenceV1::file(name).map_err(|_| contract_error())?;
+    let cancel = CancellationToken::new();
+    let hash = irmind_app::sha256(fixture);
+    let mut expected = None;
+    for workers in [1, 2, 4, 7] {
+        let mut rows = Vec::new();
+        let report = decoder.decode_with_budget(
+            DecodeInput::Reader(SourceInput {
+                metadata: SourceMetadata {
+                    source: &reference,
+                    evidence_hash: hash,
+                    time_context: None,
+                    cluster_context: None,
+                    cancel: &cancel,
+                },
+                reader: &mut Cursor::new(fixture),
+            }),
+            DecodeBudget::new(
+                std::num::NonZeroUsize::new(workers).ok_or_else(contract_error)?,
+                8 * 1024 * 1024,
+            ),
+            &mut |record| {
+                if rows.len() >= 100 || record.provenance().evidence_hash() != &hash {
+                    return Err(contract_error());
+                }
+                let mut bytes = Vec::new();
+                record.inspect(|record| {
+                    record.feed_canonical(&mut |part| bytes.extend_from_slice(part));
+                });
+                rows.push(irmind_app::sha256(&bytes));
+                Ok(())
+            },
+        )?;
+        let result = (rows, report.accepted, report.rejected, report.samples);
+        if let Some(expected) = &expected {
+            if expected != &result {
+                return Err(contract_error());
+            }
+        } else {
+            expected = Some(result);
+        }
+    }
+    Ok(())
+}

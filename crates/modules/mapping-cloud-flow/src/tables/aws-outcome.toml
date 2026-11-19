@@ -1,0 +1,22 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "cloud-flow-aws-outcome"
+version = "cloud-flow-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-vpc-flow"
+parser_versions = ["vpc-flow-source-v1"]
+format = "aws-vpc-flow"
+format_version = "vpc-flow-source-v1"
+action = ["columns", "action"]
+
+[[rules]]
+outcome = "success"
+[[rules.when]]
+path = ["columns", "action"]
+predicate = { op = "text", value = "ACCEPT" }
+
+[[rules]]
+outcome = "failure"
+[[rules.when]]
+path = ["columns", "action"]
+predicate = { op = "text", value = "REJECT" }

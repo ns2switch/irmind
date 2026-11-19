@@ -778,12 +778,14 @@ dependencies = [
  "irmind-domain",
  "irmind-infra",
  "irmind-mapping-tables",
+ "irmind-mod-mapping-cloud-flow",
  "irmind-mod-mapping-ecs",
  "irmind-mod-mapping-entra",
  "irmind-mod-mapping-guardduty",
  "irmind-mod-mapping-identity",
  "irmind-mod-mapping-kubernetes",
  "irmind-mod-mapping-network",
+ "irmind-mod-parser-azure-flow",
  "irmind-mod-parser-chainsaw",
  "irmind-mod-parser-declarative",
  "irmind-mod-parser-ecs",
@@ -791,6 +793,7 @@ dependencies = [
  "irmind-mod-parser-eztools",
  "irmind-mod-parser-falco",
  "irmind-mod-parser-gcp-audit",
+ "irmind-mod-parser-gcp-flow",
  "irmind-mod-parser-guardduty",
  "irmind-mod-parser-hayabusa",
  "irmind-mod-parser-json",
@@ -803,6 +806,7 @@ dependencies = [
  "irmind-mod-parser-suricata",
  "irmind-mod-parser-syslog",
  "irmind-mod-parser-velociraptor",
+ "irmind-mod-parser-vpc-flow",
  "irmind-mod-parser-zeek",
  "irmind-security",
  "libfuzzer-sys",
@@ -847,6 +851,16 @@ dependencies = [
  "serde",
  "serde_json",
  "toml",
+]
+
+[[package]]
+name = "irmind-mod-mapping-cloud-flow"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-build-manifest",
+ "irmind-domain",
+ "irmind-mapping-tables",
 ]
 
 [[package]]
@@ -906,6 +920,14 @@ dependencies = [
  "irmind-build-manifest",
  "irmind-domain",
  "irmind-mapping-tables",
+]
+
+[[package]]
+name = "irmind-mod-parser-azure-flow"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
 ]
 
 [[package]]
@@ -969,6 +991,14 @@ dependencies = [
 
 [[package]]
 name = "irmind-mod-parser-gcp-audit"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+]
+
+[[package]]
+name = "irmind-mod-parser-gcp-flow"
 version = "0.1.0"
 dependencies = [
  "irmind-app",
@@ -1090,6 +1120,15 @@ dependencies = [
  "irmind-domain",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-parser-vpc-flow"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "irmind-app",
+ "irmind-domain",
 ]
 
 [[package]]

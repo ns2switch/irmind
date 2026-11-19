@@ -29,6 +29,7 @@ pub(super) struct PendingIngest {
 pub(super) struct ParserPrompt {
     pub source: String,
     pub candidates: Vec<(String, u8)>,
+    pub descriptions: std::collections::BTreeMap<String, String>,
     pub selected: usize,
     pub typed_option: String,
 }
@@ -398,6 +399,7 @@ mod tests {
     #[test]
     fn parser_prompt_uses_arrows_or_number_then_enter_and_escape_cancels() {
         let mut prompt = ParserPrompt {
+            descriptions: std::collections::BTreeMap::default(),
             source: "events.json".into(),
             candidates: vec![("parser-json".into(), 45), ("parser-ecs".into(), 45)],
             selected: 0,

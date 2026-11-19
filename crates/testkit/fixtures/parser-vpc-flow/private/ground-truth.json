@@ -1,0 +1,15 @@
+{
+  "synthetic": true,
+  "events": 4,
+  "entities": [
+    "203.0.113.77",
+    "192.0.2.10",
+    "i-synthetic-1"
+  ],
+  "outcomes": [
+    "success",
+    "failure",
+    "unknown",
+    "unknown"
+  ]
+}

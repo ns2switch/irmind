@@ -5,6 +5,48 @@ use irmind_infra::LocalStore;
 use std::{path::Path, sync::Arc};
 fn registry() -> ModuleRegistry {
     let mut registry = ModuleRegistry::new();
+    #[cfg(feature = "parser-vpc-flow")]
+    registry
+        .register(
+            Box::new(irmind_mod_parser_vpc_flow::VpcFlowParser),
+            &ModuleConfig::new(),
+        )
+        .unwrap();
+    #[cfg(feature = "parser-azure-flow")]
+    registry
+        .register(
+            Box::new(irmind_mod_parser_azure_flow::AzureFlowParser),
+            &ModuleConfig::new(),
+        )
+        .unwrap();
+    #[cfg(feature = "parser-gcp-flow")]
+    registry
+        .register(
+            Box::new(irmind_mod_parser_gcp_flow::GcpFlowParser),
+            &ModuleConfig::new(),
+        )
+        .unwrap();
+    #[cfg(feature = "parser-vpc-flow")]
+    registry
+        .register(
+            Box::new(irmind_mod_mapping_cloud_flow::CloudFlowMapping::aws().unwrap()),
+            &ModuleConfig::new(),
+        )
+        .unwrap();
+    #[cfg(feature = "parser-gcp-flow")]
+    registry
+        .register(
+            Box::new(irmind_mod_mapping_cloud_flow::CloudFlowMapping::gcp().unwrap()),
+            &ModuleConfig::new(),
+        )
+        .unwrap();
+    #[cfg(feature = "parser-azure-flow")]
+    for mapper in irmind_mod_mapping_cloud_flow::CloudFlowMapping::azure().unwrap() {
+        registry
+            .register(Box::new(mapper), &ModuleConfig::new())
+            .unwrap();
+    }
+
     #[cfg(feature = "parser-guardduty")]
     {
         registry

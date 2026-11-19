@@ -48,6 +48,19 @@ class LaunchCommandOwners(unittest.TestCase):
             self.assertIn('--made-up-flag', check_docs.irmind_flag_citations('codesign --verify ./irmind' + extra))
         self.assertIn('--made-up-flag', check_docs.irmind_flag_citations('xcrun irmind --made-up-flag'))
 
+class CargoFlagOwnershipTests(unittest.TestCase):
+    def test_complete_cargo_benchmark_owns_its_harness_flags(self):
+        for package in ("-p irmind", "--package irmind", "--package=irmind"):
+            command = f"cargo test --release {package} --test identity_ingest bench -- --ignored --nocapture"
+            self.assertEqual(check_docs.irmind_flag_citations(command), set())
+            for suffix in (" && irmind --made-up-flag", " | irmind --made-up-flag", "; irmind --made-up-flag"):
+                self.assertIn("--made-up-flag", check_docs.irmind_flag_citations(command + suffix))
+
+    def test_cargo_package_name_never_hides_an_actual_irmind_invocation(self):
+        text = "cargo +nightly test -p irmind --test identity_ingest\nirmind --made-up-flag"
+        self.assertIn("--made-up-flag", check_docs.irmind_flag_citations(text))
+        self.assertIn("--made-up-flag", check_docs.irmind_flag_citations("cargo irmind --made-up-flag"))
+
 
 if __name__ == '__main__':
     unittest.main()

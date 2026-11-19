@@ -2265,6 +2265,7 @@ dependencies = [
  "irmind-mod-llm-deepseek",
  "irmind-mod-llm-openai-compatible",
  "irmind-mod-llm-openrouter",
+ "irmind-mod-mapping-cloud-flow",
  "irmind-mod-mapping-cloudtrail",
  "irmind-mod-mapping-dfir",
  "irmind-mod-mapping-ecs",
@@ -2282,6 +2283,7 @@ dependencies = [
  "irmind-mod-mapping-ocsf",
  "irmind-mod-mapping-syslog",
  "irmind-mod-mapping-udm",
+ "irmind-mod-parser-azure-flow",
  "irmind-mod-parser-chainsaw",
  "irmind-mod-parser-declarative",
  "irmind-mod-parser-ecs",
@@ -2290,6 +2292,7 @@ dependencies = [
  "irmind-mod-parser-eztools",
  "irmind-mod-parser-falco",
  "irmind-mod-parser-gcp-audit",
+ "irmind-mod-parser-gcp-flow",
  "irmind-mod-parser-guardduty",
  "irmind-mod-parser-hayabusa",
  "irmind-mod-parser-json",
@@ -2302,6 +2305,7 @@ dependencies = [
  "irmind-mod-parser-suricata",
  "irmind-mod-parser-syslog",
  "irmind-mod-parser-velociraptor",
+ "irmind-mod-parser-vpc-flow",
  "irmind-mod-parser-zeek",
  "irmind-mod-siem-chronicle",
  "irmind-mod-siem-elastic",
@@ -2413,11 +2417,15 @@ dependencies = [
  "irmind-domain",
  "irmind-fs",
  "irmind-mapping-tables",
+ "irmind-mod-mapping-cloud-flow",
  "irmind-mod-mapping-cloudtrail",
  "irmind-mod-mapping-journald-compat",
  "irmind-mod-mapping-json-compat",
+ "irmind-mod-parser-azure-flow",
+ "irmind-mod-parser-gcp-flow",
  "irmind-mod-parser-json",
  "irmind-mod-parser-linux",
+ "irmind-mod-parser-vpc-flow",
  "irmind-security",
  "irmind-testkit",
  "memchr",
@@ -2606,6 +2614,20 @@ dependencies = [
  "irmind-llm-chat-completions",
  "irmind-testkit",
  "secrecy",
+]
+
+[[package]]
+name = "irmind-mod-mapping-cloud-flow"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-build-manifest",
+ "irmind-domain",
+ "irmind-mapping-tables",
+ "irmind-mod-parser-azure-flow",
+ "irmind-mod-parser-gcp-flow",
+ "irmind-mod-parser-vpc-flow",
+ "irmind-testkit",
 ]
 
 [[package]]
@@ -2822,6 +2844,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-parser-azure-flow"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-testkit",
+]
+
+[[package]]
 name = "irmind-mod-parser-chainsaw"
 version = "0.1.0"
 dependencies = [
@@ -2899,6 +2930,15 @@ dependencies = [
 
 [[package]]
 name = "irmind-mod-parser-gcp-audit"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-testkit",
+]
+
+[[package]]
+name = "irmind-mod-parser-gcp-flow"
 version = "0.1.0"
 dependencies = [
  "irmind-app",
@@ -3037,6 +3077,17 @@ dependencies = [
  "irmind-testkit",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-parser-vpc-flow"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "irmind-app",
+ "irmind-domain",
+ "irmind-testkit",
+ "tempfile",
 ]
 
 [[package]]

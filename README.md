@@ -128,6 +128,9 @@ The normal build includes every current product module and both keystores. No re
 | Microsoft 365 audit | local parser + mapping | `parser-m365` (default) | experimental | [M365](docs/parsers.md) |
 | Okta System Log | local parser + mapping | `parser-okta` (default) | experimental | [Okta](docs/parsers.md) |
 | AWS GuardDuty | local parser + mapping | `parser-guardduty` (default) | experimental | [GuardDuty](docs/parsers.md#guardduty-exports) |
+| AWS VPC Flow Logs | local parser + mapping | `parser-vpc-flow`, `mapping-cloud-flow` (default) | experimental | [Cloud flows](docs/parsers.md#cloud-network-flow-exports) |
+| Azure VNet/NSG flow logs | local parser + mapping | `parser-azure-flow`, `mapping-cloud-flow` (default) | experimental | [Cloud flows](docs/parsers.md#cloud-network-flow-exports) |
+| GCP VPC Flow Logs | local parser + mapping | `parser-gcp-flow`, `mapping-cloud-flow` (default) | experimental | [Cloud flows](docs/parsers.md#cloud-network-flow-exports) |
 | Kubernetes audit | local parser + mapping | `parser-kubernetes` (default) | experimental | [Cluster context](docs/parsers.md#kubernetes-and-falco-interpretation) |
 | Falco | local parser + mapping | `parser-falco` (default) | experimental | [Source alerts](docs/parsers.md#kubernetes-and-falco-interpretation) |
 | Linux logs | local parser | `parser-linux` (default) | experimental | [Linux](docs/modules.md#linux-logs) |

@@ -12,6 +12,11 @@ export = ["dep:irmind-infra"]
 cargo-fuzz = true
 
 [dependencies]
+irmind-mod-parser-vpc-flow = { path = "../crates/modules/parser-vpc-flow", version = "0.1.0" }
+irmind-mod-parser-azure-flow = { path = "../crates/modules/parser-azure-flow", version = "0.1.0" }
+irmind-mod-parser-gcp-flow = { path = "../crates/modules/parser-gcp-flow", version = "0.1.0" }
+irmind-mod-mapping-cloud-flow = { path = "../crates/modules/mapping-cloud-flow", version = "0.1.0" }
+
 irmind-mod-parser-guardduty = { path = "../crates/modules/parser-guardduty", version = "0.1.0" }
 irmind-mod-mapping-guardduty = { path = "../crates/modules/mapping-guardduty", version = "0.1.0" }
 
@@ -235,6 +240,27 @@ bench = false
 [[bin]]
 name = "parser_guardduty"
 path = "fuzz_targets/parser_guardduty.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_vpc_flow"
+path = "fuzz_targets/parser_vpc_flow.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_azure_flow"
+path = "fuzz_targets/parser_azure_flow.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_gcp_flow"
+path = "fuzz_targets/parser_gcp_flow.rs"
 test = false
 doc = false
 bench = false
