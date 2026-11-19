@@ -119,13 +119,26 @@ impl Program {
         }
         #[cfg(windows)]
         {
-            let lease = self.inner.session.acquire(cancelled)?;
+            let lease =
+                windows_launch_phase("session lease", self.inner.session.acquire(cancelled))?;
             let result = (|| {
-                let stamp = self.inner.session.ensure(&self.inner, cancelled)?;
-                let mut runtime = PreparedChild::new(&self.inner, false, [0, 0], Some(lease))?;
-                self.inner.session.unchanged(stamp)?;
+                let stamp = windows_launch_phase(
+                    "session witness",
+                    self.inner.session.ensure(&self.inner, cancelled),
+                )?;
+                let mut runtime = windows_launch_phase(
+                    "private child runtime",
+                    PreparedChild::new(&self.inner, false, [0, 0], Some(lease)),
+                )?;
+                windows_launch_phase(
+                    "firewall service stamp",
+                    self.inner.session.unchanged(stamp),
+                )?;
                 runtime.stamp = Some(stamp);
-                let native = native::spawn(&runtime, input, mode)?;
+                let native = windows_launch_phase(
+                    "contained process launch",
+                    native::spawn(&runtime, input, mode),
+                )?;
                 Ok(Child {
                     native,
                     runtime,
@@ -153,6 +166,24 @@ impl Program {
             WitnessStats::default()
         }
     }
+}
+
+#[cfg(windows)]
+fn windows_launch_phase<T>(stage: &'static str, result: io::Result<T>) -> io::Result<T> {
+    // The parser reports a fixed policy error. Keep these diagnostics in the
+    // debug-assertion build used by native integration tests.
+    #[cfg(debug_assertions)]
+    if let Err(error) = &result
+        && error.kind() != io::ErrorKind::Interrupted
+    {
+        crate::windows::startup_diagnostic(format_args!(
+            "EVTX {stage} failed ({:?}/{})",
+            error.kind(),
+            error.raw_os_error().unwrap_or(0)
+        ));
+    }
+    let _ = stage;
+    result
 }
 
 pub struct Child {
