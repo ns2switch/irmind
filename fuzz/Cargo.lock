@@ -816,6 +816,7 @@ dependencies = [
  "irmind-mod-parser-google-workspace",
  "irmind-mod-parser-guardduty",
  "irmind-mod-parser-hayabusa",
+ "irmind-mod-parser-iis-w3c",
  "irmind-mod-parser-json",
  "irmind-mod-parser-kubernetes",
  "irmind-mod-parser-linux",
@@ -1117,6 +1118,14 @@ dependencies = [
  "irmind-domain",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-parser-iis-w3c"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
 ]
 
 [[package]]

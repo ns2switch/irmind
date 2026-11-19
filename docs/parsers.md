@@ -13,6 +13,7 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 | Microsoft 365 Unified Audit Log | Purview CSV, Search-UnifiedAuditLog JSON, Management Activity API JSON | Native AuditData/Operation, CreationTime and workload; 98 | UTC time, actor, mailbox target when explicit, resource, source IP, user agent, workload, finite operation/outcome tables | experimental |
 | Okta System Log | API JSON arrays and JSON/NDJSON exports | eventType, uuid, actor and published time; 98 | Authentication, MFA, administration, policies and impersonation; actor/target and source IP | experimental |
 | Windows DNS Server debug | Packet summary text | Log creation header and packet columns, 79 or 98 | Query, type, response code and remote IP by packet direction | experimental |
+| IIS W3C | Extended access log text | `#Fields` timestamp and HTTP columns, 98 | Method, path, original query string, status, bytes, client and server | experimental |
 | Route 53 VPC Resolver | JSON, NDJSON | Version 1.x, query, client and VPC or profile, 98 | DNS question, type, class, client, port, response code, account and Region | experimental |
 | GitHub audit log | Organization and enterprise CSV and JSON, native streamed NDJSON | Native action, time and audit identity/scope, 98 | Membership, tokens, keys, repository access and Actions configuration | experimental |
 | Google Workspace Reports API | JSON pages, arrays, objects and NDJSON | Native activity ID, application, time and events, 98 | Login, SAML, administration, OAuth, Drive and Gmail with original fields | experimental |
@@ -481,6 +482,10 @@ creation header; confirm the date format and time offset for each ingestion.
 When a source exceeds its normalization allowance, the error reports the
 minimum bytes needed at the point the parser stopped. IRMind does not publish
 part of the rejected file.
+
+## IIS W3C
+
+(IIS Manager → Logging) Select [W3C logging](https://learn.microsoft.com/en-us/iis/configuration/system.applicationhost/sites/site/logfile/). Include the date, time, HTTP method, URL stem, query, status, client and server addresses. Copy the original logs with `#Fields` directives. Record times are in UTC. Each valid directive sets the fields for subsequent records. Unknown custom fields remain searchable. Query strings are preserved verbatim.
 
 ## Route 53 VPC Resolver
 

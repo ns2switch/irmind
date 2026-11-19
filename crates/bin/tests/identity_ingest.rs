@@ -118,6 +118,9 @@ fn ingest_with_context(
 }
 fn fixture(parser: &str) -> &'static [u8] {
     match parser {
+        #[cfg(feature = "parser-iis-w3c")]
+        "iis-w3c" => include_bytes!("../../testkit/fixtures/parser-iis-w3c/source/access.log"),
+
         #[cfg(feature = "parser-windows-dns")]
         "windows-dns" => include_bytes!("../../testkit/fixtures/parser-windows-dns/source/dns.log"),
 
@@ -170,6 +173,8 @@ fn fixture(parser: &str) -> &'static [u8] {
     }
 }
 const IDENTITY_SOURCES: &[(&str, u64)] = &[
+    #[cfg(feature = "parser-iis-w3c")]
+    ("iis-w3c", 3),
     #[cfg(feature = "parser-windows-dns")]
     ("windows-dns", 4),
     #[cfg(feature = "parser-github-audit")]
@@ -369,7 +374,7 @@ fn one_gib_release_windows_dns_throughput() -> Result<(), &'static str> {
     benchmark_rotated("windows-dns");
     Ok(())
 }
-#[cfg(feature = "parser-windows-dns")]
+#[cfg(any(feature = "parser-windows-dns", feature = "parser-iis-w3c"))]
 fn benchmark_rotated(name: &str) {
     use irmind_app::{ParserTimeBasis, ParserTimeContext};
 
@@ -436,7 +441,7 @@ fn benchmark_rotated(name: &str) {
     engine.verify(&case.id).unwrap();
 }
 
-#[cfg(feature = "parser-windows-dns")]
+#[cfg(any(feature = "parser-windows-dns", feature = "parser-iis-w3c"))]
 struct PreparedRotations {
     files: Vec<String>,
     selections: BTreeMap<String, irmind_app::ParserSelection>,
@@ -444,7 +449,7 @@ struct PreparedRotations {
     records: u64,
 }
 
-#[cfg(feature = "parser-windows-dns")]
+#[cfg(any(feature = "parser-windows-dns", feature = "parser-iis-w3c"))]
 fn prepare_rotations(
     name: &str,
     originals: &std::path::Path,
@@ -497,7 +502,7 @@ fn prepare_rotations(
     }
 }
 
-#[cfg(feature = "parser-windows-dns")]
+#[cfg(any(feature = "parser-windows-dns", feature = "parser-iis-w3c"))]
 fn write_rotation(path: &std::path::Path, header: &[u8], name: &str, row: &[u8]) -> (u64, u64) {
     use std::io::{BufWriter, Write};
 
@@ -516,6 +521,16 @@ fn write_rotation(path: &std::path::Path, header: &[u8], name: &str, row: &[u8])
     (bytes, rows)
 }
 
+#[cfg(feature = "parser-iis-w3c")]
+#[test]
+#[ignore = "release benchmark with one GiB of synthetic evidence"]
+fn one_gib_release_iis_w3c_throughput() -> Result<(), &'static str> {
+    if cfg!(debug_assertions) {
+        return Err("source throughput benchmarks require a release build");
+    }
+    benchmark_rotated("iis-w3c");
+    Ok(())
+}
 fn benchmark_source(name: &str) {
     use std::io::{BufWriter, Write};
     let bench_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target");
@@ -565,6 +580,17 @@ fn benchmark_source(name: &str) {
 fn benchmark_lines(name: &str) -> (Vec<u8>, Vec<u8>, u64) {
     let mut lines = fixture(name).split(|b| *b == b'\n');
     let first = lines.next().unwrap();
+    if name == "iis-w3c" {
+        let mut header = Vec::new();
+        for line in fixture(name).split_inclusive(|byte| *byte == b'\n') {
+            if line.starts_with(b"#") {
+                header.extend_from_slice(line);
+            } else {
+                return (header, line.to_vec(), 1);
+            }
+        }
+        unreachable!("fixture has a web request");
+    }
     if name == "windows-dns" {
         let mut header = Vec::new();
         for line in fixture(name).split_inclusive(|byte| *byte == b'\n') {

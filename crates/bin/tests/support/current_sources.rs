@@ -5,6 +5,21 @@ use irmind_infra::LocalStore;
 use std::{path::Path, sync::Arc};
 fn registry() -> ModuleRegistry {
     let mut registry = ModuleRegistry::new();
+    #[cfg(feature = "parser-iis-w3c")]
+    {
+        registry
+            .register(
+                Box::new(irmind_mod_parser_iis_w3c::IisW3cParser),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+        registry
+            .register(
+                Box::new(irmind_mod_mapping_iis_w3c::IisW3cMapping::new().unwrap()),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+    }
     #[cfg(feature = "parser-windows-dns")]
     {
         registry

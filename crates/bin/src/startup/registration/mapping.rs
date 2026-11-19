@@ -79,6 +79,11 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
     Ok(())
 }
 fn register_export_mappings(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(feature = "mapping-iis-w3c")]
+    registry.register(
+        Box::new(irmind_mod_mapping_iis_w3c::IisW3cMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
     #[cfg(feature = "mapping-windows-dns")]
     registry.register(
         Box::new(irmind_mod_mapping_windows_dns::WindowsDnsMapping::new()?),
@@ -331,6 +336,10 @@ mod tests {
         check_catalog(&registry);
     }
     fn register_identity_decoders(registry: &mut ModuleRegistry) {
+        #[cfg(feature = "parser-iis-w3c")]
+        registry
+            .add_source_decoder(Arc::new(irmind_mod_parser_iis_w3c::IisW3cSourceDecoder))
+            .unwrap();
         #[cfg(feature = "parser-windows-dns")]
         registry
             .add_source_decoder(Arc::new(
@@ -408,7 +417,8 @@ mod tests {
         );
         assert_eq!(
             catalog.snapshots().unwrap().len(),
-            2 + usize::from(cfg!(feature = "mapping-windows-dns"))
+            2 + usize::from(cfg!(feature = "mapping-iis-w3c"))
+                + usize::from(cfg!(feature = "mapping-windows-dns"))
                 + usize::from(cfg!(feature = "mapping-route53"))
                 + usize::from(cfg!(feature = "mapping-github-audit"))
                 + usize::from(cfg!(feature = "mapping-google-workspace"))

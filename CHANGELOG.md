@@ -13,6 +13,8 @@ and export V8 sections are unchanged; keep the producing version for a case.
   validated unsigned decimal IDs. OS PIDs remain record scoped and Sysmon
   ProcessGuid keeps its existing lifetime scope.
 
+- Add experimental IIS W3C access logs with header-selected columns and an HTTP
+  mapping that preserves the original query string.
 - Add experimental Windows DNS Server debug packet decoding with confirmed time
   context, and map DNS Analytical EVTX IDs 256–258 with explicit packet roles.
 - Add experimental Route 53 VPC Resolver decoding and DNS mapping, preserving
