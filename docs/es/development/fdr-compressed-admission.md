@@ -1,49 +1,48 @@
 # Admisión de FDR comprimido
 
-Propuesta de diseño. [English](../../development/fdr-compressed-admission.md).
+Implementado en la ruta de ingesta de FDR. [English](../../development/fdr-compressed-admission.md).
 
-## Reproducción
+## Admisión y reserva
 
-El test sintético `fdr_gzip_admission_characterization` se ejecuta con
-`cargo test -p irmind --release --test identity_ingest fdr_gzip_admission_characterization -- --ignored --nocapture`.
-Repite 150.000 registros ProcessRollup2 con campos nativos y sin relleno.
+`DecodedJson16` se aplica solo a `parser-fdr/fdr-source-v1`. VPC Flow Logs usa
+`CompactFlow32`. Extender el perfil de JSON decodificado a ALB, S3 access logs,
+CloudTrail gzip u otro decodificador requiere una aprobación aparte.
 
-| Codificación | Bytes físicos | Bytes decodificados | Registros | Resultado |
-| --- | ---: | ---: | ---: | --- |
-| JSONL | 69.150.000 | 69.150.000 | 150.000 | Ingeridos y verificación firmada correcta |
-| gzip | 954.510 | 69.150.000 | 150.000 | Agota la cuota normalizada; no se publica ningún artefacto |
+La primera pasada abre el original en lectura, limita a 50 GiB tanto la entrada
+física como la decodificada y valida el CRC y el tamaño de cada miembro gzip.
+Cuenta con un búfer reutilizable de 16 KiB y estado de descompresión acotado.
+No materializa ni escribe los bytes decodificados. Para JSONL sin compresión,
+toma el tamaño del fichero sin leerlo entero en una pasada adicional.
 
-Es una comprobación de admisión con build release, no un benchmark de throughput.
-La reserva por defecto es `bytes físicos * 16 + 64 MiB`: 82.381.024 bytes para
-este gzip. Limita el flujo normalizado, por lo que una fuente comprimida puede
-agotarla aunque su equivalente en texto quepa. No es falta de disco libre. El
-original no cambia y se revierte el grupo. CompactFlow32 sigue siendo exclusivo
-de VPC Flow Logs.
+El recuento fija el techo normalizado (`bytes decodificados × 16 + 64 MiB`).
+Antes de normalizar, se comprueba el espacio libre del caso frente a la reserva
+del grupo completo, incluidos el espacio para ordenar y el margen de seguridad.
+Si falta espacio, el error indica los bytes necesarios y disponibles. El techo
+por sí solo no reserva espacio físico.
 
-## Perfil cerrado propuesto
+Durante la normalización, el lector lee como máximo los bytes admitidos más
+uno para detectar expansión. Si supera el techo, rechaza la fuente. La
+comprobación del hash del original sigue siendo independiente y precede a la
+publicación. Se mantienen el staging privado en el caso, el rollback y las
+comprobaciones de orden.
 
-Añadir `NormalizedExpansionProfile::DecodedJson16`, usado inicialmente solo por
-FDR: `bytes decodificados * 16 + 64 MiB` mediante el método opcional existente
-`SourceDecoder::normalized_source_budget`. No cambia el puerto. Para la fuente
-sintética serían 1.173.508.864 bytes, igual que en texto. CompactFlow32 y los demás
-decodificadores mantienen su comportamiento.
+## Verificación
 
-Antes de normalizar, una pasada de solo lectura y cancelable cuenta los bytes
-decodificados, valida todos los miembros gzip y su CRC y rechaza entrada física
-o decodificada por encima de 50 GiB. No escribe evidencia decodificada. Se
-mantienen el staging privado dentro del caso, reserva previa de espacio y scratch,
-cuotas por fila y totales durante ejecución, rollback, comprobación del hash del
-original, límites del parser y orden canónico. El perfil no modifica bytes
-firmados ni concede capacidades remotas.
+Un test añade un segundo miembro gzip válido al original abierto tras la
+pasada previa y exige que el decodificador y la ruta de ingesta en paralelo
+se detengan en el techo anterior. La prueba comprueba también la limpieza del spool.
+Otro cuenta 64 MiB en dos miembros con el búfer fijo y comprueba que falla al
+truncar el último tráiler. La prueba de integración comprueba reconstrucción,
+sello y exportación a partir del gzip original, y rechaza una modificación
+posterior del fichero al reconstruir.
 
-Pruebas: igualdad de cuota entre texto/gzip/miembros concatenados, CRC o truncado
-inválidos, cancelación, frontera de 50 GiB, ausencia de escrituras durante la
-pasada y éxito del mismo gzip con reconstrucción/sello/export verificados. Sin
-espacio se falla antes de normalizar. El desbordamiento aritmético sigue siendo
-un error.
+El benchmark release usa el mismo corpus de 1 GiB decodificado para JSONL y
+gzip. Las [mediciones](../../development/benchmark-data/fdr-gzip-v055.json)
+incluyen la ingesta completa y el tiempo de la pasada previa por separado.
+En esta única comparación, gzip tarda 68,323 s frente a 71,877 s en JSONL.
+La pasada adicional de gzip tarda 0,289 s medida por separado. Las dos
+ingestas se verifican correctamente.
 
-## Alternativa
-
-Mantener la cuota actual y documentar la descompresión externa explícita antes de
-ingerir. No añade un perfil, pero deja archivos FDR gzip válidos sin la ruta
-directa solicitada.
+```sh
+cargo test -p irmind --release --test identity_ingest one_gib_release_fdr_gzip_and_jsonl -- --ignored --nocapture
+```

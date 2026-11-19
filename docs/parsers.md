@@ -404,8 +404,8 @@ remain local to the source record; no Sysmon-style lifetime is inferred.
 `aid` supplies the host partition, including its bounded overflow bucket; `cid`
 is identity metadata, not a cloud account. Compressed streams have no invented
 physical record offsets. Line, JSON depth/field, source and cancellation limits
-apply to both encodings. See the [compressed admission proposal](development/fdr-compressed-admission.md)
-for the current gzip staging limitation.
+apply to both encodings. The [compressed admission contract](development/fdr-compressed-admission.md) details the
+FDR-only decoded ceiling, CRC validation and disk reservation.
 
 The synthetic [FDR performance sample](development/benchmark-data/fdr-v055.json)
 uses an unpadded 1 GiB release build: 2,329,158 records, 63.340 s and 16.167 MiB/s;

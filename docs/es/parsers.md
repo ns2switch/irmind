@@ -405,8 +405,8 @@ registro y no se infiere una vida de proceso como en Sysmon. `aid` fija la
 partición de host con su desbordamiento acotado; `cid` es identidad, no cuenta de
 nube. En gzip no se inventan offsets físicos. Se mantienen los límites de línea,
 profundidad/campos JSON, fuente y cancelación. La
-[propuesta de admisión comprimida](development/fdr-compressed-admission.md)
-explica el límite actual de staging para gzip.
+[admisión de FDR comprimido](development/fdr-compressed-admission.md) describe el
+techo decodificado exclusivo de FDR, la validación de CRC y la reserva de disco.
 
 La muestra sintética de [rendimiento FDR](../development/benchmark-data/fdr-v055.json)
 usa 1 GiB sin relleno en build release: 2.329.158 registros, 63,340 s y
