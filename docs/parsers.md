@@ -487,6 +487,11 @@ part of the rejected file.
 
 (IIS Manager → Logging) Select [W3C logging](https://learn.microsoft.com/en-us/iis/configuration/system.applicationhost/sites/site/logfile/). Include the date, time, HTTP method, URL stem, query, status, client and server addresses. Copy the original logs with `#Fields` directives. Record times are in UTC. Each valid directive sets the fields for subsequent records. Unknown custom fields remain searchable. Query strings are preserved verbatim.
 
+For large IIS logs, keep the original intact and ingest smaller rotated files
+or verified copies split at complete records. Repeat the applicable `#Fields`
+directive in every part. If a file exceeds its normalization allowance, IRMind
+rejects the whole file and reports the minimum bytes needed when it stopped.
+
 ## Route 53 VPC Resolver
 
 Configure [VPC Resolver query logging](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-query-logs.html) and export original JSON events from its log destination. Ingest objects, arrays, or NDJSON. The decoder preserves `query_timestamp` precision. The mapping provides DNS and outcome filters for known response codes. The [native answer records](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-query-logs-example-json.html) remain searchable in the original fields. AWS supplies record type, class and RDATA with each answer.

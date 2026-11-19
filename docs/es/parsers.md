@@ -491,6 +491,12 @@ mínimo en el punto donde se detuvo. IRMind rechaza el fichero completo.
 
 (Administrador de IIS → Registro) Selecciona [el formato W3C](https://learn.microsoft.com/en-us/iis/configuration/system.applicationhost/sites/site/logfile/). Incluye fecha, hora, método HTTP, ruta, consulta, estado y las direcciones del cliente y del servidor. Copia los registros originales con sus directivas `#Fields`. Los registros usan UTC. Cada directiva válida define las columnas siguientes. Los campos personalizados se pueden buscar y la consulta se conserva tal como aparece.
 
+Para registros IIS grandes, conserva el original e ingiere ficheros rotados
+más pequeños o copias verificadas partidas entre registros completos. Repite
+en cada parte la directiva `#Fields` aplicable. Si se supera el límite de
+normalización, IRMind rechaza todo el fichero e indica los bytes mínimos
+necesarios al detenerse.
+
 ## Route 53 VPC Resolver
 
 Configura los [registros de consultas de VPC Resolver](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-query-logs.html) y exporta los eventos JSON originales desde el destino de los logs. Ingiere objetos, arrays o NDJSON. El decodificador conserva la precisión de `query_timestamp`. El mapeo permite filtrar por DNS y por resultado para los códigos de respuesta conocidos. Los [registros de respuesta nativos](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-query-logs-example-json.html) se pueden buscar en sus campos originales. AWS proporciona tipo, clase y RDATA para cada respuesta.
