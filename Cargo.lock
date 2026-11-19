@@ -2293,6 +2293,7 @@ dependencies = [
  "irmind-mod-mapping-google-workspace",
  "irmind-mod-mapping-guardduty",
  "irmind-mod-mapping-identity",
+ "irmind-mod-mapping-iis-w3c",
  "irmind-mod-mapping-journald-compat",
  "irmind-mod-mapping-json-compat",
  "irmind-mod-mapping-kubernetes",
@@ -2321,6 +2322,7 @@ dependencies = [
  "irmind-mod-parser-google-workspace",
  "irmind-mod-parser-guardduty",
  "irmind-mod-parser-hayabusa",
+ "irmind-mod-parser-iis-w3c",
  "irmind-mod-parser-json",
  "irmind-mod-parser-kubernetes",
  "irmind-mod-parser-linux",
@@ -2836,6 +2838,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-mapping-iis-w3c"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-mapping-tables",
+ "irmind-mod-parser-iis-w3c",
+ "irmind-testkit",
+]
+
+[[package]]
 name = "irmind-mod-mapping-journald-compat"
 version = "0.1.0"
 dependencies = [
@@ -3136,6 +3149,15 @@ dependencies = [
  "irmind-testkit",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-parser-iis-w3c"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-testkit",
 ]
 
 [[package]]

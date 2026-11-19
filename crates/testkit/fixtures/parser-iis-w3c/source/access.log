@@ -1,0 +1,8 @@
+#Software: Microsoft Internet Information Services 10.0
+#Version: 1.0
+#Date: 2026-11-17 20:00:00
+#Fields: date time s-ip cs-method cs-uri-stem cs-uri-query s-port cs-username c-ip cs(User-Agent) sc-status sc-substatus sc-win32-status sc-bytes cs-bytes s-computername
+2026-11-17 20:00:01 192.0.2.14 POST /synthetic/upload.aspx command=%2522%253Bkeep 443 synthetic-operator 203.0.113.77 Synthetic+UA/1.0 200 0 0 256 1048 web-synthetic
+2026-11-17 20:00:02 192.0.2.14 GET /synthetic/admin - 443 - 2001:db8::27 Synthetic+UA/1.0 403 0 0 100 82 web-synthetic
+#Fields: time date c-ip cs-uri-stem cs-method s-ip sc-status custom-field
+20:00:03.000157 2026-11-17 192.0.2.55 /test.proto SYNTH 192.0.2.14 - original-custom

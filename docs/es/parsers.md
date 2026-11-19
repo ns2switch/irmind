@@ -15,6 +15,7 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 | Microsoft 365 Unified Audit Log | CSV de Purview, JSON de Search-UnifiedAuditLog y Management Activity API | AuditData/Operation, CreationTime y workload originales; 98 | Instante UTC, actor, buzón objetivo explícito, recurso, IP de origen, user agent, workload y tablas de operación/resultado | experimental |
 | Okta System Log | Arrays JSON de la API y exports JSON/NDJSON | eventType, uuid, actor e instante published; 98 | Autenticación, MFA, administración, políticas y suplantación; actor/objetivo e IP de origen | experimental |
 | Depuración de DNS Server de Windows | Resúmenes de paquetes en texto | Cabecera de creación y columnas de paquete, 79 o 98 | Consulta, tipo, código de respuesta e IP remota según el sentido del paquete | experimental |
+| IIS W3C | Texto de registros de acceso extendidos | Fecha, hora y columnas HTTP de `#Fields`, 98 | Método, ruta, consulta original, estado, bytes, cliente y servidor | experimental |
 | Route 53 VPC Resolver | JSON, NDJSON | Versión 1.x, consulta, cliente y VPC o perfil, 98 | Consulta DNS, tipo, clase, cliente, puerto, código de respuesta, cuenta y región | experimental |
 | Auditoría de GitHub | CSV y JSON de organización o empresa, NDJSON nativo del streaming | Acción, fecha e identidad o ámbito de auditoría nativos, 98 | Membresía, tokens, claves, acceso a repositorios y configuración de Actions | experimental |
 | Reports API de Google Workspace | Páginas, arrays y objetos JSON, y NDJSON | ID de actividad, aplicación, instante y eventos nativos, 98 | Login, SAML, administración, OAuth, Drive y Gmail con campos originales | experimental |
@@ -485,6 +486,16 @@ completas. Cada parte necesita la cabecera de creación nativa. Confirma el
 formato de fecha y el desfase horario al ingerir cada parte. Si la fuente supera
 el límite de normalización, el error indica cuántos bytes se necesitaban como
 mínimo en el punto donde se detuvo. IRMind rechaza el fichero completo.
+
+## IIS W3C
+
+(Administrador de IIS → Registro) Selecciona [el formato W3C](https://learn.microsoft.com/en-us/iis/configuration/system.applicationhost/sites/site/logfile/). Incluye fecha, hora, método HTTP, ruta, consulta, estado y las direcciones del cliente y del servidor. Copia los registros originales con sus directivas `#Fields`. Los registros usan UTC. Cada directiva válida define las columnas siguientes. Los campos personalizados se pueden buscar y la consulta se conserva tal como aparece.
+
+Para registros IIS grandes, conserva el original e ingiere ficheros rotados
+más pequeños o copias verificadas partidas entre registros completos. Repite
+en cada parte la directiva `#Fields` aplicable. Si se supera el límite de
+normalización, IRMind rechaza todo el fichero e indica los bytes mínimos
+necesarios al detenerse.
 
 ## Route 53 VPC Resolver
 

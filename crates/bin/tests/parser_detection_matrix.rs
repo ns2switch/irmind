@@ -74,6 +74,11 @@ mod matrix {
     #[allow(clippy::too_many_lines)]
     fn each_fixture_has_one_unique_high_confidence_parser() -> Result<(), irmind_app::AppError> {
         let mut registry = ModuleRegistry::new();
+        #[cfg(feature = "parser-iis-w3c")]
+        registry.register(
+            Box::new(irmind_mod_parser_iis_w3c::IisW3cParser),
+            &ModuleConfig::new(),
+        )?;
         #[cfg(feature = "parser-windows-dns")]
         registry.register(
             Box::new(irmind_mod_parser_windows_dns::WindowsDnsParser),
@@ -198,6 +203,13 @@ mod matrix {
         )?;
         let mut matrix: Matrix = std::collections::BTreeMap::new();
         for (name, sample, expected) in [
+            #[cfg(feature = "parser-iis-w3c")]
+            (
+                "iis-w3c.log",
+                include_bytes!("../../testkit/fixtures/parser-iis-w3c/source/access.log")
+                    .as_slice(),
+                "parser-iis-w3c",
+            ),
             #[cfg(feature = "parser-windows-dns")]
             (
                 "windows-dns.log",
@@ -707,6 +719,7 @@ mod matrix {
             | "parser-fdr"
             | "parser-macos"
             | "parser-google-workspace"
+            | "parser-iis-w3c"
             | "parser-windows-dns"
             | "parser-route53"
             | "parser-github-audit" => [
@@ -747,6 +760,13 @@ mod matrix {
         Ok(())
     }
     fn assert_export_scores(name: &str, sample: &[u8], expected: &str) {
+        #[cfg(feature = "parser-iis-w3c")]
+        assert_eq!(
+            irmind_mod_parser_iis_w3c::IisW3cParser
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            (expected == "parser-iis-w3c").then_some(98)
+        );
         #[cfg(feature = "parser-windows-dns")]
         assert_eq!(
             irmind_mod_parser_windows_dns::WindowsDnsParser
