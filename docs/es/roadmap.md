@@ -30,10 +30,13 @@ son capacidades entregadas, no afirmaciones de validación con incidentes reales
   credenciales explícitas en el llavero, TLS completo y resultados firmados.
   La validación real sigue correspondiendo al analista. El modo de instancia de
   Chronicle exige confirmación, techo de organización y aviso permanente.
-- Quince skills progresivas para Windows, Linux, AWS, Azure, GCP, red y Kubernetes.
-  El núcleo se mantiene en [irmind-skills](https://github.com/ns2switch/irmind-skills),
-  separado del catálogo instalable. La clave de producción y la primera release
-  firmada del catálogo siguen pendientes de la persona mantenedora.
+- Veintitrés skills de carga progresiva para investigar Windows, Linux, macOS,
+  nube, identidad, correo, web, red y Kubernetes. Los métodos del núcleo viven
+  en [irmind-skills](https://github.com/ns2switch/irmind-skills), junto al catálogo
+  firmado de paquetes instalables de la comunidad.
+- La versión 0.5.5 amplía la decodificación y el mapeo local de identidad y
+  correo, hallazgos y flujos de nube, endpoint y macOS, DNS y accesos web.
+  La guía de parsers describe cada exportación y su cobertura experimental.
 - Seis tipos de subagente acotados, con contexto propio, ramas, checkpoints,
   fusión determinista, export V8 y planes visibles/cancelables. Reservar más del
   25% de tokens o llamadas restantes exige firma; una preferencia permite pedir

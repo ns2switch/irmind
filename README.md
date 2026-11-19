@@ -67,13 +67,13 @@ Start with the [verified release instructions](docs/platforms.md#verify-a-releas
 
 
 
-The [v0.5.4 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.5.4) provides keyless Sigstore bundles, GitHub provenance, an SBOM, and checksums. Download a binary and `SHA256SUMS`, verify their exact signer identity and checksums with cosign 3.1.3 or newer, then check `gh attestation verify`. The [platform guide](docs/platforms.md#verify-a-release-before-installing) has the commands. After verifying a downloaded copy of [install.sh](install.sh) or [install.ps1](install.ps1), the installer can perform these checks for you.
+The [v0.5.5 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.5.5) provides keyless Sigstore bundles, GitHub provenance, an SBOM, and checksums. Download a binary and `SHA256SUMS`, verify their exact signer identity and checksums with cosign 3.1.3 or newer, then check `gh attestation verify`. The [platform guide](docs/platforms.md#verify-a-release-before-installing) has the commands. After verifying a downloaded copy of [install.sh](install.sh) or [install.ps1](install.ps1), the installer can perform these checks for you.
 
-Keep the exact IRMind version that created an existing case. Version 0.5.4 uses case marker 4 and export V8; see the [format-impact note](CHANGELOG.md). The [version policy](docs/development/decisions.md#pre-10-format-policy) explains how to retain the creating executable or re-ingest verified originals.
+Keep the exact IRMind version that created an existing case. Version 0.5.5 uses case marker 4 and export V8; see the [format-impact note](CHANGELOG.md). The [version policy](docs/development/decisions.md#pre-10-format-policy) explains how to retain the creating executable or re-ingest verified originals.
 
 ```sh
 # After downloading the binary, SHA256SUMS, and both .sigstore.json bundles:
-tag=v0.5.4; binary=irmind-linux-x86_64
+tag=v0.5.5; binary=irmind-linux-x86_64
 for file in "$binary" SHA256SUMS; do
   cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done

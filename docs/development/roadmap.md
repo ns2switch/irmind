@@ -29,11 +29,13 @@ The following describes delivered capabilities, not field-validation claims.
   queries, explicit keystore credentials, full TLS verification and signed
   results. Live-service validation is still an analyst task. Chronicle instance
   scope remains explicit, confirmed, organization-bounded and visible in the TUI.
-- Fifteen progressively loaded forensic skills cover Windows, Linux, AWS, Azure,
-  GCP, network and Kubernetes investigations. Core methods live in
-  [irmind-skills](https://github.com/ns2switch/irmind-skills); its catalog is
-  distinct from release-bundled core packages. Production catalog-key provisioning
-  and the first signed catalog release remain maintainer tasks.
+- Twenty-three progressively loaded forensic skills cover Windows, Linux, macOS,
+  cloud, identity, email, web, network and Kubernetes investigations. The core
+  methods live in [irmind-skills](https://github.com/ns2switch/irmind-skills),
+  alongside the independently signed catalog of installable community packages.
+- Version 0.5.5 expands offline decoding and mapping for identity and email,
+  cloud findings and flow logs, endpoint and macOS, DNS and web access logs.
+  The parser guide documents each export and its experimental coverage.
 - Six bounded subagent types have separate contexts, signed branches, checkpoints,
   deterministic fusion, export V8 and visible/cancelable plans. Reservations above
   25% of remaining case tokens or calls require signed analyst confirmation;
