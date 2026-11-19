@@ -1,4 +1,6 @@
 //! Shared bounded framing mechanics. Source modules still own their format and time rules.
+mod access;
+pub use access::{access_log_fields, request_line, request_path};
 mod text;
 pub use text::text_frame;
 mod csv;

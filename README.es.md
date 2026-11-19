@@ -147,6 +147,7 @@ La compilación normal incluye todos los módulos de producto actuales y ambos l
 | Okta System Log | parser y mapeo locales | `parser-okta` (por defecto) | experimental | [Okta](docs/es/parsers.md) |
 | Depuración de DNS Server de Windows | parser y mapeo locales | `parser-windows-dns`, `mapping-windows-dns` (por defecto) | experimental | [Windows DNS](docs/es/parsers.md#registros-de-depuración-de-dns-server) |
 | Accesos IIS W3C | parser y mapeo locales | `parser-iis-w3c`, `mapping-iis-w3c` (por defecto) | experimental | [IIS W3C](docs/es/parsers.md#iis-w3c) |
+| ALB y Classic ELB de AWS | parser y mapeo locales | `parser-elb`, `mapping-elb` (por defecto) | experimental | [AWS ELB](docs/es/parsers.md#registros-de-acceso-de-balanceadores-aws) |
 | Route 53 Resolver (DNS de red) | parser y mapeo locales | `parser-route53`, `mapping-route53` (por defecto) | experimental | [Route 53 Resolver](docs/es/parsers.md#route-53-vpc-resolver) |
 | Auditoría de GitHub | parser y mapeo locales | `parser-github-audit`, `mapping-github-audit` (por defecto) | experimental | [Auditoría de GitHub](docs/es/parsers.md#auditoría-de-github) |
 | Reports API de Google Workspace | parser y mapeo locales | `parser-google-workspace`, `mapping-google-workspace` (por defecto) | experimental | [Google Workspace](docs/es/parsers.md#reports-api-de-google-workspace) |

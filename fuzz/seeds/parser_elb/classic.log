@@ -1,0 +1,2 @@
+2026-11-17T20:00:03.000631Z synthetic-classic 203.0.113.77:51555 192.0.2.18:80 0.000024 0.000601 0.000014 200 200 10 296 "POST http://legacy.example.test:80/synthetic?arg=%25 HTTP/1.1" "Legacy synthetic agent" - -
+2026-11-17T20:00:04Z synthetic-classic 192.0.2.9:50211 192.0.2.18:80 0.000024 0.000601 0.000014 - - 10 296 "- - -" "-" - -

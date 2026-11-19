@@ -7,6 +7,7 @@ license.workspace = true
 
 [features]
 default = [
+    "parser-elb", "mapping-elb",
     "parser-iis-w3c", "mapping-iis-w3c",
     "parser-windows-dns", "mapping-windows-dns",
     "parser-route53", "mapping-route53",
@@ -31,10 +32,12 @@ default = [
     "siem-splunk", "siem-elastic", "siem-chronicle", "cloud-aws", "edr-crowdstrike", "edr-sentinelone",
     "ti-misp", "ti-virustotal", "storage-s3", "storage-gcs", "storage-azure",
 ]
+parser-elb = ["dep:irmind-mod-parser-elb", "mapping-elb"]
 parser-iis-w3c = ["dep:irmind-mod-parser-iis-w3c", "mapping-iis-w3c"]
 parser-windows-dns = ["dep:irmind-mod-parser-windows-dns", "mapping-windows-dns"]
 parser-route53 = ["dep:irmind-mod-parser-route53", "mapping-route53"]
 parser-github-audit = ["dep:irmind-mod-parser-github-audit", "mapping-github-audit"]
+mapping-elb = ["dep:irmind-mod-mapping-elb", "parser-elb"]
 mapping-iis-w3c = ["dep:irmind-mod-mapping-iis-w3c", "parser-iis-w3c"]
 mapping-windows-dns = ["dep:irmind-mod-mapping-windows-dns", "parser-windows-dns"]
 mapping-route53 = ["dep:irmind-mod-mapping-route53", "parser-route53"]
@@ -110,10 +113,12 @@ parser-gcp-flow = ["dep:irmind-mod-parser-gcp-flow", "mapping-cloud-flow"]
 mapping-cloud-flow = ["dep:irmind-mod-mapping-cloud-flow"]
 
 [dependencies]
+irmind-mod-parser-elb = { path = "../modules/parser-elb", version = "0.1.0", optional = true }
 irmind-mod-parser-iis-w3c = { path = "../modules/parser-iis-w3c", version = "0.1.0", optional = true }
 irmind-mod-parser-windows-dns = { path = "../modules/parser-windows-dns", version = "0.1.0", optional = true }
 irmind-mod-parser-route53 = { path = "../modules/parser-route53", version = "0.1.0", optional = true }
 irmind-mod-parser-github-audit = { path = "../modules/parser-github-audit", version = "0.1.0", optional = true }
+irmind-mod-mapping-elb = { path = "../modules/mapping-elb", version = "0.1.0", optional = true }
 irmind-mod-mapping-iis-w3c = { path = "../modules/mapping-iis-w3c", version = "0.1.0", optional = true }
 irmind-mod-mapping-windows-dns = { path = "../modules/mapping-windows-dns", version = "0.1.0", optional = true }
 irmind-mod-mapping-route53 = { path = "../modules/mapping-route53", version = "0.1.0", optional = true }

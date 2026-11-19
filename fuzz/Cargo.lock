@@ -805,6 +805,7 @@ dependencies = [
  "irmind-mod-parser-declarative",
  "irmind-mod-parser-defender",
  "irmind-mod-parser-ecs",
+ "irmind-mod-parser-elb",
  "irmind-mod-parser-email",
  "irmind-mod-parser-entra",
  "irmind-mod-parser-eztools",
@@ -1024,6 +1025,15 @@ dependencies = [
  "irmind-app",
  "irmind-domain",
  "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-parser-elb"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "irmind-app",
+ "irmind-domain",
 ]
 
 [[package]]

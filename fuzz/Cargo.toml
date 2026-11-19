@@ -12,6 +12,7 @@ export = ["dep:irmind-infra"]
 cargo-fuzz = true
 
 [dependencies]
+irmind-mod-parser-elb = { path = "../crates/modules/parser-elb", version = "0.1.0" }
 irmind-mod-parser-iis-w3c = { path = "../crates/modules/parser-iis-w3c", version = "0.1.0" }
 irmind-mod-parser-windows-dns = { path = "../crates/modules/parser-windows-dns", version = "0.1.0" }
 irmind-mod-parser-route53 = { path = "../crates/modules/parser-route53", version = "0.1.0" }
@@ -336,6 +337,13 @@ bench = false
 [[bin]]
 name = "parser_iis_w3c"
 path = "fuzz_targets/parser_iis_w3c.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_elb"
+path = "fuzz_targets/parser_elb.rs"
 test = false
 doc = false
 bench = false

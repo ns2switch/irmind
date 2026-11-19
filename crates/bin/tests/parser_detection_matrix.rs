@@ -74,6 +74,11 @@ mod matrix {
     #[allow(clippy::too_many_lines)]
     fn each_fixture_has_one_unique_high_confidence_parser() -> Result<(), irmind_app::AppError> {
         let mut registry = ModuleRegistry::new();
+        #[cfg(feature = "parser-elb")]
+        registry.register(
+            Box::new(irmind_mod_parser_elb::ElbParser),
+            &ModuleConfig::new(),
+        )?;
         #[cfg(feature = "parser-iis-w3c")]
         registry.register(
             Box::new(irmind_mod_parser_iis_w3c::IisW3cParser),
@@ -203,6 +208,24 @@ mod matrix {
         )?;
         let mut matrix: Matrix = std::collections::BTreeMap::new();
         for (name, sample, expected) in [
+            #[cfg(feature = "parser-elb")]
+            (
+                "alb-access.log",
+                include_bytes!("../../testkit/fixtures/parser-elb/source/alb.log").as_slice(),
+                "parser-elb",
+            ),
+            #[cfg(feature = "parser-elb")]
+            (
+                "classic-elb.log",
+                include_bytes!("../../testkit/fixtures/parser-elb/source/classic.log").as_slice(),
+                "parser-elb",
+            ),
+            #[cfg(feature = "parser-elb")]
+            (
+                "gzip-alb.log.gz",
+                include_bytes!("../../../fuzz/seeds/parser_elb/alb.log.gz").as_slice(),
+                "parser-elb",
+            ),
             #[cfg(feature = "parser-iis-w3c")]
             (
                 "iis-w3c.log",
@@ -719,6 +742,7 @@ mod matrix {
             | "parser-fdr"
             | "parser-macos"
             | "parser-google-workspace"
+            | "parser-elb"
             | "parser-iis-w3c"
             | "parser-windows-dns"
             | "parser-route53"
@@ -760,6 +784,13 @@ mod matrix {
         Ok(())
     }
     fn assert_export_scores(name: &str, sample: &[u8], expected: &str) {
+        #[cfg(feature = "parser-elb")]
+        assert_eq!(
+            irmind_mod_parser_elb::ElbParser
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            (expected == "parser-elb").then_some(98)
+        );
         #[cfg(feature = "parser-iis-w3c")]
         assert_eq!(
             irmind_mod_parser_iis_w3c::IisW3cParser

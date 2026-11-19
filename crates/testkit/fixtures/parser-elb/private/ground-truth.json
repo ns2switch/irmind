@@ -1,0 +1,8 @@
+{
+  "synthetic": true,
+  "sources": ["alb.log", "classic.log"],
+  "expected_records": 4,
+  "outcomes": ["success", "failure", "success", "unknown"],
+  "query": "arg=%2522",
+  "source_ip": "203.0.113.77"
+}
