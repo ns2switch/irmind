@@ -223,6 +223,13 @@ pub(super) fn no_space() -> AppError {
     AppError::Fixed(irmind_app::FixedAppError::StorageNormalizedStagingSpace)
 }
 
+pub(super) fn normalized_source_limit(required: u64, allowance: u64) -> AppError {
+    AppError::Fixed(irmind_app::FixedAppError::StorageNormalizedSourceLimit {
+        required,
+        allowance,
+    })
+}
+
 pub(super) fn standard_allowance(physical: u64) -> Result<u64, AppError> {
     physical
         .checked_mul(EXPANSION_RESERVATION)

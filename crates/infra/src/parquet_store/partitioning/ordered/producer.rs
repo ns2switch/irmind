@@ -4,7 +4,9 @@ use super::super::super::{
     AppError, BATCH_BYTES, BATCH_ROWS, CancellationToken, ParquetStore, ParseReport, RecordRow,
     SourceManifestV1, invalid_source,
 };
-use super::super::staging::{Input, MAX_STAGED_ROW, no_space, source_sample};
+use super::super::staging::{
+    Input, MAX_STAGED_ROW, no_space, normalized_source_limit, source_sample,
+};
 use irmind_app::MappedIngestRequest;
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -211,7 +213,7 @@ impl<'a> RowBuffer<'a> {
         serde_json::to_writer(&mut counter, &row).map_err(|_| no_space())?;
         self.encoded = self.encoded.checked_add(counter.0).ok_or_else(no_space)?;
         if self.encoded > self.budget {
-            return Err(no_space());
+            return Err(normalized_source_limit(self.encoded, self.budget));
         }
         self.accepted = self.accepted.checked_add(1).ok_or_else(invalid_source)?;
         self.bytes = self.bytes.saturating_add(row.estimated_bytes());
@@ -319,12 +321,20 @@ mod tests {
         let cancel = CancellationToken::new();
         let restart = AtomicBool::new(false);
         let mut buffer = RowBuffer::new(&sender, 0, hash, &cancel, &restart, None);
+        let required = serde_json::to_vec(&row).unwrap().len() as u64 + 1;
+        let error = buffer.push(row).unwrap_err();
         assert!(matches!(
-            buffer.push(row),
-            Err(AppError::Fixed(
-                irmind_app::FixedAppError::StorageNormalizedStagingSpace
-            ))
+            error,
+            AppError::Fixed(irmind_app::FixedAppError::StorageNormalizedSourceLimit {
+                required: bytes,
+                allowance: 0,
+            }) if bytes == required
         ));
+        assert!(
+            error
+                .to_string()
+                .contains("Split the input at record boundaries")
+        );
         assert!(receiver.try_recv().is_err());
     }
 }

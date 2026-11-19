@@ -479,6 +479,13 @@ desconocidos conservan sus datos originales y se pueden buscar. [Referencia de a
 
 Activa el [registro de depuración de paquetes](https://learn.microsoft.com/en-us/windows-server/networking/dns/dns-logging-and-diagnostics#debug-logging) en el Administrador de DNS. Copia como evidencia el texto de resumen de paquetes. El decodificador espera UTF-8 o ASCII y el formato inglés mes/día/año con AM/PM. Si el día inicial puede interpretarse como mes, confirma el parser tras comprobar el formato de fecha del servidor. Confirma al ingerir el año del primer paquete y el desfase UTC fijo. Para los paquetes siguientes se usa el año escrito en cada línea. Las peticiones tienen resultado desconocido y las respuestas usan los códigos DNS conocidos. El extremo remoto de un paquete recibido es el origen y el de uno enviado es el destino. Los resúmenes originales se pueden buscar. Las exportaciones EVTX del canal analítico DNS usan el parser EVTX aislado y el mapeo de consulta, respuesta y fallo de los eventos 256–258. Los campos nativos QTYPE, RCODE y los bytes del paquete permanecen en los datos originales.
 
+Para registros de depuración grandes, conserva el original e ingiere ficheros
+rotados más pequeños o copias verificadas partidas entre líneas de paquetes
+completas. Cada parte necesita la cabecera de creación nativa. Confirma el
+formato de fecha y el desfase horario al ingerir cada parte. Si la fuente supera
+el límite de normalización, el error indica cuántos bytes se necesitaban como
+mínimo en el punto donde se detuvo. IRMind rechaza el fichero completo.
+
 ## Route 53 VPC Resolver
 
 Configura los [registros de consultas de VPC Resolver](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-query-logs.html) y exporta los eventos JSON originales desde el destino de los logs. Ingiere objetos, arrays o NDJSON. El decodificador conserva la precisión de `query_timestamp`. El mapeo permite filtrar por DNS y por resultado para los códigos de respuesta conocidos. Los [registros de respuesta nativos](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-query-logs-example-json.html) se pueden buscar en sus campos originales. AWS proporciona tipo, clase y RDATA para cada respuesta.

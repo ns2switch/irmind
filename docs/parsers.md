@@ -475,6 +475,13 @@ as original data. [Google Gmail activity reference](https://developers.google.co
 
 In DNS Manager, enable [packet debug logging](https://learn.microsoft.com/en-us/windows-server/networking/dns/dns-logging-and-diagnostics#debug-logging). Copy the resulting packet summary text as evidence. The decoder expects UTF-8 or ASCII and the English month/day/year and AM/PM layout. If the first day could be read as a month, confirm the parser only after checking the server's date format. Confirm the first packet year and fixed UTC offset at ingestion. The year in each line remains authoritative for later packets. Requests have unknown outcome, and responses use known DNS response codes. An incoming packet's peer is the source and an outgoing packet's peer is the destination. The original summaries remain searchable. Exported EVTX for the DNS Analytical channel uses the isolated EVTX parser and the query, response and failure rules for IDs 256–258. Native QTYPE, RCODE and packet wire bytes remain in the original data.
 
+For large debug logs, keep the original intact and ingest smaller rotated files
+or verified copies split at complete packet lines. Each part needs the native
+creation header; confirm the date format and time offset for each ingestion.
+When a source exceeds its normalization allowance, the error reports the
+minimum bytes needed at the point the parser stopped. IRMind does not publish
+part of the rejected file.
+
 ## Route 53 VPC Resolver
 
 Configure [VPC Resolver query logging](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-query-logs.html) and export original JSON events from its log destination. Ingest objects, arrays, or NDJSON. The decoder preserves `query_timestamp` precision. The mapping provides DNS and outcome filters for known response codes. The [native answer records](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-query-logs-example-json.html) remain searchable in the original fields. AWS supplies record type, class and RDATA with each answer.
