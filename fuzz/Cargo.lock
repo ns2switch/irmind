@@ -824,6 +824,7 @@ dependencies = [
  "irmind-mod-parser-ocsf",
  "irmind-mod-parser-okta",
  "irmind-mod-parser-plaso",
+ "irmind-mod-parser-route53",
  "irmind-mod-parser-suricata",
  "irmind-mod-parser-syslog",
  "irmind-mod-parser-velociraptor",
@@ -1189,6 +1190,14 @@ dependencies = [
  "irmind-domain",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-parser-route53"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
 ]
 
 [[package]]

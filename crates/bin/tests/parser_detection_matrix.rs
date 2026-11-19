@@ -74,6 +74,11 @@ mod matrix {
     #[allow(clippy::too_many_lines)]
     fn each_fixture_has_one_unique_high_confidence_parser() -> Result<(), irmind_app::AppError> {
         let mut registry = ModuleRegistry::new();
+        #[cfg(feature = "parser-route53")]
+        registry.register(
+            Box::new(irmind_mod_parser_route53::Route53Parser),
+            &ModuleConfig::new(),
+        )?;
         #[cfg(feature = "parser-github-audit")]
         registry.register(
             Box::new(irmind_mod_parser_github_audit::GitHubAuditParser),
@@ -188,6 +193,13 @@ mod matrix {
         )?;
         let mut matrix: Matrix = std::collections::BTreeMap::new();
         for (name, sample, expected) in [
+            #[cfg(feature = "parser-route53")]
+            (
+                "resolver-queries.ndjson",
+                include_bytes!("../../testkit/fixtures/parser-route53/source/queries.ndjson")
+                    .as_slice(),
+                "parser-route53",
+            ),
             #[cfg(feature = "parser-github-audit")]
             (
                 "github-stream.ndjson",
@@ -683,6 +695,7 @@ mod matrix {
             | "parser-fdr"
             | "parser-macos"
             | "parser-google-workspace"
+            | "parser-route53"
             | "parser-github-audit" => [
                 if matches!(sample.first(), Some(b'{' | b'[')) {
                     Some(45)
@@ -721,6 +734,13 @@ mod matrix {
         Ok(())
     }
     fn assert_export_scores(name: &str, sample: &[u8], expected: &str) {
+        #[cfg(feature = "parser-route53")]
+        assert_eq!(
+            irmind_mod_parser_route53::Route53Parser
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            (expected == "parser-route53").then_some(98)
+        );
         #[cfg(feature = "parser-github-audit")]
         assert_eq!(
             irmind_mod_parser_github_audit::GitHubAuditParser

@@ -79,6 +79,11 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
     Ok(())
 }
 fn register_export_mappings(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(feature = "mapping-route53")]
+    registry.register(
+        Box::new(irmind_mod_mapping_route53::Route53Mapping::new()?),
+        &ModuleConfig::new(),
+    )?;
     #[cfg(feature = "mapping-github-audit")]
     registry.register(
         Box::new(irmind_mod_mapping_github_audit::GitHubAuditMapping::new()?),
@@ -320,6 +325,10 @@ mod tests {
         check_catalog(&registry);
     }
     fn register_identity_decoders(registry: &mut ModuleRegistry) {
+        #[cfg(feature = "parser-route53")]
+        registry
+            .add_source_decoder(Arc::new(irmind_mod_parser_route53::Route53SourceDecoder))
+            .unwrap();
         #[cfg(feature = "parser-github-audit")]
         registry
             .add_source_decoder(Arc::new(
@@ -387,7 +396,8 @@ mod tests {
         );
         assert_eq!(
             catalog.snapshots().unwrap().len(),
-            2 + usize::from(cfg!(feature = "mapping-github-audit"))
+            2 + usize::from(cfg!(feature = "mapping-route53"))
+                + usize::from(cfg!(feature = "mapping-github-audit"))
                 + usize::from(cfg!(feature = "mapping-google-workspace"))
                 + usize::from(cfg!(feature = "mapping-macos"))
                 + usize::from(cfg!(all(feature = "mapping-fdr", feature = "parser-fdr")))

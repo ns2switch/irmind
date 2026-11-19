@@ -12,6 +12,7 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 | --- | --- | --- | --- | --- |
 | Microsoft 365 Unified Audit Log | Purview CSV, Search-UnifiedAuditLog JSON, Management Activity API JSON | Native AuditData/Operation, CreationTime and workload; 98 | UTC time, actor, mailbox target when explicit, resource, source IP, user agent, workload, finite operation/outcome tables | experimental |
 | Okta System Log | API JSON arrays and JSON/NDJSON exports | eventType, uuid, actor and published time; 98 | Authentication, MFA, administration, policies and impersonation; actor/target and source IP | experimental |
+| Route 53 VPC Resolver | JSON, NDJSON | Version 1.x, query, client and VPC or profile, 98 | DNS question, type, class, client, port, response code, account and Region | experimental |
 | GitHub audit log | Organization and enterprise CSV and JSON, native streamed NDJSON | Native action, time and audit identity/scope, 98 | Membership, tokens, keys, repository access and Actions configuration | experimental |
 | Google Workspace Reports API | JSON pages, arrays, objects and NDJSON | Native activity ID, application, time and events, 98 | Login, SAML, administration, OAuth, Drive and Gmail with original fields | experimental |
 | macOS Unified Log and eslogger | JSON arrays, objects and NDJSON | Native Unified Log fields or Endpoint Security envelope and schema, 98 | Process, file, authentication, session, mounts and selected security notifications | experimental |
@@ -468,6 +469,10 @@ changes, OAuth consent, Drive downloads and sharing, and Gmail delivery
 subtypes when provided. Use the Gmail native event code to distinguish manual
 forwards (10) and automatic forwards (11). Unknown events remain searchable
 as original data. [Google Gmail activity reference](https://developers.google.com/workspace/admin/reports/v1/appendix/activity/gmail)
+
+## Route 53 VPC Resolver
+
+Configure [VPC Resolver query logging](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-query-logs.html) and export original JSON events from its log destination. Ingest objects, arrays, or NDJSON. The decoder preserves `query_timestamp` precision. The mapping provides DNS and outcome filters for known response codes. The [native answer records](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-query-logs-example-json.html) remain searchable in the original fields. AWS supplies record type, class and RDATA with each answer.
 
 ## GitHub audit log
 

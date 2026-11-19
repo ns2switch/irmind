@@ -13,6 +13,8 @@ and export V8 sections are unchanged; keep the producing version for a case.
   validated unsigned decimal IDs. OS PIDs remain record scoped and Sysmon
   ProcessGuid keeps its existing lifetime scope.
 
+- Add experimental Route 53 VPC Resolver decoding and DNS mapping, preserving
+  answer records, source ports and precise timestamps in local evidence.
 - Add experimental GitHub audit log JSON, NDJSON and CSV decoding with finite
   mappings for repository access, token and membership events, and Actions
   security settings. Keep original token metadata as evidence.

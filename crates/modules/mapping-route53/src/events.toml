@@ -1,0 +1,148 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-route53"
+version = "route53-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-route53"
+parser_versions = ["route53-source-v1"]
+format = "route53-resolver"
+format_version = "route53-source-v1"
+
+[partition]
+account = ["account_id"]
+region = ["region"]
+
+[[fields]]
+source = ["query_name"]
+target = "dns.question.name"
+observation = { kind = "domain", role = "subject", scope = { kind = "global" } }
+
+[[fields]]
+source = ["query_type"]
+target = "dns.question.type"
+
+[[fields]]
+source = ["query_class"]
+target = "dns.question.class"
+
+[[fields]]
+source = ["rcode"]
+target = "dns.response_code"
+
+[[fields]]
+source = ["srcaddr"]
+target = "source.ip"
+conversion = "ip"
+observation = { kind = "ip", role = "source", scope = { kind = "global" } }
+
+[[fields]]
+source = ["srcport"]
+target = "source.port"
+conversion = "decimal"
+
+[[fields]]
+source = ["transport"]
+target = "network.transport"
+
+[[fields]]
+source = ["account_id"]
+target = "cloud.account.id"
+
+[[fields]]
+source = ["region"]
+target = "cloud.region"
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+outcome = "success"
+[[rules.when]]
+path = ["rcode"]
+predicate = { op = "text", value = "NOERROR" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+outcome = "failure"
+[[rules.when]]
+path = ["rcode"]
+predicate = { op = "text", value = "FORMERR" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+outcome = "failure"
+[[rules.when]]
+path = ["rcode"]
+predicate = { op = "text", value = "SERVFAIL" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+outcome = "failure"
+[[rules.when]]
+path = ["rcode"]
+predicate = { op = "text", value = "NXDOMAIN" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+outcome = "failure"
+[[rules.when]]
+path = ["rcode"]
+predicate = { op = "text", value = "NOTIMP" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+outcome = "failure"
+[[rules.when]]
+path = ["rcode"]
+predicate = { op = "text", value = "REFUSED" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+outcome = "failure"
+[[rules.when]]
+path = ["rcode"]
+predicate = { op = "text", value = "YXDOMAIN" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+outcome = "failure"
+[[rules.when]]
+path = ["rcode"]
+predicate = { op = "text", value = "YXRRSET" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+outcome = "failure"
+[[rules.when]]
+path = ["rcode"]
+predicate = { op = "text", value = "NXRRSET" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+outcome = "failure"
+[[rules.when]]
+path = ["rcode"]
+predicate = { op = "text", value = "NOTAUTH" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+outcome = "failure"
+[[rules.when]]
+path = ["rcode"]
+predicate = { op = "text", value = "NOTZONE" }
+
+[[rules]]
+categories = ["network"]
+types = ["protocol"]
+[[rules.when]]
+path = ["rcode"]
+predicate = { op = "missing" }
