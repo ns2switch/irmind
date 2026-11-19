@@ -14,6 +14,7 @@
     feature = "mapping-identity",
     feature = "mapping-guardduty",
     feature = "mapping-cloud-flow",
+    feature = "mapping-route53",
     feature = "mapping-github-audit",
     feature = "mapping-google-workspace",
     feature = "mapping-macos",
@@ -59,6 +60,7 @@ use super::{
     feature = "parser-okta",
     feature = "parser-guardduty",
     feature = "parser-vpc-flow",
+    feature = "parser-route53",
     feature = "parser-github-audit",
     feature = "parser-google-workspace",
     feature = "parser-macos",
@@ -128,6 +130,7 @@ pub(super) fn configured_registry(
         feature = "parser-okta",
         feature = "parser-guardduty",
         feature = "parser-vpc-flow",
+        feature = "parser-route53",
         feature = "parser-github-audit",
         feature = "parser-google-workspace",
         feature = "parser-macos",
@@ -149,6 +152,7 @@ pub(super) fn configured_registry(
     ))]
     register_parsers(&mut registry, &mut config_issues, data_root)?;
     #[cfg(any(
+        feature = "parser-route53",
         feature = "parser-github-audit",
         feature = "parser-google-workspace",
         feature = "parser-macos"
@@ -206,6 +210,7 @@ pub(super) fn configured_registry(
     feature = "parser-okta",
     feature = "parser-guardduty",
     feature = "parser-vpc-flow",
+    feature = "parser-route53",
     feature = "parser-github-audit",
     feature = "parser-google-workspace",
     feature = "parser-macos",
@@ -247,6 +252,7 @@ fn register_parsers(
         feature = "mapping-identity",
         feature = "mapping-guardduty",
         feature = "mapping-cloud-flow",
+        feature = "mapping-route53",
         feature = "mapping-github-audit",
         feature = "mapping-google-workspace",
         feature = "mapping-macos",
@@ -834,11 +840,17 @@ fn register_contextual_parsers(registry: &mut ModuleRegistry) -> Result<()> {
 }
 
 #[cfg(any(
+    feature = "parser-route53",
     feature = "parser-github-audit",
     feature = "parser-google-workspace",
     feature = "parser-macos"
 ))]
 fn register_offline_exports(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(feature = "parser-route53")]
+    registry.register(
+        Box::new(irmind_mod_parser_route53::Route53Parser),
+        &ModuleConfig::new(),
+    )?;
     #[cfg(feature = "parser-github-audit")]
     registry.register(
         Box::new(irmind_mod_parser_github_audit::GitHubAuditParser),

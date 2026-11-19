@@ -1,0 +1,9 @@
+{
+  "synthetic": true,
+  "source": "queries.ndjson",
+  "expected_records": 3,
+  "outcomes": ["success", "failure", "unknown"],
+  "source_ips": ["203.0.113.77", "2001:db8::47", "192.0.2.8"],
+  "first_query": "resolver.example.test.",
+  "first_answer": "192.0.2.31"
+}

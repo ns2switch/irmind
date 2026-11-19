@@ -14,6 +14,7 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 | --- | --- | --- | --- | --- |
 | Microsoft 365 Unified Audit Log | CSV de Purview, JSON de Search-UnifiedAuditLog y Management Activity API | AuditData/Operation, CreationTime y workload originales; 98 | Instante UTC, actor, buzón objetivo explícito, recurso, IP de origen, user agent, workload y tablas de operación/resultado | experimental |
 | Okta System Log | Arrays JSON de la API y exports JSON/NDJSON | eventType, uuid, actor e instante published; 98 | Autenticación, MFA, administración, políticas y suplantación; actor/objetivo e IP de origen | experimental |
+| Route 53 VPC Resolver | JSON, NDJSON | Versión 1.x, consulta, cliente y VPC o perfil, 98 | Consulta DNS, tipo, clase, cliente, puerto, código de respuesta, cuenta y región | experimental |
 | Auditoría de GitHub | CSV y JSON de organización o empresa, NDJSON nativo del streaming | Acción, fecha e identidad o ámbito de auditoría nativos, 98 | Membresía, tokens, claves, acceso a repositorios y configuración de Actions | experimental |
 | Reports API de Google Workspace | Páginas, arrays y objetos JSON, y NDJSON | ID de actividad, aplicación, instante y eventos nativos, 98 | Login, SAML, administración, OAuth, Drive y Gmail con campos originales | experimental |
 | Unified Log y eslogger de macOS | Arrays y objetos JSON, y NDJSON | Campos nativos de Unified Log o envoltura y esquema de Endpoint Security, 98 | Proceso, fichero, autenticación, sesión, montajes y notificaciones de seguridad seleccionadas | experimental |
@@ -472,6 +473,10 @@ y de cuentas, consentimientos OAuth, descargas y compartición de Drive, y
 subtipos de entrega de Gmail cuando están presentes. Distingue los reenvíos
 manuales (10) y automáticos (11) con el código nativo de Gmail. Los eventos
 desconocidos conservan sus datos originales y se pueden buscar. [Referencia de actividad de Gmail](https://developers.google.com/workspace/admin/reports/v1/appendix/activity/gmail)
+
+## Route 53 VPC Resolver
+
+Configura los [registros de consultas de VPC Resolver](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-query-logs.html) y exporta los eventos JSON originales desde el destino de los logs. Ingiere objetos, arrays o NDJSON. El decodificador conserva la precisión de `query_timestamp`. El mapeo permite filtrar por DNS y por resultado para los códigos de respuesta conocidos. Los [registros de respuesta nativos](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-query-logs-example-json.html) se pueden buscar en sus campos originales. AWS proporciona tipo, clase y RDATA para cada respuesta.
 
 ## Auditoría de GitHub
 

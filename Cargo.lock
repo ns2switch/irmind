@@ -2300,6 +2300,7 @@ dependencies = [
  "irmind-mod-mapping-macos",
  "irmind-mod-mapping-network",
  "irmind-mod-mapping-ocsf",
+ "irmind-mod-mapping-route53",
  "irmind-mod-mapping-syslog",
  "irmind-mod-mapping-udm",
  "irmind-mod-parser-azure-flow",
@@ -2327,6 +2328,7 @@ dependencies = [
  "irmind-mod-parser-ocsf",
  "irmind-mod-parser-okta",
  "irmind-mod-parser-plaso",
+ "irmind-mod-parser-route53",
  "irmind-mod-parser-suricata",
  "irmind-mod-parser-syslog",
  "irmind-mod-parser-velociraptor",
@@ -2918,6 +2920,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-mapping-route53"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-mapping-tables",
+ "irmind-mod-parser-route53",
+ "irmind-testkit",
+]
+
+[[package]]
 name = "irmind-mod-mapping-syslog"
 version = "0.1.0"
 dependencies = [
@@ -3196,6 +3209,15 @@ dependencies = [
  "irmind-testkit",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-parser-route53"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-testkit",
 ]
 
 [[package]]

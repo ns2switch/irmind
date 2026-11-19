@@ -12,6 +12,7 @@ export = ["dep:irmind-infra"]
 cargo-fuzz = true
 
 [dependencies]
+irmind-mod-parser-route53 = { path = "../crates/modules/parser-route53", version = "0.1.0" }
 irmind-mod-parser-github-audit = { path = "../crates/modules/parser-github-audit", version = "0.1.0" }
 irmind-mod-parser-google-workspace = { path = "../crates/modules/parser-google-workspace", version = "0.1.0" }
 irmind-mod-parser-macos = { path = "../crates/modules/parser-macos", version = "0.1.0" }
@@ -312,6 +313,13 @@ bench = false
 [[bin]]
 name = "parser_github_audit"
 path = "fuzz_targets/parser_github_audit.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_route53"
+path = "fuzz_targets/parser_route53.rs"
 test = false
 doc = false
 bench = false

@@ -106,6 +106,9 @@ fn ingest_with_context(
 }
 fn fixture(parser: &str) -> &'static [u8] {
     match parser {
+        #[cfg(feature = "parser-route53")]
+        "route53" => include_bytes!("../../testkit/fixtures/parser-route53/source/queries.ndjson"),
+
         #[cfg(feature = "parser-github-audit")]
         "github-audit" => {
             include_bytes!("../../testkit/fixtures/parser-github-audit/source/stream.ndjson")
@@ -154,6 +157,8 @@ fn fixture(parser: &str) -> &'static [u8] {
 const IDENTITY_SOURCES: &[(&str, u64)] = &[
     #[cfg(feature = "parser-github-audit")]
     ("github-audit", 4),
+    #[cfg(feature = "parser-route53")]
+    ("route53", 3),
     #[cfg(feature = "parser-github-audit")]
     ("github-audit-csv", 2),
     #[cfg(feature = "parser-google-workspace")]
@@ -327,6 +332,16 @@ fn one_gib_release_github_audit_throughput() -> Result<(), &'static str> {
     Ok(())
 }
 
+#[cfg(feature = "parser-route53")]
+#[test]
+#[ignore = "release benchmark with one GiB of synthetic evidence"]
+fn one_gib_release_route53_throughput() -> Result<(), &'static str> {
+    if cfg!(debug_assertions) {
+        return Err("source throughput benchmarks require a release build");
+    }
+    benchmark_source("route53");
+    Ok(())
+}
 fn benchmark_source(name: &str) {
     use std::io::{BufWriter, Write};
     let bench_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target");
@@ -391,6 +406,7 @@ fn benchmark_lines(name: &str) -> (Vec<u8>, Vec<u8>, u64) {
         && !name.starts_with("macos-")
         && name != "google-workspace"
         && name != "github-audit"
+        && name != "route53"
     {
         value["synthetic_padding"] = serde_json::json!("x".repeat(1024));
     }
