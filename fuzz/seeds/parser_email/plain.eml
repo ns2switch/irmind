@@ -1,0 +1,8 @@
+From: sender@example.invalid
+To: analyst@example.invalid
+Date: Tue, 17 Nov 2026 12:34:56 +0000
+Message-ID: <synthetic-mail-plain@example.invalid>
+Subject: Synthetic plain message
+Content-Type: text/plain; charset=utf-8
+
+A synthetic link: HTTPS://portal.example.invalid/a%252Fb?x=one%26two

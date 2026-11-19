@@ -1,0 +1,28 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "email-fields"
+version = "email-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-email"
+parser_versions = ["email-source-v1"]
+format = "rfc5322"
+format_version = "email-source-v1"
+
+[[rules]]
+categories = ["email"]
+types = ["info"]
+outcome = "unknown"
+
+[[fields]]
+source = ["filename"]
+target = "file.name"
+observation = { kind = "file", role = "subject", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["sha256"]
+target = "file.hash.sha256"
+observation = { kind = "hash", role = "subject", scope = { kind = "global" } }
+
+[[fields]]
+source = ["size"]
+target = "file.size"

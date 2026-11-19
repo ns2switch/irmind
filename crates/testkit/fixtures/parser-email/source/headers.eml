@@ -1,0 +1,12 @@
+Received: from relay.example.invalid by inbox.example.invalid for <analyst@example.invalid>; Tue, 17 Nov 2026 12:34:56 +0000
+Received: from workstation.example.invalid ([203.0.113.77]) by relay.example.invalid; Tue, 17 Nov 2026 12:34:55 +0000
+From: =?UTF-8?B?U3ludGhldGlj?= <sender@example.invalid>
+To: Analyst <analyst@example.invalid>, second@example.invalid
+Reply-To: reply@example.invalid
+Return-Path: <bounce@example.invalid>
+Message-ID: <synthetic-mail-001@example.invalid>
+Date: Tue, 17 Nov 2026 12:34:56 +0000
+Subject: Synthetic review request
+Authentication-Results: inbox.example.invalid; spf=pass smtp.mailfrom=example.invalid; dkim=fail; dmarc=fail
+X-Originating-IP: [203.0.113.77]
+X-MS-Exchange-Organization-SCL: 5

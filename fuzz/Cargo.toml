@@ -12,6 +12,8 @@ export = ["dep:irmind-infra"]
 cargo-fuzz = true
 
 [dependencies]
+irmind-mod-parser-email = { path = "../crates/modules/parser-email", version = "0.1.0" }
+irmind-mod-mapping-email = { path = "../crates/modules/mapping-email", version = "0.1.0" }
 irmind-mod-parser-vpc-flow = { path = "../crates/modules/parser-vpc-flow", version = "0.1.0" }
 irmind-mod-parser-azure-flow = { path = "../crates/modules/parser-azure-flow", version = "0.1.0" }
 irmind-mod-parser-gcp-flow = { path = "../crates/modules/parser-gcp-flow", version = "0.1.0" }
@@ -261,6 +263,13 @@ bench = false
 [[bin]]
 name = "parser_gcp_flow"
 path = "fuzz_targets/parser_gcp_flow.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_email"
+path = "fuzz_targets/parser_email.rs"
 test = false
 doc = false
 bench = false

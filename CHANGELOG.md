@@ -4,6 +4,12 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+- Add experimental RFC 5322 email and bounded MIME decoding, separate email
+  mapping rules, original header/body retention, literal URL extraction and
+  attachment metadata with decoded SHA-256. HTML remains literal source.
+- Preserve native identity-export `events` fields as original data rather than
+  assigning them generic outer-document wrapper semantics.
+
 - Add experimental AWS VPC, Azure VNet/NSG and GCP VPC flow export modules with
   separate decoders and network mapping tables. Preserve native timestamps,
   counters and endpoint roles; headerless AWS layouts require analyst selection.

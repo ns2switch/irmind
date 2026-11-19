@@ -4,7 +4,7 @@ use irmind_app::{
         DecodeBudget, DecodeInput, SourceFormatV1, SourceInput, SourceRecordV1, SourceValue,
         framed::{
             DecodedSourceFrame, SourceFrameEmitter, csv_frame, csv_values,
-            decode_json_envelope_source, source_datetime,
+            decode_json_named_envelope_source, source_datetime,
         },
         json::{JsonFrames, SourceJsonLimits, decode_json_fields},
     },
@@ -83,13 +83,14 @@ impl SourceDecoder for M365SourceDecoder {
         let metadata = input.metadata;
         let prefix = reader.fill_buf().map_err(|_| invalid())?.trim_ascii_start();
         if matches!(prefix.first(), Some(b'{' | b'[')) {
-            return decode_json_envelope_source(
+            return decode_json_named_envelope_source(
                 SourceInput {
                     metadata,
                     reader: &mut reader,
                 },
                 self.identity(),
                 budget,
+                &[],
                 &prepare,
                 emit,
             );
@@ -150,7 +151,7 @@ pub(super) fn detect(sample: &[u8]) -> Option<u8> {
         .first()
         .is_some_and(|b| matches!(b, b'{' | b'['))
     {
-        let mut frames = JsonFrames::new(&mut reader, &cancel);
+        let mut frames = JsonFrames::new(&mut reader, &cancel).without_record_wrappers();
         let frame = frames.next_frame().ok()??;
         let fields = decode_json_fields(frame.bytes(), SourceJsonLimits::default()).ok()?;
         return prepare(fields).ok().map(|_| 98);

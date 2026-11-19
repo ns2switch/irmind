@@ -106,6 +106,8 @@ fn ingest_with_context(
 }
 fn fixture(parser: &str) -> &'static [u8] {
     match parser {
+        #[cfg(feature = "parser-email")]
+        "email" => include_bytes!("../../testkit/fixtures/parser-email/source/multipart.eml"),
         "m365" => include_bytes!("../../testkit/fixtures/parser-m365/source/events.ndjson"),
         #[cfg(feature = "parser-guardduty")]
         "guardduty" => {
@@ -138,6 +140,8 @@ fn identity_failures_keep_roles_originals_and_signed_export() {
         .create_case("Synthetic identity evidence", "Local only")
         .unwrap();
     for (name, count) in [
+        #[cfg(feature = "parser-email")]
+        ("email", 7),
         ("m365", 8),
         ("okta", 7),
         #[cfg(feature = "parser-guardduty")]
@@ -446,4 +450,58 @@ fn compact_flow_artifact_bytes_are_independent_of_worker_limit() {
         }
         engine.verify(&case.id).unwrap();
     }
+}
+
+#[cfg(feature = "parser-email")]
+#[test]
+#[ignore = "manual optimized 1 GiB email collection benchmark"]
+fn one_gib_release_email_throughput() -> Result<(), &'static str> {
+    use std::io::Write as _;
+    if cfg!(debug_assertions) {
+        return Err("Use --release for benchmarks");
+    }
+    let bench_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target");
+    let root = tempfile::Builder::new()
+        .prefix("irmind-email-bench-")
+        .tempdir_in(bench_root)
+        .unwrap();
+    let originals = root.path().join("originals");
+    fs::create_dir(&originals).unwrap();
+    let store = Arc::new(current_sources::open(&root.path().join("data")));
+    let engine = engine(&store);
+    let case = engine
+        .create_case("Synthetic email benchmark", "Local only")
+        .unwrap();
+    let mut bytes = 0_u64;
+    let mut records = 0_u64;
+    for index in 0..128 {
+        let name = format!("synthetic-{index:03}.eml");
+        let header = format!(
+            "From: sender@example.invalid\r\nTo: analyst@example.invalid\r\nMessage-ID: <synthetic-{index}@example.invalid>\r\nDate: Tue, 17 Nov 2026 12:00:00 +0000\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n"
+        );
+        let mut file = fs::File::create(originals.join(&name)).unwrap();
+        file.write_all(header.as_bytes()).unwrap();
+        file.write_all(&vec![b'x'; 8 * 1024 * 1024]).unwrap();
+        bytes += header.len() as u64 + 8 * 1024 * 1024;
+    }
+    let started = std::time::Instant::now();
+    for index in 0..128 {
+        records += ingest_with_context(
+            &engine,
+            store.as_ref(),
+            &case.id,
+            &originals,
+            &format!("synthetic-{index:03}.eml"),
+            None,
+        );
+    }
+    let seconds = started.elapsed().as_secs_f64();
+    assert_eq!(records, 128 * 33);
+    println!(
+        "EMAIL_BENCH bytes={bytes} records={records} files=128 seconds={seconds:.3} MiB_per_second={:.3}",
+        f64::from(u32::try_from(bytes).unwrap()) / 1_048_576.0 / seconds
+    );
+    // Reconstruction, seal and export are exercised by the mixed-source case test;
+    // this measurement covers ingestion of a collection under the per-message cap.
+    Ok(())
 }

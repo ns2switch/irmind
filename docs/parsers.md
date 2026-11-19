@@ -12,6 +12,7 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 | --- | --- | --- | --- | --- |
 | Microsoft 365 Unified Audit Log | Purview CSV, Search-UnifiedAuditLog JSON, Management Activity API JSON | Native AuditData/Operation, CreationTime and workload; 98 | UTC time, actor, mailbox target when explicit, resource, source IP, user agent, workload, finite operation/outcome tables | experimental |
 | Okta System Log | API JSON arrays and JSON/NDJSON exports | eventType, uuid, actor and published time; 98 | Authentication, MFA, administration, policies and impersonation; actor/target and source IP | experimental |
+| RFC 5322 email | One `.eml` or header dump per file; bounded MIME parts | From plus native header combination: 98; minimal headers: 70, analyst choice | Ordered Received hops, addresses, raw headers/body bytes, literal URLs and attachment metadata/hashes; email outcome stays unknown | experimental |
 | AWS GuardDuty | API, CLI/console and EventBridge JSON | Native account, finding ID/type, region, resource and time; 98 | Unconfirmed source alert, actor/resource/IP roles, exact severity and original observation times | experimental |
 | AWS VPC Flow Logs | Headered/custom and standard v2 text, gzip, CloudWatch messages | Native column header: 98; headerless v2: 70 and analyst confirmation | Network endpoints/roles, explicit disposition, bytes/packets, account/region and explicit instance host | experimental |
 | Azure flow logs | VNet and NSG JSON containers | Provider category and native flow structure: 98 | Original tuple, precise native epoch, endpoints, explicit disposition, counters, subscription and rule | experimental |
@@ -286,3 +287,56 @@ Sources: [AWS flow record fields](https://docs.aws.amazon.com/vpc/latest/usergui
 [Azure VNet flow format](https://learn.microsoft.com/en-us/azure/network-watcher/vnet-flow-logs-overview),
 [Azure NSG flow format](https://learn.microsoft.com/en-us/azure/network-watcher/nsg-flow-logs-overview),
 [GCP flow records](https://docs.cloud.google.com/vpc/docs/about-flow-logs-records).
+
+## Email exports
+
+Save the original message as `.eml` from the mail client, including full headers
+and MIME structure; use one message per file or select a directory. A header-only
+dump is also supported. IRMind does not connect to a mailbox, follow links, open
+attachments or unpack archives. Keep the originals: hashing in place does not
+implicitly copy them into the case.
+
+The decoder retains raw header order and exact header bytes, including Received
+hops, From, To/Cc, Reply-To, Return-Path, Message-ID, Date, Authentication-Results,
+X-Originating-IP and provider headers. Structured mailbox and MIME parameter
+parsing uses the bounded headers-only library entry point. IRMind owns MIME
+traversal. Plain text and literal HTML source are retained in bounded chunks;
+HTML is never rendered. Base64 and quoted-printable transport encoding are decoded
+once. HTTP(S) URLs are literal values: URL escapes and HTML entities are not
+repeatedly decoded and no network request is made. Attachments expose only their
+decoded size, declared media type, filename and SHA-256, not their contents.
+Embedded `message/rfc822` parts are treated as opaque attachments.
+
+Limits are 32 MiB per source, 64 KiB per header block, 1,024 headers in the message,
+16 nested multipart containers and 256 MIME parts. Plain/HTML source uses chunks
+of at most 256 KiB, preserving UTF-8 boundaries and the original bytes, with a
+bounded 4 KiB lookahead for mapping across chunk boundaries. Structural limits
+reject the message rather than silently trimming it. The pure mapping extracts
+up to 127 HTTP(S) URLs per text chunk, each at most 4,096 bytes; unsupported or
+excess values produce a coverage diagnostic while the original body is retained.
+UTF-8 and US-ASCII body text are decoded; other charsets retain original hex bytes
+with an explicit coverage notice. Unsupported transport encodings and malformed
+multipart structures fail clearly. Minimal recognized headers require analyst
+selection; a filename alone never proves the format.
+
+Timestamps use the original Date only with a validated explicit supported zone;
+missing, duplicate, invalid or unsupported dates remain unknown. Neither the machine clock
+nor file mtime supplies an event time. MIME transformations may prevent an exact
+original byte offset for a subrecord. Such a source uses unavailable origin offsets
+consistently; known positions remain in `source_byte_offset` and relative
+`header_offsets`, while `decoded_body_offset` never claims to be a file offset.
+`mime_part_index` preserves the container relationship.
+
+The mapping uses finite email/file rules in included TOML. Native glue projects
+RFC mailbox arrays into validated actor/target observations and retains extraction
+entities for literal URLs and a source-hash-based `email_message` identity.
+The first From/To addresses populate scalar typed roles; all addresses remain
+searchable in the original decoded headers and bounded extraction pairs, with a
+coverage diagnostic for additional targets. These are header claims, not proof of
+identity. Authentication-Results remains untrusted reported data: IRMind performs
+no DNS, SPF or DKIM validation and does not infer event success from it. Message
+outcome remains unknown. No process-lifetime identity or permission is introduced.
+
+Sources: [message syntax](https://www.rfc-editor.org/rfc/rfc5322),
+[MIME structure](https://www.rfc-editor.org/rfc/rfc2046),
+[reported authentication status](https://www.rfc-editor.org/rfc/rfc8601).
