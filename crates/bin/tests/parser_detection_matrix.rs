@@ -74,6 +74,11 @@ mod matrix {
     #[allow(clippy::too_many_lines)]
     fn each_fixture_has_one_unique_high_confidence_parser() -> Result<(), irmind_app::AppError> {
         let mut registry = ModuleRegistry::new();
+        #[cfg(feature = "parser-windows-dns")]
+        registry.register(
+            Box::new(irmind_mod_parser_windows_dns::WindowsDnsParser),
+            &ModuleConfig::new(),
+        )?;
         #[cfg(feature = "parser-route53")]
         registry.register(
             Box::new(irmind_mod_parser_route53::Route53Parser),
@@ -193,6 +198,13 @@ mod matrix {
         )?;
         let mut matrix: Matrix = std::collections::BTreeMap::new();
         for (name, sample, expected) in [
+            #[cfg(feature = "parser-windows-dns")]
+            (
+                "windows-dns.log",
+                include_bytes!("../../testkit/fixtures/parser-windows-dns/source/dns.log")
+                    .as_slice(),
+                "parser-windows-dns",
+            ),
             #[cfg(feature = "parser-route53")]
             (
                 "resolver-queries.ndjson",
@@ -695,6 +707,7 @@ mod matrix {
             | "parser-fdr"
             | "parser-macos"
             | "parser-google-workspace"
+            | "parser-windows-dns"
             | "parser-route53"
             | "parser-github-audit" => [
                 if matches!(sample.first(), Some(b'{' | b'[')) {
@@ -734,6 +747,13 @@ mod matrix {
         Ok(())
     }
     fn assert_export_scores(name: &str, sample: &[u8], expected: &str) {
+        #[cfg(feature = "parser-windows-dns")]
+        assert_eq!(
+            irmind_mod_parser_windows_dns::WindowsDnsParser
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            (expected == "parser-windows-dns").then_some(98)
+        );
         #[cfg(feature = "parser-route53")]
         assert_eq!(
             irmind_mod_parser_route53::Route53Parser

@@ -60,6 +60,12 @@ fn ingest_with_context(
     std::io::Read::take(fs::File::open(root.join(file)).unwrap(), 65536)
         .read_to_end(&mut sample)
         .unwrap();
+    let time_context = sample
+        .starts_with(b"DNS Server log file creation at ")
+        .then(|| {
+            irmind_app::ParserTimeContext::new(2026, 0, false, irmind_app::ParserTimeBasis::Command)
+                .unwrap()
+        });
     let catalog = current_sources::catalog();
     let selected = catalog
         .select_source(ParserSelectionRequest {
@@ -67,7 +73,7 @@ fn ingest_with_context(
             sample: &sample,
             parser_override: None,
             forced: false,
-            time_context: None,
+            time_context: time_context.as_ref(),
             cluster_context,
         })
         .unwrap();
@@ -93,6 +99,12 @@ fn ingest_with_context(
         .map(|e| SourceManifestV2::decode(&e.payload).unwrap())
         .unwrap();
     assert_eq!(manifest.rejected_records, 0);
+    if let Some(context) = time_context {
+        assert_eq!(
+            manifest.timestamp_context,
+            Some(irmind_app::source_mapping::source_time_snapshot(&context).unwrap())
+        );
+    }
     entries
         .iter()
         .rev()
@@ -106,6 +118,9 @@ fn ingest_with_context(
 }
 fn fixture(parser: &str) -> &'static [u8] {
     match parser {
+        #[cfg(feature = "parser-windows-dns")]
+        "windows-dns" => include_bytes!("../../testkit/fixtures/parser-windows-dns/source/dns.log"),
+
         #[cfg(feature = "parser-route53")]
         "route53" => include_bytes!("../../testkit/fixtures/parser-route53/source/queries.ndjson"),
 
@@ -155,6 +170,8 @@ fn fixture(parser: &str) -> &'static [u8] {
     }
 }
 const IDENTITY_SOURCES: &[(&str, u64)] = &[
+    #[cfg(feature = "parser-windows-dns")]
+    ("windows-dns", 4),
     #[cfg(feature = "parser-github-audit")]
     ("github-audit", 4),
     #[cfg(feature = "parser-route53")]
@@ -342,6 +359,16 @@ fn one_gib_release_route53_throughput() -> Result<(), &'static str> {
     benchmark_source("route53");
     Ok(())
 }
+#[cfg(feature = "parser-windows-dns")]
+#[test]
+#[ignore = "release benchmark with one GiB of synthetic evidence"]
+fn one_gib_release_windows_dns_throughput() -> Result<(), &'static str> {
+    if cfg!(debug_assertions) {
+        return Err("source throughput benchmarks require a release build");
+    }
+    benchmark_source("windows-dns");
+    Ok(())
+}
 fn benchmark_source(name: &str) {
     use std::io::{BufWriter, Write};
     let bench_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target");
@@ -391,6 +418,16 @@ fn benchmark_source(name: &str) {
 fn benchmark_lines(name: &str) -> (Vec<u8>, Vec<u8>, u64) {
     let mut lines = fixture(name).split(|b| *b == b'\n');
     let first = lines.next().unwrap();
+    if name == "windows-dns" {
+        let mut header = Vec::new();
+        for line in fixture(name).split_inclusive(|byte| *byte == b'\n') {
+            if line.windows(8).any(|part| part == b" PACKET ") {
+                return (header, line.to_vec(), 1);
+            }
+            header.extend_from_slice(line);
+        }
+        unreachable!("fixture has a packet");
+    }
     if name == "vpc-flow" {
         let mut header = first.to_vec();
         header.push(b'\n');

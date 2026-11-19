@@ -79,6 +79,11 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
     Ok(())
 }
 fn register_export_mappings(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(feature = "mapping-windows-dns")]
+    registry.register(
+        Box::new(irmind_mod_mapping_windows_dns::WindowsDnsMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
     #[cfg(feature = "mapping-route53")]
     registry.register(
         Box::new(irmind_mod_mapping_route53::Route53Mapping::new()?),
@@ -195,7 +200,7 @@ fn register_contextual(registry: &mut ModuleRegistry) -> Result<()> {
 #[cfg(feature = "mapping-evtx")]
 fn register_evtx(registry: &mut ModuleRegistry) -> Result<()> {
     use irmind_mod_mapping_evtx::{
-        PowerShellMapping, SecurityMapping, SysmonMapping, SystemMapping,
+        DnsAnalyticalMapping, PowerShellMapping, SecurityMapping, SysmonMapping, SystemMapping,
     };
     for &event_id in SecurityMapping::EVENT_IDS {
         registry.register(
@@ -206,6 +211,7 @@ fn register_evtx(registry: &mut ModuleRegistry) -> Result<()> {
     registry.register(Box::new(SystemMapping::new()?), &ModuleConfig::new())?;
     registry.register(Box::new(PowerShellMapping::new()?), &ModuleConfig::new())?;
     registry.register(Box::new(SysmonMapping::new()?), &ModuleConfig::new())?;
+    registry.register(Box::new(DnsAnalyticalMapping::new()?), &ModuleConfig::new())?;
     Ok(())
 }
 #[cfg(feature = "mapping-linux")]
@@ -325,6 +331,12 @@ mod tests {
         check_catalog(&registry);
     }
     fn register_identity_decoders(registry: &mut ModuleRegistry) {
+        #[cfg(feature = "parser-windows-dns")]
+        registry
+            .add_source_decoder(Arc::new(
+                irmind_mod_parser_windows_dns::WindowsDnsSourceDecoder,
+            ))
+            .unwrap();
         #[cfg(feature = "parser-route53")]
         registry
             .add_source_decoder(Arc::new(irmind_mod_parser_route53::Route53SourceDecoder))
@@ -396,7 +408,8 @@ mod tests {
         );
         assert_eq!(
             catalog.snapshots().unwrap().len(),
-            2 + usize::from(cfg!(feature = "mapping-route53"))
+            2 + usize::from(cfg!(feature = "mapping-windows-dns"))
+                + usize::from(cfg!(feature = "mapping-route53"))
                 + usize::from(cfg!(feature = "mapping-github-audit"))
                 + usize::from(cfg!(feature = "mapping-google-workspace"))
                 + usize::from(cfg!(feature = "mapping-macos"))
@@ -449,7 +462,7 @@ mod tests {
                 + usize::from(cfg!(feature = "parser-plaso"))
                 + usize::from(cfg!(feature = "parser-eztools"))
                 + usize::from(cfg!(feature = "mapping-ocsf"))
-                + 20 * usize::from(cfg!(feature = "mapping-evtx"))
+                + 21 * usize::from(cfg!(feature = "mapping-evtx"))
         );
     }
 }

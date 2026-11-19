@@ -5,6 +5,21 @@ use irmind_infra::LocalStore;
 use std::{path::Path, sync::Arc};
 fn registry() -> ModuleRegistry {
     let mut registry = ModuleRegistry::new();
+    #[cfg(feature = "parser-windows-dns")]
+    {
+        registry
+            .register(
+                Box::new(irmind_mod_parser_windows_dns::WindowsDnsParser),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+        registry
+            .register(
+                Box::new(irmind_mod_mapping_windows_dns::WindowsDnsMapping::new().unwrap()),
+                &ModuleConfig::new(),
+            )
+            .unwrap();
+    }
     #[cfg(feature = "parser-route53")]
     {
         registry

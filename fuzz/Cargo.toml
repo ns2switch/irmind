@@ -12,6 +12,7 @@ export = ["dep:irmind-infra"]
 cargo-fuzz = true
 
 [dependencies]
+irmind-mod-parser-windows-dns = { path = "../crates/modules/parser-windows-dns", version = "0.1.0" }
 irmind-mod-parser-route53 = { path = "../crates/modules/parser-route53", version = "0.1.0" }
 irmind-mod-parser-github-audit = { path = "../crates/modules/parser-github-audit", version = "0.1.0" }
 irmind-mod-parser-google-workspace = { path = "../crates/modules/parser-google-workspace", version = "0.1.0" }
@@ -320,6 +321,13 @@ bench = false
 [[bin]]
 name = "parser_route53"
 path = "fuzz_targets/parser_route53.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_windows_dns"
+path = "fuzz_targets/parser_windows_dns.rs"
 test = false
 doc = false
 bench = false

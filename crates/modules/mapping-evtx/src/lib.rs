@@ -68,6 +68,13 @@ table_module!(
     "4e3343194df2024e608a085dd4bad682f7ba408ac66b1ee2825ca47d9f835d05"
 );
 
+table_module!(
+    DnsAnalyticalMapping,
+    "mapping-evtx-dns-analytical",
+    "tables/dns-analytical.toml",
+    "e6b1cc00e10b66c8ec352f0bf0a18c2543044a5602345ed8dbdabad1736be3c9"
+);
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests;

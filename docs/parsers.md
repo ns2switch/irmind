@@ -12,6 +12,7 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 | --- | --- | --- | --- | --- |
 | Microsoft 365 Unified Audit Log | Purview CSV, Search-UnifiedAuditLog JSON, Management Activity API JSON | Native AuditData/Operation, CreationTime and workload; 98 | UTC time, actor, mailbox target when explicit, resource, source IP, user agent, workload, finite operation/outcome tables | experimental |
 | Okta System Log | API JSON arrays and JSON/NDJSON exports | eventType, uuid, actor and published time; 98 | Authentication, MFA, administration, policies and impersonation; actor/target and source IP | experimental |
+| Windows DNS Server debug | Packet summary text | Log creation header and packet columns, 79 or 98 | Query, type, response code and remote IP by packet direction | experimental |
 | Route 53 VPC Resolver | JSON, NDJSON | Version 1.x, query, client and VPC or profile, 98 | DNS question, type, class, client, port, response code, account and Region | experimental |
 | GitHub audit log | Organization and enterprise CSV and JSON, native streamed NDJSON | Native action, time and audit identity/scope, 98 | Membership, tokens, keys, repository access and Actions configuration | experimental |
 | Google Workspace Reports API | JSON pages, arrays, objects and NDJSON | Native activity ID, application, time and events, 98 | Login, SAML, administration, OAuth, Drive and Gmail with original fields | experimental |
@@ -469,6 +470,10 @@ changes, OAuth consent, Drive downloads and sharing, and Gmail delivery
 subtypes when provided. Use the Gmail native event code to distinguish manual
 forwards (10) and automatic forwards (11). Unknown events remain searchable
 as original data. [Google Gmail activity reference](https://developers.google.com/workspace/admin/reports/v1/appendix/activity/gmail)
+
+## DNS Server debug logs
+
+In DNS Manager, enable [packet debug logging](https://learn.microsoft.com/en-us/windows-server/networking/dns/dns-logging-and-diagnostics#debug-logging). Copy the resulting packet summary text as evidence. The decoder expects UTF-8 or ASCII and the English month/day/year and AM/PM layout. If the first day could be read as a month, confirm the parser only after checking the server's date format. Confirm the first packet year and fixed UTC offset at ingestion. The year in each line remains authoritative for later packets. Requests have unknown outcome, and responses use known DNS response codes. An incoming packet's peer is the source and an outgoing packet's peer is the destination. The original summaries remain searchable. Exported EVTX for the DNS Analytical channel uses the isolated EVTX parser and the query, response and failure rules for IDs 256–258. Native QTYPE, RCODE and packet wire bytes remain in the original data.
 
 ## Route 53 VPC Resolver
 

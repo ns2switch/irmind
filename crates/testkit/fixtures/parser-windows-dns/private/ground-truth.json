@@ -1,0 +1,10 @@
+{
+  "synthetic": true,
+  "source": "dns.log",
+  "year": 2026,
+  "utc_offset": "+00:00",
+  "expected_records": 4,
+  "outcomes": ["unknown", "success", "failure", "unknown"],
+  "query": "resolver.example.test.",
+  "source_ip": "203.0.113.77"
+}

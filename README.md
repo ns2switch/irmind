@@ -127,6 +127,7 @@ The normal build includes every current product module and both keystores. No re
 | Microsoft Entra ID | local parser + mapping | `parser-entra` (default) | experimental | [Entra](docs/parsers.md#microsoft-entra-id) |
 | Microsoft 365 audit | local parser + mapping | `parser-m365` (default) | experimental | [M365](docs/parsers.md) |
 | Okta System Log | local parser + mapping | `parser-okta` (default) | experimental | [Okta](docs/parsers.md) |
+| Windows DNS Server debug log | local parser + mapping | `parser-windows-dns`, `mapping-windows-dns` (default) | experimental | [Windows DNS](docs/parsers.md#dns-server-debug-logs) |
 | Route 53 Resolver (network DNS) | local parser + mapping | `parser-route53`, `mapping-route53` (default) | experimental | [Route 53 Resolver](docs/parsers.md#route-53-vpc-resolver) |
 | GitHub audit log | local parser + mapping | `parser-github-audit`, `mapping-github-audit` (default) | experimental | [GitHub audit](docs/parsers.md#github-audit-log) |
 | Google Workspace Reports API | local parser + mapping | `parser-google-workspace`, `mapping-google-workspace` (default) | experimental | [Google Workspace](docs/parsers.md#google-workspace-reports-api) |
