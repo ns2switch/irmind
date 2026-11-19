@@ -33,7 +33,7 @@ pub enum FixedAppError {
     )]
     StorageNormalizedStagingSpace,
     #[error(
-        "storage: case staging needs {required} bytes including safety margin, but only {available} bytes are available"
+        "storage: not enough space for case staging: {required} bytes required including safety margin, {available} bytes available"
     )]
     StorageCaseStagingCapacity { required: u64, available: u64 },
 
