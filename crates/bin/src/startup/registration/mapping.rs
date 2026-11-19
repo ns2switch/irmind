@@ -79,6 +79,11 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
     Ok(())
 }
 fn register_export_mappings(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(feature = "mapping-elb")]
+    registry.register(
+        Box::new(irmind_mod_mapping_elb::ElbMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
     #[cfg(feature = "mapping-iis-w3c")]
     registry.register(
         Box::new(irmind_mod_mapping_iis_w3c::IisW3cMapping::new()?),
@@ -336,6 +341,10 @@ mod tests {
         check_catalog(&registry);
     }
     fn register_identity_decoders(registry: &mut ModuleRegistry) {
+        #[cfg(feature = "parser-elb")]
+        registry
+            .add_source_decoder(Arc::new(irmind_mod_parser_elb::ElbSourceDecoder))
+            .unwrap();
         #[cfg(feature = "parser-iis-w3c")]
         registry
             .add_source_decoder(Arc::new(irmind_mod_parser_iis_w3c::IisW3cSourceDecoder))
@@ -417,7 +426,8 @@ mod tests {
         );
         assert_eq!(
             catalog.snapshots().unwrap().len(),
-            2 + usize::from(cfg!(feature = "mapping-iis-w3c"))
+            2 + usize::from(cfg!(feature = "mapping-elb"))
+                + usize::from(cfg!(feature = "mapping-iis-w3c"))
                 + usize::from(cfg!(feature = "mapping-windows-dns"))
                 + usize::from(cfg!(feature = "mapping-route53"))
                 + usize::from(cfg!(feature = "mapping-github-audit"))

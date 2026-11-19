@@ -118,6 +118,11 @@ fn ingest_with_context(
 }
 fn fixture(parser: &str) -> &'static [u8] {
     match parser {
+        #[cfg(feature = "parser-elb")]
+        "elb" => include_bytes!("../../testkit/fixtures/parser-elb/source/alb.log"),
+        #[cfg(feature = "parser-elb")]
+        "classic-elb" => include_bytes!("../../testkit/fixtures/parser-elb/source/classic.log"),
+
         #[cfg(feature = "parser-iis-w3c")]
         "iis-w3c" => include_bytes!("../../testkit/fixtures/parser-iis-w3c/source/access.log"),
 
@@ -173,6 +178,10 @@ fn fixture(parser: &str) -> &'static [u8] {
     }
 }
 const IDENTITY_SOURCES: &[(&str, u64)] = &[
+    #[cfg(feature = "parser-elb")]
+    ("elb", 2),
+    #[cfg(feature = "parser-elb")]
+    ("classic-elb", 2),
     #[cfg(feature = "parser-iis-w3c")]
     ("iis-w3c", 3),
     #[cfg(feature = "parser-windows-dns")]
@@ -531,6 +540,19 @@ fn one_gib_release_iis_w3c_throughput() -> Result<(), &'static str> {
     benchmark_rotated("iis-w3c");
     Ok(())
 }
+
+#[cfg(feature = "parser-elb")]
+#[test]
+#[ignore = "release benchmarks with one GiB of synthetic evidence per layout"]
+fn one_gib_release_elb_throughput() -> Result<(), &'static str> {
+    if cfg!(debug_assertions) {
+        return Err("source throughput benchmarks require a release build");
+    }
+    for name in ["elb", "classic-elb"] {
+        benchmark_source(name);
+    }
+    Ok(())
+}
 fn benchmark_source(name: &str) {
     use std::io::{BufWriter, Write};
     let bench_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target");
@@ -580,6 +602,17 @@ fn benchmark_source(name: &str) {
 fn benchmark_lines(name: &str) -> (Vec<u8>, Vec<u8>, u64) {
     let mut lines = fixture(name).split(|b| *b == b'\n');
     let first = lines.next().unwrap();
+    if matches!(name, "elb" | "classic-elb") {
+        return (
+            Vec::new(),
+            fixture(name)
+                .split_inclusive(|byte| *byte == b'\n')
+                .next()
+                .unwrap()
+                .to_vec(),
+            1,
+        );
+    }
     if name == "iis-w3c" {
         let mut header = Vec::new();
         for line in fixture(name).split_inclusive(|byte| *byte == b'\n') {

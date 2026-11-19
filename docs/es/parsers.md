@@ -16,6 +16,7 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 | Okta System Log | Arrays JSON de la API y exports JSON/NDJSON | eventType, uuid, actor e instante published; 98 | Autenticación, MFA, administración, políticas y suplantación; actor/objetivo e IP de origen | experimental |
 | Depuración de DNS Server de Windows | Resúmenes de paquetes en texto | Cabecera de creación y columnas de paquete, 79 o 98 | Consulta, tipo, código de respuesta e IP remota según el sentido del paquete | experimental |
 | IIS W3C | Texto de registros de acceso extendidos | Fecha, hora y columnas HTTP de `#Fields`, 98 | Método, ruta, consulta original, estado, bytes, cliente y servidor | experimental |
+| ALB y Classic ELB de AWS | Texto de acceso y gzip | Fecha, extremos y solicitud nativos, 98 | Método, URL y consulta, estado, bytes y direcciones de cliente y backend | experimental |
 | Route 53 VPC Resolver | JSON, NDJSON | Versión 1.x, consulta, cliente y VPC o perfil, 98 | Consulta DNS, tipo, clase, cliente, puerto, código de respuesta, cuenta y región | experimental |
 | Auditoría de GitHub | CSV y JSON de organización o empresa, NDJSON nativo del streaming | Acción, fecha e identidad o ámbito de auditoría nativos, 98 | Membresía, tokens, claves, acceso a repositorios y configuración de Actions | experimental |
 | Reports API de Google Workspace | Páginas, arrays y objetos JSON, y NDJSON | ID de actividad, aplicación, instante y eventos nativos, 98 | Login, SAML, administración, OAuth, Drive y Gmail con campos originales | experimental |
@@ -496,6 +497,10 @@ más pequeños o copias verificadas partidas entre registros completos. Repite
 en cada parte la directiva `#Fields` aplicable. Si se supera el límite de
 normalización, IRMind rechaza todo el fichero e indica los bytes mínimos
 necesarios al detenerse.
+
+## Registros de acceso de balanceadores AWS
+
+Activa la entrega en S3 de los [registros de Application Load Balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html) o [Classic Load Balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/access-log-collection.html). Ingiere el gzip o el texto original. El texto lleva offsets físicos y los registros comprimidos conservan hash y número de registro. La entrada gzip y el flujo descomprimido tienen cada uno un límite de 2 GiB, con la reserva habitual del caso. Los campos futuros al final se pueden buscar y se conserva la URL sin decodificar.
 
 ## Route 53 VPC Resolver
 

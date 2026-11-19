@@ -14,6 +14,7 @@
     feature = "mapping-identity",
     feature = "mapping-guardduty",
     feature = "mapping-cloud-flow",
+    feature = "mapping-elb",
     feature = "mapping-iis-w3c",
     feature = "mapping-windows-dns",
     feature = "mapping-route53",
@@ -62,6 +63,7 @@ use super::{
     feature = "parser-okta",
     feature = "parser-guardduty",
     feature = "parser-vpc-flow",
+    feature = "parser-elb",
     feature = "parser-iis-w3c",
     feature = "parser-windows-dns",
     feature = "parser-route53",
@@ -181,6 +183,7 @@ fn register_enabled_parsers(
         feature = "parser-okta",
         feature = "parser-guardduty",
         feature = "parser-vpc-flow",
+        feature = "parser-elb",
         feature = "parser-iis-w3c",
         feature = "parser-windows-dns",
         feature = "parser-route53",
@@ -205,6 +208,7 @@ fn register_enabled_parsers(
     ))]
     register_parsers(registry, issues, data_root)?;
     #[cfg(any(
+        feature = "parser-elb",
         feature = "parser-iis-w3c",
         feature = "parser-windows-dns",
         feature = "parser-route53",
@@ -228,6 +232,7 @@ fn register_enabled_parsers(
     feature = "parser-okta",
     feature = "parser-guardduty",
     feature = "parser-vpc-flow",
+    feature = "parser-elb",
     feature = "parser-iis-w3c",
     feature = "parser-windows-dns",
     feature = "parser-route53",
@@ -272,6 +277,7 @@ fn register_parsers(
         feature = "mapping-identity",
         feature = "mapping-guardduty",
         feature = "mapping-cloud-flow",
+        feature = "mapping-elb",
         feature = "mapping-iis-w3c",
         feature = "mapping-windows-dns",
         feature = "mapping-route53",
@@ -862,6 +868,7 @@ fn register_contextual_parsers(registry: &mut ModuleRegistry) -> Result<()> {
 }
 
 #[cfg(any(
+    feature = "parser-elb",
     feature = "parser-iis-w3c",
     feature = "parser-windows-dns",
     feature = "parser-route53",
@@ -870,6 +877,11 @@ fn register_contextual_parsers(registry: &mut ModuleRegistry) -> Result<()> {
     feature = "parser-macos"
 ))]
 fn register_offline_exports(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(feature = "parser-elb")]
+    registry.register(
+        Box::new(irmind_mod_parser_elb::ElbParser),
+        &ModuleConfig::new(),
+    )?;
     #[cfg(feature = "parser-iis-w3c")]
     registry.register(
         Box::new(irmind_mod_parser_iis_w3c::IisW3cParser),

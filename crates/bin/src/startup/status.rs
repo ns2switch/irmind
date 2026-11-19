@@ -52,6 +52,7 @@ pub(super) fn module_statuses(
 }
 
 const PARSER_STATUSES: &[(&str, bool)] = &[
+    ("parser-elb", cfg!(feature = "parser-elb")),
     ("parser-iis-w3c", cfg!(feature = "parser-iis-w3c")),
     ("parser-windows-dns", cfg!(feature = "parser-windows-dns")),
     ("parser-route53", cfg!(feature = "parser-route53")),

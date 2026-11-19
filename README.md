@@ -129,6 +129,7 @@ The normal build includes every current product module and both keystores. No re
 | Okta System Log | local parser + mapping | `parser-okta` (default) | experimental | [Okta](docs/parsers.md) |
 | Windows DNS Server debug log | local parser + mapping | `parser-windows-dns`, `mapping-windows-dns` (default) | experimental | [Windows DNS](docs/parsers.md#dns-server-debug-logs) |
 | IIS W3C access logs | local parser + mapping | `parser-iis-w3c`, `mapping-iis-w3c` (default) | experimental | [IIS W3C](docs/parsers.md#iis-w3c) |
+| AWS ALB and Classic ELB | local parser + mapping | `parser-elb`, `mapping-elb` (default) | experimental | [AWS ELB](docs/parsers.md#aws-load-balancer-access-logs) |
 | Route 53 Resolver (network DNS) | local parser + mapping | `parser-route53`, `mapping-route53` (default) | experimental | [Route 53 Resolver](docs/parsers.md#route-53-vpc-resolver) |
 | GitHub audit log | local parser + mapping | `parser-github-audit`, `mapping-github-audit` (default) | experimental | [GitHub audit](docs/parsers.md#github-audit-log) |
 | Google Workspace Reports API | local parser + mapping | `parser-google-workspace`, `mapping-google-workspace` (default) | experimental | [Google Workspace](docs/parsers.md#google-workspace-reports-api) |
