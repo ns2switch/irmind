@@ -1,0 +1,37 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mde-json-alertevidence"
+version = "defender-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-defender"
+parser_versions = ["defender-source-v1"]
+format = "mde-json"
+format_version = "defender-source-v1"
+native_type = "AlertEvidence"
+
+[[fields]]
+source = ["DeviceId"]
+target = "host.id"
+omit_text = ["", "-"]
+observation = { kind = "host", role = "observer", scope = { kind = "host", path = ["DeviceId"] } }
+
+[[fields]]
+source = ["DeviceName"]
+target = "host.name"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["AlertId"]
+target = "irmind.detection.id"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["Severity"]
+target = "irmind.detection.source_severity"
+omit_text = ["", "-"]
+
+[[rules]]
+categories = ["intrusion_detection"]
+types = ["indicator"]
+kind = "alert"
+outcome = "unknown"

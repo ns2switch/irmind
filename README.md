@@ -127,6 +127,7 @@ The normal build includes every current product module and both keystores. No re
 | Microsoft Entra ID | local parser + mapping | `parser-entra` (default) | experimental | [Entra](docs/parsers.md#microsoft-entra-id) |
 | Microsoft 365 audit | local parser + mapping | `parser-m365` (default) | experimental | [M365](docs/parsers.md) |
 | Okta System Log | local parser + mapping | `parser-okta` (default) | experimental | [Okta](docs/parsers.md) |
+| Microsoft Defender exports | local parser + mapping | `parser-defender`, `mapping-defender` (default) | experimental | [Defender](docs/parsers.md#microsoft-defender-exports) |
 | Email exports | local parser + mapping | `parser-email`, `mapping-email` (default) | experimental | [Email](docs/parsers.md#email-exports) |
 | AWS GuardDuty | local parser + mapping | `parser-guardduty` (default) | experimental | [GuardDuty](docs/parsers.md#guardduty-exports) |
 | AWS VPC Flow Logs | local parser + mapping | `parser-vpc-flow`, `mapping-cloud-flow` (default) | experimental | [Cloud flows](docs/parsers.md#cloud-network-flow-exports) |

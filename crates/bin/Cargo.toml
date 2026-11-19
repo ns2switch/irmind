@@ -7,6 +7,7 @@ license.workspace = true
 
 [features]
 default = [
+    "parser-defender", "mapping-defender",
     "parser-email", "mapping-email",
     "parser-vpc-flow", "parser-azure-flow", "parser-gcp-flow", "mapping-cloud-flow",
     "parser-guardduty", "mapping-guardduty",
@@ -23,6 +24,8 @@ default = [
     "siem-splunk", "siem-elastic", "siem-chronicle", "cloud-aws", "edr-crowdstrike", "edr-sentinelone",
     "ti-misp", "ti-virustotal", "storage-s3", "storage-gcs", "storage-azure",
 ]
+parser-defender = ["dep:irmind-mod-parser-defender", "mapping-defender"]
+mapping-defender = ["dep:irmind-mod-mapping-defender", "parser-defender"]
 parser-email = ["dep:irmind-mod-parser-email", "mapping-email"]
 mapping-email = ["dep:irmind-mod-mapping-email", "parser-email"]
 parser-m365 = ["dep:irmind-mod-parser-m365", "mapping-identity"]
@@ -86,6 +89,8 @@ parser-gcp-flow = ["dep:irmind-mod-parser-gcp-flow", "mapping-cloud-flow"]
 mapping-cloud-flow = ["dep:irmind-mod-mapping-cloud-flow"]
 
 [dependencies]
+irmind-mod-parser-defender = { path = "../modules/parser-defender", version = "0.1.0", optional = true }
+irmind-mod-mapping-defender = { path = "../modules/mapping-defender", version = "0.1.0", optional = true }
 irmind-mod-parser-email = { path = "../modules/parser-email", version = "0.1.0", optional = true }
 irmind-mod-mapping-email = { path = "../modules/mapping-email", version = "0.1.0", optional = true }
 irmind-mod-parser-vpc-flow = { path = "../modules/parser-vpc-flow", version = "0.1.0", optional = true }

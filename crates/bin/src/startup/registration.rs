@@ -14,6 +14,7 @@
     feature = "mapping-identity",
     feature = "mapping-guardduty",
     feature = "mapping-cloud-flow",
+    feature = "mapping-defender",
     feature = "mapping-email",
     feature = "mapping-falco",
 ))]
@@ -54,6 +55,7 @@ use super::{
     feature = "parser-okta",
     feature = "parser-guardduty",
     feature = "parser-vpc-flow",
+    feature = "parser-defender",
     feature = "parser-email",
     feature = "parser-azure-flow",
     feature = "parser-gcp-flow",
@@ -118,6 +120,7 @@ pub(super) fn configured_registry(
         feature = "parser-okta",
         feature = "parser-guardduty",
         feature = "parser-vpc-flow",
+        feature = "parser-defender",
         feature = "parser-email",
         feature = "parser-azure-flow",
         feature = "parser-gcp-flow",
@@ -185,6 +188,7 @@ pub(super) fn configured_registry(
     feature = "parser-okta",
     feature = "parser-guardduty",
     feature = "parser-vpc-flow",
+    feature = "parser-defender",
     feature = "parser-email",
     feature = "parser-azure-flow",
     feature = "parser-gcp-flow",
@@ -221,6 +225,7 @@ fn register_parsers(
         feature = "mapping-identity",
         feature = "mapping-guardduty",
         feature = "mapping-cloud-flow",
+        feature = "mapping-defender",
         feature = "mapping-email",
         feature = "mapping-falco",
     ))]
@@ -231,6 +236,7 @@ fn register_parsers(
         feature = "parser-okta",
         feature = "parser-guardduty",
         feature = "parser-vpc-flow",
+        feature = "parser-defender",
         feature = "parser-email",
         feature = "parser-azure-flow",
         feature = "parser-gcp-flow",
@@ -722,6 +728,7 @@ fn register_chronicle(
     feature = "parser-okta",
     feature = "parser-guardduty",
     feature = "parser-vpc-flow",
+    feature = "parser-defender",
     feature = "parser-email",
     feature = "parser-azure-flow",
     feature = "parser-gcp-flow",
@@ -730,6 +737,11 @@ fn register_chronicle(
     feature = "parser-falco"
 ))]
 fn register_contextual_parsers(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(feature = "parser-defender")]
+    registry.register(
+        Box::new(irmind_mod_parser_defender::DefenderParser),
+        &ModuleConfig::new(),
+    )?;
     #[cfg(feature = "parser-email")]
     registry.register(
         Box::new(irmind_mod_parser_email::EmailParser),

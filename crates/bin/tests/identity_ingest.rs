@@ -106,6 +106,8 @@ fn ingest_with_context(
 }
 fn fixture(parser: &str) -> &'static [u8] {
     match parser {
+        #[cfg(feature = "parser-defender")]
+        "defender" => include_bytes!("../../testkit/fixtures/parser-defender/source/events.ndjson"),
         #[cfg(feature = "parser-email")]
         "email" => include_bytes!("../../testkit/fixtures/parser-email/source/multipart.eml"),
         "m365" => include_bytes!("../../testkit/fixtures/parser-m365/source/events.ndjson"),
@@ -142,6 +144,8 @@ fn identity_failures_keep_roles_originals_and_signed_export() {
     for (name, count) in [
         #[cfg(feature = "parser-email")]
         ("email", 7),
+        #[cfg(feature = "parser-defender")]
+        ("defender", 9),
         ("m365", 8),
         ("okta", 7),
         #[cfg(feature = "parser-guardduty")]
@@ -172,7 +176,7 @@ fn identity_failures_keep_roles_originals_and_signed_export() {
             .timeline_filtered(&case.id, &filter, 10)
             .unwrap()
             .len(),
-        2
+        2 + usize::from(cfg!(feature = "parser-defender"))
     );
     engine.verify(&case.id).unwrap();
     let parser = current_sources::parser("parser-m365");
@@ -306,7 +310,7 @@ fn benchmark_lines(name: &str) -> (Vec<u8>, Vec<u8>, u64) {
         return (header, row, 1);
     }
     let mut value: serde_json::Value = serde_json::from_slice(first).unwrap();
-    if !name.starts_with("azure-") && name != "gcp-flow" {
+    if !name.starts_with("azure-") && name != "gcp-flow" && name != "defender" {
         value["synthetic_padding"] = serde_json::json!("x".repeat(1024));
     }
     let mut row = serde_json::to_vec(&value).unwrap();
@@ -322,6 +326,16 @@ fn benchmark_lines(name: &str) -> (Vec<u8>, Vec<u8>, u64) {
 #[test]
 #[ignore = "manual optimized host-cardinality ingestion check"]
 fn flow_host_partitions_preserve_overflow_values() {
+    assert_host_partitions("vpc-flow");
+}
+#[cfg(feature = "parser-defender")]
+#[test]
+#[ignore = "manual optimized host-cardinality ingestion check"]
+fn defender_host_partitions_preserve_overflow_values() {
+    assert_host_partitions("defender");
+}
+#[cfg(any(feature = "parser-vpc-flow", feature = "parser-defender"))]
+fn assert_host_partitions(parser: &str) {
     use irmind_domain::{ParquetArtifactV3, ScopePartitionKey, ScopePartitionValue};
     for hosts in [1usize, 64, 1024, 1025] {
         let root = tempfile::tempdir().unwrap();
@@ -330,16 +344,9 @@ fn flow_host_partitions_preserve_overflow_values() {
         let store = Arc::new(current_sources::open(&root.path().join("data")));
         let engine = engine(&store);
         let case = engine
-            .create_case("Synthetic flow partitions", "Local only")
+            .create_case("Synthetic host partitions", "Local only")
             .unwrap();
-        let mut lines = std::str::from_utf8(fixture("vpc-flow")).unwrap().lines();
-        let header = lines.next().unwrap();
-        let row = lines.next().unwrap();
-        let mut text = format!("{header}\n");
-        for host in 0..hosts {
-            text.push_str(&row.replace("i-synthetic-1", &format!("i-synthetic-{host:04}")));
-            text.push('\n');
-        }
+        let text = host_partition_input(parser, hosts);
         fs::write(originals.join("flows.log"), text).unwrap();
         assert_eq!(
             ingest_with_context(
@@ -392,7 +399,7 @@ fn flow_host_partitions_preserve_overflow_values() {
         );
         engine.verify(&case.id).unwrap();
         println!(
-            "FLOW_PARTITIONS hosts={hosts} ordinary={} overflow={}",
+            "HOST_PARTITIONS parser={parser} hosts={hosts} ordinary={} overflow={}",
             ordinary.len(),
             overflow.len()
         );
@@ -504,4 +511,40 @@ fn one_gib_release_email_throughput() -> Result<(), &'static str> {
     // Reconstruction, seal and export are exercised by the mixed-source case test;
     // this measurement covers ingestion of a collection under the per-message cap.
     Ok(())
+}
+
+#[cfg(feature = "parser-defender")]
+#[test]
+#[ignore = "manual optimized 1 GiB Defender ingestion benchmark"]
+fn one_gib_release_defender_throughput() -> Result<(), &'static str> {
+    if cfg!(debug_assertions) {
+        return Err("Use --release for benchmarks");
+    }
+    benchmark_source("defender");
+    Ok(())
+}
+
+#[cfg(any(feature = "parser-vpc-flow", feature = "parser-defender"))]
+fn host_partition_input(parser: &str, hosts: usize) -> String {
+    let mut text = String::new();
+    if parser == "vpc-flow" {
+        let mut lines = std::str::from_utf8(fixture("vpc-flow")).unwrap().lines();
+        let header = lines.next().unwrap();
+        let row = lines.next().unwrap();
+        text.push_str(header);
+        text.push('\n');
+        for host in 0..hosts {
+            text.push_str(&row.replace("i-synthetic-1", &format!("i-synthetic-{host:04}")));
+            text.push('\n');
+        }
+    } else {
+        let row = fixture(parser).split(|b| *b == b'\n').next().unwrap();
+        let mut row: serde_json::Value = serde_json::from_slice(row).unwrap();
+        for host in 0..hosts {
+            row["DeviceId"] = serde_json::json!(format!("i-synthetic-{host:04}"));
+            text.push_str(&serde_json::to_string(&row).unwrap());
+            text.push('\n');
+        }
+    }
+    text
 }

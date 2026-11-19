@@ -1,0 +1,128 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mde-csv-deviceregistryevents"
+version = "defender-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-defender"
+parser_versions = ["defender-source-v1"]
+format = "mde-csv"
+format_version = "defender-source-v1"
+native_type = "DeviceRegistryEvents"
+action = ["ActionType"]
+
+[partition]
+host = ["DeviceId"]
+
+[[fields]]
+source = ["DeviceId"]
+target = "host.id"
+omit_text = ["", "-"]
+observation = { kind = "host", role = "observer", scope = { kind = "host", path = ["DeviceId"] } }
+
+[[fields]]
+source = ["DeviceName"]
+target = "host.name"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["InitiatingProcessAccountName"]
+target = "user.name"
+omit_text = ["", "-"]
+observation = { kind = "user", role = "actor", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["InitiatingProcessAccountDomain"]
+target = "user.domain"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["InitiatingProcessId"]
+target = "process.pid"
+omit_text = ["", "-"]
+conversion = "decimal"
+observation = { kind = "process", role = "subject", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["InitiatingProcessFileName"]
+target = "process.name"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["InitiatingProcessCommandLine"]
+target = "process.command_line"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["InitiatingProcessParentId"]
+target = "process.parent.pid"
+omit_text = ["", "-"]
+conversion = "decimal"
+observation = { kind = "process", role = "parent", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["InitiatingProcessParentFileName"]
+target = "process.parent.name"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["RegistryKey"]
+target = "registry.key"
+omit_text = ["", "-"]
+observation = { kind = "registry", role = "target", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["RegistryValueName"]
+target = "registry.value"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["RegistryValueType"]
+target = "registry.data.type"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["InitiatingProcessMD5"]
+target = "process.hash.md5"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["InitiatingProcessSHA1"]
+target = "process.hash.sha1"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["InitiatingProcessSHA256"]
+target = "process.hash.sha256"
+omit_text = ["", "-"]
+
+[[rules]]
+categories = ["registry"]
+types = ["creation"]
+outcome = "unknown"
+[[rules.when]]
+path = ["ActionType"]
+predicate = { op = "text", value = "RegistryKeyCreated" }
+
+[[rules]]
+categories = ["registry"]
+types = ["deletion"]
+outcome = "unknown"
+[[rules.when]]
+path = ["ActionType"]
+predicate = { op = "text", value = "RegistryKeyDeleted" }
+
+[[rules]]
+categories = ["registry"]
+types = ["change"]
+outcome = "unknown"
+[[rules.when]]
+path = ["ActionType"]
+predicate = { op = "text", value = "RegistryValueSet" }
+
+[[rules]]
+categories = ["registry"]
+types = ["deletion"]
+outcome = "unknown"
+[[rules.when]]
+path = ["ActionType"]
+predicate = { op = "text", value = "RegistryValueDeleted" }

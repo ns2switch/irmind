@@ -791,6 +791,7 @@ dependencies = [
  "irmind-infra",
  "irmind-mapping-tables",
  "irmind-mod-mapping-cloud-flow",
+ "irmind-mod-mapping-defender",
  "irmind-mod-mapping-ecs",
  "irmind-mod-mapping-email",
  "irmind-mod-mapping-entra",
@@ -801,6 +802,7 @@ dependencies = [
  "irmind-mod-parser-azure-flow",
  "irmind-mod-parser-chainsaw",
  "irmind-mod-parser-declarative",
+ "irmind-mod-parser-defender",
  "irmind-mod-parser-ecs",
  "irmind-mod-parser-email",
  "irmind-mod-parser-entra",
@@ -869,6 +871,16 @@ dependencies = [
 
 [[package]]
 name = "irmind-mod-mapping-cloud-flow"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-build-manifest",
+ "irmind-domain",
+ "irmind-mapping-tables",
+]
+
+[[package]]
+name = "irmind-mod-mapping-defender"
 version = "0.1.0"
 dependencies = [
  "irmind-app",
@@ -977,6 +989,14 @@ dependencies = [
  "serde",
  "serde_json",
  "toml",
+]
+
+[[package]]
+name = "irmind-mod-parser-defender"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
 ]
 
 [[package]]

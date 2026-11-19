@@ -5,6 +5,20 @@ use irmind_infra::LocalStore;
 use std::{path::Path, sync::Arc};
 fn registry() -> ModuleRegistry {
     let mut registry = ModuleRegistry::new();
+    #[cfg(feature = "parser-defender")]
+    registry
+        .register(
+            Box::new(irmind_mod_parser_defender::DefenderParser),
+            &ModuleConfig::new(),
+        )
+        .unwrap();
+    #[cfg(feature = "mapping-defender")]
+    registry
+        .register(
+            Box::new(irmind_mod_mapping_defender::DefenderMapping::new().unwrap()),
+            &ModuleConfig::new(),
+        )
+        .unwrap();
     #[cfg(feature = "parser-email")]
     registry
         .register(
