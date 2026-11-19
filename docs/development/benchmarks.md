@@ -2157,3 +2157,13 @@ A single 1 GiB file of compact packet summaries reached the existing
 per-source normalization allowance. This is a failed single-file measurement.
 The rotated corpus uses the same native data rows and ordinary per-source
 admission, with no change to resource limits.
+
+### IIS W3C access log ingestion
+
+A release build ingested 1,073,780,370 bytes of synthetic IIS W3C access
+logs in 256 rotations. It indexed 6,468,096 records in 283.520 s
+(3.612 MiB/s). Case verification passed after timing stopped.
+
+A compact single 1 GiB file reached the ordinary per-source normalization
+allowance. The rotation benchmark uses the same native data rows and keeps the
+existing admission limit.
