@@ -32,6 +32,7 @@ impl ParquetStore {
         if !catalog.supports_decoder(identity.name, identity.version) {
             return Ok(None);
         }
+        let catalog = catalog.for_decoder(identity);
         let paths = Self::direct_group_paths(request, cancel)?;
         let request = &MappedIngestRequest {
             relative_paths: &paths,
@@ -42,7 +43,7 @@ impl ParquetStore {
         let mut allocator =
             super::Allocator::from_signed_iter(request.committed_artifacts.iter(), request.limits)?;
         let hash = group_identity(request, identity);
-        let routes = crate::parquet_store::mapped::projection_routes_for_direct(catalog)?
+        let routes = crate::parquet_store::mapped::projection_routes_for_direct(&catalog)?
             .into_iter()
             .map(|(mapping, route)| (route, mapping))
             .collect::<std::collections::BTreeMap<_, _>>();
@@ -82,7 +83,7 @@ impl ParquetStore {
         }
         self.validate_direct_sources(request, &sources, cancel)?;
         let staged = writing.finish(&self.case_dir(request.case_id)?, workers, cancel)?;
-        let projections = prepared::projections(catalog, &staged)?;
+        let projections = prepared::projections(&catalog, &staged)?;
         let metadata = PreparedMappedGroup {
             sources,
             snapshots: catalog

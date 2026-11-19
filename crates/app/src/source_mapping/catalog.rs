@@ -33,9 +33,10 @@ impl MappingCatalog {
         mappings: Vec<Arc<dyn SourceMapper>>,
         proofs: BTreeMap<irmind_domain::EvidenceHash, crate::SignedOperation>,
     ) -> Result<Self, MappingError> {
-        if decoders.len() > 256 || mappings.len() > 64 {
+        if decoders.len() > 256 {
             return Err(MappingError::InvalidManifest);
         }
+        capacity::validate_registry_size(mappings.iter().map(|mapper| mapper.manifest()))?;
         let mut result = Self::default();
         for decoder in decoders {
             let id = decoder.identity();
@@ -50,6 +51,7 @@ impl MappingCatalog {
                 .mappings
                 .insert(mapper.manifest().identity().id().into(), mapper);
         }
+        capacity::validate_capacity(result.manifests())?;
         result.proofs = proofs;
         Ok(result)
     }
@@ -75,13 +77,14 @@ impl MappingCatalog {
             }
             candidate.check_candidate(mapper.as_ref())?;
             candidate.mappings.insert(id.into(), mapper);
+            capacity::validate_capacity(candidate.manifests())?;
         }
         Ok(candidate)
     }
 
     fn check_candidate(&self, mapper: &dyn SourceMapper) -> Result<(), MappingError> {
         let manifest = mapper.manifest();
-        if self.mappings.contains_key(manifest.identity().id()) || self.mappings.len() >= 64 {
+        if self.mappings.contains_key(manifest.identity().id()) {
             return Err(MappingError::DuplicateIdentity);
         }
         for selector in manifest.selectors() {
@@ -205,12 +208,13 @@ impl MappingCatalog {
         }
         Ok((Some(mapper.manifest().identity().clone()), output))
     }
-    pub fn manifests(&self) -> impl ExactSizeIterator<Item = &super::MappingManifest> {
+    pub fn manifests(&self) -> impl ExactSizeIterator<Item = &super::MappingManifest> + Clone {
         self.mappings.values().map(|m| m.manifest())
     }
 }
 
 mod authenticated;
+pub(super) mod capacity;
 mod reconstruction;
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]

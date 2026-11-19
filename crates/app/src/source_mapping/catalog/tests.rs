@@ -226,3 +226,49 @@ fn no_mapping_retains_time_and_search_text_without_inventing_entities_or_roles()
     );
     assert!(mapped.record().indexed.record.text.contains("failed"));
 }
+
+fn capacity_mappers(count: usize) -> Vec<Arc<dyn SourceMapper>> {
+    (0..count)
+        .map(|index| {
+            mapper(
+                &format!("mapping-synthetic-{index:03}"),
+                selector(vec![(
+                    &["result"],
+                    SelectorPredicate::Exact(SelectorScalar::Text(index.to_string())),
+                )]),
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn capacity_reports_each_contributing_mapping_module() -> Result<(), String> {
+    for (count, limit, expected_scope) in [
+        (129, 128, None),
+        (65, 64, Some(("parser-json", "json-stream-v3"))),
+    ] {
+        let error = MappingCatalog::freeze(vec![Arc::new(Decoder)], capacity_mappers(count))
+            .err()
+            .unwrap();
+        let message = error.to_string();
+        let MappingError::Capacity {
+            limit: actual_limit,
+            count: actual_count,
+            decoder,
+            modules,
+        } = error
+        else {
+            return Err(format!("unexpected admission error {message}"));
+        };
+        assert_eq!((actual_limit, actual_count), (limit, count));
+        assert_eq!(
+            decoder.as_ref().map(|(p, v)| (p.as_str(), v.as_str())),
+            expected_scope
+        );
+        assert_eq!(modules.len(), count);
+        assert_eq!(modules.values().sum::<usize>(), count);
+        assert!(message.contains("mapping-synthetic-000=1"));
+        assert!(message.contains(&format!("mapping-synthetic-{:03}=1", count - 1)));
+    }
+    Ok(())
+}
