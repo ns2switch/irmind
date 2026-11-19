@@ -14,6 +14,7 @@
     feature = "mapping-identity",
     feature = "mapping-guardduty",
     feature = "mapping-cloud-flow",
+    feature = "mapping-macos",
     feature = "mapping-fdr",
     feature = "mapping-defender",
     feature = "mapping-email",
@@ -56,6 +57,7 @@ use super::{
     feature = "parser-okta",
     feature = "parser-guardduty",
     feature = "parser-vpc-flow",
+    feature = "parser-macos",
     feature = "parser-fdr",
     feature = "parser-defender",
     feature = "parser-email",
@@ -122,6 +124,7 @@ pub(super) fn configured_registry(
         feature = "parser-okta",
         feature = "parser-guardduty",
         feature = "parser-vpc-flow",
+        feature = "parser-macos",
         feature = "parser-fdr",
         feature = "parser-defender",
         feature = "parser-email",
@@ -191,6 +194,7 @@ pub(super) fn configured_registry(
     feature = "parser-okta",
     feature = "parser-guardduty",
     feature = "parser-vpc-flow",
+    feature = "parser-macos",
     feature = "parser-fdr",
     feature = "parser-defender",
     feature = "parser-email",
@@ -229,6 +233,7 @@ fn register_parsers(
         feature = "mapping-identity",
         feature = "mapping-guardduty",
         feature = "mapping-cloud-flow",
+        feature = "mapping-macos",
         feature = "mapping-fdr",
         feature = "mapping-defender",
         feature = "mapping-email",
@@ -241,6 +246,7 @@ fn register_parsers(
         feature = "parser-okta",
         feature = "parser-guardduty",
         feature = "parser-vpc-flow",
+        feature = "parser-macos",
         feature = "parser-fdr",
         feature = "parser-defender",
         feature = "parser-email",
@@ -734,6 +740,7 @@ fn register_chronicle(
     feature = "parser-okta",
     feature = "parser-guardduty",
     feature = "parser-vpc-flow",
+    feature = "parser-macos",
     feature = "parser-fdr",
     feature = "parser-defender",
     feature = "parser-email",
@@ -744,6 +751,11 @@ fn register_chronicle(
     feature = "parser-falco"
 ))]
 fn register_contextual_parsers(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(feature = "parser-macos")]
+    registry.register(
+        Box::new(irmind_mod_parser_macos::MacosParser),
+        &ModuleConfig::new(),
+    )?;
     #[cfg(feature = "parser-fdr")]
     registry.register(
         Box::new(irmind_mod_parser_fdr::FdrParser),

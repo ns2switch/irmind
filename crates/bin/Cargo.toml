@@ -7,6 +7,7 @@ license.workspace = true
 
 [features]
 default = [
+    "parser-macos", "mapping-macos",
     "parser-fdr", "mapping-fdr",
     "parser-defender", "mapping-defender",
     "parser-email", "mapping-email",
@@ -25,6 +26,8 @@ default = [
     "siem-splunk", "siem-elastic", "siem-chronicle", "cloud-aws", "edr-crowdstrike", "edr-sentinelone",
     "ti-misp", "ti-virustotal", "storage-s3", "storage-gcs", "storage-azure",
 ]
+parser-macos = ["dep:irmind-mod-parser-macos", "mapping-macos"]
+mapping-macos = ["dep:irmind-mod-mapping-macos", "parser-macos"]
 parser-fdr = ["dep:irmind-mod-parser-fdr", "mapping-fdr"]
 mapping-fdr = ["dep:irmind-mod-mapping-fdr", "parser-fdr"]
 parser-defender = ["dep:irmind-mod-parser-defender", "mapping-defender"]
@@ -92,6 +95,8 @@ parser-gcp-flow = ["dep:irmind-mod-parser-gcp-flow", "mapping-cloud-flow"]
 mapping-cloud-flow = ["dep:irmind-mod-mapping-cloud-flow"]
 
 [dependencies]
+irmind-mod-parser-macos = { path = "../modules/parser-macos", version = "0.1.0", optional = true }
+irmind-mod-mapping-macos = { path = "../modules/mapping-macos", version = "0.1.0", optional = true }
 irmind-mod-parser-fdr = { path = "../modules/parser-fdr", version = "0.1.0", optional = true }
 irmind-mod-mapping-fdr = { path = "../modules/mapping-fdr", version = "0.1.0", optional = true }
 irmind-mod-parser-defender = { path = "../modules/parser-defender", version = "0.1.0", optional = true }

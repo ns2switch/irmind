@@ -1,0 +1,9 @@
+{
+  "synthetic": true,
+  "unified_records": 2,
+  "endpoint_records": 2,
+  "authentication_failure_record": 1,
+  "target": "synthetic",
+  "source_ip": "203.0.113.77",
+  "exec_subject_pid": 302
+}

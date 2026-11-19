@@ -106,6 +106,14 @@ fn ingest_with_context(
 }
 fn fixture(parser: &str) -> &'static [u8] {
     match parser {
+        #[cfg(feature = "parser-macos")]
+        "macos-unified" => {
+            include_bytes!("../../testkit/fixtures/parser-macos/source/unified.ndjson")
+        }
+        #[cfg(feature = "parser-macos")]
+        "macos-endpoint" => {
+            include_bytes!("../../testkit/fixtures/parser-macos/source/endpoint.ndjson")
+        }
         #[cfg(feature = "parser-fdr")]
         "fdr" => include_bytes!("../../testkit/fixtures/parser-fdr/source/events.ndjson"),
         #[cfg(feature = "parser-defender")]
@@ -131,6 +139,31 @@ fn fixture(parser: &str) -> &'static [u8] {
         _ => unreachable!(),
     }
 }
+const IDENTITY_SOURCES: &[(&str, u64)] = &[
+    #[cfg(feature = "parser-macos")]
+    ("macos-unified", 2),
+    #[cfg(feature = "parser-macos")]
+    ("macos-endpoint", 2),
+    #[cfg(feature = "parser-email")]
+    ("email", 7),
+    #[cfg(feature = "parser-defender")]
+    ("defender", 9),
+    #[cfg(feature = "parser-fdr")]
+    ("fdr", 11),
+    ("m365", 8),
+    ("okta", 7),
+    #[cfg(feature = "parser-guardduty")]
+    ("guardduty", 2),
+    #[cfg(feature = "parser-vpc-flow")]
+    ("vpc-flow", 4),
+    #[cfg(feature = "parser-azure-flow")]
+    ("azure-vnet", 2),
+    #[cfg(feature = "parser-azure-flow")]
+    ("azure-nsg", 2),
+    #[cfg(feature = "parser-gcp-flow")]
+    ("gcp-flow", 3),
+];
+
 #[test]
 fn identity_failures_keep_roles_originals_and_signed_export() {
     use irmind_app::ExportVerifier;
@@ -143,26 +176,7 @@ fn identity_failures_keep_roles_originals_and_signed_export() {
     let case = engine
         .create_case("Synthetic identity evidence", "Local only")
         .unwrap();
-    for (name, count) in [
-        #[cfg(feature = "parser-email")]
-        ("email", 7),
-        #[cfg(feature = "parser-defender")]
-        ("defender", 9),
-        #[cfg(feature = "parser-fdr")]
-        ("fdr", 11),
-        ("m365", 8),
-        ("okta", 7),
-        #[cfg(feature = "parser-guardduty")]
-        ("guardduty", 2),
-        #[cfg(feature = "parser-vpc-flow")]
-        ("vpc-flow", 4),
-        #[cfg(feature = "parser-azure-flow")]
-        ("azure-vnet", 2),
-        #[cfg(feature = "parser-azure-flow")]
-        ("azure-nsg", 2),
-        #[cfg(feature = "parser-gcp-flow")]
-        ("gcp-flow", 3),
-    ] {
+    for &(name, count) in IDENTITY_SOURCES {
         let file = format!("{name}.ndjson");
         fs::write(originals.join(&file), fixture(name)).unwrap();
         assert_eq!(
@@ -182,6 +196,7 @@ fn identity_failures_keep_roles_originals_and_signed_export() {
             .len(),
         2 + usize::from(cfg!(feature = "parser-defender"))
             + usize::from(cfg!(feature = "parser-fdr"))
+            + usize::from(cfg!(feature = "parser-macos"))
     );
     engine.verify(&case.id).unwrap();
     let parser = current_sources::parser("parser-m365");
@@ -258,6 +273,19 @@ fn one_gib_release_cloud_json_throughput() -> Result<(), &'static str> {
     }
     Ok(())
 }
+#[cfg(feature = "parser-macos")]
+#[test]
+#[ignore = "manual optimized 1 GiB macOS ingestion benchmark per export format"]
+fn one_gib_release_macos_throughput() -> Result<(), &'static str> {
+    if cfg!(debug_assertions) {
+        return Err("Use --release for benchmarks");
+    }
+    for name in ["macos-unified", "macos-endpoint"] {
+        benchmark_source(name);
+    }
+    Ok(())
+}
+
 fn benchmark_source(name: &str) {
     use std::io::{BufWriter, Write};
     let bench_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target");
@@ -315,7 +343,12 @@ fn benchmark_lines(name: &str) -> (Vec<u8>, Vec<u8>, u64) {
         return (header, row, 1);
     }
     let mut value: serde_json::Value = serde_json::from_slice(first).unwrap();
-    if !name.starts_with("azure-") && name != "gcp-flow" && name != "defender" && name != "fdr" {
+    if !name.starts_with("azure-")
+        && name != "gcp-flow"
+        && name != "defender"
+        && name != "fdr"
+        && !name.starts_with("macos-")
+    {
         value["synthetic_padding"] = serde_json::json!("x".repeat(1024));
     }
     let mut row = serde_json::to_vec(&value).unwrap();

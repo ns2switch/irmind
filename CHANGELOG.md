@@ -13,6 +13,10 @@ and export V8 sections are unchanged; keep the producing version for a case.
   validated unsigned decimal IDs. OS PIDs remain record scoped and Sysmon
   ProcessGuid keeps its existing lifetime scope.
 
+- Add experimental macOS Unified Log and eslogger JSON export decoders with
+  separate finite mappings. Preserve exact timestamp precision, native fields
+  and schema versions. Unknown versions remain searchable without classification.
+
 - Add experimental Falcon FDR JSONL/gzip decoding and separate finite mapping
   tables, with tenant/sensor-native process identity and host partitions. Unknown
   source types remain searchable without a guessed classification.

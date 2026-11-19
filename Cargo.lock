@@ -2295,6 +2295,7 @@ dependencies = [
  "irmind-mod-mapping-json-compat",
  "irmind-mod-mapping-kubernetes",
  "irmind-mod-mapping-linux",
+ "irmind-mod-mapping-macos",
  "irmind-mod-mapping-network",
  "irmind-mod-mapping-ocsf",
  "irmind-mod-mapping-syslog",
@@ -2318,6 +2319,7 @@ dependencies = [
  "irmind-mod-parser-kubernetes",
  "irmind-mod-parser-linux",
  "irmind-mod-parser-m365",
+ "irmind-mod-parser-macos",
  "irmind-mod-parser-ocsf",
  "irmind-mod-parser-okta",
  "irmind-mod-parser-plaso",
@@ -2852,6 +2854,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-mapping-macos"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-build-manifest",
+ "irmind-domain",
+ "irmind-mapping-tables",
+ "irmind-mod-parser-macos",
+ "irmind-testkit",
+]
+
+[[package]]
 name = "irmind-mod-mapping-network"
 version = "0.1.0"
 dependencies = [
@@ -3088,6 +3102,15 @@ dependencies = [
 
 [[package]]
 name = "irmind-mod-parser-m365"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-testkit",
+]
+
+[[package]]
+name = "irmind-mod-parser-macos"
 version = "0.1.0"
 dependencies = [
  "irmind-app",

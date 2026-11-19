@@ -79,6 +79,11 @@ pub(super) fn register(registry: &mut ModuleRegistry) -> Result<()> {
     Ok(())
 }
 fn register_export_mappings(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(feature = "mapping-macos")]
+    registry.register(
+        Box::new(irmind_mod_mapping_macos::MacosMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
     #[cfg(all(feature = "mapping-fdr", feature = "parser-fdr"))]
     registry.register(
         Box::new(irmind_mod_mapping_fdr::FdrMapping::new()?),

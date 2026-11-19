@@ -27,6 +27,14 @@ class CommandOwnership(unittest.TestCase):
         self.assertIn('--env', check_docs.irmind_flag_citations('irmind --env=unexpected'))
 
 class LaunchCommandOwners(unittest.TestCase):
+    def test_apple_log_export_owns_its_flags(self):
+        command = "log show --archive case.logarchive --style ndjson > unified.ndjson"
+        self.assertEqual(check_docs.irmind_flag_citations(command), set())
+        self.assertIn("--made-up-flag", check_docs.irmind_flag_citations(
+            command + " && irmind --made-up-flag",
+        ))
+        self.assertIn("--archive", check_docs.irmind_flag_citations("irmind --archive"))
+
     def test_external_lab_and_benchmark_flags_have_their_own_owner(self):
         text = "docker compose --env-file lab.env up\ncurl --cacert ca.crt https://localhost:9200\npython3 scripts/hunteval_benchmark.py --models local.json --execute\npython3 tools/real-validation/lab.py load --windows-utc-offset +00:00\n"
         self.assertEqual(check_docs.irmind_flag_citations(text), set())
