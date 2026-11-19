@@ -37,36 +37,36 @@ fn contract_covers_dns_fields_original_answers_and_unknown_types() {
             },
             &mut |record| {
                 record.inspect(|row| {
-                    let mapped = mapper.map(row).unwrap().into_record();
+                    let normalized = mapper.map(row).unwrap().into_record();
                     assert!(
-                        mapped
+                        normalized
                             .common
                             .event()
                             .categories()
                             .contains(EventCategory::Network)
                     );
                     assert_eq!(
-                        mapped.common.event().outcome(),
+                        normalized.common.event().outcome(),
                         [
                             EventOutcome::Success,
                             EventOutcome::Failure,
                             EventOutcome::Unknown
                         ][index]
                     );
-                    assert!(mapped.common.observations().values().iter().any(|obs| {
+                    assert!(normalized.common.observations().values().iter().any(|obs| {
                         obs.role() == EntityRole::Source
                             && obs.entity().value()
                                 == ["203.0.113.77", "2001:db8::47", "192.0.2.8"][index]
                     }));
                     if index == 0 {
                         assert_eq!(
-                            mapped.common.context().get(CommonField::SourcePort),
+                            normalized.common.context().get(CommonField::SourcePort),
                             Some(&CommonValue::Unsigned(51390))
                         );
-                        assert!(mapped.indexed.record.text.contains("192.0.2.31"));
+                        assert!(normalized.indexed.record.text.contains("192.0.2.31"));
                     }
                     if index == 2 {
-                        assert!(mapped.indexed.record.text.contains("TYPE65000"));
+                        assert!(normalized.indexed.record.text.contains("TYPE65000"));
                     }
                     index += 1;
                 });

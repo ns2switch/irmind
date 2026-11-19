@@ -2139,3 +2139,10 @@ The signed-ingest benchmark used 1,073,741,875 bytes of synthetic native NDJSON
 and indexed 3,024,625 records in 65.372 s (15.664 MiB/s). The build used the
 release profile. Case verification also passed after timing stopped. CSV and
 JSON exports are covered separately by the parser and signed-ingest contracts.
+
+### Route 53 VPC Resolver query log ingestion
+
+The signed-ingest benchmark used 1,073,742,024 bytes of synthetic native NDJSON
+and indexed 2,732,168 records in 55.602 s (18.417 MiB/s) in a release build.
+The benchmark exercised the resolver decoder and declarative mapping in the
+fixture registry. Case verification passed after the timed interval.

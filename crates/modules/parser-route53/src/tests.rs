@@ -18,7 +18,7 @@ fn decoder_keeps_native_answers_and_offsets_and_rejects_unknown_major_versions()
             .detect("file.json", unsupported.as_bytes())
             .is_none()
     );
-    let combined = format!("{ROWS}{unsupported}\n", ROWS = raw);
+    let combined = format!("{raw}{unsupported}\n");
     let cancel = CancellationToken::new();
     let reference = SourceReferenceV1::file("queries.ndjson").unwrap();
     let offsets = raw.match_indices('\n').map(|(n, _)| n + 1);
