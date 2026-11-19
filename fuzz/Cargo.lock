@@ -829,6 +829,7 @@ dependencies = [
  "irmind-mod-parser-syslog",
  "irmind-mod-parser-velociraptor",
  "irmind-mod-parser-vpc-flow",
+ "irmind-mod-parser-windows-dns",
  "irmind-mod-parser-zeek",
  "irmind-security",
  "libfuzzer-sys",
@@ -1237,6 +1238,14 @@ name = "irmind-mod-parser-vpc-flow"
 version = "0.1.0"
 dependencies = [
  "flate2",
+ "irmind-app",
+ "irmind-domain",
+]
+
+[[package]]
+name = "irmind-mod-parser-windows-dns"
+version = "0.1.0"
+dependencies = [
  "irmind-app",
  "irmind-domain",
 ]

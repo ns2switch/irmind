@@ -52,6 +52,7 @@ pub(super) fn module_statuses(
 }
 
 const PARSER_STATUSES: &[(&str, bool)] = &[
+    ("parser-windows-dns", cfg!(feature = "parser-windows-dns")),
     ("parser-route53", cfg!(feature = "parser-route53")),
     (
         "parser-google-workspace",

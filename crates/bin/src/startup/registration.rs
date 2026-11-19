@@ -14,6 +14,7 @@
     feature = "mapping-identity",
     feature = "mapping-guardduty",
     feature = "mapping-cloud-flow",
+    feature = "mapping-windows-dns",
     feature = "mapping-route53",
     feature = "mapping-github-audit",
     feature = "mapping-google-workspace",
@@ -60,6 +61,7 @@ use super::{
     feature = "parser-okta",
     feature = "parser-guardduty",
     feature = "parser-vpc-flow",
+    feature = "parser-windows-dns",
     feature = "parser-route53",
     feature = "parser-github-audit",
     feature = "parser-google-workspace",
@@ -118,46 +120,7 @@ pub(super) fn configured_registry(
     let _ = data_root;
     let mut registry = ModuleRegistry::new();
     let mut config_issues = BTreeMap::<&'static str, String>::new();
-    #[cfg(any(
-        feature = "parser-evtx",
-        feature = "parser-json",
-        feature = "parser-ecs",
-        feature = "parser-ocsf",
-        feature = "parser-kubernetes",
-        feature = "parser-gcp-audit",
-        feature = "parser-entra",
-        feature = "parser-m365",
-        feature = "parser-okta",
-        feature = "parser-guardduty",
-        feature = "parser-vpc-flow",
-        feature = "parser-route53",
-        feature = "parser-github-audit",
-        feature = "parser-google-workspace",
-        feature = "parser-macos",
-        feature = "parser-fdr",
-        feature = "parser-defender",
-        feature = "parser-email",
-        feature = "parser-azure-flow",
-        feature = "parser-gcp-flow",
-        feature = "parser-falco",
-        feature = "parser-velociraptor",
-        feature = "parser-hayabusa",
-        feature = "parser-chainsaw",
-        feature = "parser-plaso",
-        feature = "parser-eztools",
-        feature = "parser-syslog",
-        feature = "parser-linux",
-        feature = "parser-zeek",
-        feature = "parser-suricata",
-    ))]
-    register_parsers(&mut registry, &mut config_issues, data_root)?;
-    #[cfg(any(
-        feature = "parser-route53",
-        feature = "parser-github-audit",
-        feature = "parser-google-workspace",
-        feature = "parser-macos"
-    ))]
-    register_offline_exports(&mut registry)?;
+    register_enabled_parsers(&mut registry, &mut config_issues, data_root)?;
 
     register_llm(
         cli,
@@ -198,6 +161,57 @@ pub(super) fn configured_registry(
     Ok((registry, config_issues))
 }
 
+fn register_enabled_parsers(
+    registry: &mut ModuleRegistry,
+    issues: &mut BTreeMap<&'static str, String>,
+    data_root: &std::path::Path,
+) -> Result<()> {
+    let _ = (&registry, &issues, data_root);
+    #[cfg(any(
+        feature = "parser-evtx",
+        feature = "parser-json",
+        feature = "parser-ecs",
+        feature = "parser-ocsf",
+        feature = "parser-kubernetes",
+        feature = "parser-gcp-audit",
+        feature = "parser-entra",
+        feature = "parser-m365",
+        feature = "parser-okta",
+        feature = "parser-guardduty",
+        feature = "parser-vpc-flow",
+        feature = "parser-windows-dns",
+        feature = "parser-route53",
+        feature = "parser-github-audit",
+        feature = "parser-google-workspace",
+        feature = "parser-macos",
+        feature = "parser-fdr",
+        feature = "parser-defender",
+        feature = "parser-email",
+        feature = "parser-azure-flow",
+        feature = "parser-gcp-flow",
+        feature = "parser-falco",
+        feature = "parser-velociraptor",
+        feature = "parser-hayabusa",
+        feature = "parser-chainsaw",
+        feature = "parser-plaso",
+        feature = "parser-eztools",
+        feature = "parser-syslog",
+        feature = "parser-linux",
+        feature = "parser-zeek",
+        feature = "parser-suricata",
+    ))]
+    register_parsers(registry, issues, data_root)?;
+    #[cfg(any(
+        feature = "parser-windows-dns",
+        feature = "parser-route53",
+        feature = "parser-github-audit",
+        feature = "parser-google-workspace",
+        feature = "parser-macos"
+    ))]
+    register_offline_exports(registry)?;
+    Ok(())
+}
+
 #[cfg(any(
     feature = "parser-evtx",
     feature = "parser-json",
@@ -210,6 +224,7 @@ pub(super) fn configured_registry(
     feature = "parser-okta",
     feature = "parser-guardduty",
     feature = "parser-vpc-flow",
+    feature = "parser-windows-dns",
     feature = "parser-route53",
     feature = "parser-github-audit",
     feature = "parser-google-workspace",
@@ -252,6 +267,7 @@ fn register_parsers(
         feature = "mapping-identity",
         feature = "mapping-guardduty",
         feature = "mapping-cloud-flow",
+        feature = "mapping-windows-dns",
         feature = "mapping-route53",
         feature = "mapping-github-audit",
         feature = "mapping-google-workspace",
@@ -840,12 +856,18 @@ fn register_contextual_parsers(registry: &mut ModuleRegistry) -> Result<()> {
 }
 
 #[cfg(any(
+    feature = "parser-windows-dns",
     feature = "parser-route53",
     feature = "parser-github-audit",
     feature = "parser-google-workspace",
     feature = "parser-macos"
 ))]
 fn register_offline_exports(registry: &mut ModuleRegistry) -> Result<()> {
+    #[cfg(feature = "parser-windows-dns")]
+    registry.register(
+        Box::new(irmind_mod_parser_windows_dns::WindowsDnsParser),
+        &ModuleConfig::new(),
+    )?;
     #[cfg(feature = "parser-route53")]
     registry.register(
         Box::new(irmind_mod_parser_route53::Route53Parser),

@@ -256,3 +256,56 @@ fn reported_status_precedes_audit_keyword_fallback_and_missing_stays_unknown() {
 }
 
 mod identities;
+
+#[test]
+fn dns_analytical_ids_use_the_same_roles_and_keep_original_wire_metadata() {
+    let mapper = DnsAnalyticalMapping::new().unwrap();
+    for (event, outcome, role, remote) in [
+        (256, EventOutcome::Unknown, EntityRole::Source, "Source"),
+        (
+            257,
+            EventOutcome::Success,
+            EntityRole::Destination,
+            "Destination",
+        ),
+        (
+            258,
+            EventOutcome::Failure,
+            EntityRole::Destination,
+            "Destination",
+        ),
+    ] {
+        let raw = json!({
+            "Event": {
+                "System": {
+                    "Provider": {"#attributes": {"Name": "Microsoft-Windows-DNSServer"}},
+                    "Channel": "Microsoft-Windows-DNSServer/Analytical",
+                    "EventID": event,
+                    "Computer": "synthetic-dns"
+                },
+                "EventData": {
+                    remote: "203.0.113.77",
+                    "InterfaceIP": "192.0.2.31",
+                    "QNAME": "resolver.example.test.",
+                    "QTYPE": 28,
+                    "RCODE": if event == 258 { 3 } else { 0 },
+                    "Port": "51390",
+                    "PacketData": "0x1234"
+                }
+            }
+        });
+        let record = source(event, &raw);
+        let normalized = mapper.map(&record).unwrap().into_record();
+        assert_eq!(normalized.common.event().outcome(), outcome);
+        assert!(
+            normalized
+                .common
+                .observations()
+                .values()
+                .iter()
+                .any(|obs| obs.role() == role && obs.entity().value() == "203.0.113.77")
+        );
+        assert_eq!(normalized.common.origin(), record.origin());
+        assert!(normalized.indexed.record.text.contains("PacketData"));
+    }
+}

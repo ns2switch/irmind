@@ -60,6 +60,12 @@ fn ingest_with_context(
     std::io::Read::take(fs::File::open(root.join(file)).unwrap(), 65536)
         .read_to_end(&mut sample)
         .unwrap();
+    let time_context = sample
+        .starts_with(b"DNS Server log file creation at ")
+        .then(|| {
+            irmind_app::ParserTimeContext::new(2026, 0, false, irmind_app::ParserTimeBasis::Command)
+                .unwrap()
+        });
     let catalog = current_sources::catalog();
     let selected = catalog
         .select_source(ParserSelectionRequest {
@@ -67,7 +73,7 @@ fn ingest_with_context(
             sample: &sample,
             parser_override: None,
             forced: false,
-            time_context: None,
+            time_context,
             cluster_context,
         })
         .unwrap();
@@ -93,6 +99,12 @@ fn ingest_with_context(
         .map(|e| SourceManifestV2::decode(&e.payload).unwrap())
         .unwrap();
     assert_eq!(manifest.rejected_records, 0);
+    if let Some(context) = time_context {
+        assert_eq!(
+            manifest.timestamp_context,
+            Some(irmind_app::source_mapping::source_time_snapshot(&context).unwrap())
+        );
+    }
     entries
         .iter()
         .rev()
@@ -106,6 +118,9 @@ fn ingest_with_context(
 }
 fn fixture(parser: &str) -> &'static [u8] {
     match parser {
+        #[cfg(feature = "parser-windows-dns")]
+        "windows-dns" => include_bytes!("../../testkit/fixtures/parser-windows-dns/source/dns.log"),
+
         #[cfg(feature = "parser-route53")]
         "route53" => include_bytes!("../../testkit/fixtures/parser-route53/source/queries.ndjson"),
 
@@ -155,6 +170,8 @@ fn fixture(parser: &str) -> &'static [u8] {
     }
 }
 const IDENTITY_SOURCES: &[(&str, u64)] = &[
+    #[cfg(feature = "parser-windows-dns")]
+    ("windows-dns", 4),
     #[cfg(feature = "parser-github-audit")]
     ("github-audit", 4),
     #[cfg(feature = "parser-route53")]
@@ -342,6 +359,163 @@ fn one_gib_release_route53_throughput() -> Result<(), &'static str> {
     benchmark_source("route53");
     Ok(())
 }
+#[cfg(feature = "parser-windows-dns")]
+#[test]
+#[ignore = "release benchmark with one GiB of synthetic evidence"]
+fn one_gib_release_windows_dns_throughput() -> Result<(), &'static str> {
+    if cfg!(debug_assertions) {
+        return Err("source throughput benchmarks require a release build");
+    }
+    benchmark_rotated("windows-dns");
+    Ok(())
+}
+#[cfg(feature = "parser-windows-dns")]
+fn benchmark_rotated(name: &str) {
+    use irmind_app::{ParserTimeBasis, ParserTimeContext};
+
+    let bench_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target");
+    let root = tempfile::Builder::new()
+        .prefix("irmind-rotated-bench-")
+        .tempdir_in(bench_root)
+        .unwrap();
+    let originals = root.path().join("originals");
+    fs::create_dir(&originals).unwrap();
+    let store = Arc::new(current_sources::open(&root.path().join("data")));
+    let engine = engine(&store);
+    let case = engine
+        .create_case("Synthetic rotated logs", "Local only")
+        .unwrap();
+
+    let time_context = (name == "windows-dns")
+        .then(|| ParserTimeContext::new(2026, 0, false, ParserTimeBasis::Command).unwrap());
+    let PreparedRotations {
+        files,
+        selections,
+        bytes,
+        records: count,
+    } = prepare_rotations(name, &originals, time_context);
+    let base_parser = current_sources::parser(&format!("parser-{name}"));
+    let parser = match time_context {
+        Some(context) => base_parser.with_time_context(&context).unwrap(),
+        None => base_parser,
+    };
+    let started = std::time::Instant::now();
+    let ingested = LargeCaseUseCases {
+        engine: &engine,
+        store: store.as_ref(),
+        parser: parser.as_ref(),
+    }
+    .ingest_local_batch_selected(
+        &case.id,
+        &originals,
+        &files,
+        false,
+        &selections,
+        &CancellationToken::new(),
+    )
+    .unwrap();
+    let seconds = started.elapsed().as_secs_f64();
+    assert_eq!(ingested.len(), files.len());
+    let sets = store
+        .entries(&case.id)
+        .unwrap()
+        .into_iter()
+        .filter(|entry| entry.kind == AuditEventKind::SourceRecordSetV1)
+        .map(|entry| {
+            irmind_domain::SourceRecordSetV1::decode(&entry.payload)
+                .unwrap()
+                .records()
+        })
+        .sum::<u64>();
+    assert_eq!(sets, count);
+    println!(
+        "ROTATED_SOURCE_BENCH parser={name} files={} bytes={bytes} records={count} seconds={seconds:.3} MiB_per_second={:.3}",
+        files.len(),
+        f64::from(u32::try_from(bytes).unwrap()) / 1_048_576.0 / seconds
+    );
+    engine.verify(&case.id).unwrap();
+}
+
+#[cfg(feature = "parser-windows-dns")]
+struct PreparedRotations {
+    files: Vec<String>,
+    selections: BTreeMap<String, irmind_app::ParserSelection>,
+    bytes: u64,
+    records: u64,
+}
+
+#[cfg(feature = "parser-windows-dns")]
+fn prepare_rotations(
+    name: &str,
+    originals: &std::path::Path,
+    time_context: Option<irmind_app::ParserTimeContext>,
+) -> PreparedRotations {
+    use std::io::Read as _;
+
+    const GIB: u64 = 1024 * 1024 * 1024;
+    let (header, record, per_row) = benchmark_lines(name);
+    let catalog = current_sources::catalog();
+    let mut selections = BTreeMap::new();
+    let mut files = Vec::new();
+    let mut bytes = 0;
+    let mut records = 0;
+    while bytes < GIB {
+        let file = format!("{name}-{:04}.log", files.len());
+        let rotation = if name == "windows-dns" {
+            format!("Log rotation {}\n", files.len())
+        } else {
+            format!("#Remark: Synthetic rotation {}\n", files.len())
+        };
+        let path = originals.join(&file);
+        let (rotation_bytes, rows) = write_rotation(&path, &header, &rotation, &record);
+        bytes += rotation_bytes;
+        records += rows * per_row;
+        let mut sample = Vec::new();
+        fs::File::open(path)
+            .unwrap()
+            .take(65_536)
+            .read_to_end(&mut sample)
+            .unwrap();
+        let selected = catalog
+            .select_source(ParserSelectionRequest {
+                source: &file,
+                sample: &sample,
+                parser_override: None,
+                forced: false,
+                time_context,
+                cluster_context: None,
+            })
+            .unwrap();
+        selections.insert(file.clone(), selected.selection);
+        files.push(file);
+    }
+    PreparedRotations {
+        files,
+        selections,
+        bytes,
+        records,
+    }
+}
+
+#[cfg(feature = "parser-windows-dns")]
+fn write_rotation(path: &std::path::Path, header: &[u8], name: &str, row: &[u8]) -> (u64, u64) {
+    use std::io::{BufWriter, Write};
+
+    const ROTATION: u64 = 4 * 1024 * 1024;
+    let mut writer = BufWriter::new(fs::File::create(path).unwrap());
+    writer.write_all(header).unwrap();
+    writer.write_all(name.as_bytes()).unwrap();
+    let mut bytes = (header.len() + name.len()) as u64;
+    let mut rows = 0;
+    while bytes < ROTATION {
+        writer.write_all(row).unwrap();
+        bytes += row.len() as u64;
+        rows += 1;
+    }
+    writer.flush().unwrap();
+    (bytes, rows)
+}
+
 fn benchmark_source(name: &str) {
     use std::io::{BufWriter, Write};
     let bench_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target");
@@ -391,6 +565,16 @@ fn benchmark_source(name: &str) {
 fn benchmark_lines(name: &str) -> (Vec<u8>, Vec<u8>, u64) {
     let mut lines = fixture(name).split(|b| *b == b'\n');
     let first = lines.next().unwrap();
+    if name == "windows-dns" {
+        let mut header = Vec::new();
+        for line in fixture(name).split_inclusive(|byte| *byte == b'\n') {
+            if line.windows(8).any(|part| part == b" PACKET ") {
+                return (header, line.to_vec(), 1);
+            }
+            header.extend_from_slice(line);
+        }
+        unreachable!("fixture has a packet");
+    }
     if name == "vpc-flow" {
         let mut header = first.to_vec();
         header.push(b'\n');

@@ -33,6 +33,10 @@ pub enum FixedAppError {
     )]
     StorageNormalizedStagingSpace,
     #[error(
+        "storage: normalized source needs at least {required} bytes, above the {allowance}-byte allowance. Split the input at record boundaries into smaller valid log files and retry."
+    )]
+    StorageNormalizedSourceLimit { required: u64, allowance: u64 },
+    #[error(
         "storage: not enough space for case staging: {required} bytes required including safety margin, {available} bytes available"
     )]
     StorageCaseStagingCapacity { required: u64, available: u64 },

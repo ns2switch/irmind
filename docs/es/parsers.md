@@ -14,6 +14,7 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 | --- | --- | --- | --- | --- |
 | Microsoft 365 Unified Audit Log | CSV de Purview, JSON de Search-UnifiedAuditLog y Management Activity API | AuditData/Operation, CreationTime y workload originales; 98 | Instante UTC, actor, buzón objetivo explícito, recurso, IP de origen, user agent, workload y tablas de operación/resultado | experimental |
 | Okta System Log | Arrays JSON de la API y exports JSON/NDJSON | eventType, uuid, actor e instante published; 98 | Autenticación, MFA, administración, políticas y suplantación; actor/objetivo e IP de origen | experimental |
+| Depuración de DNS Server de Windows | Resúmenes de paquetes en texto | Cabecera de creación y columnas de paquete, 79 o 98 | Consulta, tipo, código de respuesta e IP remota según el sentido del paquete | experimental |
 | Route 53 VPC Resolver | JSON, NDJSON | Versión 1.x, consulta, cliente y VPC o perfil, 98 | Consulta DNS, tipo, clase, cliente, puerto, código de respuesta, cuenta y región | experimental |
 | Auditoría de GitHub | CSV y JSON de organización o empresa, NDJSON nativo del streaming | Acción, fecha e identidad o ámbito de auditoría nativos, 98 | Membresía, tokens, claves, acceso a repositorios y configuración de Actions | experimental |
 | Reports API de Google Workspace | Páginas, arrays y objetos JSON, y NDJSON | ID de actividad, aplicación, instante y eventos nativos, 98 | Login, SAML, administración, OAuth, Drive y Gmail con campos originales | experimental |
@@ -473,6 +474,17 @@ y de cuentas, consentimientos OAuth, descargas y compartición de Drive, y
 subtipos de entrega de Gmail cuando están presentes. Distingue los reenvíos
 manuales (10) y automáticos (11) con el código nativo de Gmail. Los eventos
 desconocidos conservan sus datos originales y se pueden buscar. [Referencia de actividad de Gmail](https://developers.google.com/workspace/admin/reports/v1/appendix/activity/gmail)
+
+## Registros de depuración de DNS Server
+
+Activa el [registro de depuración de paquetes](https://learn.microsoft.com/en-us/windows-server/networking/dns/dns-logging-and-diagnostics#debug-logging) en el Administrador de DNS. Copia como evidencia el texto de resumen de paquetes. El decodificador espera UTF-8 o ASCII y el formato inglés mes/día/año con AM/PM. Si el día inicial puede interpretarse como mes, confirma el parser tras comprobar el formato de fecha del servidor. Confirma al ingerir el año del primer paquete y el desfase UTC fijo. Para los paquetes siguientes se usa el año escrito en cada línea. Las peticiones tienen resultado desconocido y las respuestas usan los códigos DNS conocidos. El extremo remoto de un paquete recibido es el origen y el de uno enviado es el destino. Los resúmenes originales se pueden buscar. Las exportaciones EVTX del canal analítico DNS usan el parser EVTX aislado y el mapeo de consulta, respuesta y fallo de los eventos 256–258. Los campos nativos QTYPE, RCODE y los bytes del paquete permanecen en los datos originales.
+
+Para registros de depuración grandes, conserva el original e ingiere ficheros
+rotados más pequeños o copias verificadas partidas entre líneas de paquetes
+completas. Cada parte necesita la cabecera de creación nativa. Confirma el
+formato de fecha y el desfase horario al ingerir cada parte. Si la fuente supera
+el límite de normalización, el error indica cuántos bytes se necesitaban como
+mínimo en el punto donde se detuvo. IRMind rechaza el fichero completo.
 
 ## Route 53 VPC Resolver
 

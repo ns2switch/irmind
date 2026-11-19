@@ -1,6 +1,6 @@
 use super::{
     AppError, CaseId, DiskLease, MAX_STAGED_ROW, ParquetStore, RecordRow, invalid_source, no_space,
-    storage,
+    normalized_source_limit, storage,
 };
 use sha2::{Digest, Sha256};
 use std::io::{BufWriter, Seek as _, Write as _};
@@ -47,8 +47,11 @@ impl RowSpool {
         let encoded = serde_json::to_vec(row).map_err(storage)?;
         let count = u64::try_from(encoded.len()).map_err(storage)? + 1;
         self.bytes = self.bytes.checked_add(count).ok_or_else(no_space)?;
-        if count > MAX_STAGED_ROW || self.bytes > self.budget {
+        if count > MAX_STAGED_ROW {
             return Err(no_space());
+        }
+        if self.bytes > self.budget {
+            return Err(normalized_source_limit(self.bytes, self.budget));
         }
         self.hash.update(&encoded);
         self.hash.update(b"\n");
@@ -73,5 +76,54 @@ impl RowSpool {
             hash: self.hash.finalize().into(),
             disk: self.disk,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used)]
+    use super::*;
+
+    #[test]
+    fn normalized_spool_reports_the_first_row_that_would_exceed_the_allowance() {
+        let root = tempfile::tempdir().unwrap();
+        let store = ParquetStore::open(root.path()).unwrap();
+        let case = CaseId::parse("11111111-1111-1111-1111-111111111111").unwrap();
+        let hash = irmind_domain::EvidenceHash::from_bytes([3; 32]);
+        let row = RecordRow::from_partitioned(
+            &irmind_app::IndexedGraphRecord {
+                record: irmind_app::GraphRecord {
+                    index: 0,
+                    at: String::new(),
+                    event: "Synthetic".into(),
+                    text: "{}".into(),
+                    entities: vec![],
+                    relations: vec![],
+                },
+                time: None,
+                source_offset: None,
+            },
+            &hash,
+        )
+        .unwrap();
+        let bytes = serde_json::to_vec(&row).unwrap().len() as u64 + 1;
+        let mut spool = RowSpool::new(&store, &case, bytes).unwrap();
+        spool.push(&row).unwrap();
+        assert_eq!(spool.rows, 1);
+        assert!(matches!(
+            spool.push(&row),
+            Err(AppError::Fixed(irmind_app::FixedAppError::StorageNormalizedSourceLimit {
+                required,
+                allowance,
+            })) if required == bytes * 2 && allowance == bytes
+        ));
+        assert_eq!(spool.rows, 1);
+        drop(spool);
+        assert_eq!(
+            std::fs::read_dir(store.spool_dir(&case).unwrap())
+                .unwrap()
+                .count(),
+            0
+        );
     }
 }

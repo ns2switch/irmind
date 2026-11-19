@@ -1,0 +1,13 @@
+DNS Server log file creation at 11/17/2026 8:00:01 PM
+
+Message logging key (for packets - other items use a subset of these fields):
+Field #  Information
+1        Date
+2        Time
+3        Thread ID
+4        Context
+
+11/17/2026 8:00:01 PM 0A88 PACKET 0000018ABC012340 UDP Rcv 203.0.113.77 1D17 Q [0001 D NOERROR] A (8)resolver(7)example(4)test(0)
+11/17/2026 8:00:02 PM 0A88 PACKET 0000018ABC012340 UDP Snd 203.0.113.77 1D17 R Q [8081 DR NOERROR] A (8)resolver(7)example(4)test(0)
+11/17/2026 8:00:03 PM 0A88 PACKET 0000018ABC045670 TCP Snd 2001:db8::57 1D18 R Q [8083 DR NXDOMAIN] AAAA (6)absent(7)example(4)test(0)
+11/17/2026 8:00:04 PM 0A88 PACKET 0000018ABC078910 TCP Rcv 192.0.2.31 1D19 X [0001 D NOERROR] TYPE65000 (7)unknown(4)test(0)

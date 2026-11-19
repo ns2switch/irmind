@@ -2146,3 +2146,14 @@ The signed-ingest benchmark used 1,073,742,024 bytes of synthetic native NDJSON
 and indexed 2,732,168 records in 55.602 s (18.417 MiB/s) in a release build.
 The benchmark exercised the resolver decoder and declarative mapping in the
 fixture registry. Case verification passed after the timed interval.
+
+### Windows DNS debug packet ingestion
+
+A release build ingested 1,073,772,946 bytes of synthetic DNS packet summaries
+across 256 log rotations, 8,259,328 records in 266.878 s (3.837 MiB/s).
+Case verification passed after timing stopped.
+
+A single 1 GiB file of compact packet summaries reached the existing
+per-source normalization allowance. This is a failed single-file measurement.
+The rotated corpus uses the same native data rows and ordinary per-source
+admission, with no change to resource limits.

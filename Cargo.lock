@@ -2303,6 +2303,7 @@ dependencies = [
  "irmind-mod-mapping-route53",
  "irmind-mod-mapping-syslog",
  "irmind-mod-mapping-udm",
+ "irmind-mod-mapping-windows-dns",
  "irmind-mod-parser-azure-flow",
  "irmind-mod-parser-chainsaw",
  "irmind-mod-parser-declarative",
@@ -2333,6 +2334,7 @@ dependencies = [
  "irmind-mod-parser-syslog",
  "irmind-mod-parser-velociraptor",
  "irmind-mod-parser-vpc-flow",
+ "irmind-mod-parser-windows-dns",
  "irmind-mod-parser-zeek",
  "irmind-mod-siem-chronicle",
  "irmind-mod-siem-elastic",
@@ -2954,6 +2956,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-mapping-windows-dns"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-mapping-tables",
+ "irmind-mod-parser-windows-dns",
+ "irmind-testkit",
+]
+
+[[package]]
 name = "irmind-mod-parser-azure-flow"
 version = "0.1.0"
 dependencies = [
@@ -3264,6 +3277,15 @@ dependencies = [
  "irmind-domain",
  "irmind-testkit",
  "tempfile",
+]
+
+[[package]]
+name = "irmind-mod-parser-windows-dns"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+ "irmind-testkit",
 ]
 
 [[package]]
