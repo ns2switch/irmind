@@ -7,6 +7,7 @@ license.workspace = true
 
 [features]
 default = [
+    "parser-google-workspace", "mapping-google-workspace",
     "parser-macos", "mapping-macos",
     "parser-fdr", "mapping-fdr",
     "parser-defender", "mapping-defender",
@@ -26,6 +27,8 @@ default = [
     "siem-splunk", "siem-elastic", "siem-chronicle", "cloud-aws", "edr-crowdstrike", "edr-sentinelone",
     "ti-misp", "ti-virustotal", "storage-s3", "storage-gcs", "storage-azure",
 ]
+parser-google-workspace = ["dep:irmind-mod-parser-google-workspace", "mapping-google-workspace"]
+mapping-google-workspace = ["dep:irmind-mod-mapping-google-workspace", "parser-google-workspace"]
 parser-macos = ["dep:irmind-mod-parser-macos", "mapping-macos"]
 mapping-macos = ["dep:irmind-mod-mapping-macos", "parser-macos"]
 parser-fdr = ["dep:irmind-mod-parser-fdr", "mapping-fdr"]
@@ -95,6 +98,8 @@ parser-gcp-flow = ["dep:irmind-mod-parser-gcp-flow", "mapping-cloud-flow"]
 mapping-cloud-flow = ["dep:irmind-mod-mapping-cloud-flow"]
 
 [dependencies]
+irmind-mod-parser-google-workspace = { path = "../modules/parser-google-workspace", version = "0.1.0", optional = true }
+irmind-mod-mapping-google-workspace = { path = "../modules/mapping-google-workspace", version = "0.1.0", optional = true }
 irmind-mod-parser-macos = { path = "../modules/parser-macos", version = "0.1.0", optional = true }
 irmind-mod-mapping-macos = { path = "../modules/mapping-macos", version = "0.1.0", optional = true }
 irmind-mod-parser-fdr = { path = "../modules/parser-fdr", version = "0.1.0", optional = true }

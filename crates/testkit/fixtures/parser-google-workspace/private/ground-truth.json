@@ -1,0 +1,11 @@
+{
+  "synthetic": true,
+  "activities": 7,
+  "records": 9,
+  "authentication_failures": [0, 6],
+  "failed_login_client": "203.0.113.77",
+  "oauth_client": "synthetic-client",
+  "drive_resource": "synthetic-document",
+  "restricted_user": "other-test@example.test",
+  "unclassified_record": 4
+}

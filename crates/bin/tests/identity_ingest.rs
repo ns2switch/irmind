@@ -106,6 +106,10 @@ fn ingest_with_context(
 }
 fn fixture(parser: &str) -> &'static [u8] {
     match parser {
+        #[cfg(feature = "parser-google-workspace")]
+        "google-workspace" => {
+            include_bytes!("../../testkit/fixtures/parser-google-workspace/source/events.ndjson")
+        }
         #[cfg(feature = "parser-macos")]
         "macos-unified" => {
             include_bytes!("../../testkit/fixtures/parser-macos/source/unified.ndjson")
@@ -140,6 +144,8 @@ fn fixture(parser: &str) -> &'static [u8] {
     }
 }
 const IDENTITY_SOURCES: &[(&str, u64)] = &[
+    #[cfg(feature = "parser-google-workspace")]
+    ("google-workspace", 9),
     #[cfg(feature = "parser-macos")]
     ("macos-unified", 2),
     #[cfg(feature = "parser-macos")]
@@ -197,6 +203,7 @@ fn identity_failures_keep_roles_originals_and_signed_export() {
         2 + usize::from(cfg!(feature = "parser-defender"))
             + usize::from(cfg!(feature = "parser-fdr"))
             + usize::from(cfg!(feature = "parser-macos"))
+            + 2 * usize::from(cfg!(feature = "parser-google-workspace"))
     );
     engine.verify(&case.id).unwrap();
     let parser = current_sources::parser("parser-m365");
@@ -286,6 +293,17 @@ fn one_gib_release_macos_throughput() -> Result<(), &'static str> {
     Ok(())
 }
 
+#[cfg(feature = "parser-google-workspace")]
+#[test]
+#[ignore = "manual optimized 1 GiB Google Workspace ingestion benchmark"]
+fn one_gib_release_google_workspace_throughput() -> Result<(), &'static str> {
+    if cfg!(debug_assertions) {
+        return Err("Use --release for benchmarks");
+    }
+    benchmark_source("google-workspace");
+    Ok(())
+}
+
 fn benchmark_source(name: &str) {
     use std::io::{BufWriter, Write};
     let bench_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target");
@@ -348,6 +366,7 @@ fn benchmark_lines(name: &str) -> (Vec<u8>, Vec<u8>, u64) {
         && name != "defender"
         && name != "fdr"
         && !name.starts_with("macos-")
+        && name != "google-workspace"
     {
         value["synthetic_padding"] = serde_json::json!("x".repeat(1024));
     }
@@ -356,7 +375,11 @@ fn benchmark_lines(name: &str) -> (Vec<u8>, Vec<u8>, u64) {
     (
         Vec::new(),
         row,
-        if name.starts_with("azure-") { 2 } else { 1 },
+        if name.starts_with("azure-") || name == "google-workspace" {
+            2
+        } else {
+            1
+        },
     )
 }
 

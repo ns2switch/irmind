@@ -2114,3 +2114,21 @@ cargo test --locked --release -p irmind --test identity_ingest one_gib_release_m
 
 AddressSanitizer fuzzing covered detection and bounded decoding for 601 seconds
 and executed 5,326,114 inputs without a sanitizer finding.
+
+
+### Google Workspace Reports API export
+
+One synthetic GiB of line-delimited audit activities with two events per
+activity went through the optimized ingestion path. Case verification passed
+after the measurement.
+
+| Input bytes | Expanded records | Ingestion s | MiB/s |
+| ---: | ---: | ---: | ---: |
+| 1,073,742,096 | 5,478,276 | 117.274 | 8.732 |
+
+```sh
+cargo test --locked --release -p irmind --test identity_ingest one_gib_release_google_workspace_throughput -- --ignored --nocapture
+```
+
+AddressSanitizer exercised detection and bounded decoding on 3,161,311 inputs
+in 601 seconds without a sanitizer finding.

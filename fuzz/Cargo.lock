@@ -812,6 +812,7 @@ dependencies = [
  "irmind-mod-parser-fdr",
  "irmind-mod-parser-gcp-audit",
  "irmind-mod-parser-gcp-flow",
+ "irmind-mod-parser-google-workspace",
  "irmind-mod-parser-guardduty",
  "irmind-mod-parser-hayabusa",
  "irmind-mod-parser-json",
@@ -1074,6 +1075,14 @@ dependencies = [
 
 [[package]]
 name = "irmind-mod-parser-gcp-flow"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+]
+
+[[package]]
+name = "irmind-mod-parser-google-workspace"
 version = "0.1.0"
 dependencies = [
  "irmind-app",

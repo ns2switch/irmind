@@ -127,6 +127,7 @@ The normal build includes every current product module and both keystores. No re
 | Microsoft Entra ID | local parser + mapping | `parser-entra` (default) | experimental | [Entra](docs/parsers.md#microsoft-entra-id) |
 | Microsoft 365 audit | local parser + mapping | `parser-m365` (default) | experimental | [M365](docs/parsers.md) |
 | Okta System Log | local parser + mapping | `parser-okta` (default) | experimental | [Okta](docs/parsers.md) |
+| Google Workspace Reports API | local parser + mapping | `parser-google-workspace`, `mapping-google-workspace` (default) | experimental | [Google Workspace](docs/parsers.md#google-workspace-reports-api) |
 | macOS Unified Log and eslogger | local parser + mapping | `parser-macos`, `mapping-macos` (default) | experimental | [macOS exports](docs/parsers.md#macos-exports) |
 | CrowdStrike FDR | local parser + mapping | `parser-fdr`, `mapping-fdr` (default) | experimental | [FDR](docs/parsers.md#crowdstrike-falcon-data-replicator) |
 | Microsoft Defender exports | local parser + mapping | `parser-defender`, `mapping-defender` (default) | experimental | [Defender](docs/parsers.md#microsoft-defender-exports) |

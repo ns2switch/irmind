@@ -12,6 +12,7 @@ export = ["dep:irmind-infra"]
 cargo-fuzz = true
 
 [dependencies]
+irmind-mod-parser-google-workspace = { path = "../crates/modules/parser-google-workspace", version = "0.1.0" }
 irmind-mod-parser-macos = { path = "../crates/modules/parser-macos", version = "0.1.0" }
 irmind-mod-parser-fdr = { path = "../crates/modules/parser-fdr", version = "0.1.0" }
 irmind-mod-mapping-fdr = { path = "../crates/modules/mapping-fdr", version = "0.1.0" }
@@ -296,6 +297,13 @@ bench = false
 [[bin]]
 name = "parser_macos"
 path = "fuzz_targets/parser_macos.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "parser_google_workspace"
+path = "fuzz_targets/parser_google_workspace.rs"
 test = false
 doc = false
 bench = false
