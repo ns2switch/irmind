@@ -42,11 +42,11 @@ impl SourceMapper for OtherMapper {
     }
 }
 
-fn expanded_catalog() -> Arc<MappingCatalog> {
+fn expanded_catalog(other_count: usize) -> Arc<MappingCatalog> {
     let mut mappings: Vec<Arc<dyn SourceMapper>> =
         vec![Arc::new(JsonCompatibilityMapping::new().unwrap())];
     let identity = OtherDecoder.identity();
-    for index in 0..64 {
+    for index in 0..other_count {
         let id = format!("mapping-other-{index:02}");
         let selector = SourceSelector::try_new(
             identity.name,
@@ -90,7 +90,7 @@ fn expanded_catalog_groups_and_artifacts_are_identical_with_one_or_many_workers(
     let originals = root.path().join("originals");
     fs::create_dir(&originals).unwrap();
     let paths = write_disordered_sources(&originals);
-    let catalog = expanded_catalog();
+    let catalog = expanded_catalog(64);
     assert_eq!(catalog.manifests().len(), 65);
     assert_eq!(
         catalog
@@ -185,16 +185,7 @@ fn write_disordered_sources(originals: &Path) -> Vec<String> {
 fn verify_profile_groups(
     entries: &[irmind_app::SignedEntry],
 ) -> Vec<irmind_domain::MappingProfileV1> {
-    let profiles = entries
-        .iter()
-        .filter(|e| e.kind == AuditEventKind::MappingProfileV1)
-        .filter_map(
-            |entry| match MappingProfileRecordV1::decode(&entry.payload).unwrap() {
-                MappingProfileRecordV1::Profile(p) => Some(p),
-                MappingProfileRecordV1::Snapshot(_) => None,
-            },
-        )
-        .collect::<Vec<_>>();
+    let profiles = read_profiles(entries);
     assert_eq!(
         profiles
             .iter()
@@ -204,4 +195,97 @@ fn verify_profile_groups(
     );
     assert!(profiles.iter().all(|p| p.catalog().len() == 1));
     profiles
+}
+
+#[test]
+fn signed_historical_profile_reconstructs_and_exports_identically_after_registry_growth() {
+    let root = tempfile::tempdir().unwrap();
+    let input = root.path().join("originals");
+    fs::create_dir(&input).unwrap();
+    fs::write(
+        input.join("historical.json"),
+        br#"{"eventTime":"2026-11-01T00:00:01Z","eventName":"Read","sourceIPAddress":"203.0.113.77"}"#,
+    ).unwrap();
+    let storage = root.path().join("case-data");
+    let clock = Arc::new(FixedClock::new(1_793_491_200));
+    let cancel = CancellationToken::new();
+    let (store, engine, catalog) =
+        fixture_with_clock(&storage, expanded_catalog(63), clock.clone());
+    let case = engine
+        .create_case("Synthetic historical group", "local only")
+        .unwrap();
+    let parser = catalog
+        .decoder_selection("parser-json", "json-source-v1")
+        .unwrap();
+    let large = LargeCaseUseCases {
+        engine: &engine,
+        store: store.as_ref(),
+        parser: &parser,
+    };
+    assert_eq!(
+        large
+            .ingest_local_batch(
+                &case.id,
+                &input,
+                &["historical.json".into()],
+                false,
+                &cancel
+            )
+            .unwrap()
+            .len(),
+        1
+    );
+    let entries = store.entries(&case.id).unwrap();
+    let profiles = read_profiles(&entries);
+    assert_eq!(profiles.len(), 1);
+    assert_eq!(profiles[0].catalog().len(), 64);
+    engine.seal(&case.id).unwrap();
+    let signed_before = root.path().join("before.irmind");
+    let key = irmind_app::export_case(&engine, store.as_ref(), &case.id, &signed_before, &cancel)
+        .unwrap();
+    drop(engine);
+    drop(store);
+
+    let (store, engine, catalog) = fixture_with_clock(&storage, expanded_catalog(64), clock);
+    assert_eq!(catalog.manifests().len(), 65);
+    let parser = catalog
+        .decoder_selection("parser-json", "json-source-v1")
+        .unwrap();
+    engine.verify(&case.id).unwrap();
+    let large = LargeCaseUseCases {
+        engine: &engine,
+        store: store.as_ref(),
+        parser: &parser,
+    };
+    assert_eq!(
+        large
+            .verify_parquet_rebuild(&case.id, &input, &cancel)
+            .unwrap(),
+        1
+    );
+    let signed_after = root.path().join("after.irmind");
+    assert_eq!(
+        irmind_app::export_case(&engine, store.as_ref(), &case.id, &signed_after, &cancel).unwrap(),
+        key
+    );
+    LocalExportVerifier
+        .verify_export_details(&signed_after, Some(&key))
+        .unwrap();
+    assert_eq!(
+        fs::read(signed_before).unwrap(),
+        fs::read(signed_after).unwrap()
+    );
+}
+
+fn read_profiles(entries: &[irmind_app::SignedEntry]) -> Vec<irmind_domain::MappingProfileV1> {
+    entries
+        .iter()
+        .filter(|e| e.kind == AuditEventKind::MappingProfileV1)
+        .filter_map(
+            |entry| match MappingProfileRecordV1::decode(&entry.payload).unwrap() {
+                MappingProfileRecordV1::Profile(p) => Some(p),
+                MappingProfileRecordV1::Snapshot(_) => None,
+            },
+        )
+        .collect::<Vec<_>>()
 }
