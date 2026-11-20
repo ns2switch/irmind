@@ -51,6 +51,53 @@ fn approved_receipts_match_the_exact_canonical_vectors() {
 }
 
 #[test]
+fn compiler_refuses_unregistered_datasets_result_kinds_and_predicates() {
+    let plan: serde_json::Value = serde_json::from_slice(PLAN).unwrap();
+    let source: ResolvedQuerySourceV1 = serde_json::from_value(plan["source"].clone()).unwrap();
+    let query: SourceQueryV1 = serde_json::from_value(plan["query"].clone()).unwrap();
+    let limits: SourceQueryLimits = serde_json::from_value(plan["limits"].clone()).unwrap();
+    let mut module = SourceQueryModuleV1 {
+        id: source.module().into(),
+        version: source.module_version().into(),
+        datasets: vec![query.dataset().into()],
+        fields: query
+            .fields()
+            .iter()
+            .cloned()
+            .chain(query.filters().iter().map(|filter| filter.field.clone()))
+            .collect(),
+        operators: vec![QueryOperator::Eq],
+        result_kinds: vec![QueryResultKind::Events],
+        accounting: QueryAccounting::ScanPriced,
+        recoverable_submit: true,
+        cancellation: true,
+        api_version: "v1".into(),
+    };
+    assert_eq!(
+        check_query_capabilities(&query, &source, &module, &limits),
+        Ok(())
+    );
+    let mut aggregate = plan["query"].clone();
+    aggregate["result"] = "count".into();
+    let aggregate = serde_json::from_value(aggregate).unwrap();
+    assert_eq!(
+        check_query_capabilities(&aggregate, &source, &module, &limits),
+        Err(SourceQueryError::Unsupported)
+    );
+    module.operators.clear();
+    assert_eq!(
+        check_query_capabilities(&query, &source, &module, &limits),
+        Err(SourceQueryError::Unsupported)
+    );
+    module.operators.push(QueryOperator::Eq);
+    module.datasets[0] = "other-dataset".into();
+    assert_eq!(
+        check_query_capabilities(&query, &source, &module, &limits),
+        Err(SourceQueryError::Unsupported)
+    );
+}
+
+#[test]
 fn scope_approval_and_allocation_revision_are_required_for_a_hold() {
     let (plan, approval, reservation) = records();
     let scope = CaseScope::parse(SCOPE).unwrap();

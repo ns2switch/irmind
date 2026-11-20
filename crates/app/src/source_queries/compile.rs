@@ -1,5 +1,5 @@
 use super::{
-    QueryOperator, QueryTime, SourceQueryError, SourceQueryLimits, SourceQueryV1,
+    QueryOperator, QueryResultKind, QueryTime, SourceQueryError, SourceQueryLimits, SourceQueryV1,
     canonical_query_json,
     types::{digest, id, text},
 };
@@ -265,8 +265,10 @@ impl CompiledSourceQueryV1 {
 pub struct SourceQueryModuleV1 {
     pub id: String,
     pub version: String,
+    pub datasets: Vec<String>,
     pub fields: Vec<String>,
     pub operators: Vec<QueryOperator>,
+    pub result_kinds: Vec<QueryResultKind>,
     pub accounting: QueryAccounting,
     pub recoverable_submit: bool,
     pub cancellation: bool,
@@ -278,8 +280,13 @@ impl SourceQueryModuleV1 {
             self.id.as_str(),
             "query-athena" | "query-bigquery" | "query-azure-log-analytics"
         ) || !id(&self.version)
+            || self.datasets.is_empty()
+            || self.datasets.len() > 64
+            || self.datasets.iter().any(|value| !id(value))
             || self.fields.len() > 128
             || self.operators.len() > 5
+            || self.result_kinds.is_empty()
+            || self.result_kinds.len() > 4
             || !text(&self.api_version, 64)
             || self.fields.iter().any(|s| !text(s, 128))
         {
@@ -307,11 +314,16 @@ pub fn check_query_capabilities(
     if !query.interval_within(limits.interval_seconds)? || query.limit() > limits.rows {
         return Err(SourceQueryError::Limit);
     }
-    if query
-        .fields()
+    if !module
+        .datasets
         .iter()
-        .chain(query.filters().iter().map(|p| &p.field))
-        .any(|f| !module.fields.contains(f))
+        .any(|dataset| dataset == query.dataset())
+        || !module.result_kinds.contains(&query.result())
+        || query
+            .fields()
+            .iter()
+            .chain(query.filters().iter().map(|p| &p.field))
+            .any(|f| !module.fields.contains(f))
         || query
             .filters()
             .iter()
