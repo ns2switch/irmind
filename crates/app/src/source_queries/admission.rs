@@ -4,7 +4,8 @@ use super::{
     canonical::checked_value, canonical_query_json,
 };
 use crate::{
-    Actor, AppError, AuditEventKind, CaseId, CaseScope, SignedEntry, SignedOperation, Verifier,
+    Actor, AppError, AuditEventKind, CaseId, CaseScope, Engine, SignedEntry, SignedOperation,
+    Verifier,
 };
 use irmind_domain::AgentId;
 use serde::{Deserialize, Serialize};
@@ -138,6 +139,81 @@ struct PolicyRules {
     scan_approval_threshold: Option<u64>,
 }
 
+impl Engine<'_> {
+    /// Require an attended Analyst to adopt a bounded, canonical, nonsecret
+    /// query-source configuration before it can be referenced by a plan.
+    pub fn adopt_source_query_configuration(
+        &self,
+        canonical: &[u8],
+    ) -> Result<SignedOperation, AppError> {
+        self.require_attended_analyst("adopt source-query configuration")?;
+        let (configuration, rules) = decode_adoption(canonical)?;
+        rules.check_source(&configuration.source)?;
+        let _lock = self.audit_log.lock_global_operations()?;
+        let operation = format!("{CONFIGURATION_PREFIX}{}", crate::hex(canonical));
+        let signed = self.sign_global_operation_unlocked(operation)?;
+        self.audit_log.append_global_operation(&signed)?;
+        Ok(signed)
+    }
+}
+
+fn decode_adoption(bytes: &[u8]) -> Result<(Adoption, PolicyRules), SourceQueryError> {
+    let adoption: Adoption =
+        serde_json::from_value(checked_value(bytes)?).map_err(|_| SourceQueryError::Invalid)?;
+    if adoption.version != 1 || canonical_query_json(&adoption)? != bytes {
+        return Err(SourceQueryError::Invalid);
+    }
+    let rules: PolicyRules =
+        serde_json::from_value(adoption.policy.clone()).map_err(|_| SourceQueryError::Invalid)?;
+    if [
+        &rules.accounts,
+        &rules.projects,
+        &rules.workspaces,
+        &rules.regions,
+        &rules.sources,
+    ]
+    .into_iter()
+    .any(|values| {
+        values.len() > 64
+            || values.iter().any(|value| !super::native_identifier(value))
+            || values.windows(2).any(|pair| pair[0] >= pair[1])
+    }) || !(1..=super::QUERY_MAX_INTERVAL_SECONDS).contains(&rules.interval_seconds)
+        || !(1..=super::QUERY_MAX_ROWS).contains(&rules.query_rows)
+        || !(1..=super::QUERY_MAX_BYTES).contains(&rules.query_retained_bytes)
+        || rules.query_scan_bytes == Some(0)
+        || rules
+            .scan_approval_threshold
+            .is_some_and(|limit| rules.query_scan_bytes.is_none_or(|ceiling| limit > ceiling))
+    {
+        return Err(SourceQueryError::Limit);
+    }
+    Ok((adoption, rules))
+}
+
+impl PolicyRules {
+    fn check_source(&self, source: &ResolvedQuerySourceV1) -> Result<(), SourceQueryError> {
+        let owners = match source.module() {
+            "query-athena" => &self.accounts,
+            "query-bigquery" => &self.projects,
+            _ => &self.workspaces,
+        };
+        if !owners.iter().any(|owner| owner == source.owner())
+            || !self
+                .regions
+                .iter()
+                .any(|region| region == source.location())
+            || !self.sources.iter().any(|allowed| allowed == source.id())
+        {
+            return Err(SourceQueryError::Scope);
+        }
+        let analytics = source.module() == "query-azure-log-analytics";
+        if self.query_scan_bytes.is_none() != analytics {
+            return Err(SourceQueryError::Limit);
+        }
+        Ok(())
+    }
+}
+
 fn adopted_threshold(
     plan: &SourceQueryPlanV1,
     operation: &SignedOperation,
@@ -161,11 +237,8 @@ fn adopted_threshold(
         .verify(&operation.public_key, &operation.hash, &operation.sig)
         .map_err(|_| invalid())?;
     let bytes = hex::decode(encoded).map_err(|_| invalid())?;
-    let adoption: Adoption =
-        serde_json::from_value(checked_value(&bytes)?).map_err(|_| invalid())?;
-    if adoption.version != 1
-        || crate::hex(&bytes) != encoded
-        || canonical_query_json(&adoption)? != bytes
+    let (adoption, rules) = decode_adoption(&bytes)?;
+    if crate::hex(&bytes) != encoded
         || !plan.matches_adoption(
             &crate::hex(&operation.hash),
             &adoption.source,
@@ -174,21 +247,9 @@ fn adopted_threshold(
     {
         return Err(invalid());
     }
-    let rules: PolicyRules = serde_json::from_value(adoption.policy).map_err(|_| invalid())?;
-    let source = plan.source();
-    let owners = match source.module() {
-        "query-athena" => rules.accounts,
-        "query-bigquery" => rules.projects,
-        _ => rules.workspaces,
-    };
+    rules.check_source(plan.source())?;
     let limits = plan.limits();
-    if !owners.iter().any(|owner| owner == source.owner())
-        || !rules
-            .regions
-            .iter()
-            .any(|region| region == source.location())
-        || !rules.sources.iter().any(|allowed| allowed == source.id())
-        || limits.interval_seconds > rules.interval_seconds
+    if limits.interval_seconds > rules.interval_seconds
         || limits.rows > rules.query_rows
         || limits.retained_bytes > rules.query_retained_bytes
         || limits

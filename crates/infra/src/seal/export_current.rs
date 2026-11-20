@@ -172,9 +172,7 @@ impl LocalStore {
             }
             write_frame(&mut out, &serde_json::to_vec(&operation).map_err(storage)?)?;
         }
-        {
-            super::mapping_proofs::write(self, id, &header.seal.public_key, &mut out, cancel)?;
-        }
+        super::mapping_proofs::write(self, id, &header.seal.public_key, &mut out, cancel)?;
         self.write_artifact_frames(id, &mut out, cancel)?;
         let (catalog, mut skills) =
             super::skill_proofs::write(self, id, &header.seal.public_key, &mut out, cancel)?;
@@ -189,7 +187,11 @@ impl LocalStore {
             cancel,
         )?;
         // Before any provider is enabled, a V9 case has zero query captures.
-        out.write_all(&0u64.to_be_bytes()).map_err(storage)?;
+        irmind_app::source_queries::write_query_capture_section::<std::io::Empty>(
+            &mut out,
+            &mut [],
+            cancel,
+        )?;
         out.sync_all().map_err(storage)?;
         Ok(header.seal.analyst_key_fingerprint.clone())
     }

@@ -20,7 +20,7 @@ pub use completion::{
     SignedSourceQuerySettlement, SourceQueryExecutionV1, SourceQueryResultV1,
     SourceQuerySettlementV1,
 };
-pub use export::verify_query_capture_section;
+pub use export::{verify_query_capture_section, write_query_capture_section};
 pub use ports::*;
 pub(crate) use receipts::BudgetReplay;
 pub use receipts::{

@@ -273,6 +273,33 @@ fn mapping_catalog() -> Arc<irmind_app::source_mapping::MappingCatalog> {
     )
 }
 
+#[test]
+fn source_query_adoption_persists_only_valid_canonical_scope() {
+    let root = tempfile::tempdir().unwrap();
+    let (store, mut engine, signer) = setup(root.path());
+    let vector = include_bytes!(
+        "../../../../docs/development/source-query-format-vectors/configuration-adoption.json"
+    );
+    let mut wrong: serde_json::Value = serde_json::from_slice(vector).unwrap();
+    wrong["policy"]["regions"] = serde_json::json!(["us-east-1"]);
+    assert!(
+        engine
+            .adopt_source_query_configuration(
+                &irmind_app::source_queries::canonical_query_json(&wrong).unwrap(),
+            )
+            .is_err()
+    );
+    engine.mode = ExecutionMode::Unattended;
+    assert!(engine.adopt_source_query_configuration(vector).is_err());
+    assert!(store.global_operations().unwrap().is_empty());
+    engine.mode = ExecutionMode::Attended;
+    let adoption = engine.adopt_source_query_configuration(vector).unwrap();
+    assert_eq!(adoption.actor, Actor::Analyst);
+    assert_eq!(adoption.public_key, signer.public_key());
+    assert_eq!(adoption.hash, store.global_operations().unwrap()[0].hash);
+    engine.verify_global_operations().unwrap();
+}
+
 mod seed;
 
 #[test]
