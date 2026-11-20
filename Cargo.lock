@@ -2253,7 +2253,7 @@ checksum = "791930b43c0d5973160d90a8f3894509f2b273430f5c5c73b668636d0287c5c0"
 
 [[package]]
 name = "irmind"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "anyhow",
  "arrow-array",
@@ -3517,7 +3517,7 @@ dependencies = [
 
 [[package]]
 name = "irmind-tui"
-version = "0.5.5"
+version = "0.5.6"
 dependencies = [
  "anyhow",
  "crossterm",

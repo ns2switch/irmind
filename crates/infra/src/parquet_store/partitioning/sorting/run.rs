@@ -2,7 +2,7 @@ use super::super::super::{
     AppError, CancellationToken, File, ParquetStore, RecordRow, invalid_source, storage,
 };
 use super::super::{staging::MAX_STAGED_ROW, temporary::DiskLease};
-use irmind_domain::CaseId;
+use irmind_domain::{CaseId, StableRecordKey};
 use sha2::{Digest, Sha256};
 use std::io::{BufRead, Read, Write};
 
@@ -43,6 +43,27 @@ impl RunReader {
         &mut self,
         cancel: &CancellationToken,
     ) -> Result<Option<(RecordRow, Vec<u8>)>, AppError> {
+        self.read_frame(cancel)?
+            .map(|line| {
+                let value = serde_json::from_slice(&line).map_err(storage)?;
+                Ok((value, line))
+            })
+            .transpose()
+    }
+
+    pub(super) fn next_key(
+        &mut self,
+        cancel: &CancellationToken,
+    ) -> Result<Option<(StableRecordKey<'static>, Vec<u8>)>, AppError> {
+        self.read_frame(cancel)?
+            .map(|line| {
+                let key = RecordRow::staged_sort_key(&line).map_err(storage)?;
+                Ok((key, line))
+            })
+            .transpose()
+    }
+
+    fn read_frame(&mut self, cancel: &CancellationToken) -> Result<Option<Vec<u8>>, AppError> {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
@@ -71,8 +92,7 @@ impl RunReader {
             return Err(invalid_source());
         }
         self.hash.update(&line);
-        let value = serde_json::from_slice(&line).map_err(storage)?;
-        Ok(Some((value, line)))
+        Ok(Some(line))
     }
 }
 impl Run {

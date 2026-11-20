@@ -60,6 +60,56 @@ fn binary_merge_levels_keep_global_order_and_clean_every_run() {
     );
 }
 #[test]
+fn merge_retains_original_frames_in_stable_key_order() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = crate::parquet_store::fixtures::store(dir.path());
+    let cancel = CancellationToken::new();
+    // Give the same logical key two distinguishable encodings. The left run
+    // must come first for ties and neither frame should be reserialized.
+    let frames = [(0, " "), (2, " "), (1, "\t"), (2, "\t")].map(|(index, suffix)| {
+        let mut bytes = serde_json::to_vec(&row(index)).unwrap();
+        bytes.extend_from_slice(suffix.as_bytes());
+        bytes.push(b'\n');
+        bytes
+    });
+    let [left, right] = [&frames[..2], &frames[2..]].map(|frames| {
+        let mut writer = RunWriter::new(&store, &case()).unwrap();
+        for frame in frames {
+            writer.push_encoded(frame).unwrap();
+        }
+        writer.finish().unwrap()
+    });
+    let merged = merge(&store, &case(), &left, &right, &cancel).unwrap();
+    let mut reader = merged.reader().unwrap();
+    for index in [0, 2, 1, 3] {
+        assert_eq!(
+            reader.next_encoded(&cancel).unwrap().unwrap().1,
+            frames[index]
+        );
+    }
+    assert!(reader.next_encoded(&cancel).unwrap().is_none());
+}
+
+#[test]
+fn run_key_reader_rejects_mutations_outside_the_sort_key() {
+    use std::io::{Seek as _, Write as _};
+
+    let dir = tempfile::tempdir().unwrap();
+    let expected = b"{\"index\":1,\"time\":null,\"source_offset\":null,\"text\":\"original\"}\n";
+    let changed = b"{\"index\":1,\"time\":null,\"source_offset\":null,\"text\":\"modified\"}\n";
+    assert_eq!(expected.len(), changed.len());
+    let mut file = tempfile::tempfile_in(dir.path()).unwrap();
+    file.write_all(changed).unwrap();
+    file.rewind().unwrap();
+    let hash = irmind_app::sha256(expected);
+    let mut reader = RunReader::new(file, hash, expected.len() as u64, 1);
+    let cancel = CancellationToken::new();
+    let (key, _) = reader.next_key(&cancel).unwrap().unwrap();
+    assert_eq!(key.record_index, 1);
+    assert!(reader.next_key(&cancel).is_err());
+}
+
+#[test]
 fn cancellation_during_merge_drops_private_runs() {
     let dir = tempfile::tempdir().unwrap();
     let store = crate::parquet_store::fixtures::store(dir.path());
