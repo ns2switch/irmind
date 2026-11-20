@@ -3367,6 +3367,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-query-azure-log-analytics"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "irmind-app",
+ "irmind-calendar",
+ "irmind-domain",
+ "irmind-http",
+ "irmind-testkit",
+ "reqwest",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "tokio",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
 name = "irmind-mod-siem-chronicle"
 version = "0.1.0"
 dependencies = [
