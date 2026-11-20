@@ -260,7 +260,7 @@ mod tests {
 
     #[test]
     fn wire_names_are_stable_and_unknown_names_fail() {
-        const EXPECTED: [&str; 56] = [
+        const EXPECTED: [&str; 63] = [
             "Allowed",
             "ApprovalDenied",
             "ApprovalGranted",
@@ -269,6 +269,13 @@ mod tests {
             "Cancelled",
             "CaseCreated",
             "CaseBudgetChanged",
+            "SourceQueryBudgetV1",
+            "SourceQueryPlanV1",
+            "SourceQueryApprovalV1",
+            "SourceQueryReservationV1",
+            "SourceQueryExecutionV1",
+            "SourceQueryResultV1",
+            "SourceQuerySettlementV1",
             "CaseScopeChanged",
             "CaseSealed",
             "Denied",
@@ -318,6 +325,7 @@ mod tests {
             "subagent-checkpoint-v1",
             "subagent-result-v1",
         ];
+        assert_eq!(AuditEventKind::ALL.len(), EXPECTED.len());
         for (kind, expected) in AuditEventKind::ALL.into_iter().zip(EXPECTED) {
             assert_eq!(kind.as_str(), expected);
             assert_eq!(AuditEventKind::parse(expected), Ok(kind));
