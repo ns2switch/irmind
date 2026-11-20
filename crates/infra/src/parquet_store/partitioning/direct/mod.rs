@@ -224,7 +224,8 @@ impl ParquetStore {
         available: impl FnOnce() -> Result<u64, AppError>,
     ) -> Result<BTreeMap<String, SourceReservation>, AppError> {
         let mut budgets = BTreeMap::new();
-        let mut sizes = Vec::new();
+        let mut spool_sizes = Vec::new();
+        let mut sort_sizes = Vec::new();
         let mut total = 0u64;
         for source in request.relative_paths {
             let mut file = Self::open_source(request.source_root, source)?;
@@ -240,29 +241,23 @@ impl ParquetStore {
                 .checked_add(expanded)
                 .and_then(|n| n.checked_add(if request.copy_original { physical } else { 0 }))
                 .ok_or_else(invalid_source)?;
-            let sort_space =
-                if request.parser.identity_for_source(source)?.name == "parser-azure-flow" {
-                    // Until timestamps have been decoded, allow for all live sort
-                    // files: the source spool, pending runs, and the new merge output.
-                    reservation
-                        .normalized_bytes
-                        .checked_mul(1 + super::sorting::SORT_SCRATCH_COPIES)
-                        .ok_or_else(invalid_source)?
-                } else {
-                    expanded
-                };
-            sizes.push(sort_space);
+            if request.parser.identity_for_source(source)?.name == "parser-azure-flow" {
+                spool_sizes.push(reservation.normalized_bytes);
+                sort_sizes.push(reservation.normalized_bytes);
+            } else {
+                spool_sizes.push(expanded);
+            }
             budgets.insert(source.clone(), reservation);
         }
-        sizes.sort_unstable_by(|a, b| b.cmp(a));
-        let scratch = sizes
-            .into_iter()
-            .take(workers)
-            .try_fold(0u64, |sum, size| {
-                sum.checked_add(size).ok_or_else(invalid_source)
-            })?;
+        // All active workers may stage a source. Only sort workers can also
+        // have pending input runs and a replacement open at the same time.
+        let spools = sum_largest(&mut spool_sizes, workers)?;
+        let scratch = sum_largest(&mut sort_sizes, super::sorting::sort_workers(workers))?
+            .checked_mul(super::sorting::SORT_SCRATCH_COPIES)
+            .ok_or_else(invalid_source)?;
         let required = total
-            .checked_add(scratch)
+            .checked_add(spools)
+            .and_then(|n| n.checked_add(scratch))
             .and_then(|n| n.checked_add(5 * 64 * 1024 * 1024))
             .ok_or_else(invalid_source)?;
         super::staging::check_space(available()?, required)?;
@@ -291,6 +286,13 @@ impl ParquetStore {
         }
         Ok(paths)
     }
+}
+
+fn sum_largest(sizes: &mut [u64], workers: usize) -> Result<u64, AppError> {
+    sizes.sort_unstable_by(|a, b| b.cmp(a));
+    sizes.iter().take(workers).try_fold(0u64, |sum, size| {
+        sum.checked_add(*size).ok_or_else(invalid_source)
+    })
 }
 
 fn group_identity(

@@ -19,6 +19,10 @@ const SORT_GROUP_READERS: usize = 128;
 // normalized spool size. The spool itself is reserved separately.
 pub(super) const SORT_SCRATCH_COPIES: u64 = 2;
 
+pub(super) fn sort_workers(workers: usize) -> usize {
+    workers.min(SORT_GROUP_READERS / MAX_SORT_FAN_IN)
+}
+
 impl ParquetStore {
     pub(super) fn sort_staged_sources(
         &self,
@@ -32,10 +36,7 @@ impl ParquetStore {
             .collect::<Vec<_>>();
         // At most two wide merges run at once. On a seven-worker machine
         // this still leaves room for the case and Parquet file descriptors.
-        let workers = self
-            .workers
-            .count()
-            .min(SORT_GROUP_READERS / MAX_SORT_FAN_IN);
+        let workers = sort_workers(self.workers.count());
         for group in sources.chunks_mut(workers) {
             let required = group
                 .iter()
