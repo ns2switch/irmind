@@ -116,6 +116,7 @@ pub enum Tool {
     ThreatIntelExternal,
     ObjectList,
     ObjectRead,
+    SourceQuery,
     SkillRead,
     DelegateTask,
 }
@@ -152,6 +153,7 @@ impl Tool {
             "ti_lookup_external" => Ok(Self::ThreatIntelExternal),
             "object_list" => Ok(Self::ObjectList),
             "object_read" => Ok(Self::ObjectRead),
+            "source_query" => Ok(Self::SourceQuery),
             "skill_read" => Ok(Self::SkillRead),
             "delegate_task" => Ok(Self::DelegateTask),
             _ => Err(DomainError::UnknownTool),
@@ -181,6 +183,7 @@ impl Tool {
             Self::ThreatIntelExternal => "ti_lookup_external",
             Self::ObjectList => "object_list",
             Self::ObjectRead => "object_read",
+            Self::SourceQuery => "source_query",
             Self::SkillRead => "skill_read",
             Self::DelegateTask => "delegate_task",
         }

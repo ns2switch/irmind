@@ -151,6 +151,13 @@ impl Engine<'_> {
             if current.sealed {
                 return Ok(Decision::Deny("case is sealed"));
             }
+            if proposal.tool == Tool::SourceQuery
+                && crate::source_queries::SourceQueryV1::from_proposal(&proposal.args).is_err()
+            {
+                return Ok(Decision::Deny(
+                    "source query arguments must match the bounded structured schema",
+                ));
+            }
             let policy = local.policy_for_case_unlocked(id)?;
             local.audit(
                 id,
@@ -215,6 +222,7 @@ impl Engine<'_> {
 
     fn source_unavailable_reason(&self, tool: &Tool, source: Option<&str>) -> Option<&'static str> {
         match tool {
+            Tool::SourceQuery => Some("source queries require a configured source-query module"),
             Tool::SiemSearch | Tool::SiemGetAlert if !self.siem_available(source) => {
                 Some("SIEM source unavailable")
             }

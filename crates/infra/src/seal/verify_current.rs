@@ -1,4 +1,4 @@
-use super::export_current::{HeaderV8, MAGIC_V8, v8_result};
+use super::export_current::{HeaderV9, MAGIC_V9, v9_result};
 use super::frames::{read_frame, read_hash, read_u64, verify_raw};
 use super::{
     AppError, CaseId, LocalVerifier, Path, Severity, hex, seal_challenge, sha256, storage,
@@ -14,7 +14,7 @@ const MAX_AUDIT_ENTRIES: u64 = 5_000_000;
 const MAX_SOURCE_MANIFESTS: usize = 1_000_000;
 const MAX_PACKAGE_FILE_BYTES: u64 = 2_000_000_000_000;
 
-pub(super) fn verify_export_v8(
+pub(super) fn verify_export_v9(
     path: &Path,
     expected_key: Option<&str>,
 ) -> Result<ExportVerification, AppError> {
@@ -40,17 +40,17 @@ fn verify_open_export_with_catalog(
     expected_key: Option<&str>,
     catalog: &dyn irmind_app::catalog::CatalogIndexVerifier,
 ) -> Result<ExportVerification, AppError> {
-    let version = 8;
+    let version = 9;
     if size > MAX_PACKAGE_FILE_BYTES {
         return Err(storage_reason("export package exceeds size limit"));
     }
-    let mut magic = [0u8; MAGIC_V8.len()];
-    if input.read_exact(&mut magic).is_err() || magic != MAGIC_V8 {
+    let mut magic = [0u8; MAGIC_V9.len()];
+    if input.read_exact(&mut magic).is_err() || magic != MAGIC_V9 {
         return Err(AppError::Fixed(
             irmind_app::FixedAppError::RetiredExportFormat,
         ));
     }
-    let header: HeaderV8 = serde_json::from_slice(&read_frame(&mut input)?).map_err(storage)?;
+    let header: HeaderV9 = serde_json::from_slice(&read_frame(&mut input)?).map_err(storage)?;
     if header.version != version {
         return Err(AppError::Fixed(
             irmind_app::FixedAppError::RetiredExportFormat,
@@ -79,7 +79,8 @@ fn verify_open_export_with_catalog(
     }
     verify_evidence_blobs(&mut input, &mut chain)?;
     let provided_count = verify_source_frames(&mut input, &mut chain)?;
-    verify_operation_frames(&mut input, &mut chain, &header)?;
+    let adoptions = verify_operation_frames(&mut input, &mut chain, &header)?;
+    let cancel = irmind_app::CancellationToken::new();
     {
         super::mapping_proofs::read(
             &mut input,
@@ -92,15 +93,23 @@ fn verify_open_export_with_catalog(
         super::artifact_frames::verify_artifact_frames(&mut input, &chain.artifacts)?;
     }
     verify_methodology_tail(&mut input, &mut chain, &header, catalog)?;
-    let mut extra = [0u8; 1];
-    if input.read(&mut extra).map_err(storage)? != 0 {
-        return Err(storage_reason("export has trailing bytes"));
+    let journal = irmind_app::source_queries::SourceQueryJournal::replay(
+        &chain.metadata_entries,
+        &adoptions,
+        &chain.verifier,
+        &cancel,
+    )?;
+    if journal.adoptions().len() != adoptions.len() {
+        return Err(AppError::InvalidChain(header.seal.seq));
     }
-    let mut result = v8_result(
+    journal.verify_source_links(&chain.metadata_entries)?;
+    let captures = journal.captures().collect::<Vec<_>>();
+    irmind_app::source_queries::verify_query_capture_section(&mut input, &captures, &cancel)?;
+    let mut result = v9_result(
         fingerprint,
         usize::try_from(count).map_err(storage)?,
         chain.source_count,
-        provided_count,
+        provided_count + captures.len(),
     );
     result.format_version = version;
     Ok(result)
@@ -109,7 +118,7 @@ fn verify_open_export_with_catalog(
 fn verify_methodology_tail(
     input: &mut File,
     chain: &mut ChainState,
-    header: &HeaderV8,
+    header: &HeaderV9,
     catalog: &dyn irmind_app::catalog::CatalogIndexVerifier,
 ) -> Result<(), AppError> {
     let proofs = super::skill_proofs::read(
@@ -149,17 +158,31 @@ pub(crate) fn verify_export_with_catalog(
 fn verify_operation_frames(
     input: &mut File,
     chain: &mut ChainState,
-    header: &HeaderV8,
-) -> Result<(), AppError> {
+    header: &HeaderV9,
+) -> Result<Vec<SignedOperation>, AppError> {
     let count = read_u64(input)?;
     if count > MAX_AUDIT_ENTRIES {
         return Err(storage_reason("too many operational entries"));
     }
     let mut previous = [0; 32];
+    let mut adoptions: Vec<SignedOperation> = Vec::new();
     for index in 0..count {
         let operation: SignedOperation =
             serde_json::from_slice(&read_frame(input)?).map_err(storage)?;
-        if operation.case_id != header.case_id
+        if operation.case_id == irmind_app::GLOBAL_OPERATION_SCOPE {
+            if adoptions
+                .last()
+                .is_some_and(|prior| prior.hash >= operation.hash)
+            {
+                return Err(AppError::InvalidChain(operation.seq));
+            }
+            // The signed adoption is authenticated by journal replay, which
+            // also requires each proof to be referenced by a plan.
+            adoptions.push(operation);
+            continue;
+        }
+        if !adoptions.is_empty()
+            || operation.case_id != header.case_id
             || operation.seq != index + 1
             || operation.prev != previous
             || sha256(&operation.canonical()) != operation.hash
@@ -176,7 +199,7 @@ fn verify_operation_frames(
     if !chain.source_hashes.is_subset(&chain.artifact_sources) {
         return Err(AppError::InvalidChain(header.seal.seq));
     }
-    Ok(())
+    Ok(adoptions)
 }
 
 fn verify_evidence_blobs(input: &mut File, chain: &mut ChainState) -> Result<(), AppError> {
@@ -211,6 +234,7 @@ fn verify_evidence_blobs(input: &mut File, chain: &mut ChainState) -> Result<(),
         || chain.referenced_evidence.iter().any(|hash| {
             !evidence_hashes.contains(hash)
                 && !chain.sources.keys().any(|(source, _)| source == hash)
+                && !chain.query_hashes.contains(hash)
         })
     {
         return Err(AppError::InvalidChain(last.seq));
@@ -221,9 +245,11 @@ fn verify_evidence_blobs(input: &mut File, chain: &mut ChainState) -> Result<(),
 fn verify_source_frames(input: &mut File, chain: &mut ChainState) -> Result<usize, AppError> {
     let provided = read_u64(input)?;
     let provided_count = usize::try_from(provided).map_err(storage)?;
-    if provided > MAX_SOURCE_MANIFESTS as u64
-        || (provided != 0 && provided_count != chain.source_count)
-    {
+    let originals = chain
+        .source_count
+        .checked_sub(chain.query_hashes.len())
+        .ok_or_else(|| storage_reason("capture count differs from signed manifest"))?;
+    if provided > MAX_SOURCE_MANIFESTS as u64 || (provided != 0 && provided_count != originals) {
         return Err(storage_reason(
             "source frame count differs from signed manifest",
         ));
@@ -259,6 +285,7 @@ struct ChainState {
     previous: [u8; 32],
     verifier: LocalVerifier,
     metadata_entries: Vec<SignedEntry>,
+    query_hashes: BTreeSet<String>,
     last: Option<SignedEntry>,
     referenced_evidence: BTreeSet<String>,
     sources: BTreeMap<(String, u64), usize>,
@@ -282,6 +309,7 @@ impl ChainState {
                 trusted: BTreeMap::new(),
             },
             metadata_entries: Vec::new(),
+            query_hashes: BTreeSet::new(),
             last: None,
             referenced_evidence: BTreeSet::new(),
             sources: BTreeMap::new(),
@@ -346,8 +374,22 @@ impl ChainState {
     }
 
     fn accept_metadata(&mut self, entry: &SignedEntry) -> Result<(), AppError> {
+        if entry.kind.is_source_query_lifecycle() {
+            if entry.kind == AuditEventKind::SourceQueryResultV1 {
+                let result = irmind_app::source_queries::SourceQueryResultV1::decode(
+                    entry.payload.as_bytes(),
+                )?;
+                if !self.query_hashes.insert(result.capture_identity().0.into()) {
+                    return Err(AppError::InvalidChain(entry.seq));
+                }
+            }
+            self.metadata_entries.push(entry.clone());
+            return Ok(());
+        }
         match entry.kind {
-            AuditEventKind::CaseCreated | AuditEventKind::CaseScopeChanged => {
+            AuditEventKind::CaseCreated
+            | AuditEventKind::CaseScopeChanged
+            | AuditEventKind::SourceQueryBudgetV1 => {
                 self.metadata_entries.push(entry.clone());
             }
             AuditEventKind::EvidenceIngested | AuditEventKind::GraphIndexed => {
@@ -368,40 +410,64 @@ impl ChainState {
                 }
                 self.source_count += 1;
                 self.source_hashes.insert(source.sha256.as_str().into());
-                *self
-                    .sources
-                    .entry((source.sha256.as_str().into(), source.size))
-                    .or_default() += 1;
-            }
-            AuditEventKind::ParquetArtifactV3 => {
-                let artifact = irmind_domain::ParquetArtifact::decode(entry.kind, &entry.payload)
-                    .map_err(|_| AppError::InvalidChain(entry.seq))?;
-                self.artifacts.insert(
-                    artifact.path().into(),
-                    super::artifact_frames::ArtifactFrame::from_artifact(&artifact),
-                );
-                if entry.evidence.is_some()
-                    || !self.artifact_paths.insert(artifact.path().into())
-                    || artifact
-                        .source_hashes()
-                        .iter()
-                        .any(|hash| !self.source_hashes.contains(hash.as_str()))
-                {
-                    return Err(AppError::InvalidChain(entry.seq));
+                if self.query_hashes.contains(source.sha256.as_str()) {
+                    self.metadata_entries.push(entry.clone());
+                } else {
+                    *self
+                        .sources
+                        .entry((source.sha256.as_str().into(), source.size))
+                        .or_default() += 1;
                 }
-                self.artifact_sources.extend(
-                    artifact
-                        .source_hashes()
-                        .iter()
-                        .map(|hash| hash.as_str().to_owned()),
-                );
             }
+            AuditEventKind::SourceRecordSetV1 => {
+                let source = irmind_domain::SourceRecordSetV1::decode(&entry.payload)
+                    .map_err(|_| AppError::InvalidChain(entry.seq))?;
+                if self.query_hashes.contains(source.source().as_str())
+                    || source.reference().kind() == irmind_domain::SourceKind::ToolResult
+                {
+                    self.metadata_entries.push(entry.clone());
+                }
+            }
+            AuditEventKind::ParquetArtifactV3 => self.accept_artifact(entry)?,
             _ => {}
         }
         Ok(())
     }
 
-    fn verify_seal(&self, id: &CaseId, header: &HeaderV8) -> Result<(), AppError> {
+    fn accept_artifact(&mut self, entry: &SignedEntry) -> Result<(), AppError> {
+        let invalid = || AppError::InvalidChain(entry.seq);
+        let artifact = irmind_domain::ParquetArtifact::decode(entry.kind, &entry.payload)
+            .map_err(|_| invalid())?;
+        if artifact
+            .source_hashes()
+            .iter()
+            .any(|hash| self.query_hashes.contains(hash.as_str()))
+        {
+            self.metadata_entries.push(entry.clone());
+        }
+        if entry.evidence.is_some()
+            || !self.artifact_paths.insert(artifact.path().into())
+            || artifact
+                .source_hashes()
+                .iter()
+                .any(|hash| !self.source_hashes.contains(hash.as_str()))
+        {
+            return Err(invalid());
+        }
+        self.artifacts.insert(
+            artifact.path().into(),
+            super::artifact_frames::ArtifactFrame::from_artifact(&artifact),
+        );
+        self.artifact_sources.extend(
+            artifact
+                .source_hashes()
+                .iter()
+                .map(|hash| hash.as_str().to_owned()),
+        );
+        Ok(())
+    }
+
+    fn verify_seal(&self, id: &CaseId, header: &HeaderV9) -> Result<(), AppError> {
         {
             self.catalog.validate()?;
         }

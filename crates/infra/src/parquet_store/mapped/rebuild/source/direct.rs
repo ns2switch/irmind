@@ -82,11 +82,26 @@ impl ParquetStore {
         let (case, root, workspace) = location;
         let alias = crate::parquet_store::TempWorkspace::new(&self.spool_dir(case)?)?;
         let remote = sources.iter().any(|(_, s)| s.source.source.contains("://"));
-        let (source_root, paths) = if remote {
+        let fresh = Self::open_mapped(workspace, Arc::new(catalog))?;
+        let (source_root, paths, capture_origin) = if let [(set, source)] = sources
+            && set.reference().kind() == irmind_domain::SourceKind::ToolResult
+        {
+            let hash = &source.source.sha256;
+            self.open_query_capture(case, hash, source.source.size, cancel)?;
+            let source_root = self.owned_case_path(case).join("queries");
+            let paths = vec![format!("{}.sqc", hash.as_str())];
+            let origin = crate::parquet_store::query_capture::CaptureOrigin {
+                case: case.clone(),
+                hash: hash.clone(),
+                reference: set.reference().clone(),
+            };
+            (source_root, paths, Some(origin))
+        } else if remote {
             let [(_, source)] = sources else {
                 return Err(invalid_source());
             };
-            original_location(self, case, root, source)?
+            let (source_root, paths) = original_location(self, case, root, source)?;
+            (source_root, paths, None)
         } else {
             let original = if sources.iter().all(|(_, s)| !s.source.copied) {
                 root.to_owned()
@@ -94,20 +109,21 @@ impl ParquetStore {
                 self.prepare_direct_originals(case, root, &alias.path, sources, cancel)?;
                 alias.path.clone()
             };
-            (
-                original,
-                sources
-                    .iter()
-                    .map(|(_, s)| s.source.source.clone())
-                    .collect(),
-            )
+            let paths = sources
+                .iter()
+                .map(|(_, s)| s.source.source.clone())
+                .collect();
+            (original, paths, None)
         };
-        let routed =
-            remote.then(|| irmind_app::SourceParser::new(selection, &sources[0].1.source.source));
+        let routed = (remote || capture_origin.is_some())
+            .then(|| irmind_app::SourceParser::new(selection, &sources[0].1.source.source));
         let parser: &dyn irmind_app::StreamingEventParser = routed
             .as_ref()
             .map_or(selection, |p| p as &dyn irmind_app::StreamingEventParser);
-        let fresh = Self::open_mapped(workspace, Arc::new(catalog))?;
+        let fresh = match capture_origin {
+            Some(origin) => fresh.with_capture_origin(origin),
+            None => fresh,
+        };
         fresh
             .prepare_mapped_ingest(
                 MappedIngestRequest {

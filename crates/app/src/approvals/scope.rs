@@ -21,7 +21,10 @@ impl ScopeReplay {
         match entry.kind {
             AuditEventKind::CaseCreated => {
                 let value: Created = serde_json::from_str(&entry.payload).map_err(|_| invalid())?;
-                if self.0.is_some() || value.version != 4 || entry.actor != Actor::Analyst {
+                if self.0.is_some()
+                    || value.version != crate::engine::CASE_CREATION_VERSION
+                    || entry.actor != Actor::Analyst
+                {
                     return Err(invalid());
                 }
                 CaseScope::parse(&value.scope).map_err(|_| invalid())?;

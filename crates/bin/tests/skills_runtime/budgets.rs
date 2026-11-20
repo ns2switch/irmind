@@ -402,12 +402,12 @@ fn a_signed_case_budget_survives_sealing_and_public_export_verification() {
         Some(&key),
     )
     .unwrap();
-    assert_eq!(details.format_version, 8);
+    assert_eq!(details.format_version, 9);
     if std::env::var_os("IRMIND_REFRESH_SKILL_EXPORT_SEEDS").is_some() {
         std::fs::copy(
             destination,
             std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../fuzz/seeds/export/valid-v8-budget.irmind"),
+                .join("../../fuzz/seeds/export/valid-v9-budget.irmind"),
         )
         .unwrap();
     }

@@ -28,14 +28,7 @@ impl LargeCaseUseCases<'_, '_> {
     ) -> Result<Vec<Accepted>, AppError> {
         let (sources, events, outputs) =
             self.direct_events(request, paths, prepared.metadata(), rejected)?;
-        if request.cancel.is_cancelled() {
-            return Err(AppError::Cancelled);
-        }
-        prepared.publish(request.cancel)?;
-        for artifact in &outputs {
-            self.store
-                .verify_artifact(request.id, artifact, request.cancel)?;
-        }
+        publish_mapped_files(self.store, request.id, prepared, &outputs, request.cancel)?;
         if request.cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
@@ -57,7 +50,7 @@ impl LargeCaseUseCases<'_, '_> {
             })
             .collect())
     }
-    fn direct_events(
+    pub(super) fn direct_events(
         &self,
         request: &CommitContext<'_>,
         paths: &[String],
@@ -136,4 +129,21 @@ impl LargeCaseUseCases<'_, '_> {
         ));
         Ok((sources, events, outputs))
     }
+}
+
+pub(super) fn publish_mapped_files(
+    store: &dyn crate::LargeCaseStore,
+    case: &crate::CaseId,
+    prepared: &mut dyn PreparedMappedIngest,
+    outputs: &[ParquetArtifact],
+    cancel: &crate::CancellationToken,
+) -> Result<(), AppError> {
+    if cancel.is_cancelled() {
+        return Err(AppError::Cancelled);
+    }
+    prepared.publish(cancel)?;
+    for output in outputs {
+        store.verify_artifact(case, output, cancel)?;
+    }
+    Ok(())
 }

@@ -220,7 +220,7 @@ pub(super) fn export(
     let details = irmind_infra::LocalExportVerifier
         .verify_export_details(&path, Some(&key))
         .unwrap();
-    assert_eq!(details.format_version, 8);
+    assert_eq!(details.format_version, 9);
     let result = std::process::Command::new(env!("CARGO_BIN_EXE_irmind"))
         .arg("--home")
         .arg(root.join("independent-verifier"))

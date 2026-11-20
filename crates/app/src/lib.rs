@@ -90,6 +90,7 @@ pub use skills::{
     SkillServiceError, SkillStatus,
 };
 pub mod source_mapping;
+pub mod source_queries;
 pub use source_mapping::{SourceDecoder, SourceMapper};
 mod source_evidence;
 pub use source_evidence::SourceEvidenceReader;

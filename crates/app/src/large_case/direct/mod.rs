@@ -1,6 +1,7 @@
 //! Atomic direct groups. Rejected candidates never determine physical boundaries.
 mod commit;
 mod object;
+mod query;
 use super::{
     AppError, AuditEventKind, AuditOrigin, BTreeMap, CancellationToken, CaseId, EvidenceHash,
     LargeCaseUseCases, ParquetArtifact, ParserSelection, Path, SourceManifestV1, invalid_manifest,

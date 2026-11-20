@@ -22,7 +22,8 @@ fn fixture() -> (tempfile::TempDir, Arc<LocalStore>, Engine<'static>, CaseId) {
         ExecutionMode::Attended,
         Arc::new(SystemClock),
     )
-    .unwrap();
+    .unwrap()
+    .with_large_case_pipeline(store.clone(), Arc::new(json_source_parser()));
     let case = engine
         .create_case("Incremental custody", "local evidence only")
         .unwrap();
@@ -38,6 +39,40 @@ fn fixture() -> (tempfile::TempDir, Arc<LocalStore>, Engine<'static>, CaseId) {
         );
     }
     (root, store, engine, case.id)
+}
+
+#[test]
+fn query_capture_cleanup_requires_authenticated_unsealed_case() {
+    for sealed in [false, true] {
+        let (_root, store, engine, id) = fixture();
+        let queries = store.parquet.case_dir(&id).unwrap().join("queries");
+        fs::create_dir(&queries).unwrap();
+        let orphan = queries.join(format!("{}.sqc", "cd".repeat(32)));
+        fs::write(&orphan, b"synthetic orphan").unwrap();
+        if sealed {
+            engine.seal(&id).unwrap();
+        }
+        let before = store.entries(&id).unwrap().len();
+        engine
+            .open_case_verified(&id, &CancellationToken::new())
+            .unwrap();
+        assert_eq!(orphan.exists(), sealed);
+        assert_eq!(engine.orphan_cleanup_notice(&id).is_none(), sealed);
+        assert_eq!(engine.verify(&id).unwrap(), before);
+    }
+    let (_root, store, engine, id) = fixture();
+    let queries = store.parquet.case_dir(&id).unwrap().join("queries");
+    fs::create_dir(&queries).unwrap();
+    let orphan = queries.join(format!("{}.sqc", "cd".repeat(32)));
+    fs::write(&orphan, b"synthetic orphan").unwrap();
+    corrupt_old_entry(&store, &id);
+    assert!(
+        engine
+            .open_case_verified(&id, &CancellationToken::new())
+            .is_err()
+    );
+    assert!(orphan.exists());
+    assert!(engine.orphan_cleanup_notice(&id).is_none());
 }
 
 fn corrupt_old_entry(store: &LocalStore, id: &CaseId) {

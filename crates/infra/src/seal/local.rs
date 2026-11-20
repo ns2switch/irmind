@@ -53,6 +53,14 @@ impl LocalStore {
         {
             return Err(AppError::InvalidChain(last.seq));
         }
+        let cancel = CancellationToken::new();
+        if entries
+            .iter()
+            .any(|entry| entry.kind.is_source_query_lifecycle())
+        {
+            replay_source_queries(&entries, &self.global_operations()?, &cancel)?
+                .verify_capture_files(self, &cancel)?;
+        }
         let blobs = self.evidence_hashes(id)?;
         let hashes = irmind_app::seal_inventory(&entries, &blobs)?;
         if last.payload != hashes.join(",") {
@@ -96,6 +104,10 @@ impl LocalStore {
         } else {
             self.write_seal_bytes_atomic(id, &expected)?;
         }
+        self.clean_seal_temporaries(id)
+    }
+
+    fn clean_seal_temporaries(&self, id: &CaseId) -> Result<(), AppError> {
         let prefix = format!(".{}.", id.as_str());
         for item in fs::read_dir(&self.seal_dir).map_err(storage)? {
             let item = item.map_err(storage)?;
@@ -182,4 +194,24 @@ impl LocalStore {
         }
         result
     }
+}
+
+pub(super) fn replay_source_queries<'a>(
+    entries: &'a [irmind_app::SignedEntry],
+    operations: &'a [irmind_app::SignedOperation],
+    cancel: &CancellationToken,
+) -> Result<irmind_app::source_queries::SourceQueryJournal<'a>, AppError> {
+    let mut verifier = crate::LocalVerifier {
+        trusted: std::collections::BTreeMap::new(),
+    };
+    for entry in entries {
+        // Callers authenticate the chain first. Pin the first key for each
+        // actor so journal authentication cannot switch keys mid-case.
+        verifier = verifier.with_trusted_key(&entry.actor, &entry.public_key)?;
+    }
+    let journal = irmind_app::source_queries::SourceQueryJournal::replay(
+        entries, operations, &verifier, cancel,
+    )?;
+    journal.verify_source_links(entries)?;
+    Ok(journal)
 }

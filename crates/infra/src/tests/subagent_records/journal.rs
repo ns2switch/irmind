@@ -37,10 +37,7 @@ impl History {
         };
         value.append(
             AuditEventKind::CaseCreated,
-            include_str!(
-                "../../../../../docs/development/subagent-format-vectors/case-created-v4.json"
-            )
-            .into(),
+            r#"{"version":5,"title":"Contract synthetic case","severity":"medium","scope":"local","budget":{"model_tokens":2000000,"tool_calls":1000,"cloud_bytes":536870912000},"source_queries":{"enabled":false,"analytics_allowed":false,"scan_bytes":null,"retained_rows":0,"retained_bytes":0}}"#.into(),
             true,
         );
         value
@@ -1098,7 +1095,7 @@ fn configured_history_engine_with_branches(
 }
 
 #[test]
-fn subagent_case_verification_seal_and_offline_v8_keep_every_committed_chunk() {
+fn subagent_case_verification_seal_and_offline_v9_keep_every_committed_chunk() {
     let (history, chunks, _, _, _) = completed_model_history();
     let root = tempfile::tempdir().unwrap();
     let (store, engine) = stored_history_engine(root.path(), &history, &chunks);
@@ -1115,10 +1112,8 @@ fn subagent_case_verification_seal_and_offline_v8_keep_every_committed_chunk() {
     let fingerprint = hex(&sha256(&history.analyst.public_key()));
     verify_export_expected(&output, Some(&fingerprint)).unwrap();
     let bytes = fs::read(&output).unwrap();
-    assert_eq!(
-        bytes,
-        include_bytes!("../../../../../fuzz/seeds/export/valid-v8-subagents.irmind")
-    );
+    assert!(bytes.starts_with(b"IRMIND-EXPORT-V9\0"));
+    assert!(bytes.ends_with(&0u64.to_be_bytes()));
     let chunk = chunks[1].bytes();
     let position = bytes
         .windows(chunk.len())

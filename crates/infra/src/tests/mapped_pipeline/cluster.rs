@@ -119,7 +119,7 @@ fn signed_cluster_context_survives_reconstruction_sealing_and_public_export_veri
             .verify_export_details(&target, Some(&key))
             .unwrap()
             .format_version,
-        8
+        9
     );
 }
 

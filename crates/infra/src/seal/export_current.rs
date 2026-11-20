@@ -2,18 +2,21 @@ use super::{
     AppError, AuditLog, CancellationToken, CaseId, CaseSeal, EvidenceStore, LocalStore,
     OpenOptions, Path, Repository, fs, params, private_file, storage, storage_reason,
 };
-use irmind_app::{ExportVerification, LargeCaseExporter};
+use irmind_app::{
+    ExportVerification, LargeCaseExporter,
+    source_queries::{SourceQueryJournal, write_stored_query_capture_section},
+};
 use irmind_domain::{AuditEventKind, SourceManifestV1};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{Read, Write};
 
-pub(super) const MAGIC_V8: &[u8] = b"IRMIND-EXPORT-V8\0";
+pub(super) const MAGIC_V9: &[u8] = b"IRMIND-EXPORT-V9\0";
 pub(super) const MAX_FRAME_BYTES: u64 = 1024 * 1024;
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct HeaderV8 {
+pub(super) struct HeaderV9 {
     pub version: u32,
     pub case_id: String,
     pub title: String,
@@ -28,10 +31,11 @@ struct ExportRequest<'a> {
     source_root: Option<&'a Path>,
     include_originals: bool,
     cancel: &'a CancellationToken,
-    header: HeaderV8,
+    header: HeaderV9,
     entry_count: u64,
     evidence: Vec<String>,
     source_count: u64,
+    queries: &'a SourceQueryJournal<'a>,
 }
 
 impl LargeCaseExporter for LocalStore {
@@ -66,8 +70,8 @@ impl LocalStore {
             return Err(AppError::Sealed);
         }
         let seal = self.case_seal(id)?.ok_or(AppError::InvalidChain(0))?;
-        let header = HeaderV8 {
-            version: 8,
+        let header = HeaderV9 {
+            version: 9,
             case_id: id.as_str().into(),
             title: case.title,
             severity: case.severity.as_str().into(),
@@ -76,7 +80,20 @@ impl LocalStore {
         };
         let entry_count = self.last_entry(id)?.ok_or(AppError::InvalidChain(0))?.seq;
         let evidence = self.evidence_hashes(id)?;
-        let source_count = self.source_manifest_count(id)?;
+        let query_operations = if entries
+            .iter()
+            .any(|entry| entry.kind.is_source_query_lifecycle())
+        {
+            self.signed_parquet_artifacts(id)?;
+            self.global_operations()?
+        } else {
+            Vec::new()
+        };
+        let queries = super::local::replay_source_queries(&entries, &query_operations, cancel)?;
+        let source_count = self
+            .source_manifest_count(id)?
+            .checked_sub(queries.captures().len() as u64)
+            .ok_or(AppError::InvalidChain(entry_count))?;
         let mut created = false;
         let result = self.write_current_body(
             &ExportRequest {
@@ -89,6 +106,7 @@ impl LocalStore {
                 entry_count,
                 evidence,
                 source_count,
+                queries: &queries,
             },
             &mut created,
         );
@@ -123,6 +141,7 @@ impl LocalStore {
             entry_count,
             evidence,
             source_count,
+            queries,
         } = request;
         let mut options = OpenOptions::new();
         options.write(true).create_new(true);
@@ -134,7 +153,7 @@ impl LocalStore {
         let mut out = options.open(path).map_err(storage)?;
         *created = true;
         private_file(path).map_err(storage)?;
-        out.write_all(MAGIC_V8).map_err(storage)?;
+        out.write_all(MAGIC_V9).map_err(storage)?;
         write_frame(&mut out, &serde_json::to_vec(&header).map_err(storage)?)?;
         out.write_all(&entry_count.to_be_bytes()).map_err(storage)?;
         let written = self.for_each_audit_entry(id, |entry| {
@@ -161,24 +180,22 @@ impl LocalStore {
         out.write_all(&if *include_originals { *source_count } else { 0 }.to_be_bytes())
             .map_err(storage)?;
         if *include_originals {
-            self.write_source_bytes(id, *source_root, &mut out, cancel)?;
+            self.write_source_bytes(id, *source_root, queries, &mut out, cancel)?;
         }
         let operations = self.operations(id)?;
-        out.write_all(&(operations.len() as u64).to_be_bytes())
+        out.write_all(&((operations.len() + queries.adoptions().len()) as u64).to_be_bytes())
             .map_err(storage)?;
-        for operation in operations {
+        for operation in operations.iter().chain(queries.adoptions()) {
             if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
             }
-            write_frame(&mut out, &serde_json::to_vec(&operation).map_err(storage)?)?;
+            write_frame(&mut out, &serde_json::to_vec(operation).map_err(storage)?)?;
         }
-        {
-            super::mapping_proofs::write(self, id, &header.seal.public_key, &mut out, cancel)?;
-        }
+        super::mapping_proofs::write(self, id, &header.seal.public_key, &mut out, cancel)?;
         self.write_artifact_frames(id, &mut out, cancel)?;
         let (catalog, mut skills) =
             super::skill_proofs::write(self, id, &header.seal.public_key, &mut out, cancel)?;
-        // Both V8 extension counts are mandatory, including when unused.
+        // The catalog and subagent counts are mandatory, including when unused.
         super::catalog_proofs::write(&mut out, &catalog, cancel)?;
         super::subagent_branches::write(
             self,
@@ -188,6 +205,7 @@ impl LocalStore {
             &mut out,
             cancel,
         )?;
+        write_stored_query_capture_section(&mut out, queries.captures(), self, id, cancel)?;
         out.sync_all().map_err(storage)?;
         Ok(header.seal.analyst_key_fingerprint.clone())
     }
@@ -196,6 +214,7 @@ impl LocalStore {
         &self,
         id: &CaseId,
         source_root: Option<&Path>,
+        queries: &SourceQueryJournal<'_>,
         out: &mut File,
         cancel: &CancellationToken,
     ) -> Result<(), AppError> {
@@ -205,6 +224,9 @@ impl LocalStore {
             else {
                 return Ok(());
             };
+            if queries.contains_capture(&manifest.sha256) {
+                return Ok(());
+            }
             let mut input = if manifest.copied {
                 let case_dir = self.parquet.case_dir(id)?;
                 let relative = format!("originals/{}", manifest.sha256.as_str());
@@ -270,7 +292,7 @@ pub(super) fn write_frame(out: &mut File, bytes: &[u8]) -> Result<(), AppError> 
     out.write_all(bytes).map_err(storage)
 }
 
-pub(super) fn v8_result(
+pub(super) fn v9_result(
     fingerprint: String,
     entries: usize,
     source_manifests: usize,
@@ -279,7 +301,7 @@ pub(super) fn v8_result(
     ExportVerification {
         analyst_key_fingerprint: fingerprint,
         entries,
-        format_version: 8,
+        format_version: 9,
         source_manifests,
         source_bytes_verified,
         source_bytes_unavailable: source_manifests.saturating_sub(source_bytes_verified),

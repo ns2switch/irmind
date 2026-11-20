@@ -73,10 +73,11 @@ impl CaseWorkflow<'_, '_> {
         id: &CaseId,
         cancel: &CancellationToken,
     ) -> Result<usize, AppError> {
-        if self.has_source_manifests(id)? {
-            return Err(AppError::Policy(
+        if self.requires_source_root(id)? {
+            return Err(AppError::Policy(self.with_orphan_cleanup_notice(
+                id,
                 "select the original source root with /verify <path>".into(),
-            ));
+            )));
         }
         self.engine.verify_cancelable(id, cancel)
     }
@@ -100,15 +101,54 @@ impl CaseWorkflow<'_, '_> {
         };
         let report = large.verify_sources(id, root, mode, cancel)?;
         if !report.missing_or_changed.is_empty() {
-            return Err(AppError::Policy(format!(
-                "{} original sources are missing or changed",
-                report.missing_or_changed.len()
+            return Err(AppError::Policy(self.with_orphan_cleanup_notice(
+                id,
+                format!(
+                    "{} original sources are missing or changed",
+                    report.missing_or_changed.len()
+                ),
             )));
         }
-        Ok(format!(
-            "Verified {} of {} original sources; {} were not sampled",
-            report.checked, report.total, report.unchecked
+        Ok(self.with_orphan_cleanup_notice(
+            id,
+            format!(
+                "Verified {} of {} original sources; {} were not sampled",
+                report.checked, report.total, report.unchecked
+            ),
         ))
+    }
+
+    pub(crate) fn with_orphan_cleanup_notice(&self, id: &CaseId, mut message: String) -> String {
+        if let Some(notice) = self.engine.orphan_cleanup_notice(id) {
+            message.push('\n');
+            message.push_str("Warning: ");
+            message.push_str(&notice);
+        }
+        message
+    }
+
+    fn requires_source_root(&self, id: &CaseId) -> Result<bool, AppError> {
+        let entries = self.engine.audit_log.entries(id)?;
+        let mut captures = std::collections::BTreeSet::new();
+        for entry in entries
+            .iter()
+            .filter(|entry| entry.kind == AuditEventKind::SourceQueryResultV1)
+        {
+            let receipt =
+                irmind_app::source_queries::SourceQueryResultV1::decode(entry.payload.as_bytes())?;
+            captures.insert(receipt.capture_identity().0.to_owned());
+        }
+        for entry in entries
+            .iter()
+            .filter(|entry| entry.kind == AuditEventKind::SourceManifestV2)
+        {
+            let manifest = irmind_app::SourceManifestV2::decode(&entry.payload)
+                .map_err(|_| AppError::InvalidChain(entry.seq))?;
+            if !captures.contains(manifest.source.sha256.as_str()) {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     pub(crate) fn verify_parquet_rebuild(

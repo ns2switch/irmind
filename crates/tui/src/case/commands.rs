@@ -498,7 +498,8 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             let id = self.id;
             self.start_task("Verify", move |cancel| {
                 let count = workflow.verify(id, &cancel)?;
-                Ok(format!("Verified {count} audit entries"))
+                Ok(workflow
+                    .with_orphan_cleanup_notice(id, format!("Verified {count} audit entries")))
             });
             return Ok(true);
         }

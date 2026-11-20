@@ -11,6 +11,13 @@ pub enum AuditEventKind {
     Cancelled,
     CaseCreated,
     CaseBudgetChanged,
+    SourceQueryBudgetV1,
+    SourceQueryPlanV1,
+    SourceQueryApprovalV1,
+    SourceQueryReservationV1,
+    SourceQueryExecutionV1,
+    SourceQueryResultV1,
+    SourceQuerySettlementV1,
     CaseScopeChanged,
     CaseSealed,
     Denied,
@@ -63,7 +70,7 @@ pub enum AuditEventKind {
 }
 
 impl AuditEventKind {
-    pub const ALL: [Self; 56] = [
+    pub const ALL: [Self; 63] = [
         Self::Allowed,
         Self::ApprovalDenied,
         Self::ApprovalGranted,
@@ -72,6 +79,13 @@ impl AuditEventKind {
         Self::Cancelled,
         Self::CaseCreated,
         Self::CaseBudgetChanged,
+        Self::SourceQueryBudgetV1,
+        Self::SourceQueryPlanV1,
+        Self::SourceQueryApprovalV1,
+        Self::SourceQueryReservationV1,
+        Self::SourceQueryExecutionV1,
+        Self::SourceQueryResultV1,
+        Self::SourceQuerySettlementV1,
         Self::CaseScopeChanged,
         Self::CaseSealed,
         Self::Denied,
@@ -132,6 +146,13 @@ impl AuditEventKind {
             Self::Cancelled => "Cancelled",
             Self::CaseCreated => "CaseCreated",
             Self::CaseBudgetChanged => "CaseBudgetChanged",
+            Self::SourceQueryBudgetV1 => "SourceQueryBudgetV1",
+            Self::SourceQueryPlanV1 => "SourceQueryPlanV1",
+            Self::SourceQueryApprovalV1 => "SourceQueryApprovalV1",
+            Self::SourceQueryReservationV1 => "SourceQueryReservationV1",
+            Self::SourceQueryExecutionV1 => "SourceQueryExecutionV1",
+            Self::SourceQueryResultV1 => "SourceQueryResultV1",
+            Self::SourceQuerySettlementV1 => "SourceQuerySettlementV1",
             Self::CaseScopeChanged => "CaseScopeChanged",
             Self::CaseSealed => "CaseSealed",
             Self::Denied => "Denied",
@@ -206,6 +227,18 @@ impl AuditEventKind {
         )
     }
 
+    pub const fn is_source_query_lifecycle(self) -> bool {
+        matches!(
+            self,
+            Self::SourceQueryPlanV1
+                | Self::SourceQueryApprovalV1
+                | Self::SourceQueryReservationV1
+                | Self::SourceQueryExecutionV1
+                | Self::SourceQueryResultV1
+                | Self::SourceQuerySettlementV1
+        )
+    }
+
     pub fn parse(value: &str) -> Result<Self, DomainError> {
         Self::ALL
             .iter()
@@ -227,7 +260,7 @@ mod tests {
 
     #[test]
     fn wire_names_are_stable_and_unknown_names_fail() {
-        const EXPECTED: [&str; 56] = [
+        const EXPECTED: [&str; 63] = [
             "Allowed",
             "ApprovalDenied",
             "ApprovalGranted",
@@ -236,6 +269,13 @@ mod tests {
             "Cancelled",
             "CaseCreated",
             "CaseBudgetChanged",
+            "SourceQueryBudgetV1",
+            "SourceQueryPlanV1",
+            "SourceQueryApprovalV1",
+            "SourceQueryReservationV1",
+            "SourceQueryExecutionV1",
+            "SourceQueryResultV1",
+            "SourceQuerySettlementV1",
             "CaseScopeChanged",
             "CaseSealed",
             "Denied",
@@ -285,6 +325,7 @@ mod tests {
             "subagent-checkpoint-v1",
             "subagent-result-v1",
         ];
+        assert_eq!(AuditEventKind::ALL.len(), EXPECTED.len());
         for (kind, expected) in AuditEventKind::ALL.into_iter().zip(EXPECTED) {
             assert_eq!(kind.as_str(), expected);
             assert_eq!(AuditEventKind::parse(expected), Ok(kind));

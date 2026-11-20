@@ -1,27 +1,65 @@
-use super::{CaseCreatedEvent, ScopeChangedEvent};
+use super::{CASE_CREATION_VERSION, CaseCreatedEvent, ScopeChangedEvent};
 use crate::{
     Actor, AppError, Arc, Case, CaseId, CaseMutation, CaseScope, Clock, Engine, EnginePorts,
     ExecutionMode, ModelPricing, PolicyRules, Severity, startup_check,
 };
 
 impl<'a> Engine<'a> {
+    pub fn source_query_allocation(
+        &self,
+        id: &CaseId,
+    ) -> Result<(u64, crate::source_queries::SourceQueryAllocationV1), AppError> {
+        let _lock = self.repo.lock_case(id)?;
+        self.verify_unlocked(id)?;
+        let entries = self.audit_log.entries(id)?;
+        let first = entries.first().ok_or(AppError::InvalidChain(0))?;
+        let initial = super::current_case_creation(first)?.source_queries;
+        let mut replay = crate::source_queries::BudgetReplay::new(first, initial);
+        for entry in entries.iter().skip(1) {
+            replay.accept(entry)?;
+        }
+        Ok(replay.current())
+    }
+
     pub fn open_case_verified(
         &self,
         id: &CaseId,
         cancel: &crate::CancellationToken,
     ) -> Result<Case, AppError> {
         let _case_lock = self.repo.lock_case(id)?;
-        if let Some(store) = &self.large_case_store {
-            let removed = store.clean_orphan_spools(id)?;
-            if removed != 0 {
-                tracing::info!(target: "irmind::operations", removed, "removed orphaned object spools");
-            }
-        }
         self.verify_unlocked_cancelable(id, cancel)?;
         let case = self.repo.get_case(id)?;
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
+        if !case.sealed
+            && let Some(store) = &self.large_case_store
+        {
+            let removed = store.clean_orphan_spools(id)?;
+            if removed != 0 {
+                tracing::warn!(target: "irmind::operations", removed, "removed unreferenced files from interrupted case operations");
+                let mut counts = self
+                    .orphan_cleanup
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                let count = counts.entry(id.clone()).or_default();
+                *count = count.saturating_add(removed);
+            }
+        }
         self.select_original_case(id)?;
         self.record_source_scopes_unlocked(&case)?;
         Ok(case)
+    }
+
+    /// Local diagnostic for this session, never part of the signed case.
+    pub fn orphan_cleanup_notice(&self, id: &CaseId) -> Option<String> {
+        self.orphan_cleanup
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(id)
+            .map(|count| {
+                format!("Removed {count} unreferenced case files left by interrupted operations.")
+            })
     }
 
     pub fn new(
@@ -42,6 +80,7 @@ impl<'a> Engine<'a> {
             graph: ports.graph,
             source_evidence_reader: ports.source_evidence_reader,
             subagents: ports.subagents,
+            source_queries: ports.source_queries,
             subagent_runtime: Arc::default(),
             audit_log: ports.audit_log,
             signer: ports.signer,
@@ -68,6 +107,7 @@ impl<'a> Engine<'a> {
             pricing: None,
             verified_cases: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
             object_progress: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
+            orphan_cleanup: Arc::default(),
         };
         engine.verify_global_operations()?;
         Ok(engine)
@@ -145,11 +185,12 @@ impl<'a> Engine<'a> {
             crate::AuditOrigin::System,
             irmind_domain::AuditEventKind::CaseCreated,
             &serde_json::to_string(&CaseCreatedEvent {
-                version: 4,
+                version: CASE_CREATION_VERSION,
                 title: title.to_owned(),
                 severity: Some(severity.as_str().to_owned()),
                 scope: scope.to_owned(),
                 budget: self.new_case_budget_limits(),
+                source_queries: crate::source_queries::SourceQueryAllocationV1::default(),
             })
             .map_err(|error| AppError::Storage(error.to_string()))?,
             None,

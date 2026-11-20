@@ -6,6 +6,27 @@ use super::{
 };
 
 impl LargeCaseStore for ParquetStore {
+    fn prepare_source_query_capture(
+        &self,
+        request: &irmind_app::MappedIngestRequest<'_>,
+        capture: &irmind_app::source_queries::SourceQueryResultV1,
+        cancel: &CancellationToken,
+    ) -> Result<Box<dyn irmind_app::PreparedMappedIngest>, AppError> {
+        self.prepare_query_capture(request, capture, cancel)
+    }
+
+    fn open_source_query_capture(
+        &self,
+        case: &CaseId,
+        hash: &EvidenceHash,
+        bytes: u64,
+        cancel: &CancellationToken,
+    ) -> Result<Box<dyn std::io::Read + Send>, AppError> {
+        Ok(Box::new(
+            self.open_query_capture(case, hash, bytes, cancel)?,
+        ))
+    }
+
     fn prepare_mapped_ingest(
         &self,
         request: irmind_app::MappedIngestRequest<'_>,

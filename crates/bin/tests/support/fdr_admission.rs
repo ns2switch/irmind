@@ -59,7 +59,7 @@ fn gzip_is_reconstructed_sealed_and_verified_from_its_original_bytes() {
             .verify_export_details(&target, Some(&key))
             .unwrap()
             .format_version,
-        8
+        9
     );
     // A valid extra gzip member changes the signed original even if the first
     // member and the selected format are intact.
