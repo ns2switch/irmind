@@ -92,13 +92,11 @@ fn verify_open_export_with_catalog(
         super::artifact_frames::verify_artifact_frames(&mut input, &chain.artifacts)?;
     }
     verify_methodology_tail(&mut input, &mut chain, &header, catalog)?;
-    if read_u64(&mut input)? != 0 {
-        return Err(AppError::InvalidChain(0));
-    }
-    let mut extra = [0u8; 1];
-    if input.read(&mut extra).map_err(storage)? != 0 {
-        return Err(storage_reason("export has trailing bytes"));
-    }
+    irmind_app::source_queries::verify_query_capture_section(
+        &mut input,
+        &[],
+        &irmind_app::CancellationToken::new(),
+    )?;
     let mut result = v9_result(
         fingerprint,
         usize::try_from(count).map_err(storage)?,

@@ -168,6 +168,10 @@ impl SourceQueryResultV1 {
         query_content_id("irmind-source-query-result-v1", self)
     }
 
+    pub(super) fn capture_identity(&self) -> (&str, u64) {
+        (&self.capture_sha256, self.capture_bytes)
+    }
+
     pub fn verify_capture(&self, summary: &QueryCaptureSummary) -> Result<(), SourceQueryError> {
         let causes = ["provider_partial", "local_limit", "cancelled", "rejected"];
         let missing_cause = causes.iter().enumerate().any(|(index, reason)| {
