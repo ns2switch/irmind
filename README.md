@@ -35,6 +35,13 @@ No model setup, API key, account or cost. The real interface runs a synthetic in
 - Inspect indexed records and available originals while the model receives bounded, redacted data.
 - Verify, seal, export, and independently verify a case package.
 
+## Recent releases
+
+- **v0.5.6** speeds up ingestion of out-of-order records, including Azure VNet and NSG flow logs.
+- **v0.5.5** adds support for Microsoft 365, Okta, email, Google Workspace, GitHub audit logs, Microsoft Defender, Falcon FDR, macOS logs, GuardDuty, and cloud flow, DNS and web access logs. It also adds eight bundled [forensic skills](docs/skills.md).
+
+See the [changelog](CHANGELOG.md) for the full list and format notes.
+
 ## How it works
 
 The model suggests a tool call. The policy checks its tool, arguments, case scope, execution mode, and limits. Approved connectors return evidence that stays local; the model sees a guarded copy. The signed audit trail records the proposal, decision, result, and case changes.
