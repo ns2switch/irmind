@@ -288,7 +288,7 @@ impl TryFrom<QueryWire> for SourceQueryV1 {
     }
 }
 impl SourceQueryV1 {
-    pub(crate) fn from_proposal(
+    pub fn from_proposal(
         args: &std::collections::BTreeMap<String, String>,
     ) -> Result<Self, SourceQueryError> {
         if args.len() != 9 || args.values().map(String::len).sum::<usize>() > 16 * 1024 {

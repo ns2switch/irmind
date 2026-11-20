@@ -168,6 +168,7 @@ pub enum SourceQueryLeasePhase {
 pub struct AdmittedSourceQuery {
     pub(super) case_id: crate::CaseId,
     pub(super) plan: String,
+    pub(super) attempt: u64,
     pub(super) reservation: String,
     pub(super) source: ResolvedQuerySourceV1,
     pub(super) compiled: CompiledSourceQueryV1,
@@ -182,6 +183,9 @@ impl AdmittedSourceQuery {
     }
     pub fn plan(&self) -> &str {
         &self.plan
+    }
+    pub const fn attempt(&self) -> u64 {
+        self.attempt
     }
     pub fn reservation(&self) -> &str {
         &self.reservation

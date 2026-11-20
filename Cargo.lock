@@ -3367,6 +3367,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-query-athena"
+version = "0.1.0"
+dependencies = [
+ "aws-credential-types",
+ "aws-sigv4",
+ "futures-util",
+ "http",
+ "irmind-app",
+ "irmind-calendar",
+ "irmind-domain",
+ "irmind-http",
+ "irmind-testkit",
+ "reqwest",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "irmind-mod-siem-chronicle"
 version = "0.1.0"
 dependencies = [

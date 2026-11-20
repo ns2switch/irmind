@@ -1,0 +1,28 @@
+[package]
+name = "irmind-mod-query-athena"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+aws-credential-types = "1"
+aws-sigv4 = { version = "1", default-features = false, features = ["http1", "sign-http"] }
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
+http = "1"
+irmind-app = { path = "../../app", version = "0.1.0" }
+irmind-domain = { path = "../../domain", version = "0.1.0" }
+irmind-http = { path = "../../http", version = "0.1.0" }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots"] }
+serde_json = "1"
+tokio = { version = "1", default-features = false, features = ["macros"] }
+
+[dev-dependencies]
+irmind-testkit = { path = "../../testkit", version = "0.1.0" }
+
+[lints]
+workspace = true
+
+[dependencies.irmind-calendar]
+path = "../../calendar"
+version = "0.1.0"
