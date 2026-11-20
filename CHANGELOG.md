@@ -4,15 +4,25 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
-- Add eight bundled forensic methods for Microsoft 365 BEC, email phishing, Okta,
-  endpoint EDR, macOS, Google Workspace, GitHub, and web investigations.
-- Extend the AWS, Azure, GCP, and network methods to use cloud flow logs, DNS,
-  GuardDuty or S3 access logs when those sources are available.
+## 0.5.5 — Identity, endpoint and network evidence
 
 **Format impact:** Add a bounded provider-process scope descriptor and finite
 mapping primitives for native FDR IDs. Older binaries do not interpret these new
 scope values/definitions. Existing scope bytes, V3 columns, case marker 4, seals
 and export V8 sections are unchanged; keep the producing version for a case.
+
+- Keep signed mapping profiles bounded to 64 snapshots as the module registry
+  grows. Freeze all applicable candidates before ingestion and report the
+  modules contributing to an exceeded registration limit.
+- Diagnose early Windows EVTX witness exits separately from missing or invalid
+  receipts. Keep the isolation checks and the fail-closed result.
+- Report the bytes needed when a source exceeds the normalization allowance.
+  For large Windows DNS debug and IIS W3C logs, use smaller valid log rotations.
+
+- Add eight bundled forensic methods for Microsoft 365 BEC, email phishing, Okta,
+  endpoint EDR, macOS, Google Workspace, GitHub, and web investigations.
+- Extend the AWS, Azure, GCP, and network methods to use cloud flow logs, DNS,
+  GuardDuty or S3 access logs when those sources are available.
 
 - Keep provider-native process IDs separate by provider, tenant and host, with
   validated unsigned decimal IDs. OS PIDs remain record scoped and Sysmon
