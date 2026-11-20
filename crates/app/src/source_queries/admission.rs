@@ -1,7 +1,7 @@
 use super::{
     QUERY_MAX_RECORD_BYTES, ResolvedQuerySourceV1, SourceQueryApprovalV1, SourceQueryBroker,
-    SourceQueryError, SourceQueryHold, SourceQueryPlanV1, SourceQueryReservationV1,
-    canonical::checked_value, canonical_query_json,
+    SourceQueryError, SourceQueryExecutionV1, SourceQueryHold, SourceQueryPlanV1,
+    SourceQueryReservationV1, canonical::checked_value, canonical_query_json,
 };
 use crate::{
     Actor, AppError, AuditEventKind, CaseId, CaseScope, Engine, SignedEntry, SignedOperation,
@@ -18,6 +18,7 @@ pub struct SignedSourceQueryAdmission<'a> {
     pub plan: &'a SignedEntry,
     pub approval: Option<&'a SignedEntry>,
     pub reservation: &'a SignedEntry,
+    pub intent: &'a SignedEntry,
     pub configuration: &'a SignedOperation,
 }
 
@@ -54,11 +55,24 @@ impl SourceQueryBroker {
             &principal,
             verifier,
         )?;
+        verify_entry(
+            records.intent,
+            self.case(),
+            AuditEventKind::SourceQueryExecutionV1,
+            &principal,
+            verifier,
+        )?;
         if records.plan.seq >= records.reservation.seq {
             return Err(SourceQueryError::Approval.into());
         }
         let plan = SourceQueryPlanV1::decode(records.plan.payload.as_bytes())?;
         let reservation = SourceQueryReservationV1::decode(records.reservation.payload.as_bytes())?;
+        SourceQueryExecutionV1::decode(records.intent.payload.as_bytes())?.check_submit_intent(
+            &plan,
+            &reservation,
+            records.reservation,
+            records.intent,
+        )?;
         let approval = records
             .approval
             .map(|entry| {
@@ -85,6 +99,7 @@ impl SourceQueryBroker {
             scan_threshold,
             authority.requires_policy_approval,
             records.reservation.seq,
+            Some(records.intent.hash),
         )?)
     }
 }

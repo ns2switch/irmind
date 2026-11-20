@@ -54,6 +54,27 @@ pub struct SourceQueryExecutionV1 {
 }
 
 impl SourceQueryExecutionV1 {
+    pub(super) fn check_submit_intent(
+        &self,
+        plan: &super::SourceQueryPlanV1,
+        reservation: &super::SourceQueryReservationV1,
+        reservation_frame: &SignedEntry,
+        intent_frame: &SignedEntry,
+    ) -> Result<(), SourceQueryError> {
+        if self.phase != Phase::Intent
+            || self.case_id != reservation_frame.case_id
+            || self.plan != plan.content_id()?
+            || self.reservation != reservation.content_id()?
+            || self.attempt != plan.attempt
+            || self.usage.query_price_basis != plan.accounting()
+            || Some(intent_frame.seq) != reservation_frame.seq.checked_add(1)
+            || intent_frame.prev != reservation_frame.hash
+        {
+            return Err(SourceQueryError::Invalid);
+        }
+        Ok(())
+    }
+
     pub fn decode(bytes: &[u8]) -> Result<Self, SourceQueryError> {
         let record: Self = decode_record(bytes)?;
         validate_identity(record.version, &record.case_id, None)?;
@@ -366,7 +387,9 @@ fn verify_observations(
             return Err(SourceQueryError::Invalid.into());
         }
         match &previous {
-            None if observation.phase == Phase::Intent => {}
+            None if observation.phase == Phase::Intent
+                && Some(entry.seq) == hold.reservation_seq.checked_add(1)
+                && Some(entry.hash) == hold.intent_hash => {}
             Some(prior)
                 if observation.phase != Phase::Intent
                     && observation.previous.as_deref() == Some(prior.content_id()?.as_str())

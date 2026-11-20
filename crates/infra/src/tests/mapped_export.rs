@@ -303,6 +303,50 @@ fn source_query_adoption_persists_only_valid_canonical_scope() {
 mod seed;
 
 #[test]
+fn source_query_reservation_and_submit_intent_survive_reopen_as_one_batch() {
+    use irmind_app::CaseMutation;
+    let root = tempfile::tempdir().unwrap();
+    let chain: Vec<SignedEntry> = serde_json::from_slice(include_bytes!(
+        "../../../../docs/development/source-query-format-vectors/signed-record-chain.json"
+    ))
+    .unwrap();
+    let first = &chain[0];
+    let id = CaseId::parse(&first.case_id).unwrap();
+    let metadata: serde_json::Value = serde_json::from_str(&first.payload).unwrap();
+    let store = LocalStore::open_mapped(root.path(), mapping_catalog()).unwrap();
+    let lock = store.lock_case(&id).unwrap();
+    store
+        .transact(
+            first,
+            CaseMutation::Create(Case {
+                id: id.clone(),
+                title: metadata["title"].as_str().unwrap().into(),
+                severity: Severity::Medium,
+                scope: metadata["scope"].as_str().unwrap().into(),
+                sealed: false,
+            }),
+        )
+        .unwrap();
+    store.append_batch(&chain[1..4]).unwrap();
+    let mut corrupt = chain[5].clone();
+    corrupt.seq += 1;
+    assert!(store.append_batch(&[chain[4].clone(), corrupt]).is_err());
+    assert_eq!(store.last_entry(&id).unwrap().unwrap().hash, chain[3].hash);
+    store.append_batch(&chain[4..6]).unwrap();
+    drop(lock);
+    drop(store);
+    let reopened = LocalStore::open_mapped(root.path(), mapping_catalog()).unwrap();
+    let durable = reopened.entries(&id).unwrap();
+    assert_eq!(
+        durable.iter().map(|entry| entry.hash).collect::<Vec<_>>(),
+        chain[..6]
+            .iter()
+            .map(|entry| entry.hash)
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn source_query_broker_requires_the_pinned_analyst_and_agent_proofs() {
     use irmind_app::source_queries::{
         SignedSourceQueryAdmission, SourceQueryAllocationV1, SourceQueryAuthority,
@@ -352,35 +396,30 @@ fn source_query_broker_requires_the_pinned_analyst_and_agent_proofs() {
         plan,
         approval: Some(approval),
         reservation,
+        intent: &chain[5],
         configuration: &operation,
     };
     let mut tampered = approval.clone();
     tampered.sig[0] ^= 1;
-    assert!(
-        broker
-            .reserve_authenticated(
-                SignedSourceQueryAdmission {
-                    approval: Some(&tampered),
-                    ..candidate
-                },
-                authority
-            )
-            .is_err()
-    );
     let mut wrong_configuration = operation.clone();
     wrong_configuration.operation.push('0');
-    assert!(
-        broker
-            .reserve_authenticated(
-                SignedSourceQueryAdmission {
-                    configuration: &wrong_configuration,
-                    ..candidate
-                },
-                authority
-            )
-            .is_err()
-    );
-    assert_eq!(broker.held().retained_rows, 0);
+    for invalid in [
+        SignedSourceQueryAdmission {
+            approval: Some(&tampered),
+            ..candidate
+        },
+        SignedSourceQueryAdmission {
+            configuration: &wrong_configuration,
+            ..candidate
+        },
+        SignedSourceQueryAdmission {
+            intent: &chain[6],
+            ..candidate
+        },
+    ] {
+        assert!(broker.reserve_authenticated(invalid, authority).is_err());
+        assert_eq!(broker.held().retained_rows, 0);
+    }
     let hold = broker.reserve_authenticated(candidate, authority).unwrap();
     assert_eq!(hold.resources().scan_bytes, 1_000_000);
 

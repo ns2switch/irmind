@@ -43,6 +43,7 @@ pub struct SourceQueryHold {
     pub(super) plan: String,
     pub(super) attempt: u64,
     pub(super) reservation_seq: u64,
+    pub(super) intent_hash: Option<[u8; 32]>,
     pub(super) decoder: super::receipts::Decoder,
     pub(super) mapping: super::receipts::Mapping,
     pub(super) accounting: QueryAccounting,
@@ -137,6 +138,7 @@ impl SourceQueryBroker {
         scan_threshold: u64,
         policy_requires_approval: bool,
         reservation_seq: u64,
+        intent_hash: Option<[u8; 32]>,
     ) -> Result<SourceQueryHold, SourceQueryError> {
         if !self.allocation.enabled {
             return Err(SourceQueryError::Disabled);
@@ -190,6 +192,7 @@ impl SourceQueryBroker {
             plan: plan_id.clone(),
             attempt: plan.attempt,
             reservation_seq,
+            intent_hash,
             decoder: plan.decoder.clone(),
             mapping: plan.mapping.clone(),
             source,

@@ -156,7 +156,8 @@ fn scope_approval_and_allocation_revision_are_required_for_a_hold() {
                 &scope,
                 500_000,
                 false,
-                5
+                5,
+                None
             )
             .err(),
         Some(SourceQueryError::Disabled)
@@ -165,7 +166,17 @@ fn scope_approval_and_allocation_revision_are_required_for_a_hold() {
     broker.change_allocation(1, allocation()).unwrap();
     assert_eq!(
         broker
-            .reserve(&plan, &reservation, None, &scope, &scope, 500_000, false, 5)
+            .reserve(
+                &plan,
+                &reservation,
+                None,
+                &scope,
+                &scope,
+                500_000,
+                false,
+                5,
+                None
+            )
             .err(),
         Some(SourceQueryError::Approval)
     );
@@ -179,7 +190,8 @@ fn scope_approval_and_allocation_revision_are_required_for_a_hold() {
                 &other_scope,
                 500_000,
                 false,
-                5
+                5,
+                None
             )
             .err(),
         Some(SourceQueryError::Scope)
@@ -197,7 +209,8 @@ fn scope_approval_and_allocation_revision_are_required_for_a_hold() {
                 &scope,
                 500_000,
                 false,
-                5
+                5,
+                None
             )
             .err(),
         Some(SourceQueryError::Approval)
@@ -221,6 +234,7 @@ fn holds_survive_unknown_usage_and_known_overruns_are_charged_once() {
             500_000,
             false,
             5,
+            None,
         )
         .unwrap();
     assert_eq!(broker.held(), hold.resources());
@@ -244,7 +258,8 @@ fn holds_survive_unknown_usage_and_known_overruns_are_charged_once() {
                 &scope,
                 500_000,
                 false,
-                5
+                5,
+                None
             )
             .err(),
         Some(SourceQueryError::Unresolved)
