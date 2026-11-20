@@ -238,7 +238,7 @@ fn signed_source_and_artifact_survive_reopen_and_detect_source_change() {
             report.source_manifests,
             report.source_bytes_unavailable
         ),
-        (8, 1, 1)
+        (9, 1, 1)
     );
     let with_original = root.path().join("with-original.irmind");
     irmind_app::export_case_with_originals(
