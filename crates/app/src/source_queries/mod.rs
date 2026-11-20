@@ -14,7 +14,10 @@ mod types;
 pub use admission::{SignedSourceQueryAdmission, SourceQueryAuthority};
 pub use broker::{SourceQueryBroker, SourceQueryHold, SourceQueryResources};
 pub use canonical::{canonical_query_json, query_content_id};
-pub use capture::{CaptureError, QueryCaptureSummary, verify_query_capture};
+pub use capture::{
+    CaptureColumn, CaptureError, CapturePageCompleteness, CapturePageMetadata, QueryCaptureSummary,
+    QueryCaptureWriter, verify_query_capture,
+};
 pub use compile::*;
 pub use completion::{
     SignedSourceQuerySettlement, SourceQueryExecutionV1, SourceQueryResultV1,

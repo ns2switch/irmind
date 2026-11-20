@@ -151,7 +151,7 @@ fn rejects_oversized_declarations_before_consuming_the_claimed_payload() {
 fn bounds_native_column_metadata_nodes() {
     let mut metadata = page(0, 0, b"");
     metadata.columns = (0..1500)
-        .map(|_| Column {
+        .map(|_| CaptureColumn {
             name: "a".into(),
             native_type: "string".into(),
         })

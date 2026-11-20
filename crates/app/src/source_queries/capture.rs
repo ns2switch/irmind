@@ -6,11 +6,14 @@ use crate::CancellationToken;
 use irmind_domain::{EvidenceHash, SourceDecoderIdentityV1};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use sha2::{Digest, Sha256};
-use std::io::{self, Read};
+use std::io::{self, Read, Seek, SeekFrom, Write};
 use thiserror::Error;
 
 const PAGE_DOMAIN: &[u8] = b"irmind-source-query-pages-v1\0";
 const MAX_CHUNK: usize = 64 * 1024;
+
+mod writer;
+pub use writer::{CapturePageCompleteness, CapturePageMetadata, QueryCaptureWriter};
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum CaptureError {
@@ -60,7 +63,7 @@ struct Decoder {
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Page {
-    columns: Vec<Column>,
+    columns: Vec<CaptureColumn>,
     completeness: u8,
     encoding: String,
     ordinal: u64,
@@ -70,10 +73,10 @@ struct Page {
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct Column {
-    name: String,
+pub struct CaptureColumn {
+    pub name: String,
     #[serde(rename = "type")]
-    native_type: String,
+    pub native_type: String,
 }
 
 /// Validate the capture's exact framing and page hashes with bounded memory.
