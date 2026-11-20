@@ -188,6 +188,10 @@ fn stage_error(name: &'static str, error: &io::Error, exit: Option<&str>) -> io:
         message.push_str("; ");
         message.push_str(detail);
     }
+    // Capture the allow-listed witness diagnostics even when a higher layer
+    // surfaces a fixed policy error to the analyst.
+    #[cfg(debug_assertions)]
+    crate::windows::startup_diagnostic(format_args!("{message}"));
     io::Error::new(error.kind(), message)
 }
 pub(super) fn verify(program: &Arc<Prepared>, cancelled: &dyn Fn() -> bool) -> io::Result<()> {
