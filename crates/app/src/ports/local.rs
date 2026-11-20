@@ -264,6 +264,27 @@ pub trait LargeCaseStore: Send + Sync {
         Ok(None)
     }
 
+    /// Prepares one authenticated query capture with its mapped artifacts.
+    fn prepare_source_query_capture(
+        &self,
+        _request: &crate::MappedIngestRequest<'_>,
+        _capture: &crate::source_queries::SourceQueryResultV1,
+        _cancel: &CancellationToken,
+    ) -> Result<Box<dyn crate::PreparedMappedIngest>, AppError> {
+        Err(crate::source_queries::SourceQueryError::Unavailable.into())
+    }
+
+    /// Opens a retained capture by its signed digest and length.
+    fn open_source_query_capture(
+        &self,
+        _case: &CaseId,
+        _hash: &irmind_domain::EvidenceHash,
+        _bytes: u64,
+        _cancel: &CancellationToken,
+    ) -> Result<Box<dyn std::io::Read + Send>, AppError> {
+        Err(crate::source_queries::SourceQueryError::Unavailable.into())
+    }
+
     /// Creates a private, automatically removed object spool under this case's
     /// data directory. Implementations check available space before creating it.
     fn create_object_spool(
@@ -274,7 +295,7 @@ pub trait LargeCaseStore: Send + Sync {
         Err(AppError::Policy("case spool is unavailable".into()))
     }
 
-    /// Removes orphaned spools while the caller holds the case lock.
+    /// Removes orphaned case files after verification, under the case lock.
     fn clean_orphan_spools(&self, _case_id: &CaseId) -> Result<usize, AppError> {
         Ok(0)
     }

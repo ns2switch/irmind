@@ -423,7 +423,49 @@ fn source_query_broker_requires_the_pinned_analyst_and_agent_proofs() {
     let hold = broker.reserve_authenticated(candidate, authority).unwrap();
     assert_eq!(hold.resources().scan_bytes, 1_000_000);
 
+    check_capture_spools_require_durable_intent(&broker, hold.id(), &chain);
     check_signed_settlement(&mut broker, &chain, &principal, &verifier);
+}
+
+fn check_capture_spools_require_durable_intent(
+    broker: &irmind_app::source_queries::SourceQueryBroker,
+    reservation: &str,
+    chain: &[SignedEntry],
+) {
+    let root = tempfile::tempdir().unwrap();
+    let store = LocalStore::open(root.path()).unwrap();
+    let id = CaseId::parse(&chain[0].case_id).unwrap();
+    let _lock = store.lock_case(&id).unwrap();
+    let first = &chain[0];
+    let metadata: serde_json::Value = serde_json::from_str(&first.payload).unwrap();
+    store
+        .transact(
+            first,
+            irmind_app::CaseMutation::Create(Case {
+                id: id.clone(),
+                title: metadata["title"].as_str().unwrap().into(),
+                severity: Severity::Medium,
+                scope: metadata["scope"].as_str().unwrap().into(),
+                sealed: false,
+            }),
+        )
+        .unwrap();
+    store.append_batch(&chain[1..4]).unwrap();
+    let cancel = CancellationToken::new();
+    let spool_dir = store.parquet.owned_case_path(&id).join("spool");
+    assert!(
+        broker
+            .prepare_capture_spools(reservation, &store, &store, &cancel)
+            .is_err()
+    );
+    assert!(!spool_dir.exists());
+    store.append_batch(&chain[4..6]).unwrap();
+    let (writer, output) = broker
+        .prepare_capture_spools(reservation, &store, &store, &cancel)
+        .unwrap();
+    assert_eq!(fs::read_dir(&spool_dir).unwrap().count(), 2);
+    drop((writer, output));
+    assert_eq!(fs::read_dir(&spool_dir).unwrap().count(), 0);
 }
 
 fn check_signed_settlement(

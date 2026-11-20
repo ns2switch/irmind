@@ -133,6 +133,13 @@ pub(super) struct Mapping {
 }
 
 impl Mapping {
+    pub(super) fn matches(&self, identity: &irmind_domain::MappingIdentityV1) -> bool {
+        self.id == identity.id()
+            && self.version == identity.version()
+            && self.target == identity.target()
+            && self.sha256 == identity.implementation().as_str()
+    }
+
     pub(super) fn validate(&self) -> Result<(), SourceQueryError> {
         if !id(&self.id)
             || !text(&self.version, 128)

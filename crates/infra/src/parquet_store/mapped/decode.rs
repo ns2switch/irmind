@@ -18,7 +18,10 @@ impl ParquetStore {
         let catalog = self.mapping_catalog.as_deref().ok_or_else(invalid_source)?;
         let parser = input.parser;
         let logical = parser.logical_source(input.relative_path);
-        let reference = SourceReferenceV1::file(logical).map_err(|_| invalid_source())?;
+        let reference = match &self.capture_origin {
+            Some(origin) => origin.reference(case, logical, input.hash)?,
+            None => SourceReferenceV1::file(logical).map_err(|_| invalid_source())?,
+        };
         let time = decode_source_time_context(input.parser.timestamp_context())?;
         let metadata = SourceMetadata {
             source: &reference,

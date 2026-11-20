@@ -27,17 +27,39 @@ impl<'a> Engine<'a> {
         cancel: &crate::CancellationToken,
     ) -> Result<Case, AppError> {
         let _case_lock = self.repo.lock_case(id)?;
-        if let Some(store) = &self.large_case_store {
-            let removed = store.clean_orphan_spools(id)?;
-            if removed != 0 {
-                tracing::info!(target: "irmind::operations", removed, "removed orphaned object spools");
-            }
-        }
         self.verify_unlocked_cancelable(id, cancel)?;
         let case = self.repo.get_case(id)?;
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
+        if !case.sealed
+            && let Some(store) = &self.large_case_store
+        {
+            let removed = store.clean_orphan_spools(id)?;
+            if removed != 0 {
+                tracing::warn!(target: "irmind::operations", removed, "removed unreferenced files from interrupted case operations");
+                let mut counts = self
+                    .orphan_cleanup
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+                let count = counts.entry(id.clone()).or_default();
+                *count = count.saturating_add(removed);
+            }
+        }
         self.select_original_case(id)?;
         self.record_source_scopes_unlocked(&case)?;
         Ok(case)
+    }
+
+    /// Local diagnostic for this session, never part of the signed case.
+    pub fn orphan_cleanup_notice(&self, id: &CaseId) -> Option<String> {
+        self.orphan_cleanup
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(id)
+            .map(|count| {
+                format!("Removed {count} unreferenced case files left by interrupted operations.")
+            })
     }
 
     pub fn new(
@@ -85,6 +107,7 @@ impl<'a> Engine<'a> {
             pricing: None,
             verified_cases: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
             object_progress: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
+            orphan_cleanup: Arc::default(),
         };
         engine.verify_global_operations()?;
         Ok(engine)

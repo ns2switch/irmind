@@ -105,10 +105,22 @@ impl CaseWorkflow<'_, '_> {
                 report.missing_or_changed.len()
             )));
         }
-        Ok(format!(
-            "Verified {} of {} original sources; {} were not sampled",
-            report.checked, report.total, report.unchecked
+        Ok(self.with_orphan_cleanup_notice(
+            id,
+            format!(
+                "Verified {} of {} original sources; {} were not sampled",
+                report.checked, report.total, report.unchecked
+            ),
         ))
+    }
+
+    pub(crate) fn with_orphan_cleanup_notice(&self, id: &CaseId, mut message: String) -> String {
+        if let Some(notice) = self.engine.orphan_cleanup_notice(id) {
+            message.push('\n');
+            message.push_str("Warning: ");
+            message.push_str(&notice);
+        }
+        message
     }
 
     pub(crate) fn verify_parquet_rebuild(

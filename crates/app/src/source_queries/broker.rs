@@ -127,6 +127,66 @@ impl SourceQueryBroker {
         self.held
     }
 
+    /// Allocate both private files before receiving any capture page. The caller
+    /// holds the case lock and has reconstructed this broker from the case chain.
+    pub fn prepare_capture_spools(
+        &self,
+        reservation: &str,
+        audit: &dyn crate::AuditLog,
+        store: &dyn crate::LargeCaseStore,
+        cancel: &crate::CancellationToken,
+    ) -> Result<
+        (
+            super::QueryCaptureWriter<tempfile::NamedTempFile>,
+            tempfile::NamedTempFile,
+        ),
+        crate::AppError,
+    > {
+        if cancel.is_cancelled() {
+            return Err(crate::AppError::Cancelled);
+        }
+        let hold = self.pending(reservation)?;
+        let index = usize::try_from(hold.reservation_seq).map_err(|_| SourceQueryError::Invalid)?;
+        // The submit intent immediately follows the reservation. A tentative
+        // hold prepared before append may not allocate disk or receive pages.
+        let entries = audit.entries(&self.case)?;
+        let intent = entries.get(index).ok_or(SourceQueryError::Unresolved)?;
+        if Some(intent.hash) != hold.intent_hash
+            || intent.kind != crate::AuditEventKind::SourceQueryExecutionV1
+            || intent.case_id != self.case.as_str()
+            || hold.reservation_seq.checked_add(1) != Some(intent.seq)
+            || crate::sha256(&intent.canonical()) != intent.hash
+        {
+            return Err(SourceQueryError::Unresolved.into());
+        }
+        // Scan debt blocks new reservations. It cannot revoke already
+        // admitted retention room.
+        let total = self.used.add(self.held)?;
+        if total.retained_bytes > self.allocation.retained_bytes
+            || total.retained_rows > self.allocation.retained_rows
+        {
+            return Err(SourceQueryError::Budget.into());
+        }
+        let limits = hold.resources();
+        let plan = irmind_domain::EvidenceHash::parse(&hold.plan)
+            .map_err(|_| SourceQueryError::Invalid)?;
+        let decoder = irmind_domain::SourceDecoderIdentityV1::try_new(
+            &hold.decoder.id,
+            &hold.decoder.version,
+        )
+        .map_err(|_| SourceQueryError::Invalid)?;
+        let staged = store.create_object_spool(&self.case, 2 * limits.retained_bytes)?;
+        let output = store.create_object_spool(&self.case, limits.retained_bytes)?;
+        let writer = super::QueryCaptureWriter::new(
+            staged,
+            plan,
+            decoder,
+            limits.retained_bytes,
+            limits.retained_rows,
+        )?;
+        Ok((writer, output))
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub(super) fn reserve(
         &mut self,

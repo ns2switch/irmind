@@ -27,6 +27,7 @@ mod mapped;
 mod original_read;
 mod partitioning;
 mod profile;
+mod query_capture;
 pub(crate) use profile::ParquetProfile;
 use profile::PartitionPhase;
 mod query;
@@ -64,10 +65,11 @@ fn invalid_source() -> AppError {
 
 pub struct ParquetStore {
     root: PathBuf,
-    finish_lock: std::sync::Mutex<()>,
-    workers: workers::WorkerSettings,
+    finish_lock: Arc<std::sync::Mutex<()>>,
+    workers: Arc<workers::WorkerSettings>,
     profile: Option<Arc<ParquetProfile>>,
     mapping_catalog: Option<Arc<irmind_app::source_mapping::MappingCatalog>>,
+    capture_origin: Option<query_capture::CaptureOrigin>,
 }
 
 impl ParquetStore {
@@ -81,10 +83,11 @@ impl ParquetStore {
         irmind_fs::private_dir(&root).map_err(storage)?;
         Ok(Self {
             root,
-            finish_lock: std::sync::Mutex::new(()),
-            workers: workers::WorkerSettings::default(),
+            finish_lock: Arc::default(),
+            workers: Arc::default(),
             profile: None,
             mapping_catalog: None,
+            capture_origin: None,
         })
     }
 

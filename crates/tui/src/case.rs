@@ -377,6 +377,11 @@ pub(crate) fn run_case(
         return run_signed_history_only(terminal, engine, id, shutdown, &reason);
     }
     let mut state = initial_state(engine, id, model, io_ops, presentation.resumed)?;
+    if let Some(notice) = engine.orphan_cleanup_notice(id) {
+        state
+            .conversation
+            .push(Card::new(CardKind::Notice, "", &notice, false));
+    }
     if io_ops.demo_mode() {
         state.demo_guide = Some(demo_guide::DemoGuide::with_speed(presentation.demo_speed)?);
     }

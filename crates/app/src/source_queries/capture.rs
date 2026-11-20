@@ -29,6 +29,15 @@ pub enum CaptureError {
     Cancelled,
 }
 
+impl From<CaptureError> for crate::AppError {
+    fn from(value: CaptureError) -> Self {
+        match value {
+            CaptureError::Cancelled => Self::Cancelled,
+            other => Self::Policy(other.to_string()),
+        }
+    }
+}
+
 /// Facts about a structurally valid capture. The signed result must authenticate
 /// these facts before they are used as custody evidence.
 #[derive(Debug, PartialEq, Eq)]
@@ -41,6 +50,12 @@ pub struct QueryCaptureSummary {
     pub(super) plan: EvidenceHash,
     pub(super) decoder: SourceDecoderIdentityV1,
     pub(super) completeness_mask: u8,
+}
+
+impl QueryCaptureSummary {
+    pub fn identity(&self) -> (&EvidenceHash, u64) {
+        (&self.capture_sha256, self.bytes)
+    }
 }
 
 // The member order in these fixed schemas is the canonical UTF-8 key order.

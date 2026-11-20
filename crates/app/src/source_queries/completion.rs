@@ -189,8 +189,39 @@ impl SourceQueryResultV1 {
         query_content_id("irmind-source-query-result-v1", self)
     }
 
-    pub(super) fn capture_identity(&self) -> (&str, u64) {
+    pub fn capture_identity(&self) -> (&str, u64) {
         (&self.capture_sha256, self.capture_bytes)
+    }
+
+    pub fn case_id(&self) -> &str {
+        &self.case_id
+    }
+
+    pub fn capture_path(&self) -> String {
+        format!("queries/{}.sqc", self.capture_sha256)
+    }
+
+    pub fn matches_decoder(&self, identity: crate::ParserIdentity<'_>) -> bool {
+        self.decoder.id == identity.name && self.decoder.version == identity.version
+    }
+
+    pub fn matches_mapping(&self, identity: Option<&irmind_domain::MappingIdentityV1>) -> bool {
+        identity.is_some_and(|identity| self.mapping.matches(identity))
+    }
+
+    pub const fn matches_rows(&self, accepted: u64, rejected: u64) -> bool {
+        accepted == self.row_count && rejected == self.rejected_rows
+    }
+
+    pub fn source_reference(&self) -> Result<irmind_domain::SourceReferenceV1, SourceQueryError> {
+        let acquisition = irmind_domain::EvidenceHash::parse(&self.content_id()?)
+            .map_err(|_| SourceQueryError::Invalid)?;
+        irmind_domain::SourceReferenceV1::try_new(
+            &self.capture_path(),
+            irmind_domain::SourceKind::ToolResult,
+            Some(acquisition),
+        )
+        .map_err(|_| SourceQueryError::Invalid)
     }
 
     pub fn verify_capture(&self, summary: &QueryCaptureSummary) -> Result<(), SourceQueryError> {
