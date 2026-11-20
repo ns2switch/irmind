@@ -152,7 +152,7 @@ fn append_snapshot(
     store.append(&entry).unwrap();
 }
 #[test]
-fn catalog_case_verification_and_v8_export_require_the_independent_case_copy() {
+fn catalog_case_verification_and_v9_export_require_the_independent_case_copy() {
     let f = fixture();
     let cancel = CancellationToken::new();
     f.store.publish(&f.index, &cancel).unwrap();
