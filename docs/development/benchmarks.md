@@ -2101,9 +2101,10 @@ still deserialize the complete rows. The sorted path avoids the external
 merge.
 
 ```sh
-IRMIND_AZURE_BENCH_FORMAT=vnet IRMIND_AZURE_BENCH_ORDER=ordered \
-  cargo test --release --locked -p irmind-infra --lib \
-  benchmark_azure_flow_release -- --ignored --nocapture
+(
+  export IRMIND_AZURE_BENCH_FORMAT=vnet IRMIND_AZURE_BENCH_ORDER=ordered
+  cargo test --release --locked -p irmind-infra --lib benchmark_azure_flow_release -- --ignored --nocapture
+)
 ```
 
 Use `nsg` for the NSG fixture and `disordered` for the external-sort profile.
