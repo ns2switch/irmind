@@ -38,16 +38,27 @@ fn split_runs(
         {
             // Do not retain an unbounded number of descriptors or open files.
             if runs.len() + 1 == MAX_RUNS {
+                if let Some(profile) = &store.profile {
+                    profile.record_abandoned_sort_bytes(writer.bytes());
+                }
                 return Ok(None);
             }
-            runs.push(writer.finish()?);
+            runs.push(finish_initial(store, writer)?);
             writer = RunWriter::new(store, case)?;
         }
         writer.push_encoded(&encoded)?;
         previous = Some(key);
     }
-    runs.push(writer.finish()?);
+    runs.push(finish_initial(store, writer)?);
     Ok(Some(runs))
+}
+
+fn finish_initial(store: &ParquetStore, writer: RunWriter) -> Result<Run, AppError> {
+    let run = writer.finish()?;
+    if let Some(profile) = &store.profile {
+        profile.record_sort_run(run.bytes, 0, 0);
+    }
+    Ok(run)
 }
 
 fn merge_runs(
@@ -82,12 +93,20 @@ fn merge_runs(
         let next = readers[index].next_encoded(cancel)?;
         bytes = bytes.saturating_add(head_bytes(next.as_ref()));
         if bytes > BATCH_BYTES {
+            if let Some(profile) = &store.profile {
+                profile.record_abandoned_sort_bytes(writer.bytes());
+            }
             return Ok(None);
         }
         heads[index] = next;
     }
     // Every reader reached EOF and verified its row count, byte count and hash.
-    Ok(Some(writer.finish()?))
+    let mut run = writer.finish()?;
+    run.depth = 1;
+    if let Some(profile) = &store.profile {
+        profile.record_sort_run(run.bytes, runs.len() as u64, run.depth);
+    }
+    Ok(Some(run))
 }
 
 fn smallest_head(heads: &[Option<(RecordRow, Vec<u8>)>]) -> Result<Option<usize>, AppError> {

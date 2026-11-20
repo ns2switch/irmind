@@ -210,6 +210,19 @@ impl ParquetStore {
         workers: usize,
         cancel: &CancellationToken,
     ) -> Result<BTreeMap<String, SourceReservation>, AppError> {
+        self.preflight_direct_group_with_space(request, workers, cancel, || {
+            fs4::available_space(self.spool_dir(request.case_id)?)
+                .map_err(crate::parquet_store::storage)
+        })
+    }
+
+    fn preflight_direct_group_with_space(
+        &self,
+        request: &MappedIngestRequest<'_>,
+        workers: usize,
+        cancel: &CancellationToken,
+        available: impl FnOnce() -> Result<u64, AppError>,
+    ) -> Result<BTreeMap<String, SourceReservation>, AppError> {
         let mut budgets = BTreeMap::new();
         let mut sizes = Vec::new();
         let mut total = 0u64;
@@ -227,7 +240,18 @@ impl ParquetStore {
                 .checked_add(expanded)
                 .and_then(|n| n.checked_add(if request.copy_original { physical } else { 0 }))
                 .ok_or_else(invalid_source)?;
-            sizes.push(expanded);
+            let sort_space =
+                if request.parser.identity_for_source(source)?.name == "parser-azure-flow" {
+                    // Until timestamps have been decoded, allow for all live sort
+                    // files: the source spool, pending runs, and the new merge output.
+                    reservation
+                        .normalized_bytes
+                        .checked_mul(3)
+                        .ok_or_else(invalid_source)?
+                } else {
+                    expanded
+                };
+            sizes.push(sort_space);
             budgets.insert(source.clone(), reservation);
         }
         sizes.sort_unstable_by(|a, b| b.cmp(a));
@@ -241,11 +265,7 @@ impl ParquetStore {
             .checked_add(scratch)
             .and_then(|n| n.checked_add(5 * 64 * 1024 * 1024))
             .ok_or_else(invalid_source)?;
-        super::staging::check_space(
-            fs4::available_space(self.spool_dir(request.case_id)?)
-                .map_err(crate::parquet_store::storage)?,
-            required,
-        )?;
+        super::staging::check_space(available()?, required)?;
         Ok(budgets)
     }
     fn direct_group_paths(

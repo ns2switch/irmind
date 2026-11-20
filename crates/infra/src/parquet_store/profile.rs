@@ -15,6 +15,7 @@ pub(crate) struct ParquetProfile {
     query_aggregate: AtomicU64,
     staging_peak: AtomicU64,
     pub(super) staging_live: AtomicU64,
+    sort: [AtomicU64; 8],
     partition_phases: [AtomicU64; 5],
     mapping_phases: [AtomicU64; 3],
     concurrency_phases: [AtomicU64; 6],
@@ -123,6 +124,29 @@ impl ParquetProfile {
 
     pub(super) fn record_staging_peak(&self, bytes: u64) {
         self.staging_peak.fetch_max(bytes, Ordering::Relaxed);
+    }
+
+    pub(super) fn record_sort_run(&self, bytes: u64, fan_in: u64, depth: u64) {
+        let (count, written) = if fan_in == 0 { (0, 1) } else { (2, 3) };
+        self.sort[count].fetch_add(1, Ordering::Relaxed);
+        self.sort[written].fetch_add(bytes, Ordering::Relaxed);
+        self.sort[4].fetch_max(fan_in, Ordering::Relaxed);
+        self.sort[5].fetch_max(depth, Ordering::Relaxed);
+    }
+
+    pub(super) fn record_sort_copy(&self, bytes: u64) {
+        self.sort[6].fetch_add(bytes, Ordering::Relaxed);
+    }
+
+    pub(super) fn record_abandoned_sort_bytes(&self, bytes: u64) {
+        self.sort[7].fetch_add(bytes, Ordering::Relaxed);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn sort_snapshot(&self) -> [u64; 8] {
+        self.sort
+            .each_ref()
+            .map(|counter| counter.load(Ordering::Relaxed))
     }
 
     #[cfg(test)]

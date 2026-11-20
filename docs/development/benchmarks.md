@@ -2094,6 +2094,13 @@ was 38.21 s and 25.95 s respectively. Ingestion wall time was 59.76 s and
 1.51 s). Both runs reached 2,267,553,420 temporary normalized bytes.
 Read the timers per stage because concurrent work can overlap.
 
+The instrumented 128 MiB disordered sources produced 310 external runs in VNet
+and 456 in NSG. The binary merges reached depths of 12 and 11 respectively.
+Total logical temporary writes, including staging and the final copy, were
+14.27 and 13.19 times the normalized size. Peak live space is a separate
+measure. The 1 GiB disordered runs from v0.5.6 peaked at 33.84 GiB for VNet
+and 48.11 GiB for NSG. See the [measurements and merge proposal](https://github.com/ns2switch/irmind/issues/360).
+
 Each Azure tuple is decoded before staging. The external merge uses the
 validated time, offset and ordinal, copies the existing row bytes and checks
 every run's count, length and hash. The initial chunk pass and final replay
