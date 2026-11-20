@@ -1,4 +1,4 @@
-Traducción de README.md en el commit df9a8bff2dfb803a6ce692b9ad5713f540b45057; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit 09ad51c838361f43bcc9dfc6ceea34f34a0fc799; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — investigaciones en terminal con registro firmado
 
@@ -34,6 +34,13 @@ Sin configurar modelos, claves de API, cuentas ni coste. La interfaz real invest
 - Revisar y firmar aprobaciones antes de un enriquecimiento externo.
 - Consultar registros indexados y originales disponibles mientras el modelo recibe datos limitados y redactados.
 - Verificar, sellar, exportar y volver a verificar un paquete de caso.
+
+## Novedades recientes
+
+- **v0.5.6** acelera la ingesta de registros desordenados, incluidos los flow logs de Azure VNet y NSG.
+- **v0.5.5** añade soporte para Microsoft 365, Okta, correo electrónico, Google Workspace, auditoría de GitHub, Microsoft Defender, Falcon FDR, logs de macOS, GuardDuty y logs de flujos en nube, DNS y acceso web. Incluye además ocho [skills forenses](docs/es/skills.md) nuevas.
+
+Consulta el [changelog](CHANGELOG.md) para ver la lista completa y las notas de formato.
 
 ## Cómo funciona
 
