@@ -3367,6 +3367,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-query-bigquery"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "irmind-app",
+ "irmind-calendar",
+ "irmind-domain",
+ "irmind-http",
+ "irmind-testkit",
+ "reqwest",
+ "secrecy",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "irmind-mod-siem-chronicle"
 version = "0.1.0"
 dependencies = [
