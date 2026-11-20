@@ -9,6 +9,7 @@ mod export;
 mod journal;
 mod ports;
 mod receipts;
+mod recovery;
 mod reservation;
 #[cfg(test)]
 mod tests;
@@ -34,6 +35,7 @@ pub(crate) use receipts::BudgetReplay;
 pub use receipts::{
     SourceQueryApprovalV1, SourceQueryBudgetV1, SourceQueryPlanV1, SourceQueryReservationV1,
 };
+pub use recovery::SourceQueryRecoveryV1;
 pub use types::*;
 
 pub const QUERY_MAX_RECORD_BYTES: usize = 128 * 1024;

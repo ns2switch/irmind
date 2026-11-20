@@ -54,6 +54,19 @@ pub struct SourceQueryExecutionV1 {
 }
 
 impl SourceQueryExecutionV1 {
+    pub(super) fn unknown_analytics_observed_at(&self) -> Result<&QueryTime, SourceQueryError> {
+        if self.phase != Phase::Terminal
+            || self.status != Status::Unknown
+            || self.provider_id.is_some()
+            || self.usage.query_price_basis != QueryAccounting::AnalyticsNoQueryCharge
+            || self.usage.scanned_bytes.is_some()
+            || self.usage.processed_bytes.is_some()
+            || self.usage.billed_bytes.is_some()
+        {
+            return Err(SourceQueryError::Unresolved);
+        }
+        Ok(&self.observed_at)
+    }
     pub(super) fn reservation(&self) -> &str {
         &self.reservation
     }

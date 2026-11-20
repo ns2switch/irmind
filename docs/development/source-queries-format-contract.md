@@ -255,10 +255,15 @@ or cancellation. An unresolved job blocks that source's execution slot. Proposed
 recovery is a separate Analyst-signed acknowledgement after a documented
 provider maximum lifetime covering queueing as well as execution: release the slot only, keep the uncertainty and
 observed consumption; do not turn unknown scan usage into zero or authorize a
-scan-priced adapter through this path. This bounded recovery rule is a review
-point, not an implemented exception. If that complete lifetime is not documented, this recovery is unavailable; a
-600-second running-time limit alone does not establish it. If remote termination
-is mandatory policy and cannot be verified, the adapter is unavailable.
+scan-priced adapter through this path. For the public Azure Analytics v1 route,
+the rule adds the documented three-minute concurrency queue maximum to the
+ten-minute running maximum. The resulting 780-second minimum starts at the
+signed unknown observation. Eligibility requires the recognized module version
+and an Analytics table with successful provisioning in the signed preflight.
+The Analyst signature and its audit timestamp bind the exact reservation and
+observation. A route without both documented limits has no recovery rule.
+If remote termination is mandatory policy and cannot be verified, the adapter
+is unavailable. [Azure Monitor service limits](https://learn.microsoft.com/en-us/azure/azure-monitor/fundamentals/service-limits#user-query-throttling)
 
 ## 5. Azure Analytics check and credential proposal
 
