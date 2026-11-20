@@ -81,7 +81,7 @@ impl RunReader {
         // for that frame and the overflow probe, including on corrupt input.
         line.clear();
         if let Some(size) = self.max_frame {
-            line.reserve_exact(size as usize + 1);
+            line.reserve_exact(usize::try_from(size + 1).map_err(storage)?);
         }
         (&mut self.reader)
             .take(max_frame + 1)
