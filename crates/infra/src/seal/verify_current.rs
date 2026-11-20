@@ -1,4 +1,4 @@
-use super::export_current::{HeaderV8, MAGIC_V8, v8_result};
+use super::export_current::{HeaderV9, MAGIC_V9, v9_result};
 use super::frames::{read_frame, read_hash, read_u64, verify_raw};
 use super::{
     AppError, CaseId, LocalVerifier, Path, Severity, hex, seal_challenge, sha256, storage,
@@ -14,7 +14,7 @@ const MAX_AUDIT_ENTRIES: u64 = 5_000_000;
 const MAX_SOURCE_MANIFESTS: usize = 1_000_000;
 const MAX_PACKAGE_FILE_BYTES: u64 = 2_000_000_000_000;
 
-pub(super) fn verify_export_v8(
+pub(super) fn verify_export_v9(
     path: &Path,
     expected_key: Option<&str>,
 ) -> Result<ExportVerification, AppError> {
@@ -40,17 +40,17 @@ fn verify_open_export_with_catalog(
     expected_key: Option<&str>,
     catalog: &dyn irmind_app::catalog::CatalogIndexVerifier,
 ) -> Result<ExportVerification, AppError> {
-    let version = 8;
+    let version = 9;
     if size > MAX_PACKAGE_FILE_BYTES {
         return Err(storage_reason("export package exceeds size limit"));
     }
-    let mut magic = [0u8; MAGIC_V8.len()];
-    if input.read_exact(&mut magic).is_err() || magic != MAGIC_V8 {
+    let mut magic = [0u8; MAGIC_V9.len()];
+    if input.read_exact(&mut magic).is_err() || magic != MAGIC_V9 {
         return Err(AppError::Fixed(
             irmind_app::FixedAppError::RetiredExportFormat,
         ));
     }
-    let header: HeaderV8 = serde_json::from_slice(&read_frame(&mut input)?).map_err(storage)?;
+    let header: HeaderV9 = serde_json::from_slice(&read_frame(&mut input)?).map_err(storage)?;
     if header.version != version {
         return Err(AppError::Fixed(
             irmind_app::FixedAppError::RetiredExportFormat,
@@ -92,11 +92,14 @@ fn verify_open_export_with_catalog(
         super::artifact_frames::verify_artifact_frames(&mut input, &chain.artifacts)?;
     }
     verify_methodology_tail(&mut input, &mut chain, &header, catalog)?;
+    if read_u64(&mut input)? != 0 {
+        return Err(AppError::InvalidChain(0));
+    }
     let mut extra = [0u8; 1];
     if input.read(&mut extra).map_err(storage)? != 0 {
         return Err(storage_reason("export has trailing bytes"));
     }
-    let mut result = v8_result(
+    let mut result = v9_result(
         fingerprint,
         usize::try_from(count).map_err(storage)?,
         chain.source_count,
@@ -109,7 +112,7 @@ fn verify_open_export_with_catalog(
 fn verify_methodology_tail(
     input: &mut File,
     chain: &mut ChainState,
-    header: &HeaderV8,
+    header: &HeaderV9,
     catalog: &dyn irmind_app::catalog::CatalogIndexVerifier,
 ) -> Result<(), AppError> {
     let proofs = super::skill_proofs::read(
@@ -149,7 +152,7 @@ pub(crate) fn verify_export_with_catalog(
 fn verify_operation_frames(
     input: &mut File,
     chain: &mut ChainState,
-    header: &HeaderV8,
+    header: &HeaderV9,
 ) -> Result<(), AppError> {
     let count = read_u64(input)?;
     if count > MAX_AUDIT_ENTRIES {
@@ -346,8 +349,13 @@ impl ChainState {
     }
 
     fn accept_metadata(&mut self, entry: &SignedEntry) -> Result<(), AppError> {
+        if entry.kind.is_source_query_lifecycle() {
+            return Err(AppError::InvalidChain(entry.seq));
+        }
         match entry.kind {
-            AuditEventKind::CaseCreated | AuditEventKind::CaseScopeChanged => {
+            AuditEventKind::CaseCreated
+            | AuditEventKind::CaseScopeChanged
+            | AuditEventKind::SourceQueryBudgetV1 => {
                 self.metadata_entries.push(entry.clone());
             }
             AuditEventKind::EvidenceIngested | AuditEventKind::GraphIndexed => {
@@ -401,7 +409,7 @@ impl ChainState {
         Ok(())
     }
 
-    fn verify_seal(&self, id: &CaseId, header: &HeaderV8) -> Result<(), AppError> {
+    fn verify_seal(&self, id: &CaseId, header: &HeaderV9) -> Result<(), AppError> {
         {
             self.catalog.validate()?;
         }

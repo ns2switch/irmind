@@ -269,7 +269,7 @@ fn subagents_mixed_windows_aws_kubernetes_episode_reads_real_sources_confirms_an
     let verified =
         irmind_app::verify_export_details(&irmind_infra::LocalExportVerifier, &output, Some(&key))
             .unwrap();
-    assert_eq!(verified.format_version, 8);
+    assert_eq!(verified.format_version, 9);
 }
 
 fn ingest_sources(

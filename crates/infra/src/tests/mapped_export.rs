@@ -1,4 +1,4 @@
-//! Public-key-only V8 authentication includes every retained layout parent.
+//! Public-key-only export authentication includes every retained layout parent.
 use super::*;
 use irmind_app::{LargeCaseStore, LargeCaseUseCases};
 use irmind_domain::AuditEventKind;
@@ -154,12 +154,35 @@ fn ingest(
 
 #[test]
 #[allow(clippy::too_many_lines)]
-fn v8_export_authenticates_retained_parents_receipts_schema_and_public_key() {
+fn v9_export_authenticates_retained_parents_receipts_schema_and_public_key() {
     let root = tempfile::tempdir().unwrap();
     let (store, engine, signer) = setup(root.path());
     let case = engine
         .create_case("Mapped synthetic export", "local only")
         .unwrap();
+    let initial = engine.source_query_allocation(&case.id).unwrap();
+    assert_eq!(
+        initial,
+        (
+            0,
+            irmind_app::source_queries::SourceQueryAllocationV1::default()
+        )
+    );
+    let mut budget: serde_json::Value = serde_json::from_slice(include_bytes!(
+        "../../../../docs/development/source-query-format-vectors/budget.json"
+    ))
+    .unwrap();
+    budget["case_id"] = case.id.as_str().into();
+    let payload = irmind_app::source_queries::canonical_query_json(&budget).unwrap();
+    append(
+        &store,
+        &signer,
+        &case.id,
+        AuditEventKind::SourceQueryBudgetV1,
+        String::from_utf8(payload).unwrap(),
+    );
+    let revised = engine.source_query_allocation(&case.id).unwrap();
+    assert_eq!((revised.0, revised.1.scan_bytes), (1, Some(10_000_000)));
     for (name, second) in [("a.json", "01"), ("b.json", "02")] {
         fs::write(root.path().join(name), format!(
             "{{\"eventTime\":\"2026-11-01T00:00:{second}.000001Z\",\"eventName\":\"Login\",\"sourceIPAddress\":\"203.0.113.77\"}}"
@@ -196,7 +219,7 @@ fn v8_export_authenticates_retained_parents_receipts_schema_and_public_key() {
     let details = crate::LocalExportVerifier
         .verify_export_details(&package, Some(&expected))
         .unwrap();
-    assert_eq!(details.format_version, 8);
+    assert_eq!(details.format_version, 9);
     assert_eq!(details.source_manifests, 2);
     assert!(
         crate::LocalExportVerifier
@@ -204,7 +227,8 @@ fn v8_export_authenticates_retained_parents_receipts_schema_and_public_key() {
             .is_err()
     );
     let mut bytes = fs::read(&package).unwrap();
-    assert!(bytes.starts_with(b"IRMIND-EXPORT-V8\0"));
+    assert!(bytes.starts_with(b"IRMIND-EXPORT-V9\0"));
+    seed::verify_required_tail(&bytes, root.path());
     bytes[..b"IRMIND-EXPORT-V5\0".len()].copy_from_slice(b"IRMIND-EXPORT-V5\0");
     let downgrade = root.path().join("downgrade.irmind");
     fs::write(&downgrade, bytes).unwrap();
@@ -250,3 +274,150 @@ fn mapping_catalog() -> Arc<irmind_app::source_mapping::MappingCatalog> {
 }
 
 mod seed;
+
+#[test]
+fn source_query_broker_requires_the_pinned_analyst_and_agent_proofs() {
+    use irmind_app::source_queries::{
+        SignedSourceQueryAdmission, SourceQueryAllocationV1, SourceQueryAuthority,
+        SourceQueryBroker,
+    };
+    use irmind_domain::{AgentId, CaseScope};
+    let chain: Vec<SignedEntry> = serde_json::from_slice(include_bytes!(
+        "../../../../docs/development/source-query-format-vectors/signed-record-chain.json"
+    ))
+    .unwrap();
+    let principal = AgentId::parse("main").unwrap();
+    let (plan, approval, reservation) = (&chain[2], &chain[3], &chain[4]);
+    let operation: irmind_app::SignedOperation = serde_json::from_slice(include_bytes!(
+        "../../../../docs/development/source-query-format-vectors/signed-configuration.json"
+    ))
+    .unwrap();
+    let verifier = LocalVerifier {
+        trusted: std::collections::BTreeMap::new(),
+    }
+    .with_trusted_key(&Actor::Analyst, &approval.public_key)
+    .unwrap()
+    .with_trusted_key(&Actor::Agent(principal.clone()), &plan.public_key)
+    .unwrap();
+    let scope = CaseScope::parse("v1;sources=aws-lab;accounts=111122223333;hosts=;from=2026-11-01T00:00:00Z;to=2026-12-01T00:00:00Z").unwrap();
+    let allocation = SourceQueryAllocationV1 {
+        enabled: true,
+        analytics_allowed: false,
+        scan_bytes: Some(10_000_000),
+        retained_rows: 1_000_000,
+        retained_bytes: 1_000_000_000,
+    };
+    let mut broker = SourceQueryBroker::new(
+        CaseId::parse(&plan.case_id).unwrap(),
+        allocation,
+        allocation,
+    )
+    .unwrap();
+    broker.change_allocation(1, allocation).unwrap();
+    let authority = SourceQueryAuthority {
+        principal: &principal,
+        case_scope: &scope,
+        organization_scope: &scope,
+        requires_policy_approval: false,
+        verifier: &verifier,
+    };
+    let candidate = SignedSourceQueryAdmission {
+        plan,
+        approval: Some(approval),
+        reservation,
+        configuration: &operation,
+    };
+    let mut tampered = approval.clone();
+    tampered.sig[0] ^= 1;
+    assert!(
+        broker
+            .reserve_authenticated(
+                SignedSourceQueryAdmission {
+                    approval: Some(&tampered),
+                    ..candidate
+                },
+                authority
+            )
+            .is_err()
+    );
+    let mut wrong_configuration = operation.clone();
+    wrong_configuration.operation.push('0');
+    assert!(
+        broker
+            .reserve_authenticated(
+                SignedSourceQueryAdmission {
+                    configuration: &wrong_configuration,
+                    ..candidate
+                },
+                authority
+            )
+            .is_err()
+    );
+    assert_eq!(broker.held().retained_rows, 0);
+    let hold = broker.reserve_authenticated(candidate, authority).unwrap();
+    assert_eq!(hold.resources().scan_bytes, 1_000_000);
+
+    check_signed_settlement(&mut broker, &chain, &principal, &verifier);
+}
+
+fn check_signed_settlement(
+    broker: &mut irmind_app::source_queries::SourceQueryBroker,
+    chain: &[SignedEntry],
+    principal: &irmind_domain::AgentId,
+    verifier: &LocalVerifier,
+) {
+    let expected_hold = broker.held();
+    let intent = &chain[5];
+    let execution = &chain[6];
+    let result = &chain[7];
+    let settlement = &chain[8];
+    let bytes = hex::decode(
+        include_str!("../../../../docs/development/source-query-format-vectors/capture.hex").trim(),
+    )
+    .unwrap();
+    let capture = irmind_app::source_queries::verify_query_capture(
+        bytes.as_slice(),
+        &CancellationToken::new(),
+    )
+    .unwrap();
+    let receipts = irmind_app::source_queries::SignedSourceQuerySettlement {
+        observations: &[intent, execution],
+        result: Some((result, &capture)),
+        settlement,
+    };
+    assert!(
+        broker
+            .settle_authenticated(
+                irmind_app::source_queries::SignedSourceQuerySettlement {
+                    observations: &[execution],
+                    ..receipts
+                },
+                principal,
+                verifier
+            )
+            .is_err()
+    );
+    assert!(
+        broker
+            .settle_authenticated(
+                irmind_app::source_queries::SignedSourceQuerySettlement {
+                    result: None,
+                    ..receipts
+                },
+                principal,
+                verifier
+            )
+            .is_err()
+    );
+    assert_eq!(broker.held(), expected_hold);
+    broker
+        .settle_authenticated(receipts, principal, verifier)
+        .unwrap();
+    assert_eq!(broker.used().scan_bytes, 4096);
+    assert_eq!(broker.used().retained_bytes, 2391);
+    assert!(
+        broker
+            .settle_authenticated(receipts, principal, verifier)
+            .is_err()
+    );
+}

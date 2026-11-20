@@ -11,6 +11,13 @@ pub enum AuditEventKind {
     Cancelled,
     CaseCreated,
     CaseBudgetChanged,
+    SourceQueryBudgetV1,
+    SourceQueryPlanV1,
+    SourceQueryApprovalV1,
+    SourceQueryReservationV1,
+    SourceQueryExecutionV1,
+    SourceQueryResultV1,
+    SourceQuerySettlementV1,
     CaseScopeChanged,
     CaseSealed,
     Denied,
@@ -63,7 +70,7 @@ pub enum AuditEventKind {
 }
 
 impl AuditEventKind {
-    pub const ALL: [Self; 56] = [
+    pub const ALL: [Self; 63] = [
         Self::Allowed,
         Self::ApprovalDenied,
         Self::ApprovalGranted,
@@ -72,6 +79,13 @@ impl AuditEventKind {
         Self::Cancelled,
         Self::CaseCreated,
         Self::CaseBudgetChanged,
+        Self::SourceQueryBudgetV1,
+        Self::SourceQueryPlanV1,
+        Self::SourceQueryApprovalV1,
+        Self::SourceQueryReservationV1,
+        Self::SourceQueryExecutionV1,
+        Self::SourceQueryResultV1,
+        Self::SourceQuerySettlementV1,
         Self::CaseScopeChanged,
         Self::CaseSealed,
         Self::Denied,
@@ -132,6 +146,13 @@ impl AuditEventKind {
             Self::Cancelled => "Cancelled",
             Self::CaseCreated => "CaseCreated",
             Self::CaseBudgetChanged => "CaseBudgetChanged",
+            Self::SourceQueryBudgetV1 => "SourceQueryBudgetV1",
+            Self::SourceQueryPlanV1 => "SourceQueryPlanV1",
+            Self::SourceQueryApprovalV1 => "SourceQueryApprovalV1",
+            Self::SourceQueryReservationV1 => "SourceQueryReservationV1",
+            Self::SourceQueryExecutionV1 => "SourceQueryExecutionV1",
+            Self::SourceQueryResultV1 => "SourceQueryResultV1",
+            Self::SourceQuerySettlementV1 => "SourceQuerySettlementV1",
             Self::CaseScopeChanged => "CaseScopeChanged",
             Self::CaseSealed => "CaseSealed",
             Self::Denied => "Denied",
@@ -203,6 +224,18 @@ impl AuditEventKind {
                 | Self::MappingRunV1
                 | Self::ParquetArtifactV3
                 | Self::ParquetLayoutV1
+        )
+    }
+
+    pub const fn is_source_query_lifecycle(self) -> bool {
+        matches!(
+            self,
+            Self::SourceQueryPlanV1
+                | Self::SourceQueryApprovalV1
+                | Self::SourceQueryReservationV1
+                | Self::SourceQueryExecutionV1
+                | Self::SourceQueryResultV1
+                | Self::SourceQuerySettlementV1
         )
     }
 

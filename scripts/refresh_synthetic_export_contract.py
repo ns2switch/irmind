@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Refresh two synthetic V8 vectors after an intentional common-schema change.
+"""Refresh synthetic export vectors or derive V9 vectors from the frozen V8 seeds.
 
 Development only; requires Python cryptography. Only the published synthetic
 [43; 32] signing key is accepted. Original signatures and seed digests are checked
@@ -123,7 +123,7 @@ def frame(value):
     return field(json.dumps(value, ensure_ascii=False, separators=(',', ':'), sort_keys=True))
 
 
-def refresh(path):
+def refresh(path, case_v5=False):
     test = (ROOT / 'crates/infra/src/tests/mapped_export/seed.rs').read_text()
     match = re.search(re.escape(path.name) + r'"\),\s*"([0-9a-f]{64})"', test)
     assert match, 'fixture must have an explicit frozen digest'
@@ -138,8 +138,23 @@ def refresh(path):
         assert bytes(entry['public_key']) == PUBLIC
         assert sha(canonical(entry)) == bytes(entry['hash'])
         KEY.public_key().verify(bytes(entry['sig']), bytes(entry['hash']))
-    rewrite_pipeline(entries)
-    entries[-1]['payload'] = inventory(entries[:-1])
+    if case_v5:
+        assert header['version'] == 8 and entries[0]['kind'] == 'CaseCreated'
+        header['version'] = 9
+        created = json.loads(entries[0]['payload'])
+        assert created['version'] == 4
+        created['version'] = 5
+        created['source_queries'] = dict(
+            enabled=False, analytics_allowed=False, scan_bytes=None, retained_rows=0,
+            retained_bytes=0,
+        )
+        entries[0]['payload'] = json.dumps(created, ensure_ascii=False, separators=(',', ':'))
+        magic = b'IRMIND-EXPORT-V9\0'
+        remainder += number(0)
+    else:
+        rewrite_pipeline(entries)
+        entries[-1]['payload'] = inventory(entries[:-1])
+        magic = MAGIC
     previous = bytes(32)
     for entry in entries:
         entry['prev'] = list(previous)
@@ -149,27 +164,32 @@ def refresh(path):
     challenge = b'irmind-seal-v1\0' + field(header['case_id']) + number(final['seq']) + previous + field(final['payload'])
     assert bytes(header['seal']['public_key']) == PUBLIC
     header['seal'].update(hash=list(previous), sig=list(KEY.sign(challenge)))
-    result = MAGIC + frame(header) + number(len(entries)) + b''.join(map(frame, entries)) + remainder
+    result = magic + frame(header) + number(len(entries)) + b''.join(map(frame, entries)) + remainder
     return result, match[1]
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--write', action='store_true')
+    parser.add_argument('--case-v5', action='store_true')
     args = parser.parse_args()
     updates = []
     for name in ['valid-v8-mapped.irmind', 'valid-v8-installed.irmind']:
         path = ROOT / 'fuzz/seeds/export' / name
-        data, old = refresh(path)
+        data, old = refresh(path, case_v5=args.case_v5)
+        if args.case_v5:
+            path = path.with_name(name.replace('valid-v8-', 'valid-v9-'))
         updates.append((path, data, old))
-        print(name, sha(data).hex())
+        print(path.name, sha(data).hex())
     if args.write:
         test_path = ROOT / 'crates/infra/src/tests/mapped_export/seed.rs'
         test = test_path.read_text()
         for path, data, old in updates:
             path.write_bytes(data)
-            test = test.replace(old, sha(data).hex())
-        test_path.write_text(test)
+            if not args.case_v5:
+                test = test.replace(old, sha(data).hex())
+        if not args.case_v5:
+            test_path.write_text(test)
 
 
 if __name__ == '__main__':

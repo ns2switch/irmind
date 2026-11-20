@@ -30,13 +30,14 @@ pub enum CaptureError {
 /// these facts before they are used as custody evidence.
 #[derive(Debug, PartialEq, Eq)]
 pub struct QueryCaptureSummary {
-    pub capture_sha256: EvidenceHash,
-    pub bytes: u64,
-    pub page_count: u64,
-    pub page_commitment: EvidenceHash,
-    pub rows: u64,
-    pub plan: EvidenceHash,
-    pub decoder: SourceDecoderIdentityV1,
+    pub(super) capture_sha256: EvidenceHash,
+    pub(super) bytes: u64,
+    pub(super) page_count: u64,
+    pub(super) page_commitment: EvidenceHash,
+    pub(super) rows: u64,
+    pub(super) plan: EvidenceHash,
+    pub(super) decoder: SourceDecoderIdentityV1,
+    pub(super) completeness_mask: u8,
 }
 
 // The member order in these fixed schemas is the canonical UTF-8 key order.
@@ -111,6 +112,7 @@ pub fn verify_query_capture(
     pages.update(PAGE_DOMAIN);
     pages.update(page_count.to_be_bytes());
     let mut rows = 0;
+    let mut completeness_mask = 0;
     let mut buffer = vec![0; MAX_CHUNK];
     for ordinal in 0..page_count {
         let page: Page = input.metadata()?;
@@ -132,6 +134,7 @@ pub fn verify_query_capture(
         pages.update(body_bytes.to_be_bytes());
         pages.update(page.rows.to_be_bytes());
         pages.update([page.completeness]);
+        completeness_mask |= 1 << page.completeness;
     }
     if input.read(&mut [0])? != 0 {
         return Err(CaptureError::InvalidFormat);
@@ -144,6 +147,7 @@ pub fn verify_query_capture(
         rows,
         plan,
         decoder,
+        completeness_mask,
     })
 }
 

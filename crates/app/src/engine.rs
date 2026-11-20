@@ -8,6 +8,8 @@ mod cases;
 mod investigation;
 mod model_request;
 
+pub(crate) const CASE_CREATION_VERSION: u8 = 5;
+
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct CaseCreatedEvent {
@@ -17,6 +19,7 @@ struct CaseCreatedEvent {
     severity: Option<String>,
     scope: String,
     budget: crate::CaseBudgetLimits,
+    source_queries: crate::source_queries::SourceQueryAllocationV1,
 }
 
 fn current_case_creation(first: &SignedEntry) -> Result<CaseCreatedEvent, AppError> {
@@ -29,10 +32,16 @@ fn current_case_creation(first: &SignedEntry) -> Result<CaseCreatedEvent, AppErr
     }
     let marker: VersionMarker =
         serde_json::from_str(&first.payload).map_err(|_| AppError::InvalidChain(first.seq))?;
-    if marker.version != 4 {
+    if marker.version != CASE_CREATION_VERSION {
         return Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat));
     }
-    serde_json::from_str(&first.payload).map_err(|_| AppError::InvalidChain(first.seq))
+    let created: CaseCreatedEvent =
+        serde_json::from_str(&first.payload).map_err(|_| AppError::InvalidChain(first.seq))?;
+    created
+        .source_queries
+        .validate()
+        .map_err(|_| AppError::InvalidChain(first.seq))?;
+    Ok(created)
 }
 
 #[derive(Deserialize, Serialize)]
@@ -58,9 +67,16 @@ pub fn verify_case_metadata(
         return Err(AppError::InvalidChain(first.seq));
     }
     budgets::budget_status(entries, &PolicyRules::default())?;
+    let mut query_budgets = crate::source_queries::BudgetReplay::new(first, created.source_queries);
     let mut current = created.scope;
     CaseScope::parse(&current).map_err(|_| AppError::InvalidChain(first.seq))?;
     for entry in entries.iter().skip(1) {
+        if entry.kind.is_source_query_lifecycle() {
+            // These records need the durable query verifier and adoption proof
+            // section before they can be accepted as part of a case.
+            return Err(AppError::InvalidChain(entry.seq));
+        }
+        query_budgets.accept(entry)?;
         if entry.kind != irmind_domain::AuditEventKind::CaseScopeChanged {
             crate::source_scopes::verify_entry(entry, &current)?;
             continue;
@@ -124,6 +140,7 @@ pub struct Engine<'a> {
     pub(crate) object_progress: ObjectProgressMap,
     pub(crate) skills: Option<Arc<crate::SkillServices>>,
     pub(crate) subagents: Option<Arc<crate::subagents::SubagentPorts>>,
+    pub(crate) source_queries: Option<Arc<crate::source_queries::SourceQueryPorts>>,
     pub(crate) subagent_runtime: Arc<crate::subagents::runtime::SubagentRuntime>,
 }
 
@@ -137,6 +154,7 @@ pub struct EnginePorts {
     pub guard: Arc<dyn ContentGuard>,
     source_evidence_reader: Option<Arc<dyn crate::SourceEvidenceReader>>,
     subagents: Option<Arc<crate::subagents::SubagentPorts>>,
+    source_queries: Option<Arc<crate::source_queries::SourceQueryPorts>>,
 }
 
 pub struct CryptoPorts {
@@ -169,6 +187,7 @@ impl EnginePorts {
             guard,
             source_evidence_reader: None,
             subagents: None,
+            source_queries: None,
         }
     }
 
@@ -184,6 +203,12 @@ impl EnginePorts {
     #[must_use]
     pub fn with_subagents(mut self, ports: crate::subagents::SubagentPorts) -> Self {
         self.subagents = Some(Arc::new(ports));
+        self
+    }
+
+    #[must_use]
+    pub fn with_source_queries(mut self, ports: crate::source_queries::SourceQueryPorts) -> Self {
+        self.source_queries = Some(Arc::new(ports));
         self
     }
 }
@@ -222,6 +247,7 @@ impl<'a> Engine<'a> {
             object_progress: Arc::clone(&self.object_progress),
             skills: self.skills.clone(),
             subagents: self.subagents.clone(),
+            source_queries: self.source_queries.clone(),
             subagent_runtime: self.subagent_runtime.clone(),
         }
     }
@@ -429,14 +455,17 @@ impl Engine<'_> {
 mod format_tests {
     use super::*;
     #[test]
-    fn case_created_v4_matches_the_approved_contract_bytes() {
-        let bytes = include_bytes!(
-            "../../../docs/development/subagent-format-vectors/case-created-v4.json"
-        );
-        let created: CaseCreatedEvent = serde_json::from_slice(bytes).unwrap();
-        assert_eq!(created.version, 4);
-        created.budget.validate().unwrap();
-        assert_eq!(serde_json::to_vec(&created).unwrap(), bytes);
+    fn case_created_v5_matches_the_approved_contract_bytes() {
+        for bytes in [
+            include_bytes!("../../../docs/development/source-query-format-vectors/case-created-v5.json").as_slice(),
+            include_bytes!("../../../docs/development/source-query-format-vectors/case-created-v5-disabled.json").as_slice(),
+        ] {
+            let created: CaseCreatedEvent = serde_json::from_slice(bytes).unwrap();
+            assert_eq!(created.version, CASE_CREATION_VERSION);
+            created.budget.validate().unwrap();
+            created.source_queries.validate().unwrap();
+            assert_eq!(serde_json::to_vec(&created).unwrap(), bytes);
+        }
     }
 
     #[test]
@@ -448,7 +477,7 @@ mod format_tests {
             actor: Actor::Analyst,
             origin: "analyst".into(),
             kind: AuditEventKind::CaseCreated,
-            payload: r#"{"version":4,"title":"Synthetic","severity":"medium","scope":"local","budget":{"model_tokens":2000000,"tool_calls":1000,"cloud_bytes":536870912000}}"#
+            payload: r#"{"version":5,"title":"Synthetic","severity":"medium","scope":"local","budget":{"model_tokens":2000000,"tool_calls":1000,"cloud_bytes":536870912000},"source_queries":{"enabled":false,"analytics_allowed":false,"scan_bytes":null,"retained_rows":0,"retained_bytes":0}}"#
                 .into(),
             evidence: None,
             prev: [0; 32],
@@ -460,6 +489,7 @@ mod format_tests {
             verify_case_metadata("Synthetic", Severity::Medium, "local", &[first.clone()]).is_ok()
         );
         for retired in [
+            include_str!("../../../docs/development/subagent-format-vectors/case-created-v4.json"),
             r#"{"version":3,"title":"Synthetic","severity":"medium","scope":"local"}"#,
             r#"{"version":2,"title":"Synthetic","severity":"medium","scope":"local"}"#,
             "title=Synthetic;scope=local",

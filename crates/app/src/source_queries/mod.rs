@@ -1,13 +1,29 @@
 //! Bounded, principal-only source-query admission. Providers never grant authority.
+mod admission;
+mod broker;
 mod canonical;
 mod capture;
 mod compile;
+mod completion;
 mod ports;
+mod receipts;
+#[cfg(test)]
+mod tests;
 mod types;
+pub use admission::{SignedSourceQueryAdmission, SourceQueryAuthority};
+pub use broker::{SourceQueryBroker, SourceQueryHold, SourceQueryResources};
 pub use canonical::{canonical_query_json, query_content_id};
 pub use capture::{CaptureError, QueryCaptureSummary, verify_query_capture};
 pub use compile::*;
+pub use completion::{
+    SignedSourceQuerySettlement, SourceQueryExecutionV1, SourceQueryResultV1,
+    SourceQuerySettlementV1,
+};
 pub use ports::*;
+pub(crate) use receipts::BudgetReplay;
+pub use receipts::{
+    SourceQueryApprovalV1, SourceQueryBudgetV1, SourceQueryPlanV1, SourceQueryReservationV1,
+};
 pub use types::*;
 
 pub const QUERY_MAX_RECORD_BYTES: usize = 128 * 1024;

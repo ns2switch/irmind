@@ -1,10 +1,26 @@
-use super::{CaseCreatedEvent, ScopeChangedEvent};
+use super::{CASE_CREATION_VERSION, CaseCreatedEvent, ScopeChangedEvent};
 use crate::{
     Actor, AppError, Arc, Case, CaseId, CaseMutation, CaseScope, Clock, Engine, EnginePorts,
     ExecutionMode, ModelPricing, PolicyRules, Severity, startup_check,
 };
 
 impl<'a> Engine<'a> {
+    pub fn source_query_allocation(
+        &self,
+        id: &CaseId,
+    ) -> Result<(u64, crate::source_queries::SourceQueryAllocationV1), AppError> {
+        let _lock = self.repo.lock_case(id)?;
+        self.verify_unlocked(id)?;
+        let entries = self.audit_log.entries(id)?;
+        let first = entries.first().ok_or(AppError::InvalidChain(0))?;
+        let initial = super::current_case_creation(first)?.source_queries;
+        let mut replay = crate::source_queries::BudgetReplay::new(first, initial);
+        for entry in entries.iter().skip(1) {
+            replay.accept(entry)?;
+        }
+        Ok(replay.current())
+    }
+
     pub fn open_case_verified(
         &self,
         id: &CaseId,
@@ -42,6 +58,7 @@ impl<'a> Engine<'a> {
             graph: ports.graph,
             source_evidence_reader: ports.source_evidence_reader,
             subagents: ports.subagents,
+            source_queries: ports.source_queries,
             subagent_runtime: Arc::default(),
             audit_log: ports.audit_log,
             signer: ports.signer,
@@ -145,11 +162,12 @@ impl<'a> Engine<'a> {
             crate::AuditOrigin::System,
             irmind_domain::AuditEventKind::CaseCreated,
             &serde_json::to_string(&CaseCreatedEvent {
-                version: 4,
+                version: CASE_CREATION_VERSION,
                 title: title.to_owned(),
                 severity: Some(severity.as_str().to_owned()),
                 scope: scope.to_owned(),
                 budget: self.new_case_budget_limits(),
+                source_queries: crate::source_queries::SourceQueryAllocationV1::default(),
             })
             .map_err(|error| AppError::Storage(error.to_string()))?,
             None,

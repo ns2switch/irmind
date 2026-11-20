@@ -5,7 +5,10 @@ use super::{
 use crate::{AppError, AuthorizedCall, CancellationToken, async_trait};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::{collections::BTreeMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -42,7 +45,7 @@ pub enum SubmitObservationV1 {
     NotSubmitted,
     Unknown,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct QueryExecutionRef {
     plan: String,
     attempt: u64,
@@ -93,38 +96,45 @@ pub enum CancelObservationV1 {
     Unsupported,
     Unknown,
 }
-#[derive(Clone, Debug)]
 pub struct QueryResultCursor {
-    execution: String,
+    execution: QueryExecutionRef,
     ordinal: u64,
     token: Option<String>,
+    token_hashes: BTreeSet<[u8; 32]>,
+}
+impl std::fmt::Debug for QueryResultCursor {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("QueryResultCursor")
+            .field("ordinal", &self.ordinal)
+            .finish_non_exhaustive()
+    }
 }
 impl QueryResultCursor {
     pub fn first(execution: &QueryExecutionRef) -> Self {
         Self {
-            execution: execution.provider_id.clone(),
+            execution: execution.clone(),
             ordinal: 0,
             token: None,
+            token_hashes: BTreeSet::new(),
         }
     }
     pub fn next(
-        &self,
+        mut self,
         execution: &QueryExecutionRef,
         token: &str,
     ) -> Result<Self, SourceQueryError> {
-        if self.execution != execution.provider_id
+        if self.execution != *execution
             || self.ordinal + 1 >= QUERY_MAX_PAGES
             || token.is_empty()
             || token.len() > 4096
-            || self.token.as_deref() == Some(token)
+            || !self.token_hashes.insert(crate::sha256(token.as_bytes()))
         {
             return Err(SourceQueryError::Invalid);
         }
-        Ok(Self {
-            execution: self.execution.clone(),
-            ordinal: self.ordinal + 1,
-            token: Some(token.into()),
-        })
+        self.ordinal += 1;
+        self.token = Some(token.into());
+        Ok(self)
     }
     pub const fn ordinal(&self) -> u64 {
         self.ordinal
@@ -133,7 +143,7 @@ impl QueryResultCursor {
         self.token.as_deref()
     }
     pub fn check(&self, execution: &QueryExecutionRef) -> Result<(), SourceQueryError> {
-        if self.execution == execution.provider_id {
+        if self.execution == *execution {
             Ok(())
         } else {
             Err(SourceQueryError::Invalid)

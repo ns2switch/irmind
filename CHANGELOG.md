@@ -4,6 +4,10 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+- Case marker 5 includes a separate source-query allocation, disabled at creation.
+  Export V9 includes a mandatory query-capture count. Open older cases and exports
+  with the IRMind version that created them or re-ingest the verified originals.
+
 ## 0.5.6 — Faster merging of disordered evidence
 
 - Merge sorted runs by decoding only their stable ordering keys and copying
