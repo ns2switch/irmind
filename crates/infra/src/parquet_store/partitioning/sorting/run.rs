@@ -9,7 +9,8 @@ use std::io::{BufRead, Read, Write};
 pub(super) struct Run {
     path: tempfile::TempPath,
     hash: [u8; 32],
-    bytes: u64,
+    pub(super) bytes: u64,
+    pub(super) depth: u64,
     rows: usize,
     _disk: DiskLease,
 }
@@ -159,6 +160,10 @@ impl RunWriter {
         self.disk.add(count)
     }
 
+    pub(super) fn bytes(&self) -> u64 {
+        self.bytes
+    }
+
     pub(super) fn finish(mut self) -> Result<Run, AppError> {
         self.writer
             .as_mut()
@@ -170,6 +175,7 @@ impl RunWriter {
             path: self.file.into_temp_path(),
             hash: self.hash.finalize().into(),
             bytes: self.bytes,
+            depth: 0,
             rows: self.rows,
             _disk: self.disk,
         })
