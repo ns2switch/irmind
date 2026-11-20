@@ -156,6 +156,14 @@ pub struct QueryResponsePage {
     pub content_encoding: String,
     pub chunks: crate::ObjectStream,
 }
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SourceQueryLeasePhase {
+    Submit,
+    Reconcile,
+    Fetch,
+    Cancel,
+}
+
 /// Unforgeable lease. Only the verified broker can construct it.
 pub struct AdmittedSourceQuery {
     pub(super) case_id: crate::CaseId,
@@ -165,6 +173,8 @@ pub struct AdmittedSourceQuery {
     pub(super) compiled: CompiledSourceQueryV1,
     pub(super) limits: SourceQueryLimits,
     pub(super) execution_key: String,
+    pub(super) phase: SourceQueryLeasePhase,
+    pub(super) execution: Option<QueryExecutionRef>,
 }
 impl AdmittedSourceQuery {
     pub fn case_id(&self) -> &crate::CaseId {
@@ -188,8 +198,20 @@ impl AdmittedSourceQuery {
     pub fn execution_key(&self) -> &str {
         &self.execution_key
     }
-    pub fn check(&self, module: &str, source: &str) -> Result<(), SourceQueryError> {
-        if self.source.module() == module && self.source.id() == source {
+    /// Adapters check this before every request, including polls and retries.
+    pub fn check(
+        &self,
+        module: &str,
+        source: &str,
+        phase: SourceQueryLeasePhase,
+        execution: Option<&QueryExecutionRef>,
+    ) -> Result<(), SourceQueryError> {
+        if self.source.module() == module
+            && self.source.id() == source
+            && self.phase == phase
+            && self.execution.as_ref() == execution
+            && execution.is_none_or(|job| job.plan() == self.plan)
+        {
             Ok(())
         } else {
             Err(SourceQueryError::Scope)

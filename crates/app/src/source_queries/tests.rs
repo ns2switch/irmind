@@ -51,6 +51,48 @@ fn approved_receipts_match_the_exact_canonical_vectors() {
 }
 
 #[test]
+fn execution_leases_bind_the_exact_source_phase_and_job() {
+    let wire: serde_json::Value = serde_json::from_slice(PLAN).unwrap();
+    let plan = SourceQueryPlanV1::decode(PLAN)
+        .unwrap()
+        .content_id()
+        .unwrap();
+    let job = QueryExecutionRef::new(&plan, 1, "native-job-a").unwrap();
+    let another = QueryExecutionRef::new(&plan, 1, "native-job-b").unwrap();
+    let source: ResolvedQuerySourceV1 = serde_json::from_value(wire["source"].clone()).unwrap();
+    let lease = AdmittedSourceQuery {
+        case_id: case(),
+        plan,
+        reservation: SourceQueryReservationV1::decode(RESERVATION)
+            .unwrap()
+            .content_id()
+            .unwrap(),
+        source,
+        compiled: serde_json::from_value(wire["compiled"].clone()).unwrap(),
+        limits: serde_json::from_value(wire["limits"].clone()).unwrap(),
+        execution_key: "intent-a".into(),
+        phase: SourceQueryLeasePhase::Fetch,
+        execution: Some(job.clone()),
+    };
+    let check = |source, phase, execution| lease.check("query-athena", source, phase, execution);
+    assert_eq!(
+        check("aws-lab", SourceQueryLeasePhase::Fetch, Some(&job)),
+        Ok(())
+    );
+    for (source, phase, execution) in [
+        ("other-lab", SourceQueryLeasePhase::Fetch, Some(&job)),
+        ("aws-lab", SourceQueryLeasePhase::Fetch, Some(&another)),
+        ("aws-lab", SourceQueryLeasePhase::Fetch, None),
+        ("aws-lab", SourceQueryLeasePhase::Cancel, Some(&job)),
+    ] {
+        assert_eq!(
+            check(source, phase, execution),
+            Err(SourceQueryError::Scope)
+        );
+    }
+}
+
+#[test]
 fn compiler_refuses_unregistered_datasets_result_kinds_and_predicates() {
     let plan: serde_json::Value = serde_json::from_slice(PLAN).unwrap();
     let source: ResolvedQuerySourceV1 = serde_json::from_value(plan["source"].clone()).unwrap();
