@@ -89,7 +89,7 @@ fn field_type(field: &str) -> Result<CommonFieldType, SourceQueryError> {
             Ok(CommonFieldType::Text)
         }
         _ => CommonField::parse(field)
-            .map(|f| f.value_type())
+            .map(CommonField::value_type)
             .map_err(|_| SourceQueryError::Unsupported),
     }
 }

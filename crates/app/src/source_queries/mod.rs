@@ -1,9 +1,11 @@
 //! Bounded, principal-only source-query admission. Providers never grant authority.
 mod canonical;
+mod capture;
 mod compile;
 mod ports;
 mod types;
 pub use canonical::{canonical_query_json, query_content_id};
+pub use capture::{CaptureError, QueryCaptureSummary, verify_query_capture};
 pub use compile::*;
 pub use ports::*;
 pub use types::*;

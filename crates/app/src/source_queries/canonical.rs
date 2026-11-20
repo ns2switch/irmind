@@ -25,7 +25,7 @@ fn unsigned_only(value: &Value) -> Result<(), SourceQueryError> {
         _ => Ok(()),
     }
 }
-/// Explicit key ordering, independent of serde_json/preserve_order.
+/// Explicit key ordering, independent of `serde_json/preserve_order`.
 pub fn canonical_query_json<T: Serialize>(value: &T) -> Result<Vec<u8>, SourceQueryError> {
     let value = serde_json::to_value(value).map_err(|_| SourceQueryError::Invalid)?;
     unsigned_only(&value)?;
