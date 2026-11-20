@@ -74,6 +74,11 @@ mod matrix {
     #[allow(clippy::too_many_lines)]
     fn each_fixture_has_one_unique_high_confidence_parser() -> Result<(), irmind_app::AppError> {
         let mut registry = ModuleRegistry::new();
+        #[cfg(feature = "parser-s3-access")]
+        registry.register(
+            Box::new(irmind_mod_parser_s3_access::S3AccessParser),
+            &ModuleConfig::new(),
+        )?;
         #[cfg(feature = "parser-elb")]
         registry.register(
             Box::new(irmind_mod_parser_elb::ElbParser),
@@ -208,6 +213,13 @@ mod matrix {
         )?;
         let mut matrix: Matrix = std::collections::BTreeMap::new();
         for (name, sample, expected) in [
+            #[cfg(feature = "parser-s3-access")]
+            (
+                "s3-server-access.log",
+                include_bytes!("../../testkit/fixtures/parser-s3-access/source/access.log")
+                    .as_slice(),
+                "parser-s3-access",
+            ),
             #[cfg(feature = "parser-elb")]
             (
                 "alb-access.log",
@@ -742,6 +754,7 @@ mod matrix {
             | "parser-fdr"
             | "parser-macos"
             | "parser-google-workspace"
+            | "parser-s3-access"
             | "parser-elb"
             | "parser-iis-w3c"
             | "parser-windows-dns"
@@ -784,6 +797,13 @@ mod matrix {
         Ok(())
     }
     fn assert_export_scores(name: &str, sample: &[u8], expected: &str) {
+        #[cfg(feature = "parser-s3-access")]
+        assert_eq!(
+            irmind_mod_parser_s3_access::S3AccessParser
+                .detect(name, sample)
+                .map(irmind_app::ParserConfidence::value),
+            (expected == "parser-s3-access").then_some(98)
+        );
         #[cfg(feature = "parser-elb")]
         assert_eq!(
             irmind_mod_parser_elb::ElbParser

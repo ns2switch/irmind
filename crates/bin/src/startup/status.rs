@@ -52,6 +52,7 @@ pub(super) fn module_statuses(
 }
 
 const PARSER_STATUSES: &[(&str, bool)] = &[
+    ("parser-s3-access", cfg!(feature = "parser-s3-access")),
     ("parser-elb", cfg!(feature = "parser-elb")),
     ("parser-iis-w3c", cfg!(feature = "parser-iis-w3c")),
     ("parser-windows-dns", cfg!(feature = "parser-windows-dns")),

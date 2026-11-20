@@ -17,6 +17,7 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 | Depuración de DNS Server de Windows | Resúmenes de paquetes en texto | Cabecera de creación y columnas de paquete, 79 o 98 | Consulta, tipo, código de respuesta e IP remota según el sentido del paquete | experimental |
 | IIS W3C | Texto de registros de acceso extendidos | Fecha, hora y columnas HTTP de `#Fields`, 98 | Método, ruta, consulta original, estado, bytes, cliente y servidor | experimental |
 | ALB y Classic ELB de AWS | Texto de acceso y gzip | Fecha, extremos y solicitud nativos, 98 | Método, URL y consulta, estado, bytes y direcciones de cliente y backend | experimental |
+| Acceso al servidor de Amazon S3 | Texto | Propietario canónico, fecha entre corchetes y solicitud nativa, 98 | Solicitante, IP, bucket, operación, ruta y consulta, código y bytes de la respuesta | experimental |
 | Route 53 VPC Resolver | JSON, NDJSON | Versión 1.x, consulta, cliente y VPC o perfil, 98 | Consulta DNS, tipo, clase, cliente, puerto, código de respuesta, cuenta y región | experimental |
 | Auditoría de GitHub | CSV y JSON de organización o empresa, NDJSON nativo del streaming | Acción, fecha e identidad o ámbito de auditoría nativos, 98 | Membresía, tokens, claves, acceso a repositorios y configuración de Actions | experimental |
 | Reports API de Google Workspace | Páginas, arrays y objetos JSON, y NDJSON | ID de actividad, aplicación, instante y eventos nativos, 98 | Login, SAML, administración, OAuth, Drive y Gmail con campos originales | experimental |
@@ -501,6 +502,10 @@ necesarios al detenerse.
 ## Registros de acceso de balanceadores AWS
 
 Activa la entrega en S3 de los [registros de Application Load Balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html) o [Classic Load Balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/access-log-collection.html). Ingiere el gzip o el texto original. El texto lleva offsets físicos y los registros comprimidos conservan hash y número de registro. La entrada gzip y el flujo descomprimido tienen cada uno un límite de 2 GiB, con la reserva habitual del caso. Los campos futuros al final se pueden buscar y se conserva la URL sin decodificar.
+
+## Registros de acceso de Amazon S3
+
+Activa los [registros de acceso al servidor](https://docs.aws.amazon.com/AmazonS3/latest/userguide/enable-server-access-logging.html) y copia el texto nativo desde el bucket de destino. Revisa juntos la operación, el código de respuesta, el solicitante, el bucket y el ID de solicitud. La consulta y la clave conservan sus escapes originales. Los bytes de respuesta proceden de Bytes Sent y Object Size queda en el registro original. Una URI con un límite de campo inequívoco puede contener comillas literales. Los registros con delimitadores ambiguos se cuentan como rechazados. El [formato del proveedor](https://docs.aws.amazon.com/AmazonS3/latest/userguide/LogFormat.html) describe estas limitaciones y la entrega de mejor esfuerzo.
 
 ## Route 53 VPC Resolver
 

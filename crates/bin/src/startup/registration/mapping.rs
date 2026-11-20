@@ -137,6 +137,11 @@ fn register_export_mappings(registry: &mut ModuleRegistry) -> Result<()> {
 
 fn register_web_and_identity_exports(registry: &mut ModuleRegistry) -> Result<()> {
     let _ = &registry;
+    #[cfg(feature = "mapping-s3-access")]
+    registry.register(
+        Box::new(irmind_mod_mapping_s3_access::S3AccessMapping::new()?),
+        &ModuleConfig::new(),
+    )?;
     #[cfg(feature = "mapping-elb")]
     registry.register(
         Box::new(irmind_mod_mapping_elb::ElbMapping::new()?),
@@ -347,6 +352,10 @@ mod tests {
         check_catalog(&registry);
     }
     fn register_identity_decoders(registry: &mut ModuleRegistry) {
+        #[cfg(feature = "parser-s3-access")]
+        registry
+            .add_source_decoder(Arc::new(irmind_mod_parser_s3_access::S3AccessSourceDecoder))
+            .unwrap();
         #[cfg(feature = "parser-elb")]
         registry
             .add_source_decoder(Arc::new(irmind_mod_parser_elb::ElbSourceDecoder))
@@ -432,7 +441,8 @@ mod tests {
         );
         assert_eq!(
             catalog.snapshots().unwrap().len(),
-            2 + usize::from(cfg!(feature = "mapping-elb"))
+            2 + usize::from(cfg!(feature = "mapping-s3-access"))
+                + usize::from(cfg!(feature = "mapping-elb"))
                 + usize::from(cfg!(feature = "mapping-iis-w3c"))
                 + usize::from(cfg!(feature = "mapping-windows-dns"))
                 + usize::from(cfg!(feature = "mapping-route53"))

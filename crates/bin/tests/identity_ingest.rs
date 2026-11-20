@@ -118,6 +118,9 @@ fn ingest_with_context(
 }
 fn fixture(parser: &str) -> &'static [u8] {
     match parser {
+        #[cfg(feature = "parser-s3-access")]
+        "s3-access" => include_bytes!("../../testkit/fixtures/parser-s3-access/source/access.log"),
+
         #[cfg(feature = "parser-elb")]
         "elb" => include_bytes!("../../testkit/fixtures/parser-elb/source/alb.log"),
         #[cfg(feature = "parser-elb")]
@@ -178,6 +181,8 @@ fn fixture(parser: &str) -> &'static [u8] {
     }
 }
 const IDENTITY_SOURCES: &[(&str, u64)] = &[
+    #[cfg(feature = "parser-s3-access")]
+    ("s3-access", 3),
     #[cfg(feature = "parser-elb")]
     ("elb", 2),
     #[cfg(feature = "parser-elb")]
@@ -553,6 +558,16 @@ fn one_gib_release_elb_throughput() -> Result<(), &'static str> {
     }
     Ok(())
 }
+#[cfg(feature = "parser-s3-access")]
+#[test]
+#[ignore = "release benchmark with one GiB of synthetic evidence"]
+fn one_gib_release_s3_access_throughput() -> Result<(), &'static str> {
+    if cfg!(debug_assertions) {
+        return Err("source throughput benchmarks require a release build");
+    }
+    benchmark_source("s3-access");
+    Ok(())
+}
 fn benchmark_source(name: &str) {
     use std::io::{BufWriter, Write};
     let bench_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target");
@@ -602,7 +617,7 @@ fn benchmark_source(name: &str) {
 fn benchmark_lines(name: &str) -> (Vec<u8>, Vec<u8>, u64) {
     let mut lines = fixture(name).split(|b| *b == b'\n');
     let first = lines.next().unwrap();
-    if matches!(name, "elb" | "classic-elb") {
+    if matches!(name, "elb" | "classic-elb" | "s3-access") {
         return (
             Vec::new(),
             fixture(name)

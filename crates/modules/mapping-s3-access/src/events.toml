@@ -1,0 +1,115 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-s3-access"
+version = "s3-access-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-s3-access"
+parser_versions = ["s3-access-source-v1"]
+format = "aws-s3-access"
+format_version = "s3-access-source-v1"
+action = ["operation"]
+
+[[fields]]
+source = ["request_method"]
+target = "http.request.method"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["request_target"]
+target = "url.original"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["request_path"]
+target = "url.path"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["request_query"]
+target = "url.query"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["request_http_version"]
+target = "http.version"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["http_status"]
+target = "http.response.status_code"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["bytes_sent"]
+target = "http.response.bytes"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["remote_ip"]
+target = "source.ip"
+omit_text = ["", "-"]
+conversion = "ip"
+observation = { kind = "ip", role = "source", scope = { kind = "global" } }
+
+[[fields]]
+source = ["bucket"]
+target = "irmind.resource.id"
+omit_text = ["", "-"]
+observation = { kind = "resource", role = "target", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["requester"]
+target = "user.id"
+omit_text = ["", "-"]
+observation = { kind = "user", role = "actor", scope = { kind = "source_record" } }
+
+[[fields]]
+source = ["key"]
+target = "file.path"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["user_agent"]
+target = "user_agent.original"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["host_header"]
+target = "url.domain"
+omit_text = ["", "-"]
+
+[[fields]]
+source = ["request_id"]
+target = "irmind.source_event.id"
+omit_text = ["", "-"]
+
+[[rules]]
+categories = ["web"]
+types = ["access"]
+outcome = "unknown"
+[[rules.when]]
+path = ["http_status"]
+predicate = { op = "integer_interval", value = { first = 100, last = 199 } }
+
+[[rules]]
+categories = ["web"]
+types = ["access"]
+outcome = "success"
+[[rules.when]]
+path = ["http_status"]
+predicate = { op = "integer_interval", value = { first = 200, last = 399 } }
+
+[[rules]]
+categories = ["web"]
+types = ["access"]
+outcome = "failure"
+[[rules.when]]
+path = ["http_status"]
+predicate = { op = "integer_interval", value = { first = 400, last = 599 } }
+
+[[rules]]
+categories = ["web"]
+types = ["access"]
+[[rules.when]]
+path = ["http_status"]
+predicate = { op = "text", value = "-" }

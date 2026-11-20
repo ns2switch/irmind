@@ -827,6 +827,7 @@ dependencies = [
  "irmind-mod-parser-okta",
  "irmind-mod-parser-plaso",
  "irmind-mod-parser-route53",
+ "irmind-mod-parser-s3-access",
  "irmind-mod-parser-suricata",
  "irmind-mod-parser-syslog",
  "irmind-mod-parser-velociraptor",
@@ -1214,6 +1215,14 @@ dependencies = [
 
 [[package]]
 name = "irmind-mod-parser-route53"
+version = "0.1.0"
+dependencies = [
+ "irmind-app",
+ "irmind-domain",
+]
+
+[[package]]
+name = "irmind-mod-parser-s3-access"
 version = "0.1.0"
 dependencies = [
  "irmind-app",
