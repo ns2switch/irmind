@@ -275,6 +275,17 @@ network record without applying a known tuple layout. Expanded tuples do not
 invent byte offsets within an escaped JSON string. Rule, resource and original
 tuple fields remain searchable. A MAC address does not become a host identity.
 
+Keep the original Azure blob paths and ingest each resource's hourly `PT1H.json`
+files in `y=/m=/d=/h=` order. Keeping the hourly files separate avoids creating a
+single disordered input by concatenating unrelated hours or resources. IRMind
+checks the timestamps inside each blob before deciding whether it needs to sort.
+In the disordered [1 GiB benchmark](development/benchmarks.md#azure-vnet-and-nsg-flow-ordering),
+temporary normalized files peaked at about 34 GiB for VNet and 48 GiB for NSG,
+in addition to the input and final artifacts. The free-space check allows for
+the normalized spool, pending sort runs and the merge output before ingestion.
+See the Azure storage paths for [VNet](https://learn.microsoft.com/en-us/azure/network-watcher/vnet-flow-logs-manage#download-a-flow-log)
+and [NSG](https://learn.microsoft.com/en-us/azure/network-watcher/nsg-flow-logs-overview#read-and-export-flow-logs).
+
 Export GCP Cloud Logging entries retaining `logName`, `timestamp`, `resource` and
 `jsonPayload.connection`; the source log must identify `vpc_flows`. Preserve the
 native `src_instance`, `dest_instance` and `reporter` fields for host attribution.

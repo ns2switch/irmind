@@ -3,6 +3,53 @@ use super::*;
 use irmind_app::mapped_ingest::CommittedArtifacts;
 
 #[test]
+fn azure_sort_space_is_checked_before_creating_normalized_files() {
+    use irmind_app::{FixedAppError, source_mapping::MappingCatalog};
+    use irmind_mod_parser_azure_flow::AzureFlowSourceDecoder;
+    use std::{fs, sync::Arc};
+
+    let root = tempfile::tempdir().unwrap();
+    let blob =
+        include_bytes!("../../../../../testkit/fixtures/parser-azure-flow/source/vnet.ndjson");
+    let name = "flows.ndjson";
+    fs::write(root.path().join(name), blob).unwrap();
+    let catalog =
+        Arc::new(MappingCatalog::freeze(vec![Arc::new(AzureFlowSourceDecoder)], vec![]).unwrap());
+    let parser = catalog
+        .decoder_selection("parser-azure-flow", "azure-flow-source-v1")
+        .unwrap();
+    let store = ParquetStore::open_mapped(&root.path().join("case-data"), catalog).unwrap();
+    let case = irmind_domain::CaseId::parse("11111111-1111-1111-1111-111111111111").unwrap();
+    let paths = [name.into()];
+    let request = MappedIngestRequest {
+        case_id: &case,
+        source_root: root.path(),
+        relative_paths: &paths,
+        copy_original: true,
+        parser: &parser,
+        committed_artifacts: CommittedArtifacts::Slice(&[]),
+        limits: irmind_app::PartitionLimits::default(),
+    };
+    let cancel = CancellationToken::new();
+    let raw = blob.len() as u64;
+    let normalized = super::super::staging::standard_allowance(raw).unwrap();
+    let required = 3 * normalized + 16 * raw + raw + 5 * 64 * 1024 * 1024;
+    let spool = store.spool_dir(&case).unwrap();
+    assert!(matches!(
+        store.preflight_direct_group_with_space(&request, 4, &cancel, || Ok(required - 1)),
+        Err(AppError::Fixed(FixedAppError::StorageCaseStagingCapacity {
+            required: reported, available
+        })) if reported == required && available == required - 1
+    ));
+    assert_eq!(fs::read_dir(spool).unwrap().count(), 0);
+    assert!(
+        store
+            .preflight_direct_group_with_space(&request, 4, &cancel, || Ok(required))
+            .is_ok()
+    );
+}
+
+#[test]
 fn metadata_planning_bounds_raw_bytes_but_accepts_one_large_source() {
     let root = tempfile::tempdir().unwrap();
     for (name, size) in [

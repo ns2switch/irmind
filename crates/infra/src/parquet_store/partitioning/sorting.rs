@@ -101,7 +101,11 @@ fn sorted_run(
         }
         writer.push(&row)?;
     }
-    writer.finish()
+    let run = writer.finish()?;
+    if let Some(profile) = &store.profile {
+        profile.record_sort_run(run.bytes, 0, 0);
+    }
+    Ok(run)
 }
 fn merge(
     store: &ParquetStore,
@@ -130,7 +134,12 @@ fn merge(
         writer.push_encoded(&head.as_ref().ok_or_else(invalid_source)?.1)?;
         *head = reader.next_key(cancel)?;
     }
-    writer.finish()
+    let mut run = writer.finish()?;
+    run.depth = left.depth.max(right.depth) + 1;
+    if let Some(profile) = &store.profile {
+        profile.record_sort_run(run.bytes, 2, run.depth);
+    }
+    Ok(run)
 }
 fn add_run(
     store: &ParquetStore,
@@ -175,6 +184,9 @@ fn sort_source(
         &mut source.disk,
         cancel,
     )?;
+    if let Some(profile) = &store.profile {
+        profile.record_sort_copy(final_run.bytes);
+    }
     source
         .spool
         .as_file_mut()

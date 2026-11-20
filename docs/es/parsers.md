@@ -1,4 +1,4 @@
-Traducción de docs/parsers.md en el commit 09424e9a2da7020b92f1932f69cac6bd4904397a; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/parsers.md en el commit 0a783580abdc86004b423282fd3222a7f37c0f2a; si hay diferencias, prevalece la versión en inglés.
 
 # Parsers de logs
 
@@ -277,6 +277,17 @@ conserva una vez como registro de red sin clasificar, sin aplicar una disposici�
 conocida de columnas. Las tuplas expandidas no inventan offsets dentro de cadenas
 JSON escapadas. La regla, el recurso y la tupla original siguen siendo consultables.
 Una dirección MAC no se convierte en identidad de host.
+
+Conserva las rutas originales de Azure e ingiere los archivos horarios
+`PT1H.json` de cada recurso en orden `y=/m=/d=/h=`. Mantén separados los archivos
+por hora para evitar crear una única entrada desordenada al concatenar horas o
+recursos. IRMind comprueba los instantes dentro de cada blob para decidir si
+necesita ordenar. En el [benchmark desordenado de 1 GiB](../development/benchmarks.md#azure-vnet-and-nsg-flow-ordering),
+el pico de temporales normalizados fue de unos 34 GiB en VNet y 48 GiB en NSG,
+además de la entrada y los artefactos finales. La comprobación previa de espacio
+incluye el archivo normalizado, los tramos pendientes y la salida de la fusión.
+Consulta las rutas de Azure para [VNet](https://learn.microsoft.com/en-us/azure/network-watcher/vnet-flow-logs-manage#download-a-flow-log)
+y [NSG](https://learn.microsoft.com/en-us/azure/network-watcher/nsg-flow-logs-overview#read-and-export-flow-logs).
 
 Exporta las entradas de Cloud Logging de GCP conservando `logName`, `timestamp`,
 `resource` y `jsonPayload.connection`; el nombre del log debe identificar

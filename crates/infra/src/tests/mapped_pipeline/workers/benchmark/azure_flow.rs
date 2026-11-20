@@ -127,6 +127,19 @@ fn profile_ingest(
         f64::from(u32::try_from(bytes).unwrap()) / 1_048_576.0 / wall
     );
     report_phases(&profile);
+    let [
+        runs,
+        run_bytes,
+        merges,
+        merge_bytes,
+        fan_in,
+        depth,
+        final_copy,
+        abandoned,
+    ] = profile.sort_snapshot();
+    println!(
+        "AZURE_SORT initial_runs={runs} run_bytes={run_bytes} merges={merges} merge_bytes={merge_bytes} fan_in={fan_in} max_merge_depth={depth} normalized_bytes={final_copy} final_copy_bytes={final_copy} abandoned_bytes={abandoned}"
+    );
     custody.report();
     let entries = store.entries(&case.id).unwrap();
     let actual = entries
