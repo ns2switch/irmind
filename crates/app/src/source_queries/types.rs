@@ -288,6 +288,24 @@ impl TryFrom<QueryWire> for SourceQueryV1 {
     }
 }
 impl SourceQueryV1 {
+    pub(crate) fn from_proposal(
+        args: &std::collections::BTreeMap<String, String>,
+    ) -> Result<Self, SourceQueryError> {
+        if args.len() != 9 || args.values().map(String::len).sum::<usize>() > 16 * 1024 {
+            return Err(SourceQueryError::Limit);
+        }
+        let mut object = serde_json::Map::new();
+        for (field, value) in args {
+            let field_value = match field.as_str() {
+                "fields" | "filters" | "version" | "limit" => checked_value(value.as_bytes())?,
+                "source" | "dataset" | "from" | "to" | "result" => Value::String(value.clone()),
+                _ => return Err(SourceQueryError::Invalid),
+            };
+            object.insert(field.clone(), field_value);
+        }
+        serde_json::from_value(Value::Object(object)).map_err(|_| SourceQueryError::Invalid)
+    }
+
     pub fn decode(bytes: &[u8]) -> Result<Self, SourceQueryError> {
         checked_value(bytes)?;
         serde_json::from_slice(bytes).map_err(|_| SourceQueryError::Invalid)

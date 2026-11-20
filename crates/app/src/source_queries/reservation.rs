@@ -3,6 +3,7 @@ use super::{
 };
 use crate::{
     Actor, AppError, AuditEventKind, CancellationToken, CaseId, CaseScope, Engine, SignedEntry,
+    Tool,
 };
 
 impl Engine<'_> {
@@ -22,6 +23,9 @@ impl Engine<'_> {
         if metadata.sealed {
             return Err(AppError::Sealed);
         }
+        self.policy_for_case_unlocked(case)?
+            .permits(&Tool::SourceQuery, self.completed_calls_unlocked(case)?)
+            .map_err(|reason| AppError::Policy(reason.into()))?;
         let case_scope = CaseScope::parse(&metadata.scope).map_err(|_| SourceQueryError::Scope)?;
         let organization_scope = self.policy.scope.as_ref().ok_or(SourceQueryError::Scope)?;
         let agent = self

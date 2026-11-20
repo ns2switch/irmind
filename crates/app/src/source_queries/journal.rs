@@ -11,7 +11,9 @@ use crate::{
     SignedOperation, Verifier,
     engine::{ScopeChangedEvent, current_case_creation},
 };
-use irmind_domain::{AgentId, SourceKind, SourceManifestV2, SourceRecordSetV1};
+use irmind_domain::{
+    AgentId, ArtifactDerivationV1, ParquetArtifact, SourceKind, SourceManifestV2, SourceRecordSetV1,
+};
 use std::collections::{BTreeMap, BTreeSet};
 
 struct Planned<'a> {
@@ -182,6 +184,9 @@ impl<'a> SourceQueryJournal<'a> {
                         return Err(invalid());
                     }
                 }
+                AuditEventKind::ParquetArtifactV3 if !self.captures.is_empty() => {
+                    self.verify_artifact_bindings(entry)?;
+                }
                 _ => {}
             }
         }
@@ -190,6 +195,26 @@ impl<'a> SourceQueryJournal<'a> {
                 || (!capture.receipt.has_no_rows() && !source_sets.contains(hash))
             {
                 return Err(AppError::InvalidChain(capture.result_seq));
+            }
+        }
+        Ok(())
+    }
+
+    fn verify_artifact_bindings(&self, entry: &SignedEntry) -> Result<(), AppError> {
+        let invalid = || AppError::InvalidChain(entry.seq);
+        let ParquetArtifact::V3(artifact) =
+            ParquetArtifact::decode(entry.kind, &entry.payload).map_err(|_| invalid())?;
+        if matches!(
+            artifact.pipeline().derivation(),
+            ArtifactDerivationV1::Mapped
+        ) {
+            for binding in artifact.bindings() {
+                if let Some(capture) = self.captures.get(binding.input().source().as_str())
+                    && (!capture.contains(entry.seq)
+                        || !capture.receipt.matches_mapping(binding.mapping()))
+                {
+                    return Err(invalid());
+                }
             }
         }
         Ok(())

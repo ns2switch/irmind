@@ -428,31 +428,42 @@ impl ChainState {
                     self.metadata_entries.push(entry.clone());
                 }
             }
-            AuditEventKind::ParquetArtifactV3 => {
-                let artifact = irmind_domain::ParquetArtifact::decode(entry.kind, &entry.payload)
-                    .map_err(|_| AppError::InvalidChain(entry.seq))?;
-                self.artifacts.insert(
-                    artifact.path().into(),
-                    super::artifact_frames::ArtifactFrame::from_artifact(&artifact),
-                );
-                if entry.evidence.is_some()
-                    || !self.artifact_paths.insert(artifact.path().into())
-                    || artifact
-                        .source_hashes()
-                        .iter()
-                        .any(|hash| !self.source_hashes.contains(hash.as_str()))
-                {
-                    return Err(AppError::InvalidChain(entry.seq));
-                }
-                self.artifact_sources.extend(
-                    artifact
-                        .source_hashes()
-                        .iter()
-                        .map(|hash| hash.as_str().to_owned()),
-                );
-            }
+            AuditEventKind::ParquetArtifactV3 => self.accept_artifact(entry)?,
             _ => {}
         }
+        Ok(())
+    }
+
+    fn accept_artifact(&mut self, entry: &SignedEntry) -> Result<(), AppError> {
+        let invalid = || AppError::InvalidChain(entry.seq);
+        let artifact = irmind_domain::ParquetArtifact::decode(entry.kind, &entry.payload)
+            .map_err(|_| invalid())?;
+        if artifact
+            .source_hashes()
+            .iter()
+            .any(|hash| self.query_hashes.contains(hash.as_str()))
+        {
+            self.metadata_entries.push(entry.clone());
+        }
+        if entry.evidence.is_some()
+            || !self.artifact_paths.insert(artifact.path().into())
+            || artifact
+                .source_hashes()
+                .iter()
+                .any(|hash| !self.source_hashes.contains(hash.as_str()))
+        {
+            return Err(invalid());
+        }
+        self.artifacts.insert(
+            artifact.path().into(),
+            super::artifact_frames::ArtifactFrame::from_artifact(&artifact),
+        );
+        self.artifact_sources.extend(
+            artifact
+                .source_hashes()
+                .iter()
+                .map(|hash| hash.as_str().to_owned()),
+        );
         Ok(())
     }
 

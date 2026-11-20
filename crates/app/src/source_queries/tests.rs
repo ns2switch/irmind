@@ -2,6 +2,33 @@
 use super::*;
 use irmind_domain::{CaseId, CaseScope};
 
+#[test]
+fn structured_query_proposals_reject_unknown_fields_and_duplicate_predicate_members() {
+    let vector: serde_json::Value = serde_json::from_slice(PLAN).unwrap();
+    let query = vector["query"].as_object().unwrap();
+    let mut arguments = query
+        .iter()
+        .map(|(key, value)| {
+            (
+                key.clone(),
+                value
+                    .as_str()
+                    .map_or_else(|| value.to_string(), str::to_owned),
+            )
+        })
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let expected = SourceQueryV1::decode(vector["query"].to_string().as_bytes()).unwrap();
+    assert_eq!(SourceQueryV1::from_proposal(&arguments).unwrap(), expected);
+    arguments.insert("sql".into(), "SELECT 1".into());
+    assert!(SourceQueryV1::from_proposal(&arguments).is_err());
+    arguments.remove("sql");
+    arguments.insert(
+        "filters".into(),
+        r#"[{"field":"event.action","op":"eq","op":"missing","value":"synthetic"}]"#.into(),
+    );
+    assert!(SourceQueryV1::from_proposal(&arguments).is_err());
+}
+
 const PLAN: &[u8] =
     include_bytes!("../../../../docs/development/source-query-format-vectors/plan.json");
 const APPROVAL: &[u8] =

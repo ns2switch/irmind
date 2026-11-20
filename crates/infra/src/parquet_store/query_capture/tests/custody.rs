@@ -51,6 +51,15 @@ fn engine_query_capture_survives_reopen_reconstruction_seal_and_v9_export() {
     let cancel = CancellationToken::new();
     let mut spool = reserve_and_stage(&engine, &case, &chain, &cancel);
     spool.write_all(&capture).unwrap();
+    check_append_rollback(
+        &engine,
+        store.as_ref(),
+        &case,
+        &chain,
+        &spool,
+        decoder.as_ref(),
+        &cancel,
+    );
     let hash = engine
         .publish_source_query_capture(
             &case,
@@ -76,6 +85,48 @@ fn engine_query_capture_survives_reopen_reconstruction_seal_and_v9_export() {
     );
     engine.seal(&case).unwrap();
     check_v9_export(root.path(), store.as_ref(), &case, &cancel);
+}
+
+fn check_append_rollback(
+    engine: &Engine<'_>,
+    store: &LocalStore,
+    case: &CaseId,
+    chain: &[SignedEntry],
+    spool: &tempfile::NamedTempFile,
+    decoder: &dyn irmind_app::StreamingEventParser,
+    cancel: &CancellationToken,
+) {
+    let prior = store.last_entry(case).unwrap().unwrap().hash;
+    store
+        .conn()
+        .unwrap()
+        .execute_batch(&format!(
+            "CREATE TEMP TRIGGER refuse_query_settlement BEFORE INSERT ON audit
+         WHEN NEW.kind = '{}' BEGIN SELECT RAISE(ABORT, 'synthetic append failure'); END;",
+            AuditEventKind::SourceQuerySettlementV1.as_str()
+        ))
+        .unwrap();
+    assert!(
+        engine
+            .publish_source_query_capture(
+                case,
+                &chain[7].payload,
+                &chain[8].payload,
+                spool,
+                decoder,
+                cancel
+            )
+            .is_err()
+    );
+    assert_eq!(store.last_entry(case).unwrap().unwrap().hash, prior);
+    let root = store.parquet.owned_case_path(case);
+    assert_eq!(fs::read_dir(root.join("queries")).unwrap().count(), 0);
+    assert!(store.signed_parquet_artifacts(case).unwrap().is_none());
+    store
+        .conn()
+        .unwrap()
+        .execute_batch("DROP TRIGGER refuse_query_settlement")
+        .unwrap();
 }
 
 fn engine(
