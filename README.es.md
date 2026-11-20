@@ -37,7 +37,7 @@ Sin configurar modelos, claves de API, cuentas ni coste. La interfaz real invest
 
 ## Novedades recientes
 
-- **v0.5.6** acelera la ingesta de registros desordenados, incluidos los flow logs de Azure VNet y NSG.
+- **v0.5.7** reduce las pasadas de ordenación de registros desordenados, incluidos los flow logs de Azure VNet y NSG.
 - **v0.5.5** añade soporte para Microsoft 365, Okta, correo electrónico, Google Workspace, auditoría de GitHub, Microsoft Defender, Falcon FDR, logs de macOS, GuardDuty y logs de flujos en nube, DNS y acceso web. Incluye además ocho [skills forenses](docs/es/skills.md) nuevas.
 
 Consulta el [changelog](CHANGELOG.md) para ver la lista completa y las notas de formato.
@@ -75,13 +75,13 @@ Empieza por [la instalación verificada](docs/es/platforms.md#verificar-una-vers
 
 
 
-La [versión preliminar v0.5.6](https://github.com/ns2switch/irmind/releases/tag/v0.5.6) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
+La [versión preliminar v0.5.7](https://github.com/ns2switch/irmind/releases/tag/v0.5.7) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
 
-Conserva la versión exacta de IRMind que creó el caso. La versión 0.5.6 usa el marcador de caso 4 y export V8; consulta la [nota de formatos](CHANGELOG.md). La [política de versiones](docs/development/decisions.md#pre-10-format-policy) explica cómo conservar el ejecutable creador o reingerir los originales verificados.
+Conserva la versión exacta de IRMind que creó el caso. La versión 0.5.7 usa el marcador de caso 4 y export V8; consulta la [nota de formatos](CHANGELOG.md). La [política de versiones](docs/development/decisions.md#pre-10-format-policy) explica cómo conservar el ejecutable creador o reingerir los originales verificados.
 
 ```sh
 # Tras descargar el binario, SHA256SUMS y ambos bundles .sigstore.json:
-tag=v0.5.6; binary=irmind-linux-x86_64
+tag=v0.5.7; binary=irmind-linux-x86_64
 for file in "$binary" SHA256SUMS; do
   cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done

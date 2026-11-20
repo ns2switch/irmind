@@ -81,20 +81,13 @@ fn profile_ingest(
     bytes: u64,
     rows: u64,
 ) {
-    let mappings = CloudFlowMapping::azure()
-        .unwrap()
-        .into_iter()
-        .map(|mapping| Arc::new(mapping) as Arc<dyn SourceMapper>)
-        .collect();
-    let catalog =
-        Arc::new(MappingCatalog::freeze(vec![Arc::new(AzureFlowSourceDecoder)], mappings).unwrap());
     let ProfiledFixture {
         store,
         engine,
         catalog,
         profile,
         custody,
-    } = profiled_fixture_with_catalog(&root.join("case"), catalog);
+    } = profiled_fixture_with_catalog(&root.join("case"), azure_catalog());
     store.set_parallel_worker_limit(NonZeroU16::new(4));
     let case = engine
         .create_case("Synthetic Azure flow profile", "local only")
@@ -151,4 +144,77 @@ fn profile_ingest(
     assert_eq!(sort > 0.0, !ordered);
     engine.verify(&case.id).unwrap();
     assert!(ingest.verify_parquet(&case.id, &cancel).unwrap() > 0);
+}
+
+fn azure_catalog() -> Arc<MappingCatalog> {
+    let mappings = CloudFlowMapping::azure()
+        .unwrap()
+        .into_iter()
+        .map(|mapping| Arc::new(mapping) as Arc<dyn SourceMapper>)
+        .collect();
+    Arc::new(MappingCatalog::freeze(vec![Arc::new(AzureFlowSourceDecoder)], mappings).unwrap())
+}
+
+#[test]
+fn disordered_azure_wide_merge_preserves_artifacts_and_chain_at_each_worker_cap() {
+    let root = tempfile::tempdir().unwrap();
+    let input = root.path().join("input");
+    fs::create_dir(&input).unwrap();
+    let paths = ["vnet.ndjson".into(), "nsg.ndjson".into()];
+    for (path, format) in paths.iter().zip(["vnet", "nsg"]) {
+        write_flows(&input.join(path), format, 2 << 20, false);
+    }
+    let seed = root.path().join("seed");
+    let seed_fixture = profiled_fixture_with_catalog(&seed, azure_catalog());
+    let case = seed_fixture
+        .engine
+        .create_case("Azure workers", "local only")
+        .unwrap();
+    drop(seed_fixture);
+    let mut expected = None;
+    let clock = Arc::new(FixedClock::new(1_793_491_200));
+    let cancel = CancellationToken::new();
+    for cap in [1, 4] {
+        let run = root.path().join(format!("workers-{cap}"));
+        fs::create_dir(&run).unwrap();
+        fs::copy(seed.join("irmind.db"), run.join("irmind.db")).unwrap();
+        let ProfiledFixture {
+            store,
+            mut engine,
+            catalog,
+            profile,
+            ..
+        } = profiled_fixture_with_catalog(&run, azure_catalog());
+        engine.clock = clock.clone();
+        store.set_parallel_worker_limit(NonZeroU16::new(cap));
+        let identity = AzureFlowSourceDecoder.identity();
+        let parser = catalog
+            .decoder_selection(identity.name, identity.version)
+            .unwrap();
+        let ingest = LargeCaseUseCases {
+            engine: &engine,
+            store: store.as_ref(),
+            parser: &parser,
+        };
+        assert_eq!(
+            ingest
+                .ingest_local_batch(&case.id, &input, &paths, false, &cancel)
+                .unwrap()
+                .len(),
+            paths.len()
+        );
+        let [_, _, _, _, fan_in, _, _, _] = profile.sort_snapshot();
+        assert!(fan_in > 2);
+        assert!(ingest.verify_parquet(&case.id, &cancel).unwrap() > 0);
+        let entries = store.entries(&case.id).unwrap();
+        let actual = (
+            entries.iter().map(|entry| entry.hash).collect::<Vec<_>>(),
+            irmind_app::artifact_catalog(&entries).unwrap().active,
+        );
+        if let Some(expected) = &expected {
+            assert_eq!(&actual, expected);
+        } else {
+            expected = Some(actual);
+        }
+    }
 }

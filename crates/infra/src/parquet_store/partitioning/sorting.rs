@@ -1,5 +1,6 @@
 //! External stable ordering for parsers whose completed groups arrive out of
 //! source order. Ordered sources avoid this pass entirely.
+mod heap_merge;
 mod natural;
 mod run;
 use super::super::{
@@ -10,6 +11,17 @@ use super::staging::StagedSource;
 use run::{Run, RunReader, RunWriter};
 use std::cmp::Ordering;
 use std::io::{Seek as _, SeekFrom};
+
+// Bound the number of open run files and heap heads per merge.
+const MAX_SORT_FAN_IN: usize = 64;
+const SORT_GROUP_READERS: usize = 128;
+// Input runs and their in-progress replacement each occupy at most the
+// normalized spool size. The spool itself is reserved separately.
+pub(super) const SORT_SCRATCH_COPIES: u64 = 2;
+
+pub(super) fn sort_workers(workers: usize) -> usize {
+    workers.min(SORT_GROUP_READERS / MAX_SORT_FAN_IN)
+}
 
 impl ParquetStore {
     pub(super) fn sort_staged_sources(
@@ -22,13 +34,15 @@ impl ParquetStore {
             .iter_mut()
             .filter(|source| source.needs_sort)
             .collect::<Vec<_>>();
-        let workers = self.workers.count();
+        // At most two wide merges run at once. On a seven-worker machine
+        // this still leaves room for the case and Parquet file descriptors.
+        let workers = sort_workers(self.workers.count());
         for group in sources.chunks_mut(workers) {
             let required = group
                 .iter()
                 .try_fold(64_u64 * 1024 * 1024, |bytes, source| {
                     let size = source.spool.as_file().metadata().map_err(storage)?.len();
-                    size.checked_mul(2)
+                    size.checked_mul(SORT_SCRATCH_COPIES)
                         .and_then(|size| bytes.checked_add(size))
                         .ok_or_else(invalid_source)
                 })?;
@@ -107,62 +121,25 @@ fn sorted_run(
     }
     Ok(run)
 }
-fn merge(
-    store: &ParquetStore,
-    case: &CaseId,
-    left: &Run,
-    right: &Run,
-    cancel: &CancellationToken,
-) -> Result<Run, AppError> {
-    let (mut a, mut b) = (left.reader()?, right.reader()?);
-    let (mut ah, mut bh) = (a.next_key(cancel)?, b.next_key(cancel)?);
-    let mut writer = RunWriter::new(store, case)?;
-    while ah.is_some() || bh.is_some() {
-        let take_a = match (&ah, &bh) {
-            (Some(a), Some(b)) => {
-                irmind_domain::compare_record_keys(a.0, b.0, false).map_err(|_| invalid_source())?
-                    != Ordering::Greater
-            }
-            (Some(_), None) => true,
-            _ => false,
-        };
-        let (head, reader) = if take_a {
-            (&mut ah, &mut a)
-        } else {
-            (&mut bh, &mut b)
-        };
-        writer.push_encoded(&head.as_ref().ok_or_else(invalid_source)?.1)?;
-        *head = reader.next_key(cancel)?;
-    }
-    let mut run = writer.finish()?;
-    run.depth = left.depth.max(right.depth) + 1;
-    if let Some(profile) = &store.profile {
-        profile.record_sort_run(run.bytes, 2, run.depth);
-    }
-    Ok(run)
-}
 fn add_run(
     store: &ParquetStore,
     case: &CaseId,
-    levels: &mut Vec<Option<Run>>,
+    levels: &mut Vec<Vec<Run>>,
     mut run: Run,
     cancel: &CancellationToken,
 ) -> Result<(), AppError> {
-    let mut level = 0;
-    loop {
-        if level >= 64 {
-            return Err(invalid_source());
-        }
+    for level in 0..64 {
         if level == levels.len() {
-            levels.push(None);
+            levels.push(Vec::new());
         }
-        let Some(old) = levels[level].take() else {
-            levels[level] = Some(run);
+        let pending = &mut levels[level];
+        pending.push(run);
+        if pending.len() < MAX_SORT_FAN_IN {
             return Ok(());
-        };
-        run = merge(store, case, &old, &run, cancel)?;
-        level += 1;
+        }
+        run = heap_merge::merge_group(store, case, std::mem::take(pending), cancel)?;
     }
+    Err(invalid_source())
 }
 fn sort_source(
     store: &ParquetStore,
@@ -251,16 +228,17 @@ fn external_sort(
 fn finish_runs(
     store: &ParquetStore,
     case: &CaseId,
-    levels: Vec<Option<Run>>,
+    levels: Vec<Vec<Run>>,
     cancel: &CancellationToken,
 ) -> Result<Run, AppError> {
     let mut final_run = None;
-    for run in levels.into_iter().rev().flatten() {
-        final_run = Some(if let Some(old) = final_run {
-            merge(store, case, &old, &run, cancel)?
-        } else {
-            run
-        });
+    for mut runs in levels {
+        // Lower levels contain the most recent input. The carry must follow
+        // the older runs within this level so equal keys remain stable.
+        runs.extend(final_run.take());
+        if !runs.is_empty() {
+            final_run = Some(heap_merge::merge_group(store, case, runs, cancel)?);
+        }
     }
     final_run.ok_or_else(invalid_source)
 }

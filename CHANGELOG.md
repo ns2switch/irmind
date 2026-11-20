@@ -8,6 +8,17 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
   Export V9 includes a mandatory query-capture count. Open older cases and exports
   with the IRMind version that created them or re-ingest the verified originals.
 
+## 0.5.7 — Fewer merge passes for disordered evidence
+
+- Merge external sort runs up to 64 at a time with a bounded heap. Smaller
+  merge groups handle large frames within the same per-merge memory budget.
+  Stable order, cancellation and per-run hash and row-count verification apply
+  to every merge.
+- Account for the normalized spool, pending runs and merge output before
+  starting Azure flow-log ingestion. The original and final Parquet are
+  accounted for separately.
+- Case marker 4 and export V8 retain their existing encodings.
+
 ## 0.5.6 — Faster merging of disordered evidence
 
 - Merge sorted runs by decoding only their stable ordering keys and copying
