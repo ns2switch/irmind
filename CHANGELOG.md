@@ -4,6 +4,11 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+- Add eight bundled forensic methods for Microsoft 365 BEC, email phishing, Okta,
+  endpoint EDR, macOS, Google Workspace, GitHub, and web investigations.
+- Extend the AWS, Azure, GCP, and network methods to use cloud flow logs, DNS,
+  GuardDuty or S3 access logs when those sources are available.
+
 **Format impact:** Add a bounded provider-process scope descriptor and finite
 mapping primitives for native FDR IDs. Older binaries do not interpret these new
 scope values/definitions. Existing scope bytes, V3 columns, case marker 4, seals

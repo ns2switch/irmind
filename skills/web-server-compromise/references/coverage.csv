@@ -1,0 +1,5 @@
+source,native_input,investigation_fields,coverage_limits
+parser-iis-w3c,W3C access exports,"Method, URL, status and endpoints",Keep Fields directives and original query strings
+parser-linux,nginx and Apache access or auditd,Backend requests and local execution evidence,Confirm the backend host and source interval
+parser-elb,AWS ALB or Classic ELB access,"Load balancer requests, outcomes and backend addresses",Delivery is best effort
+parser-defender / parser-fdr,EDR logs,Process and file effects,Relevant device and sensor coverage are required

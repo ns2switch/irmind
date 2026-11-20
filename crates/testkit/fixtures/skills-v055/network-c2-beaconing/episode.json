@@ -1,0 +1,114 @@
+{
+  "format_version": 1,
+  "skill": "network-c2-beaconing",
+  "files": [
+    {
+      "file": "conn.jsonl",
+      "parser": "parser-zeek"
+    },
+    {
+      "file": "eve.jsonl",
+      "parser": "parser-suricata"
+    },
+    {
+      "file": "route53.ndjson",
+      "parser": "parser-route53"
+    }
+  ],
+  "cluster": null,
+  "selected_source": 0,
+  "expected_file": "expanded.json",
+  "script": [
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "skill_read",
+          "args": {
+            "name": "network-c2-beaconing"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "graph_summary",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "text_search",
+          "args": {
+            "query": "203.0.113.77",
+            "limit": "20",
+            "event_category": "network",
+            "event_type": "connection",
+            "event_outcome": "unknown",
+            "entity_role": "destination"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "raw_records",
+          "args": {
+            "hash": "$source:0",
+            "index": "0",
+            "view": "original"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "text_search",
+          "args": {
+            "query": "resolver.example.test",
+            "event_category": "network",
+            "event_outcome": "success",
+            "entity_role": "source",
+            "limit": "20"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "case_add_finding",
+          "args": {
+            "kind": "hypothesis",
+            "value": "Four synthetic connections at 60-second intervals; C2 remains unconfirmed",
+            "evidence_hash": "$source:0",
+            "supporting_evidence": "$source:0"
+          }
+        },
+        {
+          "tool": "case_add_finding",
+          "args": {
+            "kind": "technique",
+            "value": "T1071.001",
+            "technique_id": "T1071.001",
+            "evidence_hash": "$source:0"
+          }
+        }
+      ]
+    },
+    {
+      "text": "Four synthetic connections at 60-second intervals; C2 remains unconfirmed Evidence: $source:0",
+      "calls": []
+    }
+  ]
+}

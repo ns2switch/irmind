@@ -2,12 +2,12 @@
 format = "irmind-skill-v1"
 name = "aws-credential-compromise"
 description = "Review possible AWS credential misuse, privilege changes and follow-on activity in CloudTrail."
-version = "0.1.0"
+version = "0.1.1"
 author = "IRMind contributors"
 license = "MIT OR Apache-2.0"
 target_schema = "irmind-common-event-v1"
 tools = ["graph_summary", "text_search", "entity_lookup", "entity_timeline", "neighbors", "path", "raw_records", "case_add_finding"]
-sources = ["parser-json"]
+sources = ["parser-json", "parser-guardduty", "parser-vpc-flow", "parser-s3-access"]
 categories = ["authentication", "iam", "configuration", "file", "network"]
 invocable = true
 +++
@@ -46,3 +46,7 @@ outcome and role filters only where coverage exists. Label hypotheses and
 techniques as proposals for analyst review, and describe uncertainty. This
 method neither changes scope nor authorizes containment or external enrichment.
 The methodology hash identifies the method used; it is not evidence of an attack.
+
+## Corroborate with additional collected sources
+
+Corroborate with GuardDuty, VPC Flow Logs and S3 server access when they are available in the same case. A GuardDuty finding is an unconfirmed source lead. Confirm principal, account and Region against original CloudTrail records. Use VPC records for links and permitted/denied connection results. Correlate S3 requester and request ID with a successful audit operation before attributing bucket access. These sources may cover different intervals or accounts.

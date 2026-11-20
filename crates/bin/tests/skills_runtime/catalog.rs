@@ -118,7 +118,7 @@ macro_rules! skill_tests {
         }
         #[test]
         fn $negative() {
-            hostile::run(&SCENARIOS[$index]);
+            hostile::run(SCENARIOS[$index].name);
         }
     };
 }
@@ -156,6 +156,26 @@ skill_tests!(
     k8s_workload_rejects_hostile_evidence,
     11
 );
+
+macro_rules! core_hostile {
+    ($test:ident, $skill:literal) => {
+        #[test]
+        fn $test() {
+            hostile::run($skill);
+        }
+    };
+}
+core_hostile!(m365_bec_rejects_hostile_evidence, "m365-bec");
+core_hostile!(phishing_rejects_hostile_evidence, "phishing-email-triage");
+core_hostile!(okta_rejects_hostile_evidence, "okta-identity-compromise");
+core_hostile!(endpoint_edr_rejects_hostile_evidence, "endpoint-edr-triage");
+core_hostile!(macos_rejects_hostile_evidence, "macos-compromise");
+core_hostile!(
+    workspace_rejects_hostile_evidence,
+    "google-workspace-compromise"
+);
+core_hostile!(github_rejects_hostile_evidence, "github-supply-chain");
+core_hostile!(web_server_rejects_hostile_evidence, "web-server-compromise");
 
 #[test]
 fn six_turn_scripted_investigation_records_budget_inputs_without_a_provider() {

@@ -1,0 +1,90 @@
+{
+  "format_version": 1,
+  "skill": "okta-identity-compromise",
+  "files": [
+    {
+      "file": "okta.ndjson",
+      "parser": "parser-okta"
+    }
+  ],
+  "cluster": null,
+  "selected_source": 0,
+  "expected_file": "v055-new-core.json",
+  "script": [
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "skill_read",
+          "args": {
+            "name": "okta-identity-compromise"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "graph_summary",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "text_search",
+          "args": {
+            "query": "user.mfa.factor.reset_all",
+            "limit": "20",
+            "event_category": "authentication",
+            "event_outcome": "success",
+            "entity_role": "actor"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "raw_records",
+          "args": {
+            "hash": "$source:0",
+            "index": "1",
+            "view": "original"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "case_add_finding",
+          "args": {
+            "kind": "hypothesis",
+            "value": "The synthetic successful factor reset identifies the initiating actor and affected account. Its authorization is unverified.",
+            "evidence_hash": "$source:0",
+            "supporting_evidence": "$source:0"
+          }
+        },
+        {
+          "tool": "case_add_finding",
+          "args": {
+            "kind": "technique",
+            "value": "T1098",
+            "technique_id": "T1098",
+            "evidence_hash": "$source:0"
+          }
+        }
+      ]
+    },
+    {
+      "text": "The synthetic successful factor reset identifies the initiating actor and affected account. Its authorization is unverified. Evidence: $source:0",
+      "calls": []
+    }
+  ]
+}

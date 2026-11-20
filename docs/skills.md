@@ -4,7 +4,7 @@ This page is for analysts who want a repeatable investigation method without gra
 
 ## Propose an improvement
 
-The source of the bundled methods is [ns2switch/irmind-skills](https://github.com/ns2switch/irmind-skills). Its `core/` directory contains the 15 included packages, reference resources and separate synthetic evaluation episodes. Propose improvements there; they reach IRMind through a reviewed synchronization PR and an IRMind release. No Rust is needed: contribute methodology, required sources, false-positive guidance and synthetic evaluation episodes.
+The source of the bundled methods is [ns2switch/irmind-skills](https://github.com/ns2switch/irmind-skills). Its `core/` directory contains the 23 included packages, reference resources and separate synthetic evaluation episodes. Propose improvements there; they reach IRMind through a reviewed synchronization PR and an IRMind release. No Rust is needed: contribute methodology, required sources, false-positive guidance and synthetic evaluation episodes.
 
 Community packages live in `catalog/`. They are installed explicitly with `/skills install catalog:<name>` from a signed production catalog; they cannot replace a bundled name. IRMind v0.5.4 compiles the catalog production key; catalog packages are published separately. Both contribution paths use the same bounded skill compiler and local scripted tests.
 
@@ -12,7 +12,7 @@ This repository keeps a [pinned offline copy](../skills/upstream.json). Builds n
 
 ## Use an included method
 
-Open a case, configure a model in `/settings model`, and type `/` to see the active methods. The binary includes 15 methods. All are experimental and tested with synthetic episodes, not validated forensic conclusions.
+Open a case, configure a model in `/settings model`, and type `/` to see the active methods. The binary includes 23 methods. All are experimental and tested with synthetic episodes, not validated forensic conclusions.
 
 | Command | Purpose | Required sources | Coverage |
 | --- | --- | --- | --- |
@@ -31,6 +31,16 @@ Open a case, configure a model in `/settings model`, and type `/` to see the act
 | `/malware-execution-triage` | Binary origin, execution and observed follow-on activity. | Sysmon 1/3/11 and PECmd/AmcacheParser or other DFIR exports. | Partial: Amcache presence is not proof of execution; raw binary artifacts need an export. |
 | `/k8s-cluster-compromise` | API access, secret-read attempts, service accounts and RBAC changes. | Native/EKS/AKS Kubernetes audit Events, GKE Cloud Audit exports; optional Falco k8s_audit. | Mapped API outcomes and cluster-scoped identities; binding contents require verified originals. Effective RBAC state and omitted audit bodies remain gaps. |
 | `/k8s-workload-compromise` | Risky pod requests, exec/attach leads and runtime correlation. | Kubernetes audit plus Falco JSON with pod/container metadata. | Original pod specs and mapped runtime observations; an accepted request or privilege flag alone does not prove execution, escape or cryptomining. |
+| `/m365-bec` | Compromised accounts, mailbox rules, forwarding and application consent. | Purview or Microsoft 365 Unified Audit Log plus Entra ID sign-in and audit exports. | Mail access and send events depend on licensing and collection. A rule change does not by itself prove a message was forwarded. |
+| `/phishing-email-triage` | Message origin, authentication, URLs, attachments and campaign scope. | RFC 5322 messages or exported headers. Mail audit, proxy or DNS logs can corroborate delivery and clicks. | HTML stays inert. An extracted URL, attachment hash or Received hop does not establish execution or a click. |
+| `/okta-identity-compromise` | Unusual logins, MFA changes, admin changes and session reuse. | Okta System Log activity JSON. | Map documented authentication and identity events; use original details for factors, policies and session context. |
+| `/endpoint-edr-triage` | Process relationships, execution and network or file activity. | Defender Advanced Hunting or Streaming API, FDR, or relevant EVTX/Sysmon channels. | Correlation uses available provider and source identities. A reused OS PID is insufficient to establish a process relationship. |
+| `/macos-compromise` | Execution, persistence and authentication on macOS. | Unified Log JSON or NDJSON and eslogger JSON. | TCC, quarantine and LaunchAgent details depend on collected records. IRMind reads exports. |
+| `/google-workspace-compromise` | Authentication, OAuth grants, mail forwarding and Drive access. | Workspace Reports API activity JSON for the relevant applications. | Some Gmail details and activity types depend on which applications and events were exported. |
+| `/github-supply-chain` | Token use, repository access, visibility and Actions changes. | Organization or enterprise GitHub audit JSON/CSV or streaming JSON. | Git events and token metadata depend on export settings. A permission change alone cannot establish exfiltration. |
+| `/web-server-compromise` | Suspicious web requests and corroborating endpoint execution. | IIS, nginx, Apache or ALB access logs, plus endpoint process evidence when available. | An HTTP response can establish request handling. Corroborate execution with process or file evidence. |
+
+The AWS methods can corroborate CloudTrail with GuardDuty findings, VPC Flow Logs and S3 server access logs. The Azure and GCP methods can use their cloud flow logs. The network method also covers Route 53 Resolver and Windows DNS Server debug logs. Collect these sources when relevant. Missing records still limit the conclusions.
 
 See the [parser guide](parsers.md) and [module configuration](modules.md) before collecting data. Skills declare only the local tools needed by their methodology. None runs a collector, accesses a provider, installs a mapper or expands case scope.
 

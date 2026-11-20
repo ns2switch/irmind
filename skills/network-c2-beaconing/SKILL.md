@@ -2,12 +2,12 @@
 format = "irmind-skill-v1"
 name = "network-c2-beaconing"
 description = "Review periodic connections, DNS and network alerts without treating regular traffic as proof of C2."
-version = "0.1.1"
+version = "0.1.2"
 author = "IRMind contributors"
 license = "MIT OR Apache-2.0"
 target_schema = "irmind-common-event-v1"
 tools = ["graph_summary", "text_search", "entity_timeline", "raw_records", "case_add_finding"]
-sources = ["parser-zeek", "parser-suricata", "parser-ecs"]
+sources = ["parser-zeek", "parser-suricata", "parser-ecs", "parser-route53", "parser-windows-dns"]
 categories = ["network", "intrusion_detection"]
 invocable = true
 +++
@@ -67,3 +67,7 @@ identifies methodology, not evidence of an incident.
 - Zeek connection log (official source; see the public skills guide for the link).
 - Suricata EVE format (official source; see the public skills guide for the link).
 - ATT&CK application layer protocol (official source; see the public skills guide for the link).
+
+## Corroborate with additional collected sources
+
+Add Route 53 Resolver query JSON or Windows DNS Server debug exports when available. Keep the DNS name, record type, client address, response, and native answer data distinct. Filter by network category and original DNS question or response. Preserve failure and source limitations and correlate requests with Zeek or Suricata flow time and endpoints. NXDOMAIN, cache misses and resolver forwarding each have benign explanations.

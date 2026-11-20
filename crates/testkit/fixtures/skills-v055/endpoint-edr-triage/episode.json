@@ -1,0 +1,90 @@
+{
+  "format_version": 1,
+  "skill": "endpoint-edr-triage",
+  "files": [
+    {
+      "file": "defender.ndjson",
+      "parser": "parser-defender"
+    }
+  ],
+  "cluster": null,
+  "selected_source": 0,
+  "expected_file": "v055-new-core.json",
+  "script": [
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "skill_read",
+          "args": {
+            "name": "endpoint-edr-triage"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "graph_summary",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "text_search",
+          "args": {
+            "query": "powershell.exe",
+            "limit": "20",
+            "event_category": "process",
+            "event_type": "start",
+            "entity_role": "subject"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "raw_records",
+          "args": {
+            "hash": "$source:0",
+            "index": "0",
+            "view": "original"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "case_add_finding",
+          "args": {
+            "kind": "hypothesis",
+            "value": "The synthetic DeviceProcessEvents row records PowerShell execution with distinct initiating and subject processes.",
+            "evidence_hash": "$source:0",
+            "supporting_evidence": "$source:0"
+          }
+        },
+        {
+          "tool": "case_add_finding",
+          "args": {
+            "kind": "technique",
+            "value": "T1059.001",
+            "technique_id": "T1059.001",
+            "evidence_hash": "$source:0"
+          }
+        }
+      ]
+    },
+    {
+      "text": "The synthetic DeviceProcessEvents row records PowerShell execution with distinct initiating and subject processes. Evidence: $source:0",
+      "calls": []
+    }
+  ]
+}

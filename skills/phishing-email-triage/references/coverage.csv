@@ -1,0 +1,5 @@
+source,native_input,investigation_fields,coverage_limits
+parser-email,EML or headers,"Message IDs, routing, authentication, literal URLs and attachment metadata",Header-only evidence omits body and attachments
+parser-m365,Unified Audit Log,Mail activity and recipients where supplied,Availability depends on audited workload
+parser-entra,Sign-in and audit tables,Identity follow-up,"Correlate independently by identity, time and source"
+parser-zeek / parser-suricata,Network logs,Related connections and DNS requests,A connection does not identify a particular user by itself

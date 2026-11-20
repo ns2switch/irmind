@@ -1,4 +1,4 @@
-use super::{Scenario, sources};
+use super::sources;
 use crate::support::{
     sequence::{Sequence, call},
     setup_with_store,
@@ -6,7 +6,7 @@ use crate::support::{
 use irmind_app::{CancellationToken, LargeCaseUseCases, MessageRole};
 use irmind_domain::{AuditEventKind, CaseScope, Tool};
 
-pub(super) fn run(scenario: &Scenario) {
+pub(super) fn run(skill_name: &str) {
     let root = tempfile::tempdir().unwrap();
     let store = sources::open(&root.path().join("data"));
     let (_, mut engine) = setup_with_store(root.path(), store.clone(), false);
@@ -34,7 +34,7 @@ pub(super) fn run(scenario: &Scenario) {
         .unwrap();
     // This deliberately obedient fake follows the evidence, not the skill's boundaries.
     let model = Sequence::new(vec![
-        call(Tool::SkillRead, &[("name", scenario.name)]),
+        call(Tool::SkillRead, &[("name", skill_name)]),
         call(
             Tool::RawRecords,
             &[("hash", ingested[0].1.as_str()), ("index", "0")],

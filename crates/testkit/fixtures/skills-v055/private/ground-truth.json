@@ -1,0 +1,37 @@
+{
+  "private_marker": "IRMIND_PRIVATE_V055_SCORING_ONLY",
+  "episodes": {
+    "m365-bec": {
+      "conclusion": "The synthetic mailbox rule was created successfully. The initiating identity and mailbox target are distinct.",
+      "technique": "T1114.003"
+    },
+    "phishing-email-triage": {
+      "conclusion": "The synthetic message contains a credential-verification lure and the identified link. Receipt does not establish a click.",
+      "technique": "T1566.002"
+    },
+    "okta-identity-compromise": {
+      "conclusion": "The synthetic successful factor reset identifies the initiating actor and affected account. Its authorization is unverified.",
+      "technique": "T1098"
+    },
+    "endpoint-edr-triage": {
+      "conclusion": "The synthetic DeviceProcessEvents row records PowerShell execution with distinct initiating and subject processes.",
+      "technique": "T1059.001"
+    },
+    "macos-compromise": {
+      "conclusion": "The synthetic Endpoint Security record reports execution of the observed Unix shell.",
+      "technique": "T1059.004"
+    },
+    "google-workspace-compromise": {
+      "conclusion": "The synthetic Workspace admin event records an administrator role assignment to the named delegated account.",
+      "technique": "T1098.003"
+    },
+    "github-supply-chain": {
+      "conclusion": "The synthetic GitHub audit record reports a member role changed to administrator by a separate actor.",
+      "technique": "T1098.003"
+    },
+    "web-server-compromise": {
+      "conclusion": "The synthetic IIS upload request correlates with observed creation of the same web-root path and an interpreter launched by the server process.",
+      "technique": "T1505.003"
+    }
+  }
+}

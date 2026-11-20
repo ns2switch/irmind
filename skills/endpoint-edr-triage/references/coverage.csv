@@ -1,0 +1,4 @@
+source,native_input,investigation_fields,coverage_limits
+parser-defender,Advanced Hunting or Streaming API,"Process, file, registry, logon and connections",Plain process IDs can be reused
+parser-fdr,Falcon Data Replicator,Native process links and activity,Keep process identifiers within cid and aid
+parser-evtx,Security or Sysmon event logs,Security events and documented Sysmon process IDs,Provider and IDs must match; isolated helper is required

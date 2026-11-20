@@ -1,0 +1,93 @@
+{
+  "format_version": 1,
+  "skill": "macos-compromise",
+  "files": [
+    {
+      "file": "endpoint.ndjson",
+      "parser": "parser-macos"
+    },
+    {
+      "file": "unified.ndjson",
+      "parser": "parser-macos"
+    }
+  ],
+  "cluster": null,
+  "selected_source": 0,
+  "expected_file": "v055-new-core.json",
+  "script": [
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "skill_read",
+          "args": {
+            "name": "macos-compromise"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "graph_summary",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "text_search",
+          "args": {
+            "query": "/bin/zsh",
+            "limit": "20",
+            "event_category": "process",
+            "event_type": "start"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "raw_records",
+          "args": {
+            "hash": "$source:0",
+            "index": "0",
+            "view": "original"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "case_add_finding",
+          "args": {
+            "kind": "hypothesis",
+            "value": "The synthetic Endpoint Security record reports execution of the observed Unix shell.",
+            "evidence_hash": "$source:0",
+            "supporting_evidence": "$source:0"
+          }
+        },
+        {
+          "tool": "case_add_finding",
+          "args": {
+            "kind": "technique",
+            "value": "T1059.004",
+            "technique_id": "T1059.004",
+            "evidence_hash": "$source:0"
+          }
+        }
+      ]
+    },
+    {
+      "text": "The synthetic Endpoint Security record reports execution of the observed Unix shell. Evidence: $source:0",
+      "calls": []
+    }
+  ]
+}

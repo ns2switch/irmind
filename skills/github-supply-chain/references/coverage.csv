@@ -1,0 +1,2 @@
+source,native_input,investigation_fields,coverage_limits
+parser-github-audit,"Organization and enterprise JSON, CSV or stream","Access, roles, git and Actions audit activity",Available git and token metadata depend on export mode

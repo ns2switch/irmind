@@ -1,0 +1,2 @@
+source,native_input,investigation_fields,coverage_limits
+parser-okta,System Log exports,"Sign-in, MFA, role, policy and session events",Original fields for new types; tenant retention applies

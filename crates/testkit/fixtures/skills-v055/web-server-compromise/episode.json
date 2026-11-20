@@ -1,0 +1,114 @@
+{
+  "format_version": 1,
+  "skill": "web-server-compromise",
+  "files": [
+    {
+      "file": "iis.log",
+      "parser": "parser-iis-w3c"
+    },
+    {
+      "file": "alb.log",
+      "parser": "parser-elb"
+    },
+    {
+      "file": "defender.ndjson",
+      "parser": "parser-defender"
+    }
+  ],
+  "cluster": null,
+  "selected_source": 0,
+  "expected_file": "v055-new-core.json",
+  "script": [
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "skill_read",
+          "args": {
+            "name": "web-server-compromise"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "graph_summary",
+          "args": {}
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "text_search",
+          "args": {
+            "query": "/synthetic/upload.aspx",
+            "limit": "20",
+            "event_category": "web",
+            "event_outcome": "success",
+            "entity_role": "source"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "raw_records",
+          "args": {
+            "hash": "$source:0",
+            "index": "0",
+            "view": "original"
+          }
+        },
+        {
+          "tool": "raw_records",
+          "args": {
+            "hash": "$source:2",
+            "index": "0",
+            "view": "original"
+          }
+        },
+        {
+          "tool": "raw_records",
+          "args": {
+            "hash": "$source:2",
+            "index": "1",
+            "view": "original"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "calls": [
+        {
+          "tool": "case_add_finding",
+          "args": {
+            "kind": "hypothesis",
+            "value": "The synthetic IIS upload request correlates with observed creation of the same web-root path and an interpreter launched by the server process.",
+            "evidence_hash": "$source:0",
+            "supporting_evidence": "$source:0,$source:2"
+          }
+        },
+        {
+          "tool": "case_add_finding",
+          "args": {
+            "kind": "technique",
+            "value": "T1505.003",
+            "technique_id": "T1505.003",
+            "evidence_hash": "$source:2"
+          }
+        }
+      ]
+    },
+    {
+      "text": "The synthetic IIS upload request correlates with observed creation of the same web-root path and an interpreter launched by the server process. Evidence: $source:0, $source:2",
+      "calls": []
+    }
+  ]
+}
