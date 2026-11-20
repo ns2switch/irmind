@@ -47,6 +47,32 @@ fn azure_sort_space_is_checked_before_creating_normalized_files() {
             .preflight_direct_group_with_space(&request, 4, &cancel, || Ok(required))
             .is_ok()
     );
+
+    let paths = [
+        "a.ndjson".into(),
+        "b.ndjson".into(),
+        "c.ndjson".into(),
+        name.into(),
+    ];
+    for path in &paths[..3] {
+        fs::write(root.path().join(path), blob).unwrap();
+    }
+    let group = MappedIngestRequest {
+        relative_paths: &paths,
+        ..request
+    };
+    let required = 8 * normalized + 4 * (16 * raw + raw) + 5 * 64 * 1024 * 1024;
+    assert!(matches!(
+        store.preflight_direct_group_with_space(&group, 4, &cancel, || Ok(required - 1)),
+        Err(AppError::Fixed(FixedAppError::StorageCaseStagingCapacity {
+            required: reported, available
+        })) if reported == required && available == required - 1
+    ));
+    assert!(
+        store
+            .preflight_direct_group_with_space(&group, 4, &cancel, || Ok(required))
+            .is_ok()
+    );
 }
 
 #[test]

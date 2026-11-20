@@ -8,11 +8,14 @@ fn case() -> CaseId {
     CaseId::parse("00000000-0000-0000-0000-000000000020").unwrap()
 }
 fn row(n: usize) -> RecordRow {
+    row_with_text(n, "{}".into())
+}
+fn row_with_text(n: usize, text: String) -> RecordRow {
     let record = GraphRecord {
         index: n,
         at: format!("2026-11-01T00:00:0{n}Z"),
         event: "read".into(),
-        text: "{}".into(),
+        text,
         entities: vec![],
         relations: vec![],
     };
@@ -28,7 +31,7 @@ fn row(n: usize) -> RecordRow {
     .unwrap()
 }
 #[test]
-fn binary_merge_levels_keep_global_order_and_clean_every_run() {
+fn wide_merge_levels_keep_global_order_and_clean_every_run() {
     let dir = tempfile::tempdir().unwrap();
     let store = crate::parquet_store::fixtures::store(dir.path());
     let cancel = CancellationToken::new();
@@ -59,6 +62,35 @@ fn binary_merge_levels_keep_global_order_and_clean_every_run() {
         0
     );
 }
+
+#[test]
+fn wide_merge_carry_preserves_ties_across_multiple_levels() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = crate::parquet_store::fixtures::store(dir.path());
+    let cancel = CancellationToken::new();
+    let mut levels = Vec::new();
+    let mut expected = Vec::new();
+    for i in 0..MAX_SORT_FAN_IN * 2 + 5 {
+        let input = row_with_text(1, format!(r#"{{"row":{i}}}"#));
+        let encoded = serde_json::to_vec(&input).unwrap();
+        expected.push([encoded.as_slice(), b"\n"].concat());
+        add_run(
+            &store,
+            &case(),
+            &mut levels,
+            sorted_run(&store, &case(), vec![input], &cancel).unwrap(),
+            &cancel,
+        )
+        .unwrap();
+    }
+    let merged = finish_runs(&store, &case(), levels, &cancel).unwrap();
+    assert_eq!(merged.depth, 2);
+    let mut reader = merged.reader().unwrap();
+    for frame in expected {
+        assert_eq!(reader.next_encoded(&cancel).unwrap().unwrap().1, frame);
+    }
+    assert!(reader.next_encoded(&cancel).unwrap().is_none());
+}
 #[test]
 fn merge_retains_original_frames_in_stable_key_order() {
     let dir = tempfile::tempdir().unwrap();
@@ -79,7 +111,7 @@ fn merge_retains_original_frames_in_stable_key_order() {
         }
         writer.finish().unwrap()
     });
-    let merged = merge(&store, &case(), &left, &right, &cancel).unwrap();
+    let merged = heap_merge::merge(&store, &case(), &[left, right], &cancel).unwrap();
     let mut reader = merged.reader().unwrap();
     for index in [0, 2, 1, 3] {
         assert_eq!(
@@ -104,9 +136,9 @@ fn run_key_reader_rejects_mutations_outside_the_sort_key() {
     let hash = irmind_app::sha256(expected);
     let mut reader = RunReader::new(file, hash, expected.len() as u64, 1);
     let cancel = CancellationToken::new();
-    let (key, _) = reader.next_key(&cancel).unwrap().unwrap();
+    let (key, _) = reader.next_key(Vec::new(), &cancel).unwrap().unwrap();
     assert_eq!(key.record_index, 1);
-    assert!(reader.next_key(&cancel).is_err());
+    assert!(reader.next_key(Vec::new(), &cancel).is_err());
 }
 
 #[test]
@@ -118,11 +150,9 @@ fn cancellation_during_merge_drops_private_runs() {
     let b = sorted_run(&store, &case(), vec![row(0)], &cancel).unwrap();
     cancel.cancel();
     assert!(matches!(
-        merge(&store, &case(), &a, &b, &cancel),
+        heap_merge::merge(&store, &case(), &[a, b], &cancel),
         Err(AppError::Cancelled)
     ));
-    drop(a);
-    drop(b);
     assert_eq!(
         std::fs::read_dir(store.spool_dir(&case()).unwrap())
             .unwrap()
