@@ -111,21 +111,24 @@ fn merge(
     cancel: &CancellationToken,
 ) -> Result<Run, AppError> {
     let (mut a, mut b) = (left.reader()?, right.reader()?);
-    let (mut ah, mut bh) = (a.next(cancel)?, b.next(cancel)?);
+    let (mut ah, mut bh) = (a.next_key(cancel)?, b.next_key(cancel)?);
     let mut writer = RunWriter::new(store, case)?;
     while ah.is_some() || bh.is_some() {
         let take_a = match (&ah, &bh) {
-            (Some(a), Some(b)) => compare(a, b)? != Ordering::Greater,
+            (Some(a), Some(b)) => {
+                irmind_domain::compare_record_keys(a.0, b.0, false).map_err(|_| invalid_source())?
+                    != Ordering::Greater
+            }
             (Some(_), None) => true,
             _ => false,
         };
-        if take_a {
-            writer.push(ah.as_ref().ok_or_else(invalid_source)?)?;
-            ah = a.next(cancel)?;
+        let (head, reader) = if take_a {
+            (&mut ah, &mut a)
         } else {
-            writer.push(bh.as_ref().ok_or_else(invalid_source)?)?;
-            bh = b.next(cancel)?;
-        }
+            (&mut bh, &mut b)
+        };
+        writer.push_encoded(&head.as_ref().ok_or_else(invalid_source)?.1)?;
+        *head = reader.next_key(cancel)?;
     }
     writer.finish()
 }

@@ -2079,6 +2079,37 @@ failures. Compressed-source admission is described separately in the
 [FDR admission contract](fdr-compressed-admission.md).
 
 
+### Azure VNet and NSG flow ordering
+
+Use the same synthetic two-tuple exports and four-worker cap for both orderings.
+The chronological corpus groups the two timestamps, and the disordered corpus
+alternates them. Each pair has the same tuple counts, source byte count and
+logical events. Each measured ingestion checks the signed case and Parquet
+after timing.
+
+A paired 64 MiB VNet run on one Linux x86-64 host measured 45.51 s in external
+sorting on v0.5.5 and 25.88 s with key-only merge reads. Whole-process user CPU
+was 38.21 s and 25.95 s respectively. Ingestion wall time was 59.76 s and
+58.37 s, with a much longer file-sync wait in the second run (17.98 s versus
+1.51 s). Both runs reached 2,267,553,420 temporary normalized bytes.
+Read the timers per stage because concurrent work can overlap.
+
+Each Azure tuple is decoded before staging. The external merge uses the
+validated time, offset and ordinal, copies the existing row bytes and checks
+every run's count, length and hash. The initial chunk pass and final replay
+still deserialize the complete rows. The sorted path avoids the external
+merge.
+
+```sh
+IRMIND_AZURE_BENCH_FORMAT=vnet IRMIND_AZURE_BENCH_ORDER=ordered \
+  cargo test --release --locked -p irmind-infra --lib \
+  benchmark_azure_flow_release -- --ignored --nocapture
+```
+
+Use `nsg` for the NSG fixture and `disordered` for the external-sort profile.
+The default input is 1 GiB. Set `IRMIND_AZURE_BENCH_MIB=64` for a shorter
+measurement.
+
 ### Gzip and JSONL on the same FDR corpus
 
 The [paired release sample](benchmark-data/fdr-gzip-v055.json) ingests the

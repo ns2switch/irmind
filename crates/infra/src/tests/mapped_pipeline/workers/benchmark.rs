@@ -1,6 +1,8 @@
 use super::*;
 use std::time::Instant;
 
+mod azure_flow;
+
 #[test]
 #[ignore = "manual release-only single NDJSON source worker sweep"]
 fn benchmark_single_ndjson_release() -> Result<(), &'static str> {
@@ -108,6 +110,10 @@ fn profiled_fixture(root: &Path) -> ProfiledFixture {
         )
         .unwrap(),
     );
+    profiled_fixture_with_catalog(root, catalog)
+}
+
+fn profiled_fixture_with_catalog(root: &Path, catalog: Arc<MappingCatalog>) -> ProfiledFixture {
     let profile = Arc::new(crate::parquet_store::ParquetProfile::default());
     let mut local = LocalStore::open_mapped(root, catalog.clone()).unwrap();
     local.parquet.attach_profile(profile.clone());

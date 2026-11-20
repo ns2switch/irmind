@@ -113,13 +113,23 @@ impl RecordRow {
     }
 
     pub(in crate::parquet_store) fn sort_key(&self) -> irmind_domain::StableRecordKey<'static> {
-        irmind_domain::StableRecordKey {
-            instant: self.time.map(irmind_app::IndexedTime::instant),
-            source: "",
-            source_hash: "",
-            source_offset: self.source_offset,
-            record_index: self.index,
+        sort_key(self.index, self.time, self.source_offset)
+    }
+
+    /// Sort runs already contain validated, hashed rows. Merge passes need
+    /// only their ordering key and can copy the original frame verbatim.
+    pub(in crate::parquet_store) fn staged_sort_key(
+        encoded: &[u8],
+    ) -> Result<irmind_domain::StableRecordKey<'static>, serde_json::Error> {
+        #[derive(serde::Deserialize)]
+        struct Key {
+            index: u64,
+            #[serde(deserialize_with = "super::staged_time::deserialize")]
+            time: Option<irmind_app::IndexedTime>,
+            source_offset: Option<u64>,
         }
+        let key: Key = serde_json::from_slice(encoded)?;
+        Ok(sort_key(key.index, key.time, key.source_offset))
     }
 
     pub(in crate::parquet_store) fn estimated_bytes(&self) -> usize {
@@ -139,6 +149,20 @@ impl RecordRow {
                 .iter()
                 .map(|(kind, value)| kind.len() + value.len())
                 .sum::<usize>()
+    }
+}
+
+fn sort_key(
+    index: u64,
+    time: Option<irmind_app::IndexedTime>,
+    source_offset: Option<u64>,
+) -> irmind_domain::StableRecordKey<'static> {
+    irmind_domain::StableRecordKey {
+        instant: time.map(irmind_app::IndexedTime::instant),
+        source: "",
+        source_hash: "",
+        source_offset,
+        record_index: index,
     }
 }
 

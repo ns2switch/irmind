@@ -4,6 +4,16 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+## 0.5.6 — Faster merging of disordered evidence
+
+- Merge sorted runs by decoding only their stable ordering keys and copying
+  their validated row frames. This removes repeated JSON materialization and
+  encoding during external sorting, including disordered Azure VNet and NSG
+  flow logs. Run boundaries, counts and hashes are still verified before
+  publication.
+- Case marker 4 and export V8 use the existing encodings. Stable ordering
+  produces the same normalized row bytes and Parquet artifacts.
+
 ## 0.5.5 — Identity, endpoint and network evidence
 
 **Format impact:** Add a bounded provider-process scope descriptor and finite
