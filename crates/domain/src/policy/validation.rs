@@ -23,6 +23,7 @@ pub(super) fn valid_tool_arguments(proposal: &ProposedCall) -> bool {
         | Tool::EdrDetections
         | Tool::ThreatIntelExternal => valid_edr_and_external_intel(proposal),
         Tool::ObjectList | Tool::ObjectRead => valid_object_request(proposal),
+        Tool::SourceQuery => valid_source_query(proposal),
         Tool::DelegateTask => {
             valid_args(&proposal.args, &["tasks"])
                 && proposal
@@ -42,6 +43,20 @@ pub(super) fn valid_tool_arguments(proposal: &ProposedCall) -> bool {
                     .is_none_or(|p| crate::SkillResourcePath::parse(p).is_ok())
         }
     }
+}
+
+fn valid_source_query(proposal: &ProposedCall) -> bool {
+    let args = &proposal.args;
+    let fields = [
+        "version", "source", "dataset", "from", "to", "filters", "fields", "result", "limit",
+    ];
+    args.len() == fields.len()
+        && valid_args(args, &fields)
+        && fields
+            .iter()
+            .all(|key| args.get(*key).is_some_and(|value| !value.is_empty()))
+        && args.get("source").is_some_and(|id| valid_scope_target(id))
+        && args.values().map(String::len).sum::<usize>() <= 16 * 1024
 }
 
 fn valid_object_request(proposal: &ProposedCall) -> bool {

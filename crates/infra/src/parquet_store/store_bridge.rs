@@ -102,6 +102,29 @@ impl LargeCaseStore for crate::LocalStore {
         manifest: &SourceManifestV1,
         cancel: &CancellationToken,
     ) -> Result<(), AppError> {
+        use irmind_app::AuditLog as _;
+        use irmind_app::source_queries::{SourceQueryResultV1, verify_query_capture};
+        use irmind_domain::AuditEventKind;
+        if manifest.copied && manifest.source == format!("queries/{}.sqc", manifest.sha256.as_str())
+        {
+            let entries = self.entries(case_id)?;
+            self.signed_parquet_artifacts(case_id)?;
+            for entry in entries
+                .iter()
+                .filter(|entry| entry.kind == AuditEventKind::SourceQueryResultV1)
+            {
+                let result = SourceQueryResultV1::decode(entry.payload.as_bytes())?;
+                if result.capture_identity().0 == manifest.sha256.as_str() {
+                    let capture = self.open_source_query_capture(
+                        case_id,
+                        &manifest.sha256,
+                        manifest.size,
+                        cancel,
+                    )?;
+                    return Ok(result.verify_capture(&verify_query_capture(capture, cancel)?)?);
+                }
+            }
+        }
         self.parquet.verify_copied_source(case_id, manifest, cancel)
     }
 

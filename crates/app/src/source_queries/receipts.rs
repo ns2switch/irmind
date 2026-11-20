@@ -186,6 +186,10 @@ impl SourceQueryPlanV1 {
         query_content_id("irmind-source-query-plan-v1", self)
     }
 
+    pub(super) fn adoption(&self) -> &str {
+        &self.configuration.adoption
+    }
+
     pub fn validate_scope(
         &self,
         case: &CaseId,
@@ -394,6 +398,14 @@ impl SourceQueryApprovalV1 {
         query_content_id("irmind-source-query-approval-v1", self)
     }
 
+    pub(super) fn plan(&self) -> &str {
+        &self.plan
+    }
+
+    pub(super) fn case_id(&self) -> &str {
+        &self.case_id
+    }
+
     pub(super) fn permits(&self, plan: &SourceQueryPlanV1, id: &str) -> bool {
         self.plan == id
             && self.case_id == plan.case_id
@@ -441,6 +453,14 @@ impl SourceQueryReservationV1 {
 
     pub fn content_id(&self) -> Result<String, SourceQueryError> {
         query_content_id("irmind-source-query-reservation-v1", self)
+    }
+
+    pub(super) fn plan(&self) -> &str {
+        &self.plan
+    }
+
+    pub(super) fn approval(&self) -> Option<&str> {
+        self.approval.as_deref()
     }
 
     pub(super) fn check(

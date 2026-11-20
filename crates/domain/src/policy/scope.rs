@@ -12,6 +12,7 @@ const SCOPED_TOOLS: &[Tool] = &[
     Tool::EdrDetections,
     Tool::ObjectList,
     Tool::ObjectRead,
+    Tool::SourceQuery,
 ];
 
 fn is_scoped(tool: &Tool) -> bool {
@@ -50,6 +51,8 @@ pub(super) fn scope_gate(case: &Case, proposal: &ProposedCall) -> Gate {
     };
     if in_scope(&scope, proposal) {
         Gate::Continue
+    } else if proposal.tool == Tool::SourceQuery {
+        Gate::Deny("query source outside case scope")
     } else if matches!(proposal.tool, Tool::ObjectList | Tool::ObjectRead) {
         Gate::Deny("object outside case scope")
     } else {
@@ -82,6 +85,10 @@ pub(super) fn in_scope(scope: &CaseScope, proposal: &ProposedCall) -> bool {
             scoped_edr(scope, proposal)
         }
         Tool::ObjectList | Tool::ObjectRead => scoped_object(scope, proposal),
+        Tool::SourceQuery => proposal
+            .args
+            .get("source")
+            .is_some_and(|source| scope.allows_source(source)),
         _ => false,
     }
 }

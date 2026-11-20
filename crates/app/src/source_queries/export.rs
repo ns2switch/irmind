@@ -21,8 +21,43 @@ struct Descriptor {
 /// discards the incomplete package on any error. The signature and inventory
 /// linkage are authenticated before calling this framing routine.
 pub fn write_query_capture_section<R: Read>(
-    mut output: impl Write,
+    output: impl Write,
     captures: &mut [(&SourceQueryResultV1, R)],
+    cancel: &CancellationToken,
+) -> Result<(), AppError> {
+    write_section(
+        output,
+        captures
+            .iter_mut()
+            .map(|(result, reader)| Ok((*result, reader))),
+        cancel,
+    )
+}
+
+pub fn write_stored_query_capture_section<'a>(
+    output: impl Write,
+    captures: impl ExactSizeIterator<Item = &'a SourceQueryResultV1>,
+    store: &dyn crate::LargeCaseStore,
+    case: &crate::CaseId,
+    cancel: &CancellationToken,
+) -> Result<(), AppError> {
+    write_section(
+        output,
+        captures.map(|result| {
+            let (digest, bytes) = result.capture_identity();
+            let hash = irmind_domain::EvidenceHash::parse(digest)
+                .map_err(|_| SourceQueryError::Invalid)?;
+            store
+                .open_source_query_capture(case, &hash, bytes, cancel)
+                .map(|reader| (result, reader))
+        }),
+        cancel,
+    )
+}
+
+fn write_section<'a, R: Read>(
+    mut output: impl Write,
+    captures: impl ExactSizeIterator<Item = Result<(&'a SourceQueryResultV1, R), AppError>>,
     cancel: &CancellationToken,
 ) -> Result<(), AppError> {
     output
@@ -30,10 +65,11 @@ pub fn write_query_capture_section<R: Read>(
         .map_err(|error| export_io(&error))?;
     let mut previous = None;
     let mut total = 0_u64;
-    for (receipt, input) in captures {
+    for item in captures {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
+        let (receipt, mut input) = item?;
         let (hash, bytes) = receipt.capture_identity();
         check_inventory(hash, bytes, &mut previous, &mut total)?;
         let descriptor = serde_json::to_vec(&Descriptor {
@@ -50,7 +86,7 @@ pub fn write_query_capture_section<R: Read>(
             .map_err(|error| export_io(&error))?;
         let verified = verify_query_capture(
             ExportChunks {
-                input,
+                input: &mut input,
                 output: &mut output,
                 bytes,
                 current: 0,

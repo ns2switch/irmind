@@ -12,17 +12,17 @@ pub(crate) const CASE_CREATION_VERSION: u8 = 5;
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct CaseCreatedEvent {
+pub(crate) struct CaseCreatedEvent {
     version: u8,
     title: String,
     #[serde(default)]
     severity: Option<String>,
-    scope: String,
+    pub(crate) scope: String,
     budget: crate::CaseBudgetLimits,
-    source_queries: crate::source_queries::SourceQueryAllocationV1,
+    pub(crate) source_queries: crate::source_queries::SourceQueryAllocationV1,
 }
 
-fn current_case_creation(first: &SignedEntry) -> Result<CaseCreatedEvent, AppError> {
+pub(crate) fn current_case_creation(first: &SignedEntry) -> Result<CaseCreatedEvent, AppError> {
     #[derive(Deserialize)]
     struct VersionMarker {
         version: u8,
@@ -46,10 +46,10 @@ fn current_case_creation(first: &SignedEntry) -> Result<CaseCreatedEvent, AppErr
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct ScopeChangedEvent {
+pub(crate) struct ScopeChangedEvent {
     version: u8,
     previous_scope: String,
-    new_scope: String,
+    pub(crate) new_scope: String,
 }
 
 pub fn verify_case_metadata(
@@ -71,11 +71,6 @@ pub fn verify_case_metadata(
     let mut current = created.scope;
     CaseScope::parse(&current).map_err(|_| AppError::InvalidChain(first.seq))?;
     for entry in entries.iter().skip(1) {
-        if entry.kind.is_source_query_lifecycle() {
-            // These records need the durable query verifier and adoption proof
-            // section before they can be accepted as part of a case.
-            return Err(AppError::InvalidChain(entry.seq));
-        }
         query_budgets.accept(entry)?;
         if entry.kind != irmind_domain::AuditEventKind::CaseScopeChanged {
             crate::source_scopes::verify_entry(entry, &current)?;

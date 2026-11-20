@@ -54,6 +54,10 @@ pub struct SourceQueryExecutionV1 {
 }
 
 impl SourceQueryExecutionV1 {
+    pub(super) fn reservation(&self) -> &str {
+        &self.reservation
+    }
+
     pub(super) fn check_submit_intent(
         &self,
         plan: &super::SourceQueryPlanV1,
@@ -148,6 +152,9 @@ pub struct SourceQueryResultV1 {
 }
 
 impl SourceQueryResultV1 {
+    pub(super) fn reservation(&self) -> &str {
+        &self.reservation
+    }
     pub fn decode(bytes: &[u8]) -> Result<Self, SourceQueryError> {
         let record: Self = decode_record(bytes)?;
         validate_identity(record.version, &record.case_id, None)?;
@@ -213,6 +220,20 @@ impl SourceQueryResultV1 {
         accepted == self.row_count && rejected == self.rejected_rows
     }
 
+    pub(super) const fn has_no_rows(&self) -> bool {
+        self.row_count == 0
+    }
+
+    pub(super) fn matches_manifest(&self, source: &irmind_domain::SourceManifestV2) -> bool {
+        source.source.copied
+            && source.source.sha256.as_str() == self.capture_sha256
+            && source.source.size == self.capture_bytes
+            && source.source.source == self.capture_path()
+            && source.parser_id == self.decoder.id
+            && source.parser_version == self.decoder.version
+            && source.rejected_records == self.rejected_rows
+    }
+
     pub fn source_reference(&self) -> Result<irmind_domain::SourceReferenceV1, SourceQueryError> {
         let acquisition = irmind_domain::EvidenceHash::parse(&self.content_id()?)
             .map_err(|_| SourceQueryError::Invalid)?;
@@ -264,6 +285,9 @@ pub struct SourceQuerySettlementV1 {
 }
 
 impl SourceQuerySettlementV1 {
+    pub(super) fn reservation(&self) -> &str {
+        &self.reservation
+    }
     pub fn decode(bytes: &[u8]) -> Result<Self, SourceQueryError> {
         let record: Self = decode_record(bytes)?;
         validate_identity(record.version, &record.case_id, None)?;
@@ -318,23 +342,44 @@ impl SourceQueryBroker {
         principal: &AgentId,
         verifier: &dyn Verifier,
     ) -> Result<(), AppError> {
+        self.settle_records(
+            records.observations,
+            records.result.map(|(entry, _)| entry),
+            records.settlement,
+            principal,
+            verifier,
+            |result| {
+                let (_, capture) = records.result.ok_or(SourceQueryError::Invalid)?;
+                Ok(result.verify_capture(capture)?)
+            },
+        )?;
+        Ok(())
+    }
+
+    /// Offline replay first authenticates the signed inventory. It must then
+    /// verify each capture against that inventory before accepting the case.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn settle_records(
+        &mut self,
+        observations: &[&SignedEntry],
+        result_entry: Option<&SignedEntry>,
+        settlement_entry: &SignedEntry,
+        principal: &AgentId,
+        verifier: &dyn Verifier,
+        check_capture: impl FnOnce(&SourceQueryResultV1) -> Result<(), AppError>,
+    ) -> Result<Option<SourceQueryResultV1>, AppError> {
         let principal = Actor::Agent(principal.clone());
         verify_entry(
-            records.settlement,
+            settlement_entry,
             self.case(),
             AuditEventKind::SourceQuerySettlementV1,
             &principal,
             verifier,
         )?;
-        let settlement = SourceQuerySettlementV1::decode(records.settlement.payload.as_bytes())?;
+        let settlement = SourceQuerySettlementV1::decode(settlement_entry.payload.as_bytes())?;
         let pending = self.pending(&settlement.reservation)?;
-        let (execution, execution_seq) = verify_observations(
-            records.observations,
-            self.case(),
-            pending,
-            &principal,
-            verifier,
-        )?;
+        let (execution, execution_seq) =
+            verify_observations(observations, self.case(), pending, &principal, verifier)?;
         let execution_id = execution.content_id()?;
         if execution.phase != Phase::Terminal
             || execution.status == Status::Unknown
@@ -346,12 +391,12 @@ impl SourceQueryBroker {
             || settlement.execution != execution_id
             || settlement.usage != execution.usage
             || settlement.at.as_str() < execution.observed_at.as_str()
-            || execution_seq >= records.settlement.seq
+            || execution_seq >= settlement_entry.seq
         {
             return Err(SourceQueryError::Unresolved.into());
         }
-        match (settlement.result.as_deref(), records.result) {
-            (Some(expected), Some((entry, capture))) => {
+        let result = match (settlement.result.as_deref(), result_entry) {
+            (Some(expected), Some(entry)) => {
                 verify_entry(
                     entry,
                     self.case(),
@@ -368,7 +413,7 @@ impl SourceQueryBroker {
                     || result.capture_bytes != settlement.retained_bytes
                     || result.row_count + result.rejected_rows != settlement.retained_rows
                     || entry.seq <= execution_seq
-                    || entry.seq >= records.settlement.seq
+                    || entry.seq >= settlement_entry.seq
                     || result.at.as_str() < execution.observed_at.as_str()
                     || result.at.as_str() > settlement.at.as_str()
                     || result.decoder != pending.decoder
@@ -376,21 +421,23 @@ impl SourceQueryBroker {
                 {
                     return Err(SourceQueryError::Invalid.into());
                 }
-                result.verify_capture(capture)?;
+                check_capture(&result)?;
+                Some(result)
             }
-            (None, None) => {}
+            (None, None) => None,
             _ => return Err(SourceQueryError::Invalid.into()),
-        }
-        Ok(self.settle(
+        };
+        self.settle(
             &settlement.reservation,
             settlement.scan_charged,
             settlement.retained_rows,
             settlement.retained_bytes,
-        )?)
+        )?;
+        Ok(result)
     }
 }
 
-fn verify_observations(
+pub(super) fn verify_observations(
     entries: &[&SignedEntry],
     case: &crate::CaseId,
     hold: &SourceQueryHold,

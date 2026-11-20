@@ -215,6 +215,7 @@ impl Engine<'_> {
 
     fn source_unavailable_reason(&self, tool: &Tool, source: Option<&str>) -> Option<&'static str> {
         match tool {
+            Tool::SourceQuery => Some("source queries require a configured source-query module"),
             Tool::SiemSearch | Tool::SiemGetAlert if !self.siem_available(source) => {
                 Some("SIEM source unavailable")
             }

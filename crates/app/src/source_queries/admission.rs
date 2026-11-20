@@ -229,7 +229,7 @@ impl PolicyRules {
     }
 }
 
-fn adopted_threshold(
+pub(super) fn adopted_threshold(
     plan: &SourceQueryPlanV1,
     operation: &SignedOperation,
     verifier: &dyn Verifier,

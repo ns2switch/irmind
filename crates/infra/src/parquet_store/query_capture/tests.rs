@@ -12,6 +12,8 @@ use irmind_domain::{
 };
 use std::{collections::BTreeMap, sync::Arc};
 
+mod custody;
+
 fn capture() -> Vec<u8> {
     hex::decode(
         include_str!("../../../../../docs/development/source-query-format-vectors/capture.hex")

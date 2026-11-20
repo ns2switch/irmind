@@ -89,6 +89,7 @@ impl Engine<'_> {
             }
         }
         let manifest = crate::large_case::read_manifest_index(&entries)?;
+        self.verify_source_query_journal(&entries, cancel, true)?;
         let source_hashes = manifest
             .sources
             .iter()

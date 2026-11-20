@@ -112,6 +112,12 @@ impl Engine<'_> {
                 return Ok(false);
             }
             let case = CaseId::parse(&started.plan.case_id).map_err(|_| invalid())?;
+            if call.tool == Tool::SourceQuery.as_str() {
+                state
+                    .coverage
+                    .insert("Source queries are unavailable for subagents in this version.".into());
+                return Ok(false);
+            }
             if matches!(
                 Tool::parse(&call.tool),
                 Ok(Tool::ThreatIntelExternal | Tool::ObjectRead)

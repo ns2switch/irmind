@@ -289,6 +289,12 @@ impl PreparedMappedIngest for PreparedCapture {
         check_directory(directory)?;
         irmind_fs::private_dir(directory).map_err(storage)?;
         self.inner.publish(cancel)?;
+        #[cfg(windows)]
+        let mut file = {
+            irmind_fs::durable_rename(staged.path(), &self.target).map_err(storage)?;
+            staged.into_file()
+        };
+        #[cfg(not(windows))]
         let mut file = staged.persist_noclobber(&self.target).map_err(storage)?;
         self.published = true;
         if !irmind_fs::regular_file_has_single_link(&file).map_err(storage)? {

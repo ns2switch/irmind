@@ -6,8 +6,10 @@ mod capture;
 mod compile;
 mod completion;
 mod export;
+mod journal;
 mod ports;
 mod receipts;
+mod reservation;
 #[cfg(test)]
 mod tests;
 mod types;
@@ -23,7 +25,10 @@ pub use completion::{
     SignedSourceQuerySettlement, SourceQueryExecutionV1, SourceQueryResultV1,
     SourceQuerySettlementV1,
 };
-pub use export::{verify_query_capture_section, write_query_capture_section};
+pub use export::{
+    verify_query_capture_section, write_query_capture_section, write_stored_query_capture_section,
+};
+pub use journal::SourceQueryJournal;
 pub use ports::*;
 pub(crate) use receipts::BudgetReplay;
 pub use receipts::{

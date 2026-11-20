@@ -142,6 +142,7 @@ impl Engine<'_> {
             previous = self.verify_chain_entry(id, index, previous, entry)?;
         }
         verify_case_metadata(&case.title, case.severity, &case.scope, &entries)?;
+        self.verify_source_query_journal(&entries, cancel, false)?;
         crate::large_case::read_manifest_index(&entries)?;
         self.verify_seal_metadata(id, &case, &entries)?;
         self.pending_requests_unlocked(&case, &entries)?;
@@ -207,6 +208,7 @@ impl Engine<'_> {
             prev = self.verify_chain_entry(id, index, prev, entry)?;
         }
         verify_case_metadata(&case.title, case.severity, &case.scope, &entries)?;
+        self.verify_source_query_journal(&entries, cancel, true)?;
         self.verify_mapping_events(entries.iter().map(|e| (e.kind, e.payload.as_str())))?;
         self.verify_skill_receipts(&entries, cancel)?;
         let manifest = crate::large_case::read_manifest_index(&entries)?;
@@ -243,5 +245,36 @@ impl Engine<'_> {
         self.verify_operations_unlocked(id, cancel)?;
         self.remember_verified_checkpoint(id, entries.last())?;
         Ok(entries.len())
+    }
+
+    pub(crate) fn verify_source_query_journal(
+        &self,
+        entries: &[SignedEntry],
+        cancel: &CancellationToken,
+        check_files: bool,
+    ) -> Result<(), AppError> {
+        if !entries
+            .iter()
+            .any(|entry| entry.kind.is_source_query_lifecycle())
+        {
+            return Ok(());
+        }
+        let operations = self.audit_log.global_operations()?;
+        self.verify_global_operation_entries(&operations)?;
+        let journal = crate::source_queries::SourceQueryJournal::replay(
+            entries,
+            &operations,
+            self.verifier.as_ref(),
+            cancel,
+        )?;
+        journal.verify_source_links(entries)?;
+        if check_files && journal.captures().len() > 0 {
+            let store = self
+                .large_case_store
+                .as_deref()
+                .ok_or(crate::source_queries::SourceQueryError::Unavailable)?;
+            journal.verify_capture_files(store, cancel)?;
+        }
+        Ok(())
     }
 }
