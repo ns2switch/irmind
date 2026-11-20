@@ -246,7 +246,7 @@ impl ParquetStore {
                     // files: the source spool, pending runs, and the new merge output.
                     reservation
                         .normalized_bytes
-                        .checked_mul(3)
+                        .checked_mul(1 + super::sorting::SORT_SCRATCH_COPIES)
                         .ok_or_else(invalid_source)?
                 } else {
                     expanded

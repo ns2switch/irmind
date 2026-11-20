@@ -11,6 +11,7 @@ pub(super) struct Run {
     hash: [u8; 32],
     pub(super) bytes: u64,
     pub(super) depth: u64,
+    pub(super) max_frame: u64,
     rows: usize,
     _disk: DiskLease,
 }
@@ -21,6 +22,7 @@ pub(super) struct RunReader {
     bytes: u64,
     rows: usize,
     expected: ([u8; 32], u64, usize),
+    max_frame: Option<u64>,
 }
 impl RunReader {
     pub(super) fn new(file: File, hash: [u8; 32], bytes: u64, rows: usize) -> Self {
@@ -30,6 +32,7 @@ impl RunReader {
             bytes: 0,
             rows: 0,
             expected: (hash, bytes, rows),
+            max_frame: None,
         }
     }
     pub(super) fn next(
@@ -44,7 +47,7 @@ impl RunReader {
         &mut self,
         cancel: &CancellationToken,
     ) -> Result<Option<(RecordRow, Vec<u8>)>, AppError> {
-        self.read_frame(cancel)?
+        self.read_frame(Vec::new(), cancel)?
             .map(|line| {
                 let value = serde_json::from_slice(&line).map_err(storage)?;
                 Ok((value, line))
@@ -54,9 +57,10 @@ impl RunReader {
 
     pub(super) fn next_key(
         &mut self,
+        frame: Vec<u8>,
         cancel: &CancellationToken,
     ) -> Result<Option<(StableRecordKey<'static>, Vec<u8>)>, AppError> {
-        self.read_frame(cancel)?
+        self.read_frame(frame, cancel)?
             .map(|line| {
                 let key = RecordRow::staged_sort_key(&line).map_err(storage)?;
                 Ok((key, line))
@@ -64,13 +68,23 @@ impl RunReader {
             .transpose()
     }
 
-    fn read_frame(&mut self, cancel: &CancellationToken) -> Result<Option<Vec<u8>>, AppError> {
+    fn read_frame(
+        &mut self,
+        mut line: Vec<u8>,
+        cancel: &CancellationToken,
+    ) -> Result<Option<Vec<u8>>, AppError> {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        let mut line = Vec::new();
+        let max_frame = self.max_frame.unwrap_or(MAX_STAGED_ROW);
+        // A run's writer records its biggest frame. Reserve exactly enough
+        // for that frame and the overflow probe, including on corrupt input.
+        line.clear();
+        if let Some(size) = self.max_frame {
+            line.reserve_exact(size as usize + 1);
+        }
         (&mut self.reader)
-            .take(MAX_STAGED_ROW + 1)
+            .take(max_frame + 1)
             .read_until(b'\n', &mut line)
             .map_err(storage)?;
         if line.is_empty() {
@@ -85,7 +99,7 @@ impl RunReader {
             .checked_add(line.len() as u64)
             .ok_or_else(invalid_source)?;
         self.rows = self.rows.checked_add(1).ok_or_else(invalid_source)?;
-        if line.len() as u64 > MAX_STAGED_ROW
+        if line.len() as u64 > max_frame
             || line.last() != Some(&b'\n')
             || self.bytes > self.expected.1
             || self.rows > self.expected.2
@@ -102,7 +116,9 @@ impl Run {
         let name = self.path.file_name().ok_or_else(invalid_source)?;
         let file =
             irmind_fs::open_regular_no_follow(root, std::path::Path::new(name)).map_err(storage)?;
-        Ok(RunReader::new(file, self.hash, self.bytes, self.rows))
+        let mut reader = RunReader::new(file, self.hash, self.bytes, self.rows);
+        reader.max_frame = Some(self.max_frame);
+        Ok(reader)
     }
 }
 
@@ -112,6 +128,7 @@ pub(super) struct RunWriter {
     hash: Sha256,
     bytes: u64,
     rows: usize,
+    max_frame: u64,
     disk: DiskLease,
 }
 impl RunWriter {
@@ -124,6 +141,7 @@ impl RunWriter {
             hash: Sha256::new(),
             bytes: 0,
             rows: 0,
+            max_frame: 0,
             disk: DiskLease::new(store.profile.clone()),
         })
     }
@@ -137,6 +155,7 @@ impl RunWriter {
         }
         self.bytes = self.bytes.checked_add(count).ok_or_else(invalid_source)?;
         self.rows = self.rows.checked_add(1).ok_or_else(invalid_source)?;
+        self.max_frame = self.max_frame.max(count);
         let writer = self.writer.as_mut().ok_or_else(invalid_source)?;
         writer.write_all(&encoded).map_err(storage)?;
         writer.write_all(b"\n").map_err(storage)?;
@@ -151,6 +170,7 @@ impl RunWriter {
         }
         self.bytes = self.bytes.checked_add(count).ok_or_else(invalid_source)?;
         self.rows = self.rows.checked_add(1).ok_or_else(invalid_source)?;
+        self.max_frame = self.max_frame.max(count);
         self.writer
             .as_mut()
             .ok_or_else(invalid_source)?
@@ -176,6 +196,7 @@ impl RunWriter {
             hash: self.hash.finalize().into(),
             bytes: self.bytes,
             depth: 0,
+            max_frame: self.max_frame,
             rows: self.rows,
             _disk: self.disk,
         })
