@@ -451,6 +451,23 @@ then use that source locally under existing scopes, samples and deadlines. They
 must not trigger additional network queries. Local pages do not spend remote scan
 budget. A requested new remote acquisition is a distinct signed/budgeted plan.
 
+### Proposed registration for provider page decoders
+
+A query module registers a local page decoder keyed by its module and version.
+The runtime selects it from the committed plan, never from HTTP headers or
+payload fields. An unregistered decoder makes the module unavailable before
+preflight. The decoder receives the approved source and the bounded body of a
+complete page already in the case spool. It checks the native column names,
+types and order, counts rows and rejected rows, and recognizes closed provider
+partial-result indicators. The engine applies its own remaining row and byte
+limits and records `local_limit` independently of anything in the payload.
+
+The same module provides the identified source decoder for reconstruction from
+the resulting capture. Its row semantics must match admission, including any
+schema carried over from an earlier page. It emits provenance-bound tainted
+records. Nothing is published until the capture and its derived artifacts pass
+the existing atomic publication checks. The registration adds no signed fields.
+
 ## 8. Export V9 and seal
 
 Retain V8 body order through catalog proofs and subagent branch chunks. The

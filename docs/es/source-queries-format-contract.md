@@ -388,6 +388,22 @@ y vista previa acotada. Timeline, búsqueda, entidades y lectura consultan despu
 en local con los límites existentes; nunca generan consultas remotas ocultas.
 Otra adquisición requiere otro plan firmado y presupuestado.
 
+### Propuesta de registro de decodificadores de páginas
+
+Cada módulo registra un decodificador local por módulo y versión. El motor lo
+elige según el plan comprometido. Si no está registrado, el módulo queda
+deshabilitado antes de la comprobación previa. El decodificador recibe la fuente
+aprobada y el cuerpo acotado de una página completa en el spool del caso.
+Valida nombres, tipos y orden de columnas, cuenta filas y rechazos y reconoce los
+indicadores de resultado parcial del proveedor. El motor aplica el saldo de
+filas y bytes y registra por su cuenta `local_limit`.
+
+El módulo también aporta el decodificador identificado para reconstruir la
+captura. Aplica las mismas reglas a las filas y conserva el esquema fijado en
+páginas anteriores, si procede. Emite registros no confiables con procedencia.
+La captura y los artefactos derivados se publican tras superar las comprobaciones
+atómicas existentes. El registro de módulos no incorpora campos firmados.
+
 ## 8. Export V9 y sello
 
 Conservar el orden V8 hasta catálogo y chunks de ramas. La sección de operaciones
