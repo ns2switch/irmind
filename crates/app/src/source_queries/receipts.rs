@@ -191,7 +191,7 @@ pub struct SourceQueryPlanV1 {
     configuration: Configuration,
     policy: Policy,
     allocation_revision: u64,
-    preflight: QueryPreflightV1,
+    pub(super) preflight: QueryPreflightV1,
     limits: SourceQueryLimits,
     pub(super) decoder: Decoder,
     pub(super) mapping: Mapping,

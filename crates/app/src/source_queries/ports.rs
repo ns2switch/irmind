@@ -173,6 +173,7 @@ pub struct AdmittedSourceQuery {
     pub(super) source: ResolvedQuerySourceV1,
     pub(super) compiled: CompiledSourceQueryV1,
     pub(super) limits: SourceQueryLimits,
+    pub(super) source_metadata: serde_json::Value,
     pub(super) execution_key: String,
     pub(super) phase: SourceQueryLeasePhase,
     pub(super) execution: Option<QueryExecutionRef>,
@@ -198,6 +199,10 @@ impl AdmittedSourceQuery {
     }
     pub fn limits(&self) -> &SourceQueryLimits {
         &self.limits
+    }
+    /// The service facts committed by the signed, approved preflight.
+    pub fn source_metadata(&self) -> &serde_json::Value {
+        &self.source_metadata
     }
     pub fn execution_key(&self) -> &str {
         &self.execution_key

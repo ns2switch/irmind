@@ -27,6 +27,10 @@ const IDS: &[u8] = include_bytes!(
 
 #[test]
 fn engine_query_capture_survives_reopen_reconstruction_seal_and_v9_export() {
+    assert_eq!(query_capture_roundtrip(1), query_capture_roundtrip(4));
+}
+
+fn query_capture_roundtrip(workers: u16) -> (EvidenceHash, Vec<[u8; 32]>) {
     let root = tempfile::tempdir().unwrap();
     let decoder = TestDecoder.identity();
     let (catalog, template) = synthetic_catalog_and_result(decoder);
@@ -41,6 +45,7 @@ fn engine_query_capture_survives_reopen_reconstruction_seal_and_v9_export() {
     let (chain, capture) = remap_vector(&template, agent.as_ref(), analyst.as_ref());
     let case = case();
     let store = Arc::new(LocalStore::open_mapped(root.path(), catalog.clone()).unwrap());
+    store.set_parallel_worker_limit(std::num::NonZeroU16::new(workers));
     record_query_prefix(store.as_ref(), &case, &chain);
     let decoder = Arc::new(
         catalog
@@ -91,9 +96,14 @@ fn engine_query_capture_survives_reopen_reconstruction_seal_and_v9_export() {
         1
     );
     check_missing_capture_decoder(&engine, &case, root.path(), decoder.as_ref(), &cancel);
+    let acquisition = store.entries(&case).unwrap();
     let notices = check_citation_notices(&engine, &case, &hash, &cancel);
     engine.seal(&case).unwrap();
     check_v9_export(root.path(), store.as_ref(), &case, &notices, &cancel);
+    (
+        hash,
+        acquisition.into_iter().map(|entry| entry.hash).collect(),
+    )
 }
 
 fn check_missing_capture_decoder(

@@ -168,6 +168,7 @@ impl Engine<'_> {
             source: plan.source().clone(),
             compiled: plan.compiled().clone(),
             limits: plan.limits().clone(),
+            source_metadata: plan.preflight.source_metadata.clone(),
             execution_key: intent.execution_key().into(),
             phase: SourceQueryLeasePhase::Submit,
             execution: None,
