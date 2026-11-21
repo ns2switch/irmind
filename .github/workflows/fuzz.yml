@@ -86,7 +86,7 @@ jobs:
       fail-fast: false
       max-parallel: 2
       matrix:
-        target: [parser_s3_access, parser_elb, parser_iis_w3c, parser_windows_dns, parser_route53, parser_github_audit, parser_google_workspace, parser_macos, parser_fdr, parser_defender, parser_email, parser_m365, parser_okta, parser_guardduty, parser_vpc_flow, parser_azure_flow, parser_gcp_flow, query_page_athena, query_page_bigquery]
+        target: [parser_s3_access, parser_elb, parser_iis_w3c, parser_windows_dns, parser_route53, parser_github_audit, parser_google_workspace, parser_macos, parser_fdr, parser_defender, parser_email, parser_m365, parser_okta, parser_guardduty, parser_vpc_flow, parser_azure_flow, parser_gcp_flow, query_page_athena, query_page_bigquery, query_page_azure_analytics]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:

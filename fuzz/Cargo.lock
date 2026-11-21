@@ -1214,6 +1214,7 @@ dependencies = [
  "irmind-mod-parser-windows-dns",
  "irmind-mod-parser-zeek",
  "irmind-mod-query-athena",
+ "irmind-mod-query-azure-log-analytics",
  "irmind-mod-query-bigquery",
  "irmind-security",
  "libfuzzer-sys",
@@ -1700,6 +1701,24 @@ dependencies = [
  "reqwest",
  "serde_json",
  "tokio",
+]
+
+[[package]]
+name = "irmind-mod-query-azure-log-analytics"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "irmind-app",
+ "irmind-calendar",
+ "irmind-domain",
+ "irmind-http",
+ "reqwest",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "tokio",
+ "uuid",
+ "zeroize",
 ]
 
 [[package]]

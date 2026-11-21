@@ -65,6 +65,7 @@ pub(crate) fn layout(fields: &SourceValue) -> Option<(&'static str, &'static [&'
             Some(("entra-signin-table", &["CreatedDateTime", "TimeGenerated"]))
         }
         "AuditLogs" => Some(("entra-audit-table", &["ActivityDateTime", "TimeGenerated"])),
+        "AzureActivity" => Some(("azure-activity-table", &["TimeGenerated"])),
         _ => None,
     }
 }
