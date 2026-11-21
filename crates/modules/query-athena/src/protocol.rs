@@ -20,7 +20,7 @@ pub(super) fn billable_bytes(scanned: u64) -> Option<u64> {
 }
 
 pub(super) const METADATA_LIMIT: usize = 256 * 1024;
-const PAGE_LIMIT: usize = 8 * 1024 * 1024;
+pub(super) const PAGE_LIMIT: usize = 8 * 1024 * 1024;
 
 impl Athena {
     pub(super) async fn post(

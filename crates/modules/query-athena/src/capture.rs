@@ -10,9 +10,8 @@ use irmind_domain::{
     SourceKind, SourceRecordV1, SourceValue, Tainted,
 };
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, io::BufReader};
 
-const MAX_PAGE_BYTES: u64 = 8 * 1024 * 1024;
 const MAX_PAGE_ROWS: usize = 1_000;
 const COLUMNS: [(&str, &str); 6] = [
     ("eventtime", "eventTime"),
@@ -54,11 +53,11 @@ impl SourceDecoder for AthenaCaptureDecoder {
         };
         let mut ordinal = 0;
         let summary = read_query_capture_pages(input.reader, meta.cancel, |page, reader| {
-            if page.body_bytes > MAX_PAGE_BYTES {
+            if page.body_bytes > super::protocol::PAGE_LIMIT as u64 {
                 return Err(SourceQueryError::Limit.into());
             }
-            let wire: Value =
-                serde_json::from_reader(reader).map_err(|_| SourceQueryError::Invalid)?;
+            let wire: Value = serde_json::from_reader(BufReader::new(reader))
+                .map_err(|_| SourceQueryError::Invalid)?;
             let rows = checked_rows(&wire, page.ordinal == 0)?;
             let native = columns(&wire)?;
             if rows.len() as u64 != page.rows
