@@ -212,3 +212,50 @@ async fn usage_and_workgroup_cutoff_use_billed_units() {
     assert_eq!(server.finish().unwrap().len(), 5);
     assert_eq!(protocol::billable_bytes(u64::MAX), None);
 }
+
+#[path = "../../../testkit/provider_tests/source_query_v9.rs"]
+mod case_contract;
+
+#[test]
+fn real_clock_preflight_and_exact_v9_citation() {
+    let mut page: Value = serde_json::from_slice(include_bytes!(
+        "../../../../fuzz/seeds/query_page_athena/page.json"
+    ))
+    .unwrap();
+    let rows = page["ResultSet"]["Rows"].as_array_mut().unwrap();
+    rows[0]["Data"][2]["VarCharValue"] = json!(case_contract::FIRST);
+    rows[0]["Data"][0]["VarCharValue"] = json!(case_contract::AT);
+    rows[0]["Data"][3]["VarCharValue"] = json!("111122223333");
+    let mut second = rows[0].clone();
+    second["Data"][2]["VarCharValue"] = json!(case_contract::CITED);
+    rows.push(second);
+    let status = json!({"QueryExecution":{"QueryExecutionId":JOB,"WorkGroup":"irmind_lab",
+        "Status":{"State":"SUCCEEDED"},"Statistics":{"DataScannedInBytes":4096}}});
+    let server = MockServer::start(vec![
+        MockResponse::json(CUTOFF),
+        MockResponse::json(CUTOFF),
+        MockResponse::json(&json!({"QueryExecutionId":JOB}).to_string()),
+        MockResponse::json(&status.to_string()),
+        MockResponse::json(&page.to_string()),
+    ])
+    .unwrap();
+    let (executor, plan) = fixture(&server);
+    let fixture = case_contract::Fixture {
+        source: executor.source.clone(),
+        limits: executor.limits.clone(),
+        query: plan["query"].clone(),
+        billed_bytes: 10 << 20,
+        citation_field: "eventID",
+    };
+    case_contract::acquire_and_export(
+        &fixture,
+        executor,
+        AthenaCaptureDecoder,
+        irmind_mod_mapping_cloudtrail::CloudTrailMapping::for_capture().unwrap(),
+    );
+    let calls = server.finish().unwrap();
+    assert_eq!(
+        calls[4].headers["x-amz-target"],
+        "AmazonAthena.GetQueryResults"
+    );
+}

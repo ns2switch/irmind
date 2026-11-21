@@ -111,3 +111,57 @@ async fn lost_synchronous_query_is_not_replayed_and_cancel_prevents_a_new_reques
     ));
     assert_eq!(server.finish().unwrap().len(), 2);
 }
+
+#[path = "../../../testkit/provider_tests/source_query_v9.rs"]
+mod case_contract;
+
+#[test]
+fn real_clock_preflight_and_exact_v9_citation() {
+    use irmind_app::SourceDecoder as _;
+    let page = json!({"tables":[{"name":"PrimaryResult","columns":[
+        {"name":"TimeGenerated","type":"datetime"}, {"name":"UserPrincipalName","type":"string"}
+    ],"rows":[[case_contract::AT,case_contract::FIRST],[case_contract::AT,case_contract::CITED]]}]});
+    let server = MockServer::start(vec![
+        MockResponse::json(TOKEN),
+        MockResponse::json(WORKSPACE_ARM),
+        table("Analytics"),
+        MockResponse::json(TOKEN),
+        MockResponse::json(WORKSPACE_ARM),
+        table("Analytics"),
+        MockResponse::json(TOKEN),
+        MockResponse::json(&page.to_string()).with_header("x-ms-request-id", "synthetic-request"),
+        MockResponse::json(TOKEN),
+        MockResponse::json(WORKSPACE_ARM),
+        table("Analytics"),
+    ])
+    .unwrap();
+    let (executor, _) = fixture(&server);
+    let wire: Value = serde_json::from_slice(include_bytes!(
+        "../../../../docs/development/source-query-format-vectors/plan.json"
+    ))
+    .unwrap();
+    let mut query = wire["query"].clone();
+    query["source"] = json!(executor.source.id());
+    query["dataset"] = json!(executor.source.dataset());
+    query["fields"] = json!(["@timestamp"]);
+    query["filters"] = json!([]);
+    let fixture = case_contract::Fixture {
+        source: executor.source.clone(),
+        limits: executor.limits.clone(),
+        query,
+        billed_bytes: 0,
+        citation_field: "UserPrincipalName",
+    };
+    let decoder = AzureAnalyticsCaptureDecoder::for_dataset("entra-signins").unwrap();
+    let identity = decoder.identity();
+    let decoder_identity =
+        irmind_domain::SourceDecoderIdentityV1::try_new(identity.name, identity.version).unwrap();
+    let mapper = irmind_mod_mapping_entra::EntraMapping::for_capture(
+        "entra-signin-table",
+        &decoder_identity,
+    )
+    .unwrap();
+    case_contract::acquire_and_export(&fixture, executor, decoder, mapper);
+    let calls = server.finish().unwrap();
+    assert!(calls[7].target.ends_with("/query"));
+}
