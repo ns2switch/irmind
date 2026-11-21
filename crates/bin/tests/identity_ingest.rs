@@ -305,6 +305,9 @@ fn one_gib_release_throughput() -> Result<(), &'static str> {
         #[cfg(feature = "parser-gcp-flow")]
         "gcp-flow",
     ] {
+        if std::env::var("IRMIND_BENCH_PARSER").is_ok_and(|filter| filter != name) {
+            continue;
+        }
         benchmark_source(name);
     }
     Ok(())
