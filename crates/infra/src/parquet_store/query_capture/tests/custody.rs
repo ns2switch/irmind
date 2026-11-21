@@ -389,6 +389,37 @@ mod signed_dispatch {
         store: Arc<LocalStore>,
         compiled: CompiledSourceQueryV1,
         submissions: AtomicUsize,
+        complete: bool,
+    }
+
+    impl SourceQueryPageDecoder for TestDecoder {
+        fn inspect_page(
+            &self,
+            input: &mut dyn QueryPageInput,
+            _: u64,
+            _: Option<&QueryPageSchema>,
+            _: &CancellationToken,
+        ) -> Result<InspectedQueryPage, AppError> {
+            let mut body = Vec::new();
+            input.take(256).read_to_end(&mut body).map_err(storage)?;
+            if body != b"synthetic page" {
+                return Err(SourceQueryError::Invalid.into());
+            }
+            Ok(InspectedQueryPage {
+                schema: QueryPageSchema::new(
+                    vec![CaptureColumn {
+                        name: "synthetic".into(),
+                        native_type: "varchar".into(),
+                    }],
+                    vec![],
+                )?,
+                rows: 2,
+                rejected: 0,
+                provider_partial: true,
+                total_rows: None,
+                next_token: None,
+            })
+        }
     }
 
     #[async_trait]
@@ -445,26 +476,63 @@ mod signed_dispatch {
                     && intent.prev == reservation.hash)
             );
             self.submissions.fetch_add(1, Ordering::SeqCst);
+            if self.complete {
+                return Ok(SubmitObservationV1::Accepted(QueryExecutionRef::new(
+                    lease.plan(),
+                    lease.attempt(),
+                    "synthetic-query-job",
+                )?));
+            }
             Ok(SubmitObservationV1::Unknown)
         }
 
         async fn reconcile(
             &self,
-            _: &AdmittedSourceQuery,
-            _: &QueryExecutionRef,
+            lease: &AdmittedSourceQuery,
+            job: &QueryExecutionRef,
             _: &CancellationToken,
         ) -> Result<ExecutionObservationV1, AppError> {
-            Err(SourceQueryError::Unavailable.into())
+            lease.check(
+                "query-athena",
+                "aws-lab",
+                SourceQueryLeasePhase::Reconcile,
+                Some(job),
+            )?;
+            Ok(ExecutionObservationV1 {
+                status: QueryExecutionStatus::Succeeded,
+                request_id: None,
+                usage: SourceQueryUsage {
+                    scanned_bytes: Some(64),
+                    processed_bytes: None,
+                    billed_bytes: Some(10 << 20),
+                    returned_wire_bytes: 0,
+                    returned_decoded_bytes: 0,
+                    query_price_basis: QueryAccounting::ScanPriced,
+                },
+                source_observation: None,
+            })
         }
 
         async fn fetch(
             &self,
-            _: &AdmittedSourceQuery,
-            _: &QueryExecutionRef,
-            _: &QueryResultCursor,
+            lease: &AdmittedSourceQuery,
+            job: &QueryExecutionRef,
+            cursor: &QueryResultCursor,
             _: &CancellationToken,
         ) -> Result<QueryResponsePage, AppError> {
-            Err(SourceQueryError::Unavailable.into())
+            lease.check(
+                "query-athena",
+                "aws-lab",
+                SourceQueryLeasePhase::Fetch,
+                Some(job),
+            )?;
+            cursor.check(job)?;
+            Ok(QueryResponsePage {
+                request_id: None,
+                next_token: None,
+                content_encoding: "identity".into(),
+                chunks: Box::pin(futures_util::stream::iter([Ok(b"synthetic page".to_vec())])),
+            })
         }
 
         async fn cancel(
@@ -514,6 +582,19 @@ mod signed_dispatch {
 
     #[test]
     fn ambiguous_submission_is_only_called_once_after_durable_intent() {
+        signed_dispatch(false);
+    }
+
+    #[test]
+    fn signed_dispatch_fetches_and_atomically_publishes_a_partial_capture() {
+        signed_dispatch(true);
+    }
+
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Use one signed fixture for both dispatch outcomes"
+    )]
+    fn signed_dispatch(complete: bool) {
         let root = tempfile::tempdir().unwrap();
         let identity = TestDecoder.identity();
         let (catalog, template) = synthetic_catalog_and_result(identity);
@@ -534,9 +615,18 @@ mod signed_dispatch {
             store: store.clone(),
             compiled: serde_json::from_value(plan["compiled"].clone()).unwrap(),
             submissions: AtomicUsize::new(0),
+            complete,
         });
         let mut queries = SourceQueryPorts::new();
         queries.add(executor.clone()).unwrap();
+        queries
+            .add_page_decoder(
+                "query-athena",
+                "1",
+                "cloudtrail-management",
+                Arc::new(TestDecoder),
+            )
+            .unwrap();
         let decoder = Arc::new(
             catalog
                 .decoder_selection(identity.name, identity.version)
@@ -575,6 +665,11 @@ mod signed_dispatch {
                 .is_err()
         );
         assert_eq!(executor.submissions.load(Ordering::SeqCst), 0);
+        if complete {
+            check_acquired(&engine, &case, &authorized, admission, &cancel);
+            assert_eq!(executor.submissions.load(Ordering::SeqCst), 1);
+            return;
+        }
         assert!(matches!(
             engine
                 .submit_signed_source_query(&authorized, admission, &cancel)
@@ -588,6 +683,25 @@ mod signed_dispatch {
         );
         assert_eq!(executor.submissions.load(Ordering::SeqCst), 1);
         verify_unknown_observation(&engine, &store, &case);
+    }
+
+    fn check_acquired(
+        engine: &Engine<'_>,
+        case: &CaseId,
+        authorized: &irmind_domain::AuthorizedCall,
+        admission: SignedSourceQueryAdmission<'_>,
+        cancel: &CancellationToken,
+    ) {
+        let acquired = engine
+            .acquire_signed_source_query(authorized, admission, cancel)
+            .unwrap();
+        assert_eq!((acquired.rows, acquired.rejected_rows), (2, 0));
+        assert_eq!(acquired.completeness, ["local_limit", "provider_partial"]);
+        assert!(engine.verify(case).is_ok());
+        assert_eq!(
+            engine.verify_with_query_limits(case, cancel).unwrap().1[0].capture_sha256(),
+            acquired.capture.as_str()
+        );
     }
 
     fn verify_unknown_observation(engine: &Engine<'_>, store: &LocalStore, case: &CaseId) {

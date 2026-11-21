@@ -286,7 +286,7 @@ impl Engine<'_> {
         self.persist_source_query_observation_unlocked(case, observation, cancel)
     }
 
-    fn persist_source_query_observation_unlocked(
+    pub(super) fn persist_source_query_observation_unlocked(
         &self,
         case: &CaseId,
         observation: &SignedEntry,

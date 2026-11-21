@@ -57,3 +57,6 @@ pub use product_contracts::{
 pub fn run_test_future<F: std::future::Future>(future: F) -> Result<F::Output, String> {
     Ok(contract_support::contract_runtime()?.block_on(future))
 }
+
+mod query_capture_contract;
+pub use query_capture_contract::assert_capture_mapping_equivalent;

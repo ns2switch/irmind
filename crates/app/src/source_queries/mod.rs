@@ -1,4 +1,5 @@
 //! Bounded, principal-only source-query admission. Providers never grant authority.
+mod acquisition;
 mod admission;
 mod broker;
 mod canonical;
@@ -15,6 +16,7 @@ mod reservation;
 #[cfg(test)]
 mod tests;
 mod types;
+pub use acquisition::AcquiredSourceQuery;
 pub use admission::{SignedSourceQueryAdmission, SourceQueryAuthority};
 pub use broker::{SourceQueryBroker, SourceQueryHold, SourceQueryResources};
 pub use canonical::{canonical_query_json, query_content_id};

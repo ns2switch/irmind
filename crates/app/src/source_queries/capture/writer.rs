@@ -76,7 +76,7 @@ impl<S: Read + Write + Seek> QueryCaptureWriter<S> {
 
     /// Check the exact decoder version and provider schema before adding the page.
     /// The input is already bounded by the held reservation; framing overhead is
-    /// checked by stage_page before any copy into the capture staging file.
+    /// checked by `stage_page` before any copy into the capture staging file.
     pub fn stage_inspected_page(
         &mut self,
         page: &mut (impl Read + Seek),
