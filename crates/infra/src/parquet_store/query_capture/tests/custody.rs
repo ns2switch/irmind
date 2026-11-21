@@ -27,6 +27,10 @@ const IDS: &[u8] = include_bytes!(
 
 #[test]
 fn engine_query_capture_survives_reopen_reconstruction_seal_and_v9_export() {
+    assert_eq!(query_capture_roundtrip(1), query_capture_roundtrip(4));
+}
+
+fn query_capture_roundtrip(workers: u16) -> (EvidenceHash, Vec<[u8; 32]>) {
     let root = tempfile::tempdir().unwrap();
     let decoder = TestDecoder.identity();
     let (catalog, template) = synthetic_catalog_and_result(decoder);
@@ -41,6 +45,7 @@ fn engine_query_capture_survives_reopen_reconstruction_seal_and_v9_export() {
     let (chain, capture) = remap_vector(&template, agent.as_ref(), analyst.as_ref());
     let case = case();
     let store = Arc::new(LocalStore::open_mapped(root.path(), catalog.clone()).unwrap());
+    store.set_parallel_worker_limit(std::num::NonZeroU16::new(workers));
     record_query_prefix(store.as_ref(), &case, &chain);
     let decoder = Arc::new(
         catalog
@@ -91,9 +96,14 @@ fn engine_query_capture_survives_reopen_reconstruction_seal_and_v9_export() {
         1
     );
     check_missing_capture_decoder(&engine, &case, root.path(), decoder.as_ref(), &cancel);
+    let acquisition = store.entries(&case).unwrap();
     let notices = check_citation_notices(&engine, &case, &hash, &cancel);
     engine.seal(&case).unwrap();
     check_v9_export(root.path(), store.as_ref(), &case, &notices, &cancel);
+    (
+        hash,
+        acquisition.into_iter().map(|entry| entry.hash).collect(),
+    )
 }
 
 fn check_missing_capture_decoder(
@@ -666,7 +676,15 @@ mod signed_dispatch {
             submissions: AtomicUsize::new(0),
             complete,
         });
-        let mut queries = SourceQueryPorts::new();
+        let mut queries = SourceQueryPorts::new()
+            .with_organization_ceiling(SourceQueryAllocationV1 {
+                enabled: true,
+                analytics_allowed: true,
+                scan_bytes: Some(128 << 20),
+                retained_rows: QUERY_CASE_MAX_ROWS,
+                retained_bytes: QUERY_CASE_MAX_BYTES,
+            })
+            .unwrap();
         queries.add(executor.clone()).unwrap();
         queries
             .add_page_decoder(
@@ -801,6 +819,41 @@ mod signed_dispatch {
         assert_eq!(result.rows, 2);
         assert!(engine.verify(case).is_ok());
         assert_eq!(executor.submissions.load(Ordering::SeqCst), 1);
+        let status = engine.source_query_budget(case, cancel).unwrap();
+        assert_eq!(status.used.scan_bytes, 10 << 20);
+        assert_eq!(status.used.retained_rows, 2);
+        assert_eq!(status.held, SourceQueryResources::default());
+        assert!(
+            engine
+                .change_source_query_budget(
+                    case,
+                    SourceQueryAllocationV1 {
+                        scan_bytes: Some(129 << 20),
+                        ..status.allocation
+                    },
+                    "Synthetic above the organization ceiling",
+                    cancel,
+                )
+                .is_err()
+        );
+        assert!(
+            engine
+                .change_source_query_budget(
+                    case,
+                    SourceQueryAllocationV1 {
+                        scan_bytes: Some(64 << 20),
+                        ..status.allocation
+                    },
+                    "Synthetic case allocation",
+                    cancel,
+                )
+                .unwrap()
+        );
+        let current = engine.source_query_budget(case, cancel).unwrap();
+        assert_eq!(current.revision, status.revision + 1);
+        assert_eq!(current.allocation.scan_bytes, Some(64 << 20));
+        assert_eq!(current.used, status.used);
+        assert!(engine.verify(case).is_ok());
     }
 
     fn check_acquired(
