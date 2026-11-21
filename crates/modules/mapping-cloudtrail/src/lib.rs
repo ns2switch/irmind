@@ -11,6 +11,16 @@ const DEFINITION: &str = include_str!("cloudtrail.toml");
 const DIGEST: &str = "a1d8d85bd6d8aee0e9246fde59f46d779532066b9310d0e1c7246e812bec2ab5";
 pub struct CloudTrailMapping(TableMapping);
 impl CloudTrailMapping {
+    pub fn for_capture() -> Result<Self, MappingError> {
+        let decoder =
+            irmind_domain::SourceDecoderIdentityV1::try_new("query-athena-cloudtrail", "1")
+                .map_err(|_| MappingError::UnsupportedDecoder)?;
+        Self::new()?
+            .0
+            .capture_alias("mapping-cloudtrail-query", &decoder)
+            .map(Self)
+    }
+
     pub fn new() -> Result<Self, MappingError> {
         let digest = EvidenceHash::parse(DIGEST).map_err(|_| MappingError::InvalidDefinition)?;
         TableMapping::bundled(DEFINITION, &digest).map(Self)
