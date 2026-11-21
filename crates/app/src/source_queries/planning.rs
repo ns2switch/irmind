@@ -48,7 +48,7 @@ impl Engine<'_> {
             .ok_or(SourceQueryError::Unavailable)?;
         let binding = ports.binding(query.source())?;
         let decoder = ports.page_decoder(&binding.source)?.identity();
-        let executor = ports.executor(binding.source.module())?;
+        let executor = ports.executor_for(&binding.source)?;
         if executor.descriptor().version != binding.source.module_version() {
             return Err(SourceQueryError::Unavailable.into());
         }

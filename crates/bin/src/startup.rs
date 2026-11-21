@@ -16,6 +16,7 @@ use super::SentinelOne;
 use super::Splunk;
 #[cfg(feature = "ti-virustotal")]
 use super::VirusTotal;
+use super::policy_config::LoadedPolicy;
 use super::{
     Arc, AuditLog, BTreeMap, CancellationToken, Cli, Command, ConfigurationStore, Context,
     CryptoPorts, DEFAULT_LLM_MODULE, Engine, EnginePorts, ExecutionMode, JsonParser,
@@ -51,6 +52,7 @@ struct PreparedStartup {
     overrides_active: bool,
     verifier: Arc<LocalVerifier>,
     guard: Arc<MandatoryGuard>,
+    organization: Option<LoadedPolicy>,
 }
 
 pub(super) fn run_once(cancel: &CancellationToken) -> Result<bool> {
@@ -80,6 +82,10 @@ pub(super) fn run_once(cancel: &CancellationToken) -> Result<bool> {
 }
 
 impl PreparedStartup {
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep startup admission checks in order"
+    )]
     fn new(mut cli: Cli, interactive: bool) -> Result<Option<Self>> {
         let (home, store, active) = open_local(&cli, interactive)?;
         let config_store = Arc::new(TomlConfigurationStore::new(&home));
@@ -147,6 +153,7 @@ impl PreparedStartup {
             subagent_review: Arc::default(),
             #[cfg(feature = "parser-declarative")]
             definitions,
+            organization: cli.policy.as_deref().map(load_policy).transpose()?,
             cli,
             interactive,
             home,
@@ -232,18 +239,19 @@ impl PreparedStartup {
             overrides_active,
             verifier: _,
             guard,
+            organization,
             #[cfg(feature = "parser-declarative")]
                 definitions: _,
         } = self;
         let secrets = active.secret_backend;
         let signer_backend = active.signer_backend;
-        let new_analyst_key = interactive && active.new_analyst_key;
         let workspace_io = RootWorkspaceIo {
             subagent_review,
             parser_catalog: catalog,
             definition_store: irmind_infra::FileDefinitionStore::new(&home),
             home: home.clone(),
-            credential_fields: compiled_credential_fields(),
+            credential_fields: credential_fields(organization.as_ref()),
+            source_query_settings: organization.and_then(|policy| policy.source_queries),
             store: store.clone(),
             signer_backend,
             secret_backend: secrets.clone(),
@@ -276,7 +284,7 @@ impl PreparedStartup {
                 workspace_io: &workspace_io,
                 module_statuses: &module_statuses,
                 cancel,
-                new_analyst_key,
+                new_analyst_key: interactive && active.new_analyst_key,
                 overrides_active,
                 mouse_capture: saved.mouse_capture.unwrap_or(true),
             },
@@ -334,6 +342,13 @@ impl PreparedStartup {
                 analyst: self.subagent_review.clone(),
             });
         }
+        if let Some(settings) = self
+            .organization
+            .as_ref()
+            .and_then(|policy| policy.source_queries.as_ref())
+        {
+            ports = ports.with_source_queries(settings.build(self.active.secret_backend.as_ref())?);
+        }
         let engine = registry.bind(
             Engine::new(ports, ExecutionMode::Attended, Arc::new(SystemClock))?
                 .with_case_lifecycle(self.store.clone())
@@ -343,7 +358,7 @@ impl PreparedStartup {
         )?;
         apply_session_policy(
             engine,
-            &self.cli,
+            self.organization.as_ref(),
             &self.saved,
             self.config_store.as_ref(),
             &self.manifests,
@@ -411,16 +426,28 @@ fn retry_startup<T>(
     }
 }
 
+fn credential_fields(organization: Option<&LoadedPolicy>) -> Vec<String> {
+    let mut fields = compiled_credential_fields()
+        .into_iter()
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    if let Some(settings) = organization.and_then(|policy| policy.source_queries.as_ref()) {
+        fields.extend(settings.credential_names());
+        fields.sort_unstable();
+        fields.dedup();
+    }
+    fields
+}
+
 fn apply_session_policy<'a>(
     mut engine: Engine<'a>,
-    cli: &Cli,
+    organization: Option<&LoadedPolicy>,
     saved: &PersistentConfig,
     store: &dyn ConfigurationStore,
     manifests: &[&irmind_app::modules::ModuleManifest],
 ) -> Result<Engine<'a>> {
-    if let Some(path) = &cli.policy {
-        let (policy, fingerprint) = load_policy(path)?;
-        engine = engine.with_policy(policy, fingerprint)?;
+    if let Some(policy) = organization {
+        engine = engine.with_policy(policy.rules.clone(), policy.fingerprint.clone())?;
     }
     if let Some(limits) = saved.case_budget_defaults {
         engine = engine.with_case_budget_defaults(limits)?;

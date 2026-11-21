@@ -83,7 +83,7 @@ impl Engine<'_> {
         if plan.decoder.id != identity.name || plan.decoder.version != identity.version {
             return Err(SourceQueryError::Unavailable.into());
         }
-        let executor = ports.executor(plan.source().module())?;
+        let executor = ports.executor_for(plan.source())?;
         let deadline = Instant::now() + Duration::from_secs(plan.limits().deadline_seconds);
         let reservation =
             SourceQueryReservationV1::decode(admission.reservation.payload.as_bytes())?;

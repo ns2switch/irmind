@@ -150,7 +150,7 @@ impl Engine<'_> {
             .source_queries
             .as_ref()
             .ok_or(SourceQueryError::Unavailable)?
-            .executor(plan.source().module())?;
+            .executor_for(plan.source())?;
         if executor.descriptor().version != plan.source().module_version()
             || executor.compile(plan.source(), plan.query())? != *plan.compiled()
         {

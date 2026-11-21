@@ -10,6 +10,7 @@ impl AutomationContext<'_, '_> {
                 Err(anyhow!("demo must start before opening persistent storage"))
             }
             cmd @ Command::Case { .. } => self.handle_case(cmd),
+            Command::SourceQuery { command } => self.handle_source_query(command),
             cmd @ Command::Ingest { .. } => self.handle_ingest(cmd),
             cmd @ Command::Ask { .. } => self.handle_ask(cmd),
             cmd @ (Command::Approvals { .. }

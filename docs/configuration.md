@@ -325,3 +325,38 @@ pricing applies only to five-minute writes. Every nonzero component needs its
 configured rate; unknown breakdown/lifetime or any unpriced request makes the
 total estimate unavailable. Counters are provider reports, not an invoice. The
 cache status segments show reported counts (with partial coverage) or unavailable.
+
+## Source queries
+
+Source queries start disabled. The organization supplies a `[source_queries]`
+section in the policy passed to `--policy`. Its `case_ceiling` limits billed scan
+bytes, retained rows and retained bytes independently of object transfer bytes.
+Each `sources` entry defines the provider resource, dataset, time window,
+approval threshold and per-query limits.
+
+Use Settings → Keystore to manage the provider fields. Athena uses the existing
+AWS access key, secret key and optional session token fields. BigQuery shows
+`query-bigquery/<source>/service-account-json`. Azure Log Analytics shows
+`query-azure-log-analytics/<source>/tenant-id`, `client-id` and `client-secret`.
+The policy describes resources and limits. Keep provider credentials in the
+keystore.
+
+An analyst adopts an organization source and allocates resources to a case
+through signed operations. The following commands use synthetic identifiers:
+
+```sh
+irmind --policy policy.toml source-query adopt synthetic-audit
+irmind --policy policy.toml source-query allocate "$CASE_ID" \
+  --scan-bytes 67108864 --retained-rows 2000 --retained-bytes 4194304 \
+  --reason 'Review the scoped audit window'
+```
+
+An Analytics-only allocation uses `--allow-analytics` and can omit
+`--scan-bytes`. `/budget` shows billed scan and retention consumption separately
+from ordinary object transfers. When exact-plan consent is required, in the case
+use `/source-query show <plan-id>` followed by `/source-query approve <plan-id>`
+after reviewing the scope, limits and translated query.
+
+Use the retained capture for local timeline, search and entity queries. If a
+capture hits its row limit, narrow the time range or add structured filters
+before proposing another remote acquisition.

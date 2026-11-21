@@ -331,3 +331,40 @@ Cada componente no nulo necesita su precio; si faltan datos, la vigencia es
 incierta o alguna petición no tiene precio, el coste total no está disponible.
 Los contadores son informes del proveedor, no una factura. Los segmentos de caché
 muestran los valores recibidos (indicando cobertura parcial) o no disponible.
+
+## Consultas en origen
+
+Las consultas en origen empiezan desactivadas. La organización las configura en
+la sección `[source_queries]` de la política indicada con `--policy`.
+`case_ceiling` limita por separado los bytes de escaneo facturados, las filas
+retenidas y los bytes retenidos. Cada entrada de `sources` fija el recurso del
+proveedor, el conjunto de datos, el intervalo permitido, el umbral de aprobación
+y los límites por consulta.
+
+Las credenciales se gestionan en Settings → Keystore. Athena utiliza los campos
+ya existentes de clave de acceso, clave secreta y token de sesión opcional de
+AWS. BigQuery muestra `query-bigquery/<fuente>/service-account-json`. Azure Log
+Analytics muestra `query-azure-log-analytics/<fuente>/tenant-id`, `client-id` y
+`client-secret`. La política solo describe recursos y límites. Las credenciales
+se guardan en el keystore.
+
+El analista adopta la fuente de la organización y asigna el presupuesto al caso
+mediante operaciones firmadas. Estos comandos usan identificadores sintéticos:
+
+```sh
+irmind --policy policy.toml source-query adopt synthetic-audit
+irmind --policy policy.toml source-query allocate "$CASE_ID" \
+  --scan-bytes 67108864 --retained-rows 2000 --retained-bytes 4194304 \
+  --reason 'Revisar el intervalo de auditoría autorizado'
+```
+
+Para una asignación exclusiva de Analytics, usa `--allow-analytics`. Puedes
+omitir `--scan-bytes`. `/budget` muestra el escaneo facturado y la retención
+por separado del tráfico de objetos. Cuando hace falta el consentimiento del
+analista, revisa el alcance, los límites y la consulta traducida con
+`/source-query show <id-del-plan>` y firma con
+`/source-query approve <id-del-plan>`.
+
+Usa la captura retenida para consultar la timeline, buscar texto y examinar
+entidades en local. Si una captura llega al límite de filas, acota el intervalo
+o añade filtros antes de proponer otra consulta remota.
