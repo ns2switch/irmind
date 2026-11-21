@@ -482,7 +482,7 @@ mod tests {
                     feature = "mapping-identity",
                     feature = "parser-okta"
                 )))
-                + 4 * usize::from(cfg!(feature = "mapping-entra"))
+                + 5 * usize::from(cfg!(feature = "mapping-entra"))
                 + 2 * usize::from(cfg!(feature = "mapping-gcp-audit"))
                 + 3 * usize::from(cfg!(feature = "mapping-falco"))
                 + 3 * usize::from(cfg!(feature = "mapping-kubernetes"))
