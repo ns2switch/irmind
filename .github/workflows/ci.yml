@@ -165,7 +165,7 @@ jobs:
       - name: Build unsigned release binary for tag, nightly code change, or manual dry run
         if: needs.dco.outputs.release_build == 'true'
         run: |
-          cargo build --release -p irmind --locked
+          CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 cargo build --release -p irmind --locked
           cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked
       - name: Check links and documented CLI commands against the built test binary
         run: python3 .github/scripts/check_docs.py --binary target/ci/irmind

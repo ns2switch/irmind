@@ -2,6 +2,39 @@
 
 
 
+## Linux release profile comparison
+
+The same Ubuntu 22.04 x86_64 runner built the default and
+ThinLTO/single-codegen-unit profiles from the same commit, with Rust 1.95.0,
+mold and symbol stripping. Each ingestion measurement used a synthetic
+1 GiB corpus. FDR gzip throughput uses decoded bytes, and EVTX uses four
+files with the isolated helper. [Workflow measurement](https://github.com/ns2switch/irmind/actions/runs/44937363927).
+
+| Metric | Default | ThinLTO, one codegen unit |
+| --- | ---: | ---: |
+| Cold build, main binary (s) | 486.225 | 437.038 |
+| Cold build, EVTX helper (s) | 23.860 | 23.542 |
+| Main binary (bytes) | 52,622,424 | 45,825,864 |
+| EVTX helper (bytes) | 1,304,496 | 1,217,136 |
+| CloudTrail-shaped NDJSON (MiB/s) | 62.44 | 62.09 |
+| Microsoft 365 (MiB/s) | 27.84 | 29.77 |
+| FDR JSONL (MiB/s) | 9.36 | 9.82 |
+| FDR gzip (decoded MiB/s) | 9.64 | 10.04 |
+| EVTX (MiB/s) | 30.97 | 33.33 |
+
+Both builds passed the same signed-format goldens and produced identical bytes
+for all 20 native mapping build manifests in the shipped main binary. Two
+clean local Linux builds of the ThinLTO main binary in different directories
+also produced the same SHA-256. The separately built EVTX helper produced
+different hashes across clean directories with both profiles. A separate
+local smoke run of a ThinLTO host with the default helper completed the
+1 GiB EVTX benchmark within the existing limits.
+
+Use ThinLTO and one codegen unit for the Linux x86_64 main binary. Its size
+fell 12.9% and its build time fell 10.1% in this pair. The EVTX helper and
+other platforms retain their current profiles. See also the [four- and
+sixteen-CPU worker measurements](worker-memory-budget.md).
+
 ## Kubernetes methods and verified-original reads (release)
 
 A sequential [paired smoke](benchmarks/kubernetes-skills-original-reads.json)
