@@ -65,7 +65,7 @@ pub struct InspectedQueryPage {
     pub next_token: Option<String>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(crate) struct QueryPageSequence {
     schema: Option<QueryPageSchema>,
     rows: u64,
