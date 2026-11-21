@@ -352,11 +352,19 @@ irmind --policy policy.toml source-query allocate "$CASE_ID" \
 ```
 
 An Analytics-only allocation uses `--allow-analytics` and can omit
-`--scan-bytes`. `/budget` shows billed scan and retention consumption separately
-from ordinary object transfers. When exact-plan consent is required, in the case
+`--scan-bytes`. `/budget` shows the used and reserved amounts for billed scan
+bytes, retained rows and retained bytes, separately from ordinary object
+transfers. The status bar's **Costs** preset includes three corresponding
+segments. Add or reorder them under **Settings → Preferences → Status bar**.
+The billed scan segment appears for allocations with a scan budget.
+
+When exact-plan consent is required, in the case
 use `/source-query show <plan-id>` followed by `/source-query approve <plan-id>`
 after reviewing the scope, limits and translated query.
 
 Use the retained capture for local timeline, search and entity queries. If a
 capture hits its row limit, narrow the time range or add structured filters
 before proposing another remote acquisition.
+
+See [Manual validation of source queries](development/source-query-validation.md)
+for an optional analyst-run exercise with each provider.

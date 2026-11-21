@@ -359,8 +359,14 @@ irmind --policy policy.toml source-query allocate "$CASE_ID" \
 ```
 
 Para una asignación exclusiva de Analytics, usa `--allow-analytics`. Puedes
-omitir `--scan-bytes`. `/budget` muestra el escaneo facturado y la retención
-por separado del tráfico de objetos. Cuando hace falta el consentimiento del
+omitir `--scan-bytes`. `/budget` muestra los bytes de escaneo facturados,
+las filas y los bytes retenidos, con los valores usados y reservados por
+separado del tráfico de objetos. El perfil **Costs** de la barra de estado
+incluye estos tres segmentos. Se pueden añadir o reordenar en
+**Settings → Preferences → Status bar**. El segmento de escaneo aparece cuando
+hay un presupuesto de escaneo asignado.
+
+Cuando hace falta el consentimiento del
 analista, revisa el alcance, los límites y la consulta traducida con
 `/source-query show <id-del-plan>` y firma con
 `/source-query approve <id-del-plan>`.
@@ -368,3 +374,6 @@ analista, revisa el alcance, los límites y la consulta traducida con
 Usa la captura retenida para consultar la timeline, buscar texto y examinar
 entidades en local. Si una captura llega al límite de filas, acota el intervalo
 o añade filtros antes de proponer otra consulta remota.
+
+Consulta la [validación manual de consultas en origen](source-query-validation.md)
+para un ejercicio opcional a cargo del analista con cada proveedor.
