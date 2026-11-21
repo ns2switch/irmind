@@ -94,6 +94,10 @@ async fn capped_jobs_reconcile_by_id_and_keep_earlier_pages_on_error() {
         "67108864"
     );
     assert_eq!(submit["jobReference"], reference);
+    assert_eq!(
+        submit["configuration"]["query"]["queryParameters"][0]["parameterValue"]["value"],
+        "2026-11-16T00:00:00.000000Z"
+    );
     assert!(!compiled.text().contains("OR '1'"));
     assert_eq!(
         submit["configuration"]["query"]["queryParameters"][3]["parameterValue"]["value"],

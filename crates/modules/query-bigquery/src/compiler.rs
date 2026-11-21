@@ -44,8 +44,8 @@ pub(super) fn translate(
         "resource.labels.project_id = @project".to_owned(),
     ];
     let mut bindings = vec![
-        json!({"name":"from","type":"timestamp","value":query.from().as_str()}),
-        json!({"name":"to","type":"timestamp","value":query.to().as_str()}),
+        json!({"name":"from","type":"timestamp","value":format!("{}Z", &query.from().as_str()[..26])}),
+        json!({"name":"to","type":"timestamp","value":format!("{}Z", &query.to().as_str()[..26])}),
         json!({"name":"project","type":"text","value":source.owner()}),
     ];
     let table = match layout {
