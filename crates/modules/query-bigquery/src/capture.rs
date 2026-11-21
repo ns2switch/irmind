@@ -10,7 +10,7 @@ use irmind_domain::{
     SourceValue, Tainted, TimePrecision,
 };
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, io::BufReader};
 
 const COLUMNS: [(&str, &str); 4] = [
     ("timestamp", "TIMESTAMP"),
@@ -54,8 +54,8 @@ impl SourceDecoder for BigQueryCaptureDecoder {
             if page.body_bytes > super::protocol::PAGE_LIMIT as u64 {
                 return Err(SourceQueryError::Limit.into());
             }
-            let wire: Value =
-                serde_json::from_reader(reader).map_err(|_| SourceQueryError::Invalid)?;
+            let wire: Value = serde_json::from_reader(BufReader::new(reader))
+                .map_err(|_| SourceQueryError::Invalid)?;
             let rows = checked_rows(&wire, &mut schema)?;
             if rows.len() as u64 != page.rows
                 || page.columns.len() != COLUMNS.len()
