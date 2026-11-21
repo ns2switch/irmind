@@ -101,8 +101,20 @@ fn common_events(
 
 fn without_origin(mut events: Vec<Value>) -> Vec<Value> {
     for event in &mut events {
+        let source = event["origin"]["source"].as_str().map(str::to_owned);
         if let Some(object) = event.as_object_mut() {
             object.remove("origin");
+        }
+        if let Some(observations) = event["observations"].as_array_mut() {
+            for observation in observations {
+                let scope = &mut observation["scope"];
+                if scope["kind"] == "source_record" {
+                    assert_eq!(scope["source"].as_str(), source.as_deref());
+                    if let Some(scope) = scope.as_object_mut() {
+                        scope.remove("source");
+                    }
+                }
+            }
         }
     }
     events
