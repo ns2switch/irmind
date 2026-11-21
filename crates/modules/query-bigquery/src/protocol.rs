@@ -245,23 +245,17 @@ impl BigQuery {
         let body = response_bytes(response, PAGE_LIMIT, cancel).await?;
         let result: Value = serde_json::from_slice(&body).map_err(|_| AppError::RemoteTool)?;
         self.check_reference(&result, id)?;
-        if result["jobComplete"] != true
-            || result["rows"]
-                .as_array()
-                .is_some_and(|rows| rows.len() > 1000)
+        if result["rows"]
+            .as_array()
+            .is_some_and(|rows| rows.len() > 1_000)
         {
-            return Err(SourceQueryError::Unresolved.into());
+            return Err(SourceQueryError::Limit.into());
         }
-        let next_token = match result.get("pageToken") {
-            None => None,
-            Some(value) => Some(
-                value
-                    .as_str()
-                    .filter(|token| !token.is_empty() && token.len() <= 4096)
-                    .ok_or(SourceQueryError::Invalid)?
-                    .into(),
-            ),
-        };
+        let next_token = result
+            .get("pageToken")
+            .and_then(Value::as_str)
+            .filter(|token| !token.is_empty() && token.len() <= 4096)
+            .map(str::to_owned);
         let chunks = Box::pin(futures_util::stream::iter(
             (0..body.len())
                 .step_by(64 * 1024)

@@ -1,8 +1,10 @@
 //! Decode the retained `BigQuery` REST row encoding without floating-point timestamps.
+use irmind_app::source_queries::{
+    CaptureColumn, InspectedQueryPage, QueryPageInput, QueryPageSchema, SourceQueryError,
+    SourceQueryPageDecoder, canonical_query_json, read_query_capture_pages,
+};
 use irmind_app::{
-    AppError, ParseReport, ParserIdentity, SourceDecoder,
-    source_mapping::SourceInput,
-    source_queries::{SourceQueryError, read_query_capture_pages},
+    AppError, ParseReport, ParserIdentity, SourceDecoder, source_mapping::SourceInput,
 };
 use irmind_domain::{
     DecodeAnnotationsV1, EventOrigin, EvidenceHash, IndexedInstant, IndexedTime, Provenance,
@@ -41,7 +43,7 @@ impl SourceDecoder for BigQueryCaptureDecoder {
         }
         let id = self.identity();
         let hash = EvidenceHash::from_bytes(meta.evidence_hash);
-        let format = SourceFormatV1::try_new("bigquery-cloud-audit", "1", BTreeMap::new())
+        let format = SourceFormatV1::try_new("gcp-audit", "gcp-audit-source-v1", BTreeMap::new())
             .map_err(|_| SourceQueryError::Invalid)?;
         let mut report = ParseReport {
             accepted: 0,
@@ -57,6 +59,9 @@ impl SourceDecoder for BigQueryCaptureDecoder {
             let wire: Value = serde_json::from_reader(BufReader::new(reader))
                 .map_err(|_| SourceQueryError::Invalid)?;
             let rows = checked_rows(&wire, &mut schema)?;
+            if needs_partial_marker(&wire) && !page.provider_partial {
+                return Err(SourceQueryError::Invalid.into());
+            }
             if rows.len() as u64 != page.rows
                 || page.columns.len() != COLUMNS.len()
                 || page
@@ -105,13 +110,92 @@ impl SourceDecoder for BigQueryCaptureDecoder {
     }
 }
 
+impl SourceQueryPageDecoder for BigQueryCaptureDecoder {
+    fn inspect_page(
+        &self,
+        input: &mut dyn QueryPageInput,
+        _: u64,
+        prior: Option<&QueryPageSchema>,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<InspectedQueryPage, AppError> {
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
+        let wire = bounded_page(input)?;
+        let mut native = prior
+            .map(|schema| serde_json::from_slice(schema.native()))
+            .transpose()
+            .map_err(|_| SourceQueryError::Invalid)?;
+        let rows = checked_rows(&wire, &mut native)?;
+        let fields = native.as_deref().ok_or(SourceQueryError::Invalid)?;
+        let schema = QueryPageSchema::new(
+            COLUMNS
+                .iter()
+                .map(|(name, kind)| CaptureColumn {
+                    name: (*name).into(),
+                    native_type: (*kind).into(),
+                })
+                .collect(),
+            canonical_query_json(&fields)?,
+        )?;
+        let mut rejected = 0;
+        for row in rows {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            rejected += u64::from(decode_row(fields, row).is_none());
+        }
+        let (next_token, partial_token) = match wire.get("pageToken") {
+            None => (None, false),
+            Some(Value::String(token)) if !token.is_empty() && token.len() <= 4096 => {
+                (Some(token.clone()), false)
+            }
+            Some(_) => (None, true),
+        };
+        let total = wire["totalRows"]
+            .as_str()
+            .and_then(|value| value.parse::<u64>().ok());
+        Ok(InspectedQueryPage {
+            schema,
+            rows: rows.len() as u64,
+            rejected,
+            provider_partial: wire["jobComplete"] != true || total.is_none() || partial_token,
+            total_rows: total,
+            next_token,
+        })
+    }
+}
+
+fn needs_partial_marker(wire: &Value) -> bool {
+    wire["jobComplete"] != true
+        || wire["totalRows"]
+            .as_str()
+            .and_then(|total| total.parse::<u64>().ok())
+            .is_none()
+        || wire.get("pageToken").is_some_and(|token| {
+            token
+                .as_str()
+                .is_none_or(|token| token.is_empty() || token.len() > 4096)
+        })
+}
+
+fn bounded_page(input: &mut dyn QueryPageInput) -> Result<Value, AppError> {
+    use std::io::{Read as _, SeekFrom};
+    let size = input
+        .seek(SeekFrom::End(0))
+        .map_err(|_| SourceQueryError::Invalid)?;
+    if size > super::protocol::PAGE_LIMIT as u64 {
+        return Err(SourceQueryError::Limit.into());
+    }
+    input.rewind().map_err(|_| SourceQueryError::Invalid)?;
+    serde_json::from_reader(BufReader::new(input.take(size)))
+        .map_err(|_| SourceQueryError::Invalid.into())
+}
+
 fn checked_rows<'a>(
     wire: &'a Value,
     stable_schema: &mut Option<Vec<Value>>,
 ) -> Result<&'a [Value], SourceQueryError> {
-    if wire["jobComplete"] != true {
-        return Err(SourceQueryError::Unresolved);
-    }
     if let Some(schema) = wire.get("schema") {
         let fields = schema["fields"]
             .as_array()
@@ -126,7 +210,7 @@ fn checked_rows<'a>(
             return Err(SourceQueryError::Unsupported);
         }
         match stable_schema {
-            Some(prior) if prior != fields => return Err(SourceQueryError::Invalid),
+            Some(prior) if prior != fields => return Err(SourceQueryError::PageSchemaChanged),
             None => *stable_schema = Some(fields.clone()),
             Some(_) => {}
         }
@@ -156,7 +240,11 @@ fn decode_row(schema: &[Value], row: &Value) -> Option<(IndexedTime, SourceValue
     values.insert("timestamp".into(), SourceValue::Text(time.to_rfc3339()));
     let payload = values.remove("protopayload_auditlog")?;
     values.insert("protoPayload".into(), payload);
-    Some((time, SourceValue::Object(values)))
+    let fields = SourceValue::Object(values);
+    if fields.validate().ok()? > irmind_domain::SOURCE_MAX_BYTES - 4096 {
+        return None;
+    }
+    Some((time, fields))
 }
 
 fn decode_fields(
@@ -283,5 +371,24 @@ mod tests {
         malformed["schema"]["fields"][3]["fields"][0]["name"] = json!("swapped");
         assert!(checked_rows(&malformed, &mut schema).is_err());
         assert!(decode_row(schema.as_deref().unwrap(), &json!({"f":[{"v":"1e9"}]})).is_none());
+    }
+
+    #[test]
+    fn captured_and_local_cloud_audit_map_to_the_same_common_event() {
+        use irmind_mod_mapping_gcp_audit::CloudAuditMapping;
+        use irmind_mod_parser_gcp_audit::GcpAuditSourceDecoder;
+        let file = serde_json::json!({
+            "timestamp":"2026-01-01T00:00:00.123456Z","insertId":"test-id",
+            "resource":{"type":"audited_resource"},
+            "protoPayload":{"serviceName":"compute.googleapis.com","methodName":"v1.compute.instances.insert"}
+        });
+        irmind_testkit::assert_capture_mapping_equivalent(
+            file.to_string().as_bytes(),
+            include_bytes!("../../../../fuzz/seeds/query_page_bigquery/page.json"),
+            &GcpAuditSourceDecoder,
+            &BigQueryCaptureDecoder,
+            &CloudAuditMapping::new().unwrap(),
+            &CloudAuditMapping::for_capture().unwrap(),
+        );
     }
 }
