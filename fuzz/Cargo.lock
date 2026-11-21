@@ -1695,7 +1695,6 @@ dependencies = [
  "futures-util",
  "http",
  "irmind-app",
- "irmind-calendar",
  "irmind-domain",
  "irmind-http",
  "reqwest",
@@ -1709,7 +1708,6 @@ version = "0.1.0"
 dependencies = [
  "futures-util",
  "irmind-app",
- "irmind-calendar",
  "irmind-domain",
  "irmind-http",
  "reqwest",
