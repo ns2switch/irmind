@@ -6,9 +6,14 @@ use std::io::Cursor;
 
 fuzz_target!(|body: &[u8]| {
     let cancel = CancellationToken::new();
-    let decoder = AzureAnalyticsCaptureDecoder::SignIn;
-    let first = decoder.inspect_page(&mut Cursor::new(body), 0, None, &cancel);
-    if let Ok(first) = first {
-        let _ = decoder.inspect_page(&mut Cursor::new(body), 1, Some(&first.schema), &cancel);
+    for decoder in [
+        AzureAnalyticsCaptureDecoder::SignIn,
+        AzureAnalyticsCaptureDecoder::Audit,
+        AzureAnalyticsCaptureDecoder::Activity,
+    ] {
+        let first = decoder.inspect_page(&mut Cursor::new(body), 0, None, &cancel);
+        if let Ok(first) = first {
+            let _ = decoder.inspect_page(&mut Cursor::new(body), 1, Some(&first.schema), &cancel);
+        }
     }
 });
