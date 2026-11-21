@@ -3420,17 +3420,21 @@ dependencies = [
 name = "irmind-mod-query-bigquery"
 version = "0.1.0"
 dependencies = [
+ "ed25519-dalek",
  "futures-util",
  "irmind-app",
  "irmind-calendar",
  "irmind-domain",
  "irmind-http",
+ "irmind-infra",
  "irmind-mod-mapping-gcp-audit",
  "irmind-mod-parser-gcp-audit",
+ "irmind-security",
  "irmind-testkit",
  "reqwest",
  "secrecy",
  "serde_json",
+ "tempfile",
  "tokio",
 ]
 

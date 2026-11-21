@@ -1,5 +1,7 @@
 """External export examples never exempt flags used by IRMind itself."""
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 import check_docs
 
 class CommandOwnership(unittest.TestCase):
@@ -68,6 +70,23 @@ class CargoFlagOwnershipTests(unittest.TestCase):
         text = "cargo +nightly test -p irmind --test identity_ingest\nirmind --made-up-flag"
         self.assertIn("--made-up-flag", check_docs.irmind_flag_citations(text))
         self.assertIn("--made-up-flag", check_docs.irmind_flag_citations("cargo irmind --made-up-flag"))
+
+
+class SourceQueryFlagsTests(unittest.TestCase):
+    def test_source_and_binary_validate_nested_options(self):
+        docs = ("--allow-analytics", "--reason", "--retained-bytes",
+                "--retained-rows", "--scan-bytes")
+        self.assertTrue(set(docs) <= check_docs.source_cli()[2])
+        help_pages = {
+            (): "Commands:\n  case  Case commands\n  source-query  Queries\nOptions:",
+            ("case",): "Commands:\n  help  Help\nOptions:",
+            ("source-query",): "Commands:\n  allocate  Allocate\n  help  Help\nOptions:",
+            ("source-query", "allocate"): "Options:\n  " + "  ".join(docs),
+        }
+        with patch.object(check_docs, "help_text", side_effect=lambda _, *args: help_pages[args]):
+            flags = check_docs.binary_cli(Path("irmind"))[2]
+        self.assertTrue(set(docs) <= flags)
+        self.assertNotIn("--made-up-flag", flags)
 
 
 if __name__ == '__main__':

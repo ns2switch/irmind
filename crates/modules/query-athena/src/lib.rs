@@ -198,7 +198,10 @@ impl SourceQueryExecutor for Athena {
             // The workflow binds this compiler commitment to the complete
             // scope and reservation context when it builds the signed plan.
             plan_digest: irmind_app::hex(&irmind_app::sha256(&canonical_query_json(query)?)),
-            observed_at: QueryTime::parse(&irmind_calendar::Utc::now().to_rfc3339())?,
+            observed_at: QueryTime::parse(
+                &irmind_calendar::Utc::now()
+                    .to_rfc3339_opts(irmind_calendar::SecondsFormat::Secs, true),
+            )?,
             accounting: QueryAccounting::ScanPriced,
             estimate: QueryEstimate {
                 unit: "billed_bytes".into(),
