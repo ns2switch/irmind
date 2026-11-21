@@ -824,6 +824,7 @@ mod signed_dispatch {
         assert_eq!(status.used.scan_bytes, 10 << 20);
         assert_eq!(status.used.retained_rows, 2);
         assert_eq!(status.held, SourceQueryResources::default());
+        check_authenticated_budget_display(engine, case, store, &status, cancel);
         assert!(
             engine
                 .change_source_query_budget(
@@ -855,6 +856,27 @@ mod signed_dispatch {
         assert_eq!(current.allocation.scan_bytes, Some(64 << 20));
         assert_eq!(current.used, status.used);
         assert!(engine.verify(case).is_ok());
+    }
+
+    fn check_authenticated_budget_display(
+        engine: &Engine<'_>,
+        case: &CaseId,
+        store: &LocalStore,
+        status: &irmind_app::source_queries::SourceQueryBudgetStatus,
+        cancel: &CancellationToken,
+    ) {
+        let mut receipts = store.entries(case).unwrap();
+        let display = engine
+            .source_query_budget_display(case, &receipts, cancel)
+            .unwrap();
+        assert_eq!(display.used, status.used);
+        assert_eq!(display.held, status.held);
+        receipts.last_mut().unwrap().payload.push(' ');
+        assert!(
+            engine
+                .source_query_budget_display(case, &receipts, cancel)
+                .is_err()
+        );
     }
 
     fn check_released_dispatch_slot(store: &LocalStore, case: &CaseId) {

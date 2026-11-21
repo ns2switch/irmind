@@ -73,10 +73,63 @@ impl CaseRuntime<'_, '_, '_> {
             StatusSegment::Subagents,
             format!("{} active children", active_children(&self.state.entries)?),
         );
+        let query_head = self
+            .state
+            .entries
+            .iter()
+            .rfind(|entry| {
+                entry.kind.is_source_query_lifecycle()
+                    || entry.kind == AuditEventKind::SourceQueryBudgetV1
+            })
+            .map(|entry| entry.hash);
+        if query_head != self.query_status.0 {
+            let status = self.engine.source_query_budget_display(
+                self.id,
+                &self.state.entries,
+                self.shutdown,
+            );
+            self.query_status = (query_head, source_query_data(status.as_ref()));
+        }
+        data.extend(self.query_status.1.clone());
         self.status_data = data;
         Ok(())
     }
 }
+
+fn source_query_data(
+    status: Result<&irmind_app::source_queries::SourceQueryBudgetStatus, &irmind_app::AppError>,
+) -> StatusData {
+    use StatusSegment::{QueryRetainedBytes, QueryRetainedRows, QueryScanBytes};
+    let mut data = StatusData::default();
+    match status {
+        Ok(status) if status.allocation.enabled => {
+            if let Some(cap) = status.allocation.scan_bytes {
+                data.insert(
+                    QueryScanBytes,
+                    format!("{} / {cap} B billed", status.used.scan_bytes),
+                );
+            }
+            data.insert(
+                QueryRetainedRows,
+                format!(
+                    "{} / {} query rows",
+                    status.used.retained_rows, status.allocation.retained_rows
+                ),
+            );
+            data.insert(
+                QueryRetainedBytes,
+                format!(
+                    "{} / {} B retained",
+                    status.used.retained_bytes, status.allocation.retained_bytes
+                ),
+            );
+        }
+        Ok(_) => {}
+        Err(_) => data.insert(QueryScanBytes, "query budget unavailable"),
+    }
+    data
+}
+
 fn cache_data(data: &mut StatusData, usage: irmind_app::CaseBudgetUsage) {
     for (segment, count) in [
         (

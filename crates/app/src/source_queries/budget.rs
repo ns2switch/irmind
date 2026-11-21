@@ -25,12 +25,38 @@ impl Engine<'_> {
         let _lock = self.repo.lock_case(case)?;
         self.verify_unlocked_cancelable(case, cancel)?;
         let entries = self.audit_log.entries(case)?;
+        self.source_query_budget_status(&entries, cancel)
+    }
+
+    /// Authenticate the displayed accounting without reopening capture files.
+    /// This snapshot is for display only and confers no execution authority.
+    pub fn source_query_budget_display(
+        &self,
+        case: &CaseId,
+        entries: &[SignedEntry],
+        cancel: &CancellationToken,
+    ) -> Result<SourceQueryBudgetStatus, AppError> {
+        let mut previous = [0; 32];
+        for (index, entry) in entries.iter().enumerate() {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            previous = self.verify_chain_entry(case, index, previous, entry)?;
+        }
+        self.source_query_budget_status(entries, cancel)
+    }
+
+    fn source_query_budget_status(
+        &self,
+        entries: &[SignedEntry],
+        cancel: &CancellationToken,
+    ) -> Result<SourceQueryBudgetStatus, AppError> {
         let operations = self.audit_log.global_operations()?;
         self.verify_global_operation_entries(&operations)?;
-        let budget = replay_budget(&entries)?;
+        let budget = replay_budget(entries)?;
         let (revision, allocation) = budget.current();
         let journal =
-            SourceQueryJournal::replay(&entries, &operations, self.verifier.as_ref(), cancel)?;
+            SourceQueryJournal::replay(entries, &operations, self.verifier.as_ref(), cancel)?;
         Ok(SourceQueryBudgetStatus {
             revision,
             allocation,

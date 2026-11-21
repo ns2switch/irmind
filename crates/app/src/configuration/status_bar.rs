@@ -29,9 +29,12 @@ pub enum StatusSegment {
     Version,
     Clock,
     Activity,
+    QueryScanBytes,
+    QueryRetainedRows,
+    QueryRetainedBytes,
 }
 impl StatusSegment {
-    pub const ALL: [Self; 24] = [
+    pub const ALL: [Self; 27] = [
         Self::CaseTitle,
         Self::Severity,
         Self::Seal,
@@ -56,6 +59,9 @@ impl StatusSegment {
         Self::Version,
         Self::Clock,
         Self::Activity,
+        Self::QueryScanBytes,
+        Self::QueryRetainedRows,
+        Self::QueryRetainedBytes,
     ];
     pub fn label(self) -> &'static str {
         match self {
@@ -83,6 +89,9 @@ impl StatusSegment {
             Self::Version => "IRMind version",
             Self::Clock => "UTC clock",
             Self::Activity => "Activity",
+            Self::QueryScanBytes => "Billed source query bytes",
+            Self::QueryRetainedRows => "Source query rows retained",
+            Self::QueryRetainedBytes => "Source query bytes retained",
         }
     }
 }
@@ -196,8 +205,8 @@ impl StatusBarTemplate {
     }
     pub fn costs() -> Self {
         use StatusSegment::{
-            CacheRead, CacheWrite, Cost, Model, Provider, TokenBudget, TokenPercent, Tokens,
-            ToolCalls,
+            CacheRead, CacheWrite, Cost, Model, Provider, QueryRetainedBytes, QueryRetainedRows,
+            QueryScanBytes, TokenBudget, TokenPercent, Tokens, ToolCalls,
         };
         Self::preset(&[
             (Model, 70),
@@ -209,6 +218,9 @@ impl StatusBarTemplate {
             (CacheWrite, 40),
             (Cost, 100),
             (ToolCalls, 60),
+            (QueryScanBytes, 81),
+            (QueryRetainedRows, 78),
+            (QueryRetainedBytes, 76),
         ])
     }
 }

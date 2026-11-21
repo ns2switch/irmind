@@ -32,6 +32,7 @@ pub(super) struct CaseRuntime<'scope, 'env, 'ports> {
     pub exit_to: CaseExit,
     pub status_bar: irmind_app::StatusBarTemplate,
     pub status_data: crate::status_bar::StatusData,
+    pub query_status: (Option<[u8; 32]>, crate::status_bar::StatusData),
     pub data_directory: Option<std::path::PathBuf>,
 }
 

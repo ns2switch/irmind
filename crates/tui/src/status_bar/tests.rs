@@ -18,6 +18,31 @@ fn presets_fit_eighty_one_hundred_and_two_hundred_columns() {
     }
 }
 #[test]
+fn query_budget_segments_fit_together_at_eighty_columns() {
+    let template = StatusBarTemplate {
+        version: 1,
+        separator: " · ".into(),
+        segments: [
+            StatusSegment::QueryScanBytes,
+            StatusSegment::QueryRetainedRows,
+            StatusSegment::QueryRetainedBytes,
+        ]
+        .into_iter()
+        .map(|segment| StatusItem {
+            segment,
+            priority: 80,
+            color: StatusColor::Text,
+        })
+        .collect(),
+    };
+    let line = render(&template, &StatusData::preview(), 80, Theme::plain());
+    assert!(line.width() <= 80);
+    for value in ["B billed", "query rows", "B retained"] {
+        assert!(line.to_string().contains(value));
+    }
+}
+
+#[test]
 fn low_priority_segments_are_removed_before_high_priority_segments() {
     let template = StatusBarTemplate {
         version: 1,
