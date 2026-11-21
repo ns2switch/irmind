@@ -218,10 +218,26 @@ prueba. En otro caso conservar desconocido/reserva y bloquear trabajo incompatib
 Poll/fetch no reinician plazo, frecuencia ni filas/bytes acumulados.
 
 Una liquidación por reserva, enlazada a observación terminal y retención real.
-Procesados, escaneados y facturados separados; desconocidos `null` con motivo.
-Cancelar también puede consumir. El cutoff de Athena dispara cancelación, no es
-frontera física exacta: registrar exceso y bloquear nuevas consultas; no disponible
-si la organización exige ese tope exacto. No extender deuda de tokens al escaneo.
+Los bytes procesados, escaneados y facturados quedan separados. Para una fuente
+de pago, `scan_charged` coincide con `usage.billed_bytes`. Si faltan los bytes
+facturados, la reserva queda pendiente aunque se conozca el escaneo. Antes del
+envío se reserva el techo firmado completo en bytes facturables. La estimación
+del *dry run* no reduce la reserva.
+
+- BigQuery bajo demanda usa `totalBytesBilled` para liquidar y el techo reservado
+  como `maximumBytesBilled`. Los bytes procesados por sí solos no dan una
+  estimación fiable de la facturación. El mínimo es de 10.485.760 bytes por tabla
+  referenciada y por consulta. [Precios de Google](https://cloud.google.com/bigquery/pricing) · [Estadísticas de BigQuery](https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/Job#JobStatistics2).
+- Athena sobre S3 bajo demanda redondea hacia arriba el umbral del workgroup y
+  el escaneo terminal a unidades de 1.048.576 bytes, con un mínimo de diez
+  unidades. Un fallo definitivo no genera cargo de escaneo de Athena. Cancelar
+  puede generar un cargo. El umbral dispara la cancelación, por lo que se cobra
+  cualquier exceso conocido y se bloquean nuevas consultas al agotar el
+  presupuesto. La fuente no está disponible si la organización exige un límite
+  físico exacto. [Precios de Athena](https://aws.amazon.com/athena/pricing/) · [Límites del workgroup](https://docs.aws.amazon.com/athena/latest/ug/workgroups-setting-control-limits-cloudwatch.html).
+
+Los contadores desconocidos se registran como `null` con un motivo. La deuda de
+tokens del modelo no concede capacidad de escaneo.
 
 Timeout Azure no reconciliable queda unknown y ocupa el hueco de ejecución.
 Recuperación propuesta: reconocimiento Analyst firmado tras la vida máxima
@@ -273,7 +289,7 @@ campos nullable presentes. J ordena claves; la lista define pertenencia.
 | SourceQueryReservationV1 / source-query-reservation-v1 | plan,task_id,approval,allocation_revision,scan_bytes,retained_rows,retained_bytes,at; Agent/broker. approval=null solo si todas las reglas lo permiten. |
 | SourceQueryExecutionV1 / source-query-execution-v1 | plan,reservation,previous,attempt,phase,execution_key,provider_id,provider_request_id,started_at,observed_at,provider_at,status,usage,source_observation,reason; Agent. previous encadena observaciones del intento. |
 | SourceQueryResultV1 / source-query-result-v1 | plan,reservation,execution,capture_sha256,capture_bytes,page_count,page_commitment,row_count,rejected_rows,completeness,coverage,decoder,mapping,at; Agent. execution anterior, nunca liquidación futura. |
-| SourceQuerySettlementV1 / source-query-settlement-v1 | plan,reservation,execution,result,scan_charged,retained_rows,retained_bytes,usage,uncertainty,at; Agent/broker, una sola vez. result=null sin captura admitida; no liquidar normalmente escaneo desconocido. |
+| SourceQuerySettlementV1 / source-query-settlement-v1 | plan,reservation,execution,result,scan_charged,retained_rows,retained_bytes,usage,uncertainty,at; Agent/broker, una sola vez. result=null sin captura admitida; la facturación desconocida impide la liquidación ordinaria. |
 | SourceQueryRecoveryV1 / source-query-recovery-v1 | plan,reservation,execution,action,reason,not_before,at; Analyst. Solo reconocer ejecución Analytics expirada no reconciliable; no concede escaneo ni afirma éxito. |
 
 SourceQueryExecutionV1.phase: intent, accepted, running o terminal; status:
@@ -309,7 +325,10 @@ concat(u64(ordinal) || hash32(body) || u64(bytes) || u64(rows) || u8(completenes
 Ordinales contiguos desde cero. Cambiar orden/fila/longitud/cuerpo o quitar/duplicar
 página falla. Códigos: 0 completo, 1 parcial del proveedor, 2 límite local,
 3 cancelado, 4 rechazado. Resultado global conserva causas ordenadas únicas.
-N filas exactas bajo LIMIT no prueba que se adquirieran todas las coincidencias.
+Una respuesta que alcanza el límite de filas solicitado registra `local_limit`
+en el resultado firmado. El límite cuenta las filas retenidas y las rechazadas.
+El verificador rechaza un recibo con el número exacto de filas sin ese indicador
+o con más filas que las solicitadas. Pueden existir más coincidencias.
 
 SourceManifestV2 fija hash/tamaño y `queries/<capture_sha256>.sqc`, copied=true;
 la referencia no autoriza rutas arbitrarias. SourceRecordSetV1 usa ToolResult y
@@ -357,11 +376,33 @@ retención atómicamente en la cadena principal tras hash y tamaño final. Recib
 de ejecución/escaneo se conservan aunque falle la admisión. Ficheros de append
 fallido se limpian como huérfanos, sin fuente admitida a medias. Ningún dato entra
 al rol system. Mantener Provenance, ContentGuard y UNTRUSTED con nonce.
+Si el resultado firmado contiene `local_limit`, la verificación del caso y del
+export V9 y los hallazgos que citen la captura avisan de que puede haber más
+coincidencias. El modelo recibe ese aviso como metadato de la herramienta fuera
+del bloque UNTRUSTED. El texto del proveedor queda dentro del bloque, incluidas
+las imitaciones del aviso. Antes de otra adquisición, acotar el intervalo o
+añadir filtros. Alcanzar el límite no demuestra que no haya más actividad.
 
 El modelo recibe ID/hash de fuente, ventana, filas/bytes, completitud/cobertura
 y vista previa acotada. Timeline, búsqueda, entidades y lectura consultan después
 en local con los límites existentes; nunca generan consultas remotas ocultas.
 Otra adquisición requiere otro plan firmado y presupuestado.
+
+### Propuesta de registro de decodificadores de páginas
+
+Cada módulo registra un decodificador local por módulo y versión. El motor lo
+elige según el plan comprometido. Si no está registrado, el módulo queda
+deshabilitado antes de la comprobación previa. El decodificador recibe la fuente
+aprobada y el cuerpo acotado de una página completa en el spool del caso.
+Valida nombres, tipos y orden de columnas, cuenta filas y rechazos y reconoce los
+indicadores de resultado parcial del proveedor. El motor aplica el saldo de
+filas y bytes y registra por su cuenta `local_limit`.
+
+El módulo también aporta el decodificador identificado para reconstruir la
+captura. Aplica las mismas reglas a las filas y conserva el esquema fijado en
+páginas anteriores, si procede. Emite registros no confiables con procedencia.
+La captura y los artefactos derivados se publican tras superar las comprobaciones
+atómicas existentes. El registro de módulos no incorpora campos firmados.
 
 ## 8. Export V9 y sello
 

@@ -243,12 +243,25 @@ conflicting work. Poll/fetch retries obey deadline/rate/call bounds and cannot
 reset acquisition row/byte caps.
 
 Settlement is once per reservation and references an earlier terminal observation
-plus actual admitted-retention counts. Preserve reported processed/scanned/billed
-bytes separately; unknown counters are `null` with a reason, not zero. Provider
-cancellations can still cost scans. Athena's cutoff is a cancellation trigger,
-not a physically exact byte boundary: retain the overrun, block subsequent scans
-and mark the contract not suitable for an organization requiring an exact hard
-byte cap. Do not extend model-token debt capacity to scans.
+plus actual admitted-retention counts. Preserve processed, scanned and billed
+bytes separately. For a priced source, `scan_charged` must equal
+`usage.billed_bytes`. Missing billed bytes keep the hold unresolved, including
+when raw scan telemetry is available. The full signed per-query billed-byte
+ceiling is reserved before submission. A dry-run estimate cannot reduce that hold.
+
+- BigQuery on demand uses `totalBytesBilled` for settlement and the reserved
+  ceiling as `maximumBytesBilled`. A processed-byte estimate alone cannot establish
+  reliable billable usage. The on-demand minimum is 10,485,760 bytes for a
+  referenced table and for the query. [Google pricing](https://cloud.google.com/bigquery/pricing) · [BigQuery job statistics](https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/Job#JobStatistics2).
+- Athena S3 on demand rounds the workgroup cutoff and the terminal scanned
+  bytes up to 1,048,576-byte units with a 10-unit minimum. A definitive failed
+  query has no Athena scan charge. Cancellation can incur a charge. The cutoff
+  triggers cancellation, so a known overrun is charged in full and further
+  admission stops when the budget is exhausted. This source remains unavailable
+  under an exact hard-cap policy. [Athena pricing](https://aws.amazon.com/athena/pricing/) · [Athena workgroup controls](https://docs.aws.amazon.com/athena/latest/ug/workgroups-setting-control-limits-cloudwatch.html).
+
+Use `null` with a reason for unknown counters. Model-token debt does not grant
+scan capacity.
 
 For a non-reconcilable synchronous Azure timeout, record `unknown`, not success
 or cancellation. An unresolved job blocks that source's execution slot. Proposed
@@ -310,7 +323,7 @@ so this list defines membership rather than serialization order.
 | `SourceQueryReservationV1` / `source-query-reservation-v1` | `plan,task_id,approval,allocation_revision,scan_bytes,retained_rows,retained_bytes,at`; Agent/broker. `approval=null` is allowed only if all policy and plan-consent rules permit it. |
 | `SourceQueryExecutionV1` / `source-query-execution-v1` | `plan,reservation,previous,attempt,phase,execution_key,provider_id,provider_request_id,started_at,observed_at,provider_at,status,usage,source_observation,reason`; Agent. `previous` chains observations for the same attempt. |
 | `SourceQueryResultV1` / `source-query-result-v1` | `plan,reservation,execution,capture_sha256,capture_bytes,page_count,page_commitment,row_count,rejected_rows,completeness,coverage,decoder,mapping,at`; Agent. `execution` is the earlier terminal/partial observation, never a later settlement. |
-| `SourceQuerySettlementV1` / `source-query-settlement-v1` | `plan,reservation,execution,result,scan_charged,retained_rows,retained_bytes,usage,uncertainty,at`; Agent/broker, exactly once. `result=null` for no admitted capture; unresolved scan usage prevents ordinary settlement. |
+| `SourceQuerySettlementV1` / `source-query-settlement-v1` | `plan,reservation,execution,result,scan_charged,retained_rows,retained_bytes,usage,uncertainty,at`; Agent/broker, exactly once. `result=null` for no admitted capture; unresolved billed usage prevents ordinary settlement. |
 | `SourceQueryRecoveryV1` / `source-query-recovery-v1` | `plan,reservation,execution,action,reason,not_before,at`; Analyst. Only acknowledgement of a documented expired non-reconcilable Analytics execution; no grant of scan capacity or assertion of provider success. |
 
 `SourceQueryExecutionV1.phase` is intent, accepted, running or terminal;
@@ -356,8 +369,11 @@ Ordinals are contiguous from zero; duplicates, missing/reordered pages and
 changed row/length/body invalidate the commitment. Completeness codes are
 0=complete, 1=provider_partial, 2=local_limit, 3=cancelled, 4=rejected.
 Overall completeness preserves all applicable causes in a sorted unique list.
-A complete response limited by compiler LIMIT is still `local_limit` if all
-matches cannot be proven acquired; do not infer completeness from exactly N rows.
+A response that reaches the requested row limit always records `local_limit`
+in the signed result. Both retained and rejected rows count toward this limit.
+The verifier rejects a receipt that reports exactly the requested count without
+that flag or reports more rows than requested. An exact count establishes only
+that the bound was reached; there may be further matches.
 
 Existing SourceManifestV2 binds the capture's hash/size and checked case-relative
 `queries/<capture_sha256>.sqc` identity with `copied=true`; it is not authority to
@@ -422,12 +438,35 @@ if local admission rolls back. Prepared files on failed append are removed or
 unreferenced and cleaned diagnostically; no half-admitted source is visible.
 No query data enters system prompts. Provider/evidence values and summaries pass
 through existing provenance, ContentGuard and nonce-isolated UNTRUSTED handling.
+When the signed result records `local_limit`, case verification, V9 export
+verification and findings citing its capture show that more matches may exist.
+The model receives the application-generated warning as tool metadata outside the
+UNTRUSTED block. Provider text, including copies of that warning, stays inside
+the block. Narrow the time range or add filters before another acquisition.
+Reaching the bound does not establish that activity is absent beyond the capture.
 
 Return only source ID/hash, interval, retained counts, completeness/coverage and
 the bounded model preview. Timeline, search, entity lookup and raw-record tools
 then use that source locally under existing scopes, samples and deadlines. They
 must not trigger additional network queries. Local pages do not spend remote scan
 budget. A requested new remote acquisition is a distinct signed/budgeted plan.
+
+### Proposed registration for provider page decoders
+
+A query module registers a local page decoder keyed by its module and version.
+The runtime selects it from the committed plan, never from HTTP headers or
+payload fields. An unregistered decoder makes the module unavailable before
+preflight. The decoder receives the approved source and the bounded body of a
+complete page already in the case spool. It checks the native column names,
+types and order, counts rows and rejected rows, and recognizes closed provider
+partial-result indicators. The engine applies its own remaining row and byte
+limits and records `local_limit` independently of anything in the payload.
+
+The same module provides the identified source decoder for reconstruction from
+the resulting capture. Its row semantics must match admission, including any
+schema carried over from an earlier page. It emits provenance-bound tainted
+records. Nothing is published until the capture and its derived artifacts pass
+the existing atomic publication checks. The registration adds no signed fields.
 
 ## 8. Export V9 and seal
 

@@ -47,7 +47,7 @@ fn allocation() -> SourceQueryAllocationV1 {
     SourceQueryAllocationV1 {
         enabled: true,
         analytics_allowed: false,
-        scan_bytes: Some(1_000_000),
+        scan_bytes: Some(11 << 20),
         retained_rows: 100_000,
         retained_bytes: 100_000_000,
     }
@@ -293,8 +293,8 @@ fn holds_survive_unknown_usage_and_known_overruns_are_charged_once() {
         Some(SourceQueryError::Unresolved)
     );
     assert!(broker.settle(hold.id(), Some(10), 2, 100_000_001).is_err());
-    broker.settle(hold.id(), Some(1_000_001), 2, 2391).unwrap();
-    assert_eq!(broker.used().scan_bytes, 1_000_001);
+    broker.settle(hold.id(), Some(12 << 20), 2, 2391).unwrap();
+    assert_eq!(broker.used().scan_bytes, 12 << 20);
     assert_eq!(broker.held(), SourceQueryResources::default());
     assert_eq!(
         broker.settle(hold.id(), Some(0), 0, 0),
@@ -338,7 +338,7 @@ fn source_query_budget_replay_binds_the_case_analyst_and_revision() {
     assert!(replay.accept(&foreign).is_err());
     replay.accept(&budget).unwrap();
     assert_eq!(replay.current().0, 1);
-    assert_eq!(replay.current().1.scan_bytes, Some(10_000_000));
+    assert_eq!(replay.current().1.scan_bytes, Some(32 << 20));
     assert!(replay.accept(&budget).is_err());
 }
 
@@ -356,4 +356,27 @@ fn pagination_binds_plan_attempt_and_job_and_rejects_token_cycles() {
     let cursor = cursor.next(&execution, "synthetic-page-b").unwrap();
     assert_eq!(cursor.ordinal(), 2);
     assert!(cursor.next(&execution, "synthetic-page-a").is_err());
+}
+
+#[test]
+fn scan_settlement_requires_billed_bytes_even_if_scanned_bytes_are_known() {
+    let raw =
+        include_bytes!("../../../../docs/development/source-query-format-vectors/settlement.json");
+    let mut value: serde_json::Value = serde_json::from_slice(raw).unwrap();
+    let billed = value["usage"]["billed_bytes"].as_u64().unwrap();
+    assert_eq!(billed, 10 << 20);
+    let settlement = SourceQuerySettlementV1::decode(raw).unwrap();
+    assert_eq!(canonical_query_json(&settlement).unwrap(), raw);
+
+    value["scan_charged"] = value["usage"]["scanned_bytes"].clone();
+    assert!(matches!(
+        SourceQuerySettlementV1::decode(&canonical_query_json(&value).unwrap()),
+        Err(SourceQueryError::Unresolved)
+    ));
+    value["scan_charged"] = serde_json::json!(billed);
+    value["usage"]["billed_bytes"] = serde_json::Value::Null;
+    assert!(matches!(
+        SourceQuerySettlementV1::decode(&canonical_query_json(&value).unwrap()),
+        Err(SourceQueryError::Unresolved)
+    ));
 }

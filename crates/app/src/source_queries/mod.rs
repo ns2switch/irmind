@@ -18,13 +18,13 @@ pub use admission::{SignedSourceQueryAdmission, SourceQueryAuthority};
 pub use broker::{SourceQueryBroker, SourceQueryHold, SourceQueryResources};
 pub use canonical::{canonical_query_json, query_content_id};
 pub use capture::{
-    CaptureColumn, CaptureError, CapturePageCompleteness, CapturePageMetadata, QueryCaptureSummary,
-    QueryCaptureWriter, verify_query_capture,
+    CaptureColumn, CaptureError, CapturePageCompleteness, CapturePageMetadata, QueryCapturePage,
+    QueryCaptureSummary, QueryCaptureWriter, read_query_capture_pages, verify_query_capture,
 };
 pub use compile::*;
 pub use completion::{
-    SignedSourceQuerySettlement, SourceQueryExecutionV1, SourceQueryResultV1,
-    SourceQuerySettlementV1,
+    SignedSourceQuerySettlement, SourceQueryExecutionV1, SourceQueryLimitNotice,
+    SourceQueryResultV1, SourceQuerySettlementV1,
 };
 pub use export::{
     verify_query_capture_section, write_query_capture_section, write_stored_query_capture_section,
@@ -45,6 +45,16 @@ pub const QUERY_CASE_MAX_ROWS: u64 = 1_000_000;
 pub const QUERY_CASE_MAX_BYTES: u64 = 1_000_000_000;
 pub const QUERY_DEFAULT_INTERVAL_SECONDS: u64 = 31 * 86_400;
 pub const QUERY_MAX_INTERVAL_SECONDS: u64 = 366 * 86_400;
+const QUERY_BILLING_MEGABYTE: u64 = 1 << 20;
+const QUERY_MIN_BILLED_BYTES: u64 = 10 * QUERY_BILLING_MEGABYTE;
+
+fn rounded_scan_billed_bytes(bytes: u64) -> Option<u64> {
+    bytes
+        .div_ceil(QUERY_BILLING_MEGABYTE)
+        .checked_mul(QUERY_BILLING_MEGABYTE)
+        .map(|rounded| rounded.max(QUERY_MIN_BILLED_BYTES))
+}
+
 pub const QUERY_MAX_PAGES: u64 = 4096;
 pub const QUERY_CAPTURE_MAGIC: &[u8] = b"IRMIND-QUERY-CAPTURE-V1\0";
 
@@ -79,4 +89,16 @@ impl From<SourceQueryError> for crate::AppError {
     fn from(value: SourceQueryError) -> Self {
         Self::Policy(value.to_string())
     }
+}
+
+/// Collect notices only after authenticating the case chain and query journal.
+pub(crate) fn result_limit_notices(
+    entries: &[crate::SignedEntry],
+) -> Result<Vec<SourceQueryLimitNotice>, SourceQueryError> {
+    entries
+        .iter()
+        .filter(|entry| entry.kind == crate::AuditEventKind::SourceQueryResultV1)
+        .map(|entry| SourceQueryResultV1::decode(entry.payload.as_bytes()))
+        .filter_map(|result| result.map(|item| item.limit_notice()).transpose())
+        .collect()
 }

@@ -16,6 +16,8 @@ pub struct Finding {
     pub dismissed: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub details: Option<EntityDetails>,
+    #[serde(skip)]
+    pub source_query_limited: bool,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -150,6 +152,7 @@ impl Engine<'_> {
             confirmed: false,
             dismissed: false,
             details,
+            source_query_limited: false,
         };
         if !finding.valid_for(&known_evidence) {
             return Err(AppError::Fixed(
@@ -302,6 +305,17 @@ impl Engine<'_> {
                 }
                 _ => {}
             }
+        }
+        let notices = crate::source_queries::result_limit_notices(entries)?;
+        let limited = notices
+            .iter()
+            .map(crate::source_queries::SourceQueryLimitNotice::capture_sha256)
+            .collect::<std::collections::BTreeSet<_>>();
+        for finding in findings.values_mut() {
+            finding.source_query_limited = limited.contains(finding.evidence_hash.as_str())
+                || matches!(&finding.details, Some(EntityDetails::Hypothesis { supporting_evidence, refuting_evidence })
+                    if supporting_evidence.iter().chain(refuting_evidence)
+                        .any(|hash| limited.contains(hash.as_str())));
         }
         Ok(findings.into_values().collect())
     }

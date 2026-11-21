@@ -32,3 +32,12 @@ pueden eludir política, alcance, herramientas declaradas o aprobaciones.
 Las contribuciones requieren DCO, pruebas afectadas y documentación bilingüe. El
 catálogo comunitario es independiente del núcleo; su publicación sigue pendiente
 de la clave de producción. No dupliques nombres incluidos en el binario.
+
+
+### Consultas en origen
+
+Si una skill declara `source_query`, incluye un paso para el aviso de límite
+local en los metadatos de la herramienta. Trata el resultado como parcial.
+Acota la ventana temporal o añade filtros antes de repetir la consulta, dentro
+del alcance y presupuesto aprobados. Investiga las filas retenidas con las
+herramientas locales. Una captura limitada no demuestra que no hubiera más actividad.

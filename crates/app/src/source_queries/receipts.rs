@@ -186,6 +186,27 @@ impl SourceQueryPlanV1 {
         query_content_id("irmind-source-query-plan-v1", self)
     }
 
+    pub(super) const fn query(&self) -> &SourceQueryV1 {
+        &self.query
+    }
+
+    pub(super) const fn compiled(&self) -> &CompiledSourceQueryV1 {
+        &self.compiled
+    }
+
+    pub(super) fn check_authorized_call(
+        &self,
+        call: &crate::AuthorizedCall,
+    ) -> Result<(), SourceQueryError> {
+        if call.tool() != &crate::Tool::SourceQuery
+            || call.case_id().as_str() != self.case_id
+            || SourceQueryV1::from_proposal(call.proposal_args())? != self.query
+        {
+            return Err(SourceQueryError::Scope);
+        }
+        Ok(())
+    }
+
     pub(super) fn adoption(&self) -> &str {
         &self.configuration.adoption
     }
@@ -215,6 +236,10 @@ impl SourceQueryPlanV1 {
 
     pub(super) const fn allocation_revision(&self) -> u64 {
         self.allocation_revision
+    }
+
+    pub(super) const fn requested_rows(&self) -> u64 {
+        self.query.limit()
     }
 
     pub(super) const fn limits(&self) -> &SourceQueryLimits {
@@ -353,9 +378,9 @@ impl SourceQueryPlanV1 {
                 Ok(())
             }
             ("query-athena" | "query-bigquery", QueryAccounting::ScanPriced, Some(limit))
-                if preflight
-                    .provider_ceiling
-                    .is_some_and(|ceiling| ceiling > 0 && ceiling <= limit)
+                if preflight.provider_ceiling.is_some_and(|ceiling| {
+                    (super::QUERY_MIN_BILLED_BYTES..=limit).contains(&ceiling)
+                }) && preflight.estimate.unit == "billed_bytes"
                     && preflight.estimate.value.is_none_or(|bytes| bytes <= limit) =>
             {
                 Ok(())

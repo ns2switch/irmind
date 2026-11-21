@@ -182,7 +182,7 @@ fn v9_export_authenticates_retained_parents_receipts_schema_and_public_key() {
         String::from_utf8(payload).unwrap(),
     );
     let revised = engine.source_query_allocation(&case.id).unwrap();
-    assert_eq!((revised.0, revised.1.scan_bytes), (1, Some(10_000_000)));
+    assert_eq!((revised.0, revised.1.scan_bytes), (1, Some(32 << 20)));
     for (name, second) in [("a.json", "01"), ("b.json", "02")] {
         fs::write(root.path().join(name), format!(
             "{{\"eventTime\":\"2026-11-01T00:00:{second}.000001Z\",\"eventName\":\"Login\",\"sourceIPAddress\":\"203.0.113.77\"}}"
@@ -422,7 +422,7 @@ fn source_query_broker_requires_the_pinned_analyst_and_agent_proofs() {
     let allocation = SourceQueryAllocationV1 {
         enabled: true,
         analytics_allowed: false,
-        scan_bytes: Some(10_000_000),
+        scan_bytes: Some(32 << 20),
         retained_rows: 1_000_000,
         retained_bytes: 1_000_000_000,
     };
@@ -469,7 +469,7 @@ fn source_query_broker_requires_the_pinned_analyst_and_agent_proofs() {
         assert_eq!(broker.held().retained_rows, 0);
     }
     let hold = broker.reserve_authenticated(candidate, authority).unwrap();
-    assert_eq!(hold.resources().scan_bytes, 1_000_000);
+    assert_eq!(hold.resources().scan_bytes, 11 << 20);
 
     check_capture_spools_require_durable_intent(&broker, hold.id(), &chain);
     check_signed_settlement(&mut broker, &chain, &principal, &verifier);
@@ -569,7 +569,7 @@ fn check_signed_settlement(
     broker
         .settle_authenticated(receipts, principal, verifier)
         .unwrap();
-    assert_eq!(broker.used().scan_bytes, 4096);
+    assert_eq!(broker.used().scan_bytes, 10 << 20);
     assert_eq!(broker.used().retained_bytes, 2391);
     assert!(
         broker
