@@ -18,7 +18,10 @@ use irmind_app::{
     },
 };
 use irmind_domain::AuthorizedCall;
-use secrecy::{ExposeSecret as _, SecretString};
+use irmind_http::google_auth::{
+    GoogleApi, GoogleAuthError, GoogleServiceAccount, google_token_endpoint,
+};
+use secrecy::SecretString;
 use serde_json::json;
 use std::time::Duration;
 
@@ -29,14 +32,36 @@ pub struct BigQuery {
     endpoint: reqwest::Url,
     source: ResolvedQuerySourceV1,
     limits: SourceQueryLimits,
-    token: SecretString,
+    credentials: Credentials,
+}
+
+enum Credentials {
+    ServiceAccount {
+        account: GoogleServiceAccount,
+        endpoint: reqwest::Url,
+    },
+    #[cfg(test)]
+    SyntheticToken(SecretString),
 }
 
 impl BigQuery {
-    pub fn new(
+    pub fn with_service_account(
         source: ResolvedQuerySourceV1,
         limits: SourceQueryLimits,
-        access_token: SecretString,
+        service_account: &SecretString,
+    ) -> Result<Self, AppError> {
+        let credentials = Credentials::ServiceAccount {
+            account: GoogleServiceAccount::new(service_account, GoogleApi::BigQuery)
+                .map_err(auth_error)?,
+            endpoint: google_token_endpoint().map_err(auth_error)?,
+        };
+        Self::new(source, limits, credentials)
+    }
+
+    fn new(
+        source: ResolvedQuerySourceV1,
+        limits: SourceQueryLimits,
+        credentials: Credentials,
     ) -> Result<Self, AppError> {
         limits.validate()?;
         compiler::table_layout(&source)?;
@@ -47,12 +72,6 @@ impl BigQuery {
                 .is_none_or(|cap| cap < protocol::MINIMUM_BILLED_BYTES)
             || !compiler::identifier(source.owner(), true)
             || !compiler::identifier(source.location(), true)
-            || access_token.expose_secret().is_empty()
-            || access_token.expose_secret().len() > 8192
-            || !access_token
-                .expose_secret()
-                .bytes()
-                .all(|byte| byte.is_ascii_graphic())
         {
             return Err(SourceQueryError::Invalid.into());
         }
@@ -64,8 +83,19 @@ impl BigQuery {
                 .map_err(|_| SourceQueryError::Invalid)?,
             source,
             limits,
-            token: access_token,
+            credentials,
         })
+    }
+
+    async fn access_token(&self, cancel: &CancellationToken) -> Result<SecretString, AppError> {
+        match &self.credentials {
+            Credentials::ServiceAccount { account, endpoint } => account
+                .token(&self.client, endpoint, cancel)
+                .await
+                .map_err(auth_error),
+            #[cfg(test)]
+            Credentials::SyntheticToken(token) => Ok(token.clone()),
+        }
     }
 
     fn check(
@@ -82,6 +112,17 @@ impl BigQuery {
             return Err(SourceQueryError::Scope.into());
         }
         Ok(())
+    }
+}
+
+fn auth_error(error: GoogleAuthError) -> AppError {
+    match error {
+        GoogleAuthError::InvalidConfiguration => AppError::Policy(
+            "Configure a Google service account for the BigQuery query source in the keystore."
+                .into(),
+        ),
+        GoogleAuthError::Cancelled => AppError::Cancelled,
+        GoogleAuthError::ExchangeFailed => AppError::RemoteTool,
     }
 }
 

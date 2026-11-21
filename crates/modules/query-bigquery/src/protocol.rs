@@ -41,11 +41,12 @@ impl BigQuery {
             .endpoint
             .join(path)
             .map_err(|_| SourceQueryError::Invalid)?;
+        let token = self.access_token(cancel).await?;
         let mut request = self
             .client
             .request(method, url)
             .query(parameters)
-            .bearer_auth(self.token.expose_secret());
+            .bearer_auth(token.expose_secret());
         if let Some(data) = data {
             request = request
                 .header("content-type", "application/json")

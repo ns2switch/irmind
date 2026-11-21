@@ -28,9 +28,69 @@ fn executor(source: Value, limits: SourceQueryLimits) -> BigQuery {
     BigQuery::new(
         serde_json::from_value(source).unwrap(),
         limits,
-        "synthetic-bearer".into(),
+        Credentials::SyntheticToken("synthetic-bearer".into()),
     )
     .unwrap()
+}
+
+#[tokio::test]
+async fn service_account_exchanges_a_signed_assertion_and_reuses_the_token() {
+    const DRY_RUN: &str =
+        r#"{"configuration":{"dryRun":true},"statistics":{"query":{"totalBytesProcessed":"128"}}}"#;
+    let (source, limits, query) = compiled_fixture();
+    let account = SecretString::from(
+        json!({
+            "type": "service_account",
+            "client_email": "irmind-test@synthetic-project.iam.gserviceaccount.com",
+            "private_key": include_str!("../../siem-chronicle/tests/fixtures/synthetic-service-account.pem"),
+            "token_uri": "https://oauth2.googleapis.com/token"
+        })
+        .to_string(),
+    );
+    let mut executor =
+        BigQuery::with_service_account(serde_json::from_value(source).unwrap(), limits, &account)
+            .unwrap();
+    let server = MockServer::start(vec![
+        MockResponse::json(r#"{"access_token":"synthetic-exchanged-token","token_type":"Bearer","expires_in":300}"#),
+        MockResponse::json(DRY_RUN),
+        MockResponse::json(DRY_RUN),
+    ])
+    .unwrap();
+    let url = reqwest::Url::parse(server.origin()).unwrap();
+    executor.endpoint = url.join("bigquery/v2/").unwrap();
+    if let Credentials::ServiceAccount { endpoint, .. } = &mut executor.credentials {
+        *endpoint = url.join("token").unwrap();
+    }
+    let query = serde_json::from_value(query).unwrap();
+    let compiled = executor.compile(&executor.source, &query).unwrap();
+    for _ in 0..2 {
+        executor
+            .dry_run(&compiled, &CancellationToken::new())
+            .await
+            .unwrap();
+    }
+    let calls = server.finish().unwrap();
+    assert_eq!(calls.len(), 3);
+    assert_eq!(calls[0].target, "/token");
+    let exchange = std::str::from_utf8(&calls[0].body).unwrap();
+    assert!(exchange.contains("jwt-bearer"));
+    assert_eq!(
+        exchange
+            .split("assertion=")
+            .nth(1)
+            .unwrap()
+            .split('.')
+            .count(),
+        3
+    );
+    assert!(!exchange.contains("PRIVATE+KEY"));
+    for call in &calls[1..] {
+        assert_eq!(
+            call.headers["authorization"],
+            "Bearer synthetic-exchanged-token"
+        );
+        assert!(call.target.starts_with("/bigquery/v2/projects/"));
+    }
 }
 
 #[tokio::test]
