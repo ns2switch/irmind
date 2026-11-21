@@ -3,7 +3,6 @@ use super::{
     ExecutionObservationV1, QueryAccounting, QueryExecutionStatus, QueryResponsePage,
     SourceQueryError, SourceQueryUsage, json,
 };
-use secrecy::ExposeSecret as _;
 use serde_json::Value;
 
 const MEBIBYTE: u64 = 1 << 20;
@@ -41,12 +40,8 @@ impl BigQuery {
             .endpoint
             .join(path)
             .map_err(|_| SourceQueryError::Invalid)?;
-        let token = self.access_token(cancel).await?;
-        let mut request = self
-            .client
-            .request(method, url)
-            .query(parameters)
-            .bearer_auth(token.expose_secret());
+        let request = self.client.request(method, url).query(parameters);
+        let mut request = self.authorize_request(request, cancel).await?;
         if let Some(data) = data {
             request = request
                 .header("content-type", "application/json")

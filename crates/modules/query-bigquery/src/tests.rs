@@ -69,6 +69,25 @@ async fn service_account_exchanges_a_signed_assertion_and_reuses_the_token() {
             .await
             .unwrap();
     }
+    let Credentials::ServiceAccount { account, endpoint } = &executor.credentials else {
+        unreachable!();
+    };
+    let token = account
+        .token(&executor.client, endpoint, &CancellationToken::new())
+        .await
+        .unwrap();
+    let request = executor.client.get(executor.endpoint.clone());
+    assert!(token.authorize(GoogleApi::Chronicle, request).is_err());
+    let forwarded = token
+        .authorize(
+            GoogleApi::BigQuery,
+            executor.client.get(executor.endpoint.clone()),
+        )
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(forwarded.headers()["authorization"].is_sensitive());
+    assert!(!format!("{token:?} {forwarded:?}").contains("synthetic-exchanged-token"));
     let calls = server.finish().unwrap();
     assert_eq!(calls.len(), 3);
     assert_eq!(calls[0].target, "/token");

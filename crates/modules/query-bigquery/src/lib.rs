@@ -87,14 +87,22 @@ impl BigQuery {
         })
     }
 
-    async fn access_token(&self, cancel: &CancellationToken) -> Result<SecretString, AppError> {
+    async fn authorize_request(
+        &self,
+        request: reqwest::RequestBuilder,
+        cancel: &CancellationToken,
+    ) -> Result<reqwest::RequestBuilder, AppError> {
         match &self.credentials {
             Credentials::ServiceAccount { account, endpoint } => account
                 .token(&self.client, endpoint, cancel)
                 .await
+                .and_then(|token| token.authorize(GoogleApi::BigQuery, request))
                 .map_err(auth_error),
             #[cfg(test)]
-            Credentials::SyntheticToken(token) => Ok(token.clone()),
+            Credentials::SyntheticToken(token) => {
+                use secrecy::ExposeSecret as _;
+                Ok(request.bearer_auth(token.expose_secret()))
+            }
         }
     }
 
