@@ -9,6 +9,7 @@ mod export;
 mod parsers;
 mod recovery;
 mod skills;
+mod source_queries;
 
 impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
     pub(super) fn submit(&mut self, prompt: String) -> Result<bool> {
@@ -141,6 +142,7 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                 }
                 Err(error) => self.state.messages.push(error.to_string()),
             }
+            self.show_source_query_budget();
             self.state.overlay_scroll = 0;
             return true;
         }
@@ -496,11 +498,7 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         if prompt == "/verify" {
             let workflow = self.workflow();
             let id = self.id;
-            self.start_task("Verify", move |cancel| {
-                let count = workflow.verify(id, &cancel)?;
-                Ok(workflow
-                    .with_orphan_cleanup_notice(id, format!("Verified {count} audit entries")))
-            });
+            self.start_task("Verify", move |cancel| workflow.verify_summary(id, &cancel));
             return Ok(true);
         }
         if let Some(args) = prompt.strip_prefix("/verify ") {
@@ -545,6 +543,9 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
     }
 
     fn case_command(&mut self, prompt: &str) -> Result<bool> {
+        if self.source_query_command(prompt) {
+            return Ok(true);
+        }
         match prompt {
             "/help" => {
                 self.state.overlay_scroll = 0;

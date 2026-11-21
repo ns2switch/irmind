@@ -425,6 +425,7 @@ pub(crate) fn run_case(
             exit_to: CaseExit::Home,
             status_bar: presentation.status_bar.cloned().unwrap_or_default(),
             status_data: crate::status_bar::StatusData::default(),
+            query_status: (None, crate::status_bar::StatusData::default()),
             data_directory: presentation.data_directory.map(std::path::Path::to_owned),
         };
         let _mouse = MouseCapture::start(presentation.mouse_capture)?;

@@ -305,5 +305,6 @@ pub(super) fn v9_result(
         source_manifests,
         source_bytes_verified,
         source_bytes_unavailable: source_manifests.saturating_sub(source_bytes_verified),
+        source_query_limits: Vec::new(),
     }
 }

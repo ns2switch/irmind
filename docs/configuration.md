@@ -325,3 +325,79 @@ pricing applies only to five-minute writes. Every nonzero component needs its
 configured rate; unknown breakdown/lifetime or any unpriced request makes the
 total estimate unavailable. Counters are provider reports, not an invoice. The
 cache status segments show reported counts (with partial coverage) or unavailable.
+
+## Source queries
+
+Source queries start disabled. The organization supplies a `[source_queries]`
+section in the policy passed to `--policy`. Its `case_ceiling` limits billed scan
+bytes, retained rows and retained bytes independently of object transfer bytes.
+Each `sources` entry defines the provider resource, dataset, time window,
+approval threshold and per-query limits.
+
+Use Settings → Keystore to manage the provider fields. Athena uses the existing
+AWS access key, secret key and optional session token fields. BigQuery shows
+`query-bigquery/<source>/service-account-json`. Azure Log Analytics shows
+`query-azure-log-analytics/<source>/tenant-id`, `client-id` and `client-secret`.
+The policy describes resources and limits. Keep provider credentials in the
+keystore.
+
+An analyst adopts an organization source and allocates resources to a case
+through signed operations. The following commands use synthetic identifiers:
+
+```sh
+irmind --policy policy.toml source-query adopt synthetic-audit
+irmind --policy policy.toml source-query allocate "$CASE_ID" \
+  --scan-bytes 67108864 --retained-rows 2000 --retained-bytes 4194304 \
+  --reason 'Review the scoped audit window'
+```
+
+An Analytics-only allocation uses `--allow-analytics` and can omit
+`--scan-bytes`. `/budget` shows the used and reserved amounts for billed scan
+bytes, retained rows and retained bytes, separately from ordinary object
+transfers. The status bar's **Costs** preset includes three corresponding
+segments. Add or reorder them under **Settings → Preferences → Status bar**.
+The billed scan segment appears for allocations with a scan budget.
+
+When exact-plan consent is required, in the case
+use `/source-query show <plan-id>` followed by `/source-query approve <plan-id>`
+after reviewing the scope, limits and translated query.
+
+Use the retained capture for local timeline, search and entity queries. If a
+capture hits its row limit, narrow the time range or add structured filters
+before proposing another remote acquisition.
+
+See [Manual validation of source queries](development/source-query-validation.md)
+for an optional analyst-run exercise with each provider.
+
+### Athena
+
+Use a dedicated workgroup with enforced settings and a per-query scan cutoff.
+Set the workgroup and the explicit cutoff-overrun acknowledgement in the
+source policy. Configure the partitioned CloudTrail table and give the query
+identity access only to the adopted workgroup, source data and its result
+location. [Workgroup and billed-byte configuration](../crates/modules/query-athena/README.md) · [IAM actions by resource](development/source-queries-design.md#4-credentials-scope-and-minimum-permissions).
+
+### BigQuery
+
+Create a Cloud Logging sink to a dedicated BigQuery dataset. Declare its
+timestamp-partitioned or daily-sharded layout in the source and grant the
+query service account access to the selected dataset and job creation in the
+query project. Store the service-account JSON in IRMind's keystore.
+[Sink, layout and service-account configuration](../crates/modules/query-bigquery/README.md).
+
+### Azure Log Analytics
+
+Create a single-tenant Microsoft Entra app registration for client credentials.
+Store the tenant ID, application client ID and client secret in IRMind's
+keystore. Specify the subscription, resource group, workspace name, workspace
+ID and Analytics table in the source policy.
+[Microsoft Entra app and API authentication](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/api/access-api).
+
+Scope the app's service-principal grants to the adopted workspace. The adapter
+needs `Microsoft.OperationalInsights/workspaces/read` and
+`Microsoft.OperationalInsights/workspaces/tables/read` for the two metadata
+checks. Grant `Microsoft.OperationalInsights/workspaces/query/read` and
+restrict data access to the adopted tables using table-level permissions or
+a granular RBAC assignment. No log ingestion, role changes, shared keys or
+workspace administration permissions are required.
+[Workspace and table access](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/manage-access) · [Granular RBAC](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/granular-rbac-log-analytics) · [Table plan permissions](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-table-plans).

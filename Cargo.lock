@@ -2253,7 +2253,7 @@ checksum = "791930b43c0d5973160d90a8f3894509f2b273430f5c5c73b668636d0287c5c0"
 
 [[package]]
 name = "irmind"
-version = "0.5.7"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "arrow-array",
@@ -2342,6 +2342,9 @@ dependencies = [
  "irmind-mod-parser-vpc-flow",
  "irmind-mod-parser-windows-dns",
  "irmind-mod-parser-zeek",
+ "irmind-mod-query-athena",
+ "irmind-mod-query-azure-log-analytics",
+ "irmind-mod-query-bigquery",
  "irmind-mod-siem-chronicle",
  "irmind-mod-siem-elastic",
  "irmind-mod-siem-splunk",
@@ -2426,12 +2429,18 @@ dependencies = [
 name = "irmind-http"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "reqwest",
+ "ring",
+ "secrecy",
+ "serde",
+ "serde_json",
  "sha2 0.10.9",
  "tempfile",
  "tokio",
  "tokio-rustls",
  "tokio-util",
+ "zeroize",
 ]
 
 [[package]]
@@ -3367,6 +3376,77 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-query-athena"
+version = "0.1.0"
+dependencies = [
+ "aws-credential-types",
+ "aws-sigv4",
+ "ed25519-dalek",
+ "futures-util",
+ "http",
+ "irmind-app",
+ "irmind-calendar",
+ "irmind-domain",
+ "irmind-http",
+ "irmind-infra",
+ "irmind-mod-mapping-cloudtrail",
+ "irmind-mod-parser-json",
+ "irmind-security",
+ "irmind-testkit",
+ "reqwest",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "irmind-mod-query-azure-log-analytics"
+version = "0.1.0"
+dependencies = [
+ "ed25519-dalek",
+ "futures-util",
+ "irmind-app",
+ "irmind-calendar",
+ "irmind-domain",
+ "irmind-http",
+ "irmind-infra",
+ "irmind-mod-mapping-entra",
+ "irmind-mod-parser-entra",
+ "irmind-security",
+ "irmind-testkit",
+ "reqwest",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
+name = "irmind-mod-query-bigquery"
+version = "0.1.0"
+dependencies = [
+ "ed25519-dalek",
+ "futures-util",
+ "irmind-app",
+ "irmind-calendar",
+ "irmind-domain",
+ "irmind-http",
+ "irmind-infra",
+ "irmind-mod-mapping-gcp-audit",
+ "irmind-mod-parser-gcp-audit",
+ "irmind-security",
+ "irmind-testkit",
+ "reqwest",
+ "secrecy",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "irmind-mod-siem-chronicle"
 version = "0.1.0"
 dependencies = [
@@ -3383,11 +3463,9 @@ dependencies = [
  "reqwest",
  "ring",
  "secrecy",
- "serde",
  "serde_json",
  "tempfile",
  "tokio",
- "zeroize",
 ]
 
 [[package]]
@@ -3517,7 +3595,7 @@ dependencies = [
 
 [[package]]
 name = "irmind-tui"
-version = "0.5.7"
+version = "0.6.0"
 dependencies = [
  "anyhow",
  "crossterm",

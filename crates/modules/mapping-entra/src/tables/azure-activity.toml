@@ -1,0 +1,55 @@
+interpreter = "irmind-mapping-tables-v2"
+id = "mapping-azure-activity-table-base"
+version = "entra-tables-v1"
+target_schema = "irmind-common-event-v1"
+source_contract = "irmind-source-record-v1"
+parser = "parser-entra"
+parser_versions = ["entra-source-v1"]
+format = "azure-activity-table"
+format_version = "entra-source-v1"
+action = ["OperationNameValue"]
+
+[partition]
+account = ["SubscriptionId"]
+
+[[fields]]
+source = ["SubscriptionId"]
+target = "cloud.account.id"
+omit_text = [""]
+
+[[fields]]
+source = ["Caller"]
+target = "user.id"
+omit_text = [""]
+observation = { kind = "user", role = "actor", scope = { kind = "account", path = ["SubscriptionId"] } }
+[[fields.when]]
+path = ["SubscriptionId"]
+predicate = { op = "present" }
+
+[[fields]]
+source = ["CallerIpAddress"]
+target = "source.ip"
+conversion = "ip"
+omit_text = [""]
+observation = { kind = "ip", role = "source", scope = { kind = "global" } }
+
+[[fields]]
+source = ["ResourceProviderValue"]
+target = "cloud.service.name"
+omit_text = [""]
+
+[[rules]]
+categories = ["api"]
+types = ["info"]
+outcome = "success"
+[[rules.when]]
+path = ["ActivityStatusValue"]
+predicate = { op = "text", value = "Succeeded" }
+
+[[rules]]
+categories = ["api"]
+types = ["info"]
+outcome = "failure"
+[[rules.when]]
+path = ["ActivityStatusValue"]
+predicate = { op = "text", value = "Failed" }

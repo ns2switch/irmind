@@ -331,3 +331,84 @@ Cada componente no nulo necesita su precio; si faltan datos, la vigencia es
 incierta o alguna petición no tiene precio, el coste total no está disponible.
 Los contadores son informes del proveedor, no una factura. Los segmentos de caché
 muestran los valores recibidos (indicando cobertura parcial) o no disponible.
+
+## Consultas en origen
+
+Las consultas en origen empiezan desactivadas. La organización las configura en
+la sección `[source_queries]` de la política indicada con `--policy`.
+`case_ceiling` limita por separado los bytes de escaneo facturados, las filas
+retenidas y los bytes retenidos. Cada entrada de `sources` fija el recurso del
+proveedor, el conjunto de datos, el intervalo permitido, el umbral de aprobación
+y los límites por consulta.
+
+Las credenciales se gestionan en Settings → Keystore. Athena utiliza los campos
+ya existentes de clave de acceso, clave secreta y token de sesión opcional de
+AWS. BigQuery muestra `query-bigquery/<fuente>/service-account-json`. Azure Log
+Analytics muestra `query-azure-log-analytics/<fuente>/tenant-id`, `client-id` y
+`client-secret`. La política solo describe recursos y límites. Las credenciales
+se guardan en el keystore.
+
+El analista adopta la fuente de la organización y asigna el presupuesto al caso
+mediante operaciones firmadas. Estos comandos usan identificadores sintéticos:
+
+```sh
+irmind --policy policy.toml source-query adopt synthetic-audit
+irmind --policy policy.toml source-query allocate "$CASE_ID" \
+  --scan-bytes 67108864 --retained-rows 2000 --retained-bytes 4194304 \
+  --reason 'Revisar el intervalo de auditoría autorizado'
+```
+
+Para una asignación exclusiva de Analytics, usa `--allow-analytics`. Puedes
+omitir `--scan-bytes`. `/budget` muestra los bytes de escaneo facturados,
+las filas y los bytes retenidos, con los valores usados y reservados por
+separado del tráfico de objetos. El perfil **Costs** de la barra de estado
+incluye estos tres segmentos. Se pueden añadir o reordenar en
+**Settings → Preferences → Status bar**. El segmento de escaneo aparece cuando
+hay un presupuesto de escaneo asignado.
+
+Cuando hace falta el consentimiento del
+analista, revisa el alcance, los límites y la consulta traducida con
+`/source-query show <id-del-plan>` y firma con
+`/source-query approve <id-del-plan>`.
+
+Usa la captura retenida para consultar la timeline, buscar texto y examinar
+entidades en local. Si una captura llega al límite de filas, acota el intervalo
+o añade filtros antes de proponer otra consulta remota.
+
+Consulta la [validación manual de consultas en origen](source-query-validation.md)
+para un ejercicio opcional a cargo del analista con cada proveedor.
+
+### Athena
+
+Usa un workgroup dedicado que haga obligatoria su configuración y tenga un
+tope de escaneo por consulta. Declara el workgroup y confirma explícitamente
+en la política de la fuente que el escaneo puede superar el tope antes de
+cancelarse. Configura la tabla particionada de CloudTrail. Restringe la identidad
+de consulta al workgroup, los datos de origen y la ubicación de resultados.
+[Workgroup y bytes facturados](../../crates/modules/query-athena/README.md) · [Acciones IAM por recurso](source-queries-design.md).
+
+### BigQuery
+
+Crea un sink de Cloud Logging hacia un dataset dedicado de BigQuery. Declara
+el diseño de tablas particionadas por instante o por día. Da a la cuenta de
+servicio acceso al dataset seleccionado y permiso para crear jobs en el
+proyecto de consulta. Guarda su JSON en el keystore de IRMind.
+[Configuración del sink, las tablas y la cuenta de servicio](../../crates/modules/query-bigquery/README.md).
+
+### Azure Log Analytics
+
+Registra una aplicación Microsoft Entra de un solo tenant para el flujo de
+credenciales de cliente. Guarda el ID del tenant, el ID de cliente y el secreto
+en el keystore. Indica en la política la suscripción, el grupo de recursos,
+el nombre y el ID del workspace y la tabla Analytics.
+[Registro de la aplicación y autenticación de la API](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/api/access-api).
+
+Limita los permisos de la entidad de servicio al workspace adoptado. El
+adaptador necesita `Microsoft.OperationalInsights/workspaces/read` y
+`Microsoft.OperationalInsights/workspaces/tables/read` para las dos
+comprobaciones de metadatos. Concede
+`Microsoft.OperationalInsights/workspaces/query/read` y restringe el acceso
+a las tablas adoptadas con permisos por tabla o una asignación de RBAC granular.
+La aplicación no necesita permisos de ingesta, cambios de roles, claves
+compartidas o administración del workspace.
+[Acceso al workspace y las tablas](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/manage-access) · [RBAC granular](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/granular-rbac-log-analytics) · [Permisos para el plan de tabla](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-table-plans).

@@ -26,8 +26,8 @@ impl StatusData {
     pub(crate) fn preview() -> Self {
         use StatusSegment::{
             CallBudget, CaseTitle, Clock, CloudBudget, CloudBytes, Cost, Keystore, Model, Provider,
-            Seal, Severity, Sources, Subagents, TokenBudget, TokenPercent, Tokens, ToolCalls,
-            Version,
+            QueryRetainedBytes, QueryRetainedRows, QueryScanBytes, Seal, Severity, Sources,
+            Subagents, TokenBudget, TokenPercent, Tokens, ToolCalls, Version,
         };
         let mut data = Self::default();
         for (segment, value) in [
@@ -43,6 +43,9 @@ impl StatusData {
             (CallBudget, "of 1000 calls"),
             (CloudBytes, "0 B cloud"),
             (CloudBudget, "cloud limit 1 GiB"),
+            (QueryScanBytes, "10485760 / 67108864 B billed"),
+            (QueryRetainedRows, "12 / 2000 query rows"),
+            (QueryRetainedBytes, "8192 / 4194304 B retained"),
             (Cost, "cost $0.10 (example)"),
             (Subagents, "2 active children"),
             (Sources, "8 sources"),

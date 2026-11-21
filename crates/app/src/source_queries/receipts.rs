@@ -87,6 +87,29 @@ impl<'a> BudgetReplay<'a> {
     pub(crate) const fn current(&self) -> (u64, SourceQueryAllocationV1) {
         (self.revision, self.allocation)
     }
+
+    pub(super) fn next(
+        &self,
+        budget: SourceQueryAllocationV1,
+        reason: &str,
+        at: QueryTime,
+    ) -> Result<SourceQueryBudgetV1, SourceQueryError> {
+        if !text(reason, 1024) {
+            return Err(SourceQueryError::Invalid);
+        }
+        Ok(SourceQueryBudgetV1 {
+            version: 1,
+            case_id: self.case.to_owned(),
+            revision: self
+                .revision
+                .checked_add(1)
+                .ok_or(SourceQueryError::Limit)?,
+            previous: self.previous.clone(),
+            budget,
+            reason: reason.to_owned(),
+            at,
+        })
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -168,7 +191,7 @@ pub struct SourceQueryPlanV1 {
     configuration: Configuration,
     policy: Policy,
     allocation_revision: u64,
-    preflight: QueryPreflightV1,
+    pub(super) preflight: QueryPreflightV1,
     limits: SourceQueryLimits,
     pub(super) decoder: Decoder,
     pub(super) mapping: Mapping,
@@ -176,6 +199,73 @@ pub struct SourceQueryPlanV1 {
 }
 
 impl SourceQueryPlanV1 {
+    pub(super) fn prepare(
+        input: super::planning::PlanInput<'_>,
+        mut preflight: QueryPreflightV1,
+    ) -> Result<Self, SourceQueryError> {
+        let binding = input.binding;
+        let owner = binding.source.owner().to_owned();
+        let (accounts, projects, workspaces) = match binding.source.module() {
+            "query-athena" => (vec![owner], vec![], vec![]),
+            "query-bigquery" => (vec![], vec![owner], vec![]),
+            "query-azure-log-analytics" => (vec![], vec![], vec![owner]),
+            _ => return Err(SourceQueryError::Scope),
+        };
+        let adoption = crate::hex(&input.adoption.operation.hash);
+        let scope = Scope {
+            accounts,
+            projects,
+            workspaces,
+            regions: vec![binding.source.location().into()],
+            from: input.query.from().clone(),
+            to: input.query.to().clone(),
+            proof: input.scope_proof,
+        };
+        if preflight.plan_digest != fingerprint(&input.compiled)? {
+            return Err(SourceQueryError::Invalid);
+        }
+        preflight.plan_digest = fingerprint(&serde_json::json!({
+            "compiled": input.compiled, "source": binding.source,
+            "scope": scope, "limits": binding.limits,
+        }))?;
+        let mapping = &binding.mapping;
+        let result = Self {
+            version: 1,
+            case_id: input.case.as_str().into(),
+            task_id: None,
+            attempt: input.attempt,
+            query: input.query,
+            compiled: input.compiled,
+            source: binding.source.clone(),
+            scope,
+            configuration: Configuration {
+                sha256: fingerprint(&binding.source)?,
+                adoption: adoption.clone(),
+            },
+            policy: Policy {
+                sha256: fingerprint(&input.adoption.policy)?,
+                rules: input.adoption.policy.clone(),
+                adoption,
+            },
+            allocation_revision: input.revision,
+            preflight,
+            limits: binding.limits.clone(),
+            decoder: Decoder {
+                id: input.decoder.name.into(),
+                version: input.decoder.version.into(),
+            },
+            mapping: Mapping {
+                id: mapping.id().into(),
+                version: mapping.version().into(),
+                target: mapping.target().into(),
+                sha256: mapping.implementation().as_str().into(),
+            },
+            at: input.at,
+        };
+        result.validate()?;
+        Ok(result)
+    }
+
     pub fn decode(bytes: &[u8]) -> Result<Self, SourceQueryError> {
         let plan: Self = decode_record(bytes)?;
         plan.validate()?;
@@ -184,6 +274,44 @@ impl SourceQueryPlanV1 {
 
     pub fn content_id(&self) -> Result<String, SourceQueryError> {
         query_content_id("irmind-source-query-plan-v1", self)
+    }
+
+    pub(super) fn proposal(&self) -> Result<crate::ProposedCall, SourceQueryError> {
+        let query = serde_json::to_value(&self.query).map_err(|_| SourceQueryError::Invalid)?;
+        let fields = query.as_object().ok_or(SourceQueryError::Invalid)?;
+        Ok(crate::ProposedCall {
+            tool: crate::Tool::SourceQuery,
+            args: fields
+                .iter()
+                .map(|(key, value)| {
+                    let value = value
+                        .as_str()
+                        .map_or_else(|| value.to_string(), str::to_owned);
+                    (key.clone(), value)
+                })
+                .collect(),
+        })
+    }
+
+    pub(super) const fn query(&self) -> &SourceQueryV1 {
+        &self.query
+    }
+
+    pub(super) const fn compiled(&self) -> &CompiledSourceQueryV1 {
+        &self.compiled
+    }
+
+    pub(super) fn check_authorized_call(
+        &self,
+        call: &crate::AuthorizedCall,
+    ) -> Result<(), SourceQueryError> {
+        if call.tool() != &crate::Tool::SourceQuery
+            || call.case_id().as_str() != self.case_id
+            || SourceQueryV1::from_proposal(call.proposal_args())? != self.query
+        {
+            return Err(SourceQueryError::Scope);
+        }
+        Ok(())
     }
 
     pub(super) fn adoption(&self) -> &str {
@@ -215,6 +343,10 @@ impl SourceQueryPlanV1 {
 
     pub(super) const fn allocation_revision(&self) -> u64 {
         self.allocation_revision
+    }
+
+    pub(super) const fn requested_rows(&self) -> u64 {
+        self.query.limit()
     }
 
     pub(super) const fn limits(&self) -> &SourceQueryLimits {
@@ -385,6 +517,25 @@ pub struct SourceQueryApprovalV1 {
 }
 
 impl SourceQueryApprovalV1 {
+    pub(super) fn approve_plan(
+        plan: &SourceQueryPlanV1,
+        reason: &str,
+        at: QueryTime,
+    ) -> Result<Self, SourceQueryError> {
+        if !text(reason, 1024) {
+            return Err(SourceQueryError::Invalid);
+        }
+        Ok(Self {
+            version: 1,
+            case_id: plan.case_id.clone(),
+            task_id: None,
+            plan: plan.content_id()?,
+            decision: Decision::Approve,
+            reason: reason.into(),
+            at,
+        })
+    }
+
     pub fn decode(bytes: &[u8]) -> Result<Self, SourceQueryError> {
         let approval: Self = decode_record(bytes)?;
         validate_identity(
@@ -434,6 +585,27 @@ pub struct SourceQueryReservationV1 {
 }
 
 impl SourceQueryReservationV1 {
+    pub(super) fn for_plan(
+        plan: &SourceQueryPlanV1,
+        approval: Option<&SourceQueryApprovalV1>,
+        at: QueryTime,
+    ) -> Result<Self, SourceQueryError> {
+        Ok(Self {
+            version: 1,
+            case_id: plan.case_id.clone(),
+            task_id: None,
+            plan: plan.content_id()?,
+            approval: approval
+                .map(SourceQueryApprovalV1::content_id)
+                .transpose()?,
+            allocation_revision: plan.allocation_revision,
+            scan_bytes: plan.limits.scan_bytes,
+            retained_rows: plan.limits.rows,
+            retained_bytes: plan.limits.retained_bytes,
+            at,
+        })
+    }
+
     pub fn decode(bytes: &[u8]) -> Result<Self, SourceQueryError> {
         let reservation: Self = decode_record(bytes)?;
         validate_identity(

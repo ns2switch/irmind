@@ -43,6 +43,7 @@ mod tests {
                 id: id.clone(),
                 plan: String::new(),
                 attempt: 1,
+                requested_rows: 7,
                 reservation_seq: 1,
                 intent_hash: None,
                 decoder: super::super::receipts::Decoder {
@@ -122,6 +123,7 @@ pub struct SourceQueryHold {
     id: String,
     pub(super) plan: String,
     pub(super) attempt: u64,
+    pub(super) requested_rows: u64,
     pub(super) reservation_seq: u64,
     pub(super) intent_hash: Option<[u8; 32]>,
     pub(super) decoder: super::receipts::Decoder,
@@ -302,46 +304,27 @@ impl SourceQueryBroker {
         receipt.check(plan, approval_id.as_deref())?;
         let id = receipt.content_id()?;
         let source = plan.source();
-        let source = (
-            source.module().to_owned(),
-            source.owner().to_owned(),
-            source.location().to_owned(),
-        );
         let limits = plan.limits();
-        if self.plans.contains(&plan_id)
-            || self
-                .holds
-                .values()
-                .filter(|hold| !hold.slot_released && hold.source == source)
-                .count() as u64
-                >= limits.concurrency
-        {
+        if self.plans.contains(&plan_id) || !self.query_slot_available(source, limits.concurrency) {
             return Err(SourceQueryError::Unresolved);
         }
         let accounting = plan.accounting();
-        if accounting == QueryAccounting::AnalyticsNoQueryCharge
-            && !self.allocation.analytics_allowed
-        {
-            return Err(SourceQueryError::Budget);
-        }
-        let resources = SourceQueryResources {
-            scan_bytes: limits.scan_bytes.unwrap_or(0),
-            retained_rows: limits.rows,
-            retained_bytes: limits.retained_bytes,
-        };
-        let total_reserved = self.held.add(resources)?;
-        if !self.used.add(total_reserved)?.fits(self.allocation) {
-            return Err(SourceQueryError::Budget);
-        }
+        let resources = query_resources(limits);
+        let total_reserved = self.checked_query_capacity(accounting, resources)?;
         let hold = SourceQueryHold {
             id,
             plan: plan_id.clone(),
             attempt: plan.attempt,
+            requested_rows: plan.requested_rows(),
             reservation_seq,
             intent_hash,
             decoder: plan.decoder.clone(),
             mapping: plan.mapping.clone(),
-            source,
+            source: (
+                source.module().to_owned(),
+                source.owner().to_owned(),
+                source.location().to_owned(),
+            ),
             accounting,
             analytics_expiry_seconds: plan.analytics_expiry_seconds(),
             resources,
@@ -351,6 +334,57 @@ impl SourceQueryBroker {
         self.plans.insert(plan_id);
         self.held = total_reserved;
         Ok(hold)
+    }
+
+    pub(super) fn preflight_revision(
+        &self,
+        source: &super::ResolvedQuerySourceV1,
+        limits: &super::SourceQueryLimits,
+    ) -> Result<u64, SourceQueryError> {
+        let accounting = if limits.scan_bytes.is_some() {
+            QueryAccounting::ScanPriced
+        } else {
+            QueryAccounting::AnalyticsNoQueryCharge
+        };
+        self.checked_query_capacity(accounting, query_resources(limits))?;
+        if !self.query_slot_available(source, limits.concurrency) {
+            return Err(SourceQueryError::Unresolved);
+        }
+        Ok(self.revision)
+    }
+
+    fn query_slot_available(&self, source: &super::ResolvedQuerySourceV1, ceiling: u64) -> bool {
+        let active = self
+            .holds
+            .values()
+            .filter(|hold| {
+                !hold.slot_released
+                    && hold.source.0 == source.module()
+                    && hold.source.1 == source.owner()
+                    && hold.source.2 == source.location()
+            })
+            .count() as u64;
+        active < ceiling
+    }
+
+    fn checked_query_capacity(
+        &self,
+        accounting: QueryAccounting,
+        resources: SourceQueryResources,
+    ) -> Result<SourceQueryResources, SourceQueryError> {
+        if !self.allocation.enabled {
+            return Err(SourceQueryError::Disabled);
+        }
+        if accounting == QueryAccounting::AnalyticsNoQueryCharge
+            && !self.allocation.analytics_allowed
+        {
+            return Err(SourceQueryError::Budget);
+        }
+        let total_reserved = self.held.add(resources)?;
+        if !self.used.add(total_reserved)?.fits(self.allocation) {
+            return Err(SourceQueryError::Budget);
+        }
+        Ok(total_reserved)
     }
 
     pub(super) const fn case(&self) -> &CaseId {
@@ -414,5 +448,13 @@ impl SourceQueryBroker {
         }
         hold.slot_released = true;
         Ok(())
+    }
+}
+
+fn query_resources(limits: &super::SourceQueryLimits) -> SourceQueryResources {
+    SourceQueryResources {
+        scan_bytes: limits.scan_bytes.unwrap_or(0),
+        retained_rows: limits.rows,
+        retained_bytes: limits.retained_bytes,
     }
 }

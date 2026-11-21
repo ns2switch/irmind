@@ -168,10 +168,12 @@ pub enum SourceQueryLeasePhase {
 pub struct AdmittedSourceQuery {
     pub(super) case_id: crate::CaseId,
     pub(super) plan: String,
+    pub(super) attempt: u64,
     pub(super) reservation: String,
     pub(super) source: ResolvedQuerySourceV1,
     pub(super) compiled: CompiledSourceQueryV1,
     pub(super) limits: SourceQueryLimits,
+    pub(super) source_metadata: serde_json::Value,
     pub(super) execution_key: String,
     pub(super) phase: SourceQueryLeasePhase,
     pub(super) execution: Option<QueryExecutionRef>,
@@ -182,6 +184,9 @@ impl AdmittedSourceQuery {
     }
     pub fn plan(&self) -> &str {
         &self.plan
+    }
+    pub const fn attempt(&self) -> u64 {
+        self.attempt
     }
     pub fn reservation(&self) -> &str {
         &self.reservation
@@ -194,6 +199,10 @@ impl AdmittedSourceQuery {
     }
     pub fn limits(&self) -> &SourceQueryLimits {
         &self.limits
+    }
+    /// The service facts committed by the signed, approved preflight.
+    pub fn source_metadata(&self) -> &serde_json::Value {
+        &self.source_metadata
     }
     pub fn execution_key(&self) -> &str {
         &self.execution_key
@@ -257,13 +266,37 @@ pub trait SourceQueryExecutor: Send + Sync {
         cancel: &CancellationToken,
     ) -> Result<CancelObservationV1, AppError>;
 }
+pub(super) struct QuerySourceBinding {
+    pub source: ResolvedQuerySourceV1,
+    pub limits: SourceQueryLimits,
+    pub mapping: irmind_domain::MappingIdentityV1,
+}
+
+struct ConfiguredQuerySource {
+    binding: QuerySourceBinding,
+    executor: Arc<dyn SourceQueryExecutor>,
+    decoder: Arc<dyn super::SourceQueryPageDecoder>,
+}
+
 #[derive(Default)]
 pub struct SourceQueryPorts {
     executors: BTreeMap<String, Arc<dyn SourceQueryExecutor>>,
+    bindings: BTreeMap<String, ConfiguredQuerySource>,
+    page_decoders: BTreeMap<(String, String, String), Arc<dyn super::SourceQueryPageDecoder>>,
+    pub(super) organization_ceiling: Option<super::SourceQueryAllocationV1>,
 }
 impl SourceQueryPorts {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn with_organization_ceiling(
+        mut self,
+        ceiling: super::SourceQueryAllocationV1,
+    ) -> Result<Self, SourceQueryError> {
+        ceiling.validate()?;
+        self.organization_ceiling = Some(ceiling);
+        Ok(self)
     }
     pub fn add(&mut self, executor: Arc<dyn SourceQueryExecutor>) -> Result<(), SourceQueryError> {
         let descriptor = executor.descriptor();
@@ -274,6 +307,130 @@ impl SourceQueryPorts {
         self.executors.insert(descriptor.id, executor);
         Ok(())
     }
+    pub fn add_page_decoder(
+        &mut self,
+        module: &str,
+        version: &str,
+        dataset: &str,
+        decoder: Arc<dyn super::SourceQueryPageDecoder>,
+    ) -> Result<(), SourceQueryError> {
+        let descriptor = self.executor(module)?.descriptor();
+        let identity = decoder.identity();
+        irmind_domain::SourceDecoderIdentityV1::try_new(identity.name, identity.version)
+            .map_err(|_| SourceQueryError::Invalid)?;
+        let key = (module.into(), version.into(), dataset.into());
+        if descriptor.version != version
+            || !descriptor.datasets.iter().any(|name| name == dataset)
+            || self.page_decoders.contains_key(&key)
+        {
+            return Err(SourceQueryError::Invalid);
+        }
+        self.page_decoders.insert(key, decoder);
+        Ok(())
+    }
+
+    /// Associate an explicitly selected source with a registered implementation.
+    pub fn bind_source(
+        &mut self,
+        source: ResolvedQuerySourceV1,
+        limits: SourceQueryLimits,
+        mapping: irmind_domain::MappingIdentityV1,
+    ) -> Result<(), SourceQueryError> {
+        let executor = self.executor(source.module())?.clone();
+        let decoder = self
+            .page_decoders
+            .get(&page_decoder_key(&source))
+            .ok_or(SourceQueryError::Unavailable)?
+            .clone();
+        self.register_configured_source(source, limits, mapping, executor, decoder)
+    }
+
+    /// Pin a provider instance and page decoder to one configured source.
+    /// The case broker still requires the matching signed source adoption.
+    pub fn register_configured_source(
+        &mut self,
+        source: ResolvedQuerySourceV1,
+        limits: SourceQueryLimits,
+        mapping: irmind_domain::MappingIdentityV1,
+        executor: Arc<dyn SourceQueryExecutor>,
+        decoder: Arc<dyn super::SourceQueryPageDecoder>,
+    ) -> Result<(), SourceQueryError> {
+        limits.validate()?;
+        let descriptor = executor.descriptor();
+        descriptor.validate()?;
+        let identity = decoder.identity();
+        irmind_domain::SourceDecoderIdentityV1::try_new(identity.name, identity.version)
+            .map_err(|_| SourceQueryError::Invalid)?;
+        if self.bindings.len() >= 64
+            || self.bindings.contains_key(source.id())
+            || mapping.target() != irmind_domain::COMMON_EVENT_V1
+            || descriptor.id != source.module()
+            || descriptor.version != source.module_version()
+            || !descriptor
+                .datasets
+                .iter()
+                .any(|known| known == source.dataset())
+        {
+            return Err(SourceQueryError::Invalid);
+        }
+        self.bindings.insert(
+            source.id().into(),
+            ConfiguredQuerySource {
+                binding: QuerySourceBinding {
+                    source,
+                    limits,
+                    mapping,
+                },
+                executor,
+                decoder,
+            },
+        );
+        Ok(())
+    }
+
+    pub(crate) fn available(&self) -> bool {
+        !self.bindings.is_empty()
+    }
+
+    pub(crate) fn available_source(&self, source: &str) -> bool {
+        self.bindings.contains_key(source)
+    }
+
+    pub(super) fn binding(&self, source: &str) -> Result<&QuerySourceBinding, SourceQueryError> {
+        self.bindings
+            .get(source)
+            .map(|source| &source.binding)
+            .ok_or(SourceQueryError::Unavailable)
+    }
+
+    fn configured_source(
+        &self,
+        source: &ResolvedQuerySourceV1,
+    ) -> Result<&ConfiguredQuerySource, SourceQueryError> {
+        let configured = self
+            .bindings
+            .get(source.id())
+            .ok_or(SourceQueryError::Unavailable)?;
+        if &configured.binding.source != source {
+            return Err(SourceQueryError::Scope);
+        }
+        Ok(configured)
+    }
+
+    pub fn page_decoder(
+        &self,
+        source: &ResolvedQuerySourceV1,
+    ) -> Result<&dyn super::SourceQueryPageDecoder, SourceQueryError> {
+        Ok(self.configured_source(source)?.decoder.as_ref())
+    }
+
+    pub(super) fn executor_for(
+        &self,
+        source: &ResolvedQuerySourceV1,
+    ) -> Result<&Arc<dyn SourceQueryExecutor>, SourceQueryError> {
+        Ok(&self.configured_source(source)?.executor)
+    }
+
     pub fn executor(
         &self,
         module: &str,
@@ -282,4 +439,12 @@ impl SourceQueryPorts {
             .get(module)
             .ok_or(SourceQueryError::Unavailable)
     }
+}
+
+fn page_decoder_key(source: &ResolvedQuerySourceV1) -> (String, String, String) {
+    (
+        source.module().into(),
+        source.module_version().into(),
+        source.dataset().into(),
+    )
 }

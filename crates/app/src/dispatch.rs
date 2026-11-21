@@ -12,6 +12,26 @@ use crate::{
     remote_tool_error, sha256,
 };
 
+#[derive(Clone)]
+pub(crate) struct ToolFeedback {
+    pub(crate) text: String,
+    pub(crate) source_query_limit: Option<crate::source_queries::SourceQueryLimitNotice>,
+}
+
+impl From<String> for ToolFeedback {
+    fn from(text: String) -> Self {
+        Self {
+            text,
+            source_query_limit: None,
+        }
+    }
+}
+impl From<&str> for ToolFeedback {
+    fn from(text: &str) -> Self {
+        text.to_owned().into()
+    }
+}
+
 impl Engine<'_> {
     pub fn request_tool_as_analyst(
         &self,
@@ -36,7 +56,7 @@ impl Engine<'_> {
             ));
         }
         let id_owned = id.clone();
-        let _case_lock = self
+        let case_lock = self
             .blocking_local(move |local| local.repo.lock_case(&id_owned))
             .await?;
         let id_owned = id.clone();
@@ -50,8 +70,21 @@ impl Engine<'_> {
         if case.sealed {
             return Err(AppError::Sealed);
         }
+        let _case_lock = if proposal.tool == Tool::SourceQuery {
+            drop(case_lock);
+            None
+        } else {
+            Some(case_lock)
+        };
         self.execute_proposal_from_origin(&case, proposal, crate::AuditOrigin::Analyst, cancel)
             .await
+            .map(|feedback| {
+                if let Some(notice) = feedback.source_query_limit {
+                    format!("{}\n{}", notice.message(), feedback.text)
+                } else {
+                    feedback.text
+                }
+            })
     }
 
     pub(crate) async fn execute_proposal(
@@ -59,7 +92,7 @@ impl Engine<'_> {
         case: &Case,
         proposal: ProposedCall,
         cancel: &CancellationToken,
-    ) -> Result<String, AppError> {
+    ) -> Result<ToolFeedback, AppError> {
         self.execute_proposal_from_origin(case, proposal, crate::AuditOrigin::Model, cancel)
             .await
     }
@@ -70,7 +103,7 @@ impl Engine<'_> {
         proposal: ProposedCall,
         origin: crate::AuditOrigin,
         cancel: &CancellationToken,
-    ) -> Result<String, AppError> {
+    ) -> Result<ToolFeedback, AppError> {
         let id = &case.id;
         let decision = self.evaluate_proposal(case, proposal, origin).await?;
         match decision {
@@ -92,11 +125,12 @@ impl Engine<'_> {
                                 local
                                     .case_budget_unlocked(&owned)?
                                     .notice("case tool call limit")
-                            ))
+                            )
+                            .into())
                         })
                         .await;
                 }
-                Ok(format!("denied: {reason}"))
+                Ok(format!("denied: {reason}").into())
             }
             Decision::NeedsApproval(pending) => {
                 if let Some(reason) = self.pending_unavailable_reason(&pending) {
@@ -108,16 +142,14 @@ impl Engine<'_> {
                         None,
                     )
                     .await?;
-                    return Ok(format!("denied: {reason}"));
+                    return Ok(format!("denied: {reason}").into());
                 }
                 let id_owned = id.clone();
                 let mode = self.mode;
                 let challenge_id = self
                     .blocking_local(move |local| local.audit_pending(&id_owned, &pending, mode))
                     .await?;
-                Ok(format!(
-                    "approval pending: {challenge_id}; request was not executed"
-                ))
+                Ok(format!("approval pending: {challenge_id}; request was not executed").into())
             }
             Decision::Allow(call) => {
                 if let Some(reason) = self.unavailable_reason(&call) {
@@ -129,12 +161,42 @@ impl Engine<'_> {
                         None,
                     )
                     .await?;
-                    return Ok(format!("denied: {reason}"));
+                    return Ok(format!("denied: {reason}").into());
                 }
-                let (screened, _) = self.execute_authorized(id, &call, false, cancel).await?;
-                Ok(screened)
+                let (screened, hash) = self.execute_authorized(id, &call, false, cancel).await?;
+                let source_query_limit = self
+                    .query_limit_for_tool_result(id, call.tool(), hash, cancel)
+                    .await?;
+                Ok(ToolFeedback {
+                    text: screened,
+                    source_query_limit,
+                })
             }
         }
+    }
+
+    async fn query_limit_for_tool_result(
+        &self,
+        id: &CaseId,
+        tool: &Tool,
+        hash: String,
+        cancel: &CancellationToken,
+    ) -> Result<Option<crate::source_queries::SourceQueryLimitNotice>, AppError> {
+        if tool != &Tool::SourceQuery || hash.is_empty() {
+            return Ok(None);
+        }
+        let case = id.clone();
+        let cancel = cancel.clone();
+        self.blocking_local(move |local| {
+            let _lock = local.repo.lock_case(&case)?;
+            let entries = local.audit_log.entries(&case)?;
+            local.verify_source_query_journal(&entries, &cancel, false)?;
+            let notices = crate::source_queries::result_limit_notices(&entries)?;
+            Ok(notices
+                .into_iter()
+                .find(|notice| notice.capture_sha256() == hash))
+        })
+        .await
     }
 
     pub(crate) async fn evaluate_proposal(
@@ -214,6 +276,9 @@ impl Engine<'_> {
     }
 
     fn pending_unavailable_reason(&self, pending: &PendingApproval) -> Option<&'static str> {
+        if pending.proposal().tool == Tool::SourceQuery {
+            return Some("case policy denied source-query preflight");
+        }
         self.source_unavailable_reason(
             &pending.proposal().tool,
             pending.proposal().args.get("source").map(String::as_str),
@@ -222,7 +287,15 @@ impl Engine<'_> {
 
     fn source_unavailable_reason(&self, tool: &Tool, source: Option<&str>) -> Option<&'static str> {
         match tool {
-            Tool::SourceQuery => Some("source queries require a configured source-query module"),
+            Tool::SourceQuery
+                if !source.is_some_and(|source| {
+                    self.source_queries
+                        .as_ref()
+                        .is_some_and(|ports| ports.available_source(source))
+                }) =>
+            {
+                Some("source queries require a configured source-query module")
+            }
             Tool::SiemSearch | Tool::SiemGetAlert if !self.siem_available(source) => {
                 Some("SIEM source unavailable")
             }

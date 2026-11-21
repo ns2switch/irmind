@@ -122,6 +122,14 @@ pub trait AuditLog: Send + Sync {
     fn transact(&self, entry: &SignedEntry, mutation: CaseMutation) -> Result<(), AppError>;
     /// Append every signed entry in one durable transaction, or none of them.
     fn append_batch(&self, entries: &[SignedEntry]) -> Result<(), AppError>;
+    /// Admit the dispatch against installation-wide quotas and append the signed
+    /// case batch. The caller must obtain this commitment before requesting a lease.
+    fn append_source_query_dispatch(
+        &self,
+        _dispatch: &crate::source_queries::SourceQueryDispatch<'_>,
+    ) -> Result<(), AppError> {
+        Err(crate::source_queries::SourceQueryError::Unavailable.into())
+    }
     /// Append-only events use the same transaction path without a case-state mutation.
     fn append(&self, entry: &SignedEntry) -> Result<(), AppError> {
         self.transact(entry, CaseMutation::None)
@@ -370,6 +378,7 @@ pub trait ExportVerifier: Send + Sync {
             source_manifests: 0,
             source_bytes_verified: 0,
             source_bytes_unavailable: 0,
+            source_query_limits: Vec::new(),
         })
     }
 }
@@ -382,6 +391,7 @@ pub struct ExportVerification {
     pub source_manifests: usize,
     pub source_bytes_verified: usize,
     pub source_bytes_unavailable: usize,
+    pub source_query_limits: Vec<crate::source_queries::SourceQueryLimitNotice>,
 }
 
 pub trait LargeCaseExporter: Send + Sync {

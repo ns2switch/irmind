@@ -54,6 +54,163 @@ pub struct SourceQueryExecutionV1 {
 }
 
 impl SourceQueryExecutionV1 {
+    pub(super) fn intent_for_plan(
+        case: &crate::CaseId,
+        plan: &super::SourceQueryPlanV1,
+        reservation: &super::SourceQueryReservationV1,
+        at: QueryTime,
+    ) -> Result<Self, SourceQueryError> {
+        let plan_id = plan.content_id()?;
+        let reservation = reservation.content_id()?;
+        let execution_key = query_content_id(
+            "irmind-source-query-job-key-v1",
+            &(case.as_str(), &plan_id, plan.attempt),
+        )?;
+        Ok(Self {
+            version: 1,
+            case_id: case.as_str().into(),
+            plan: plan_id,
+            reservation,
+            previous: None,
+            attempt: plan.attempt,
+            phase: Phase::Intent,
+            execution_key,
+            provider_id: None,
+            provider_request_id: None,
+            started_at: at.clone(),
+            observed_at: at,
+            provider_at: None,
+            status: Status::Pending,
+            usage: SourceQueryUsage {
+                scanned_bytes: None,
+                processed_bytes: None,
+                billed_bytes: None,
+                returned_wire_bytes: 0,
+                returned_decoded_bytes: 0,
+                query_price_basis: plan.accounting(),
+            },
+            source_observation: None,
+            reason: None,
+        })
+    }
+
+    pub(super) fn execution_key(&self) -> &str {
+        &self.execution_key
+    }
+
+    pub(super) fn submit_observation(
+        &self,
+        reply: &super::SubmitObservationV1,
+        at: QueryTime,
+    ) -> Result<Self, SourceQueryError> {
+        if self.phase != Phase::Intent || at.as_str() < self.observed_at.as_str() {
+            return Err(SourceQueryError::Invalid);
+        }
+        let (phase, status, provider_id, reason) = match reply {
+            super::SubmitObservationV1::Accepted(job)
+                if job.plan() == self.plan && job.attempt() == self.attempt =>
+            {
+                (
+                    Phase::Accepted,
+                    Status::Pending,
+                    Some(job.provider_id().into()),
+                    None,
+                )
+            }
+            super::SubmitObservationV1::Accepted(_) => return Err(SourceQueryError::Scope),
+            super::SubmitObservationV1::NotSubmitted => (
+                Phase::Terminal,
+                Status::Failed,
+                None,
+                Some("provider_confirmed_not_submitted".into()),
+            ),
+            super::SubmitObservationV1::Unknown => (
+                Phase::Terminal,
+                Status::Unknown,
+                None,
+                Some("submission_outcome_unknown".into()),
+            ),
+        };
+        let mut usage = self.usage.clone();
+        if status == Status::Failed && usage.query_price_basis == QueryAccounting::ScanPriced {
+            usage.billed_bytes = Some(0);
+        }
+        Ok(Self {
+            version: 1,
+            case_id: self.case_id.clone(),
+            plan: self.plan.clone(),
+            reservation: self.reservation.clone(),
+            previous: Some(self.content_id()?),
+            attempt: self.attempt,
+            phase,
+            execution_key: self.execution_key.clone(),
+            provider_id,
+            provider_request_id: None,
+            started_at: self.started_at.clone(),
+            observed_at: at,
+            provider_at: None,
+            status,
+            usage,
+            source_observation: None,
+            reason,
+        })
+    }
+
+    pub(super) fn accepts_execution(
+        &self,
+        reservation: &str,
+        job: &super::QueryExecutionRef,
+    ) -> bool {
+        self.phase == Phase::Accepted
+            && self.reservation == reservation
+            && self.plan == job.plan()
+            && self.attempt == job.attempt()
+            && self.provider_id.as_deref() == Some(job.provider_id())
+    }
+
+    pub(super) fn observed_execution(
+        mut self,
+        observation: super::ExecutionObservationV1,
+        at: QueryTime,
+    ) -> Result<Self, SourceQueryError> {
+        use super::QueryExecutionStatus as Provider;
+        if self.phase != Phase::Accepted
+            || at.as_str() < self.observed_at.as_str()
+            || self.usage.query_price_basis != observation.usage.query_price_basis
+        {
+            return Err(SourceQueryError::Invalid);
+        }
+        self.previous = Some(self.content_id()?);
+        self.phase = Phase::Terminal;
+        self.status = match observation.status {
+            Provider::Succeeded => Status::Succeeded,
+            Provider::Failed => Status::Failed,
+            Provider::Cancelled => Status::Cancelled,
+            Provider::Partial => Status::Partial,
+            _ => Status::Unknown,
+        };
+        self.observed_at = at;
+        self.usage = observation.usage;
+        self.provider_request_id = observation.request_id;
+        self.source_observation = observation.source_observation;
+        if self.status == Status::Unknown {
+            self.reason = Some("provider_outcome_unknown".into());
+        }
+        Ok(self)
+    }
+
+    pub(super) fn proof_time(&self) -> &QueryTime {
+        &self.observed_at
+    }
+
+    pub(super) fn is_provider_partial(&self) -> bool {
+        self.status == Status::Partial
+    }
+
+    pub(super) fn is_terminal_known(&self) -> bool {
+        self.phase == Phase::Terminal && self.status != Status::Unknown
+    }
+
     pub(super) fn unknown_analytics_observed_at(&self) -> Result<&QueryTime, SourceQueryError> {
         if self.phase != Phase::Terminal
             || self.status != Status::Unknown
@@ -155,6 +312,26 @@ impl SourceQueryExecutionV1 {
     }
 }
 
+/// A display notice derived exclusively from the authenticated result receipt.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SourceQueryLimitNotice {
+    capture_sha256: String,
+    captured_rows: u64,
+}
+
+impl SourceQueryLimitNotice {
+    pub fn capture_sha256(&self) -> &str {
+        &self.capture_sha256
+    }
+
+    pub fn message(&self) -> String {
+        format!(
+            "Source query reached a local limit after {} captured rows. More results may exist. Narrow the time range or add filters before querying again.",
+            self.captured_rows
+        )
+    }
+}
+
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SourceQueryResultV1 {
@@ -177,6 +354,39 @@ pub struct SourceQueryResultV1 {
 }
 
 impl SourceQueryResultV1 {
+    pub(super) fn for_capture(
+        terminal: &SourceQueryExecutionV1,
+        plan: &super::SourceQueryPlanV1,
+        capture: &QueryCaptureSummary,
+        rejected_rows: u64,
+        completeness: Vec<String>,
+    ) -> Result<Self, SourceQueryError> {
+        let record = Self {
+            version: 1,
+            case_id: terminal.case_id.clone(),
+            plan: terminal.plan.clone(),
+            reservation: terminal.reservation.clone(),
+            execution: terminal.content_id()?,
+            capture_sha256: capture.capture_sha256.as_str().into(),
+            capture_bytes: capture.bytes,
+            page_count: capture.page_count,
+            page_commitment: capture.page_commitment.as_str().into(),
+            row_count: capture
+                .rows
+                .checked_sub(rejected_rows)
+                .ok_or(SourceQueryError::Invalid)?,
+            rejected_rows,
+            completeness,
+            coverage: vec![],
+            decoder: plan.decoder.clone(),
+            mapping: plan.mapping.clone(),
+            at: terminal.proof_time().clone(),
+        };
+        let record = Self::decode(&super::canonical_query_json(&record)?)?;
+        record.verify_capture(capture)?;
+        Ok(record)
+    }
+
     pub(super) fn reservation(&self) -> &str {
         &self.reservation
     }
@@ -223,6 +433,22 @@ impl SourceQueryResultV1 {
 
     pub fn capture_identity(&self) -> (&str, u64) {
         (&self.capture_sha256, self.capture_bytes)
+    }
+
+    pub fn limit_notice(&self) -> Option<SourceQueryLimitNotice> {
+        self.hit_local_limit().then(|| SourceQueryLimitNotice {
+            capture_sha256: self.capture_sha256.clone(),
+            captured_rows: self.row_count + self.rejected_rows,
+        })
+    }
+
+    fn hit_local_limit(&self) -> bool {
+        self.completeness.iter().any(|cause| cause == "local_limit")
+    }
+
+    fn fits_requested_rows(&self, requested: u64) -> bool {
+        let total = self.row_count + self.rejected_rows;
+        total < requested || (total == requested && self.hit_local_limit())
     }
 
     pub fn case_id(&self) -> &str {
@@ -310,7 +536,31 @@ pub struct SourceQuerySettlementV1 {
 }
 
 impl SourceQuerySettlementV1 {
-    pub(super) fn reservation(&self) -> &str {
+    pub(super) fn for_terminal(
+        terminal: &SourceQueryExecutionV1,
+        result: Option<&SourceQueryResultV1>,
+    ) -> Result<Self, SourceQueryError> {
+        if !terminal.is_terminal_known() {
+            return Err(SourceQueryError::Unresolved);
+        }
+        let record = Self {
+            version: 1,
+            case_id: terminal.case_id.clone(),
+            plan: terminal.plan.clone(),
+            reservation: terminal.reservation.clone(),
+            execution: terminal.content_id()?,
+            result: result.map(SourceQueryResultV1::content_id).transpose()?,
+            scan_charged: terminal.usage.billed_bytes,
+            retained_rows: result.map_or(0, |r| r.row_count + r.rejected_rows),
+            retained_bytes: result.map_or(0, |r| r.capture_bytes),
+            usage: terminal.usage.clone(),
+            uncertainty: vec![],
+            at: terminal.proof_time().clone(),
+        };
+        Self::decode(&super::canonical_query_json(&record)?)
+    }
+
+    pub fn reservation(&self) -> &str {
         &self.reservation
     }
     pub fn decode(bytes: &[u8]) -> Result<Self, SourceQueryError> {
@@ -438,6 +688,7 @@ impl SourceQueryBroker {
                     || result.plan != settlement.plan
                     || result.reservation != settlement.reservation
                     || result.execution != execution_id
+                    || !result.fits_requested_rows(pending.requested_rows)
                     || result.capture_bytes != settlement.retained_bytes
                     || result.row_count + result.rejected_rows != settlement.retained_rows
                     || entry.seq <= execution_seq
@@ -532,6 +783,29 @@ fn bounded_reasons(values: &[String]) -> bool {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn exact_row_limit_requires_an_explicit_signed_local_limit() {
+        let template =
+            include_bytes!("../../../../docs/development/source-query-format-vectors/result.json");
+        let mut wire: serde_json::Value = serde_json::from_slice(template).unwrap();
+        let complete = SourceQueryResultV1::decode(template).unwrap();
+        let rows = wire["row_count"].as_u64().unwrap();
+        assert!(complete.fits_requested_rows(rows + 1));
+        assert!(!complete.fits_requested_rows(rows));
+        assert!(complete.limit_notice().is_none());
+
+        wire["completeness"] = serde_json::json!(["local_limit", "provider_partial"]);
+        let limited =
+            SourceQueryResultV1::decode(&super::super::canonical_query_json(&wire).unwrap())
+                .unwrap();
+        assert!(!limited.fits_requested_rows(rows - 1));
+        assert!(limited.fits_requested_rows(rows));
+        assert_eq!(
+            limited.limit_notice().unwrap().capture_sha256(),
+            complete.capture_identity().0
+        );
+    }
 
     #[test]
     fn athena_billing_verifies_rounding_and_handles_failed_or_unresolved_executions() {

@@ -91,7 +91,13 @@ son elementos explícitos de la lista, no garantías implícitas.
 
 ## v0.6: consultas en origen
 
-Consultas estructuradas y con presupuesto en Athena, CloudTrail Lake, Security Lake, BigQuery, Cloud Logging Log Analytics, Azure Data Explorer y Azure Log Analytics. Los resultados se firman y las fuentes originales en la nube se pueden volver a verificar tras sellar. Consulta el [diseño](../development/cloud-query-design.md).
+Consultas estructuradas y con presupuesto para CloudTrail en Athena, Cloud
+Audit Logs en BigQuery y las tablas admitidas de Azure Log Analytics en el
+plan Analytics. El resultado se firma y se conserva como evidencia derivada
+para el análisis local. Las consultas desde subagentes, la reverificación
+de originales en la nube y los demás conjuntos de datos y proveedores
+quedan para después. Consulta el [diseño](source-queries-design.md) y el
+[contrato de implementación](source-queries-format-contract.md).
 
 ## v0.7: detección, informes, extensibilidad y API del motor
 

@@ -93,9 +93,13 @@ remain explicit checklist items, not implied guarantees.
 
 ## v0.6: Source-side queries
 
-Run structured, budgeted queries at cloud sources and sign their results.
-
-The backends cover Athena, CloudTrail Lake, and Security Lake; BigQuery and Cloud Logging Log Analytics; and Azure Data Explorer and Log Analytics. Include scan estimates where available. Add remote re-verification of cloud originals after sealing. See the [query design](cloud-query-design.md).
+Run structured, budgeted CloudTrail queries in Athena, Cloud Audit Logs in
+BigQuery and queries on supported Azure Log Analytics tables in the Analytics
+plan. Sign the result and retain it as derived evidence for local analysis.
+Source-side queries in subagents and remote re-verification of cloud originals
+remain follow-up work, along with additional datasets and providers.
+See the [source query design](source-queries-design.md) and
+[implementation contract](source-queries-format-contract.md).
 
 ## v0.7: Detection, reports, extensibility, and engine API
 

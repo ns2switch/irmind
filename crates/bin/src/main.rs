@@ -24,6 +24,7 @@ mod model_probe;
 mod parser_definitions;
 mod policy_config;
 mod recent_case;
+mod source_query_settings;
 use cli::{
     Cli, Command, audit_source_name, input_files_large, read_evidence, write_private_output,
 };
@@ -106,7 +107,8 @@ struct RootWorkspaceIo {
     parser_catalog: irmind_app::modules::ParserCatalog,
     definition_store: irmind_infra::FileDefinitionStore,
     home: PathBuf,
-    credential_fields: Vec<&'static str>,
+    credential_fields: Vec<String>,
+    source_query_settings: Option<source_query_settings::SourceQuerySettings>,
     store: Arc<LocalStore>,
     signer_backend: Arc<dyn SignerBackend>,
     secret_backend: Arc<dyn SecretBackend>,
@@ -229,15 +231,25 @@ impl WorkspaceIo for RootWorkspaceIo {
         write_private_output(path, bytes)
     }
     fn verify_export(&self, path: &Path, expected_key: &str) -> Result<String> {
+        use std::fmt::Write as _;
         let result =
             irmind_app::verify_export_details(&LocalExportVerifier, path, Some(expected_key))?;
-        Ok(format!(
+        let mut message = format!(
             "Verified {} entries; analyst key {}; original bytes verified {}; unavailable {}",
             result.entries,
             result.analyst_key_fingerprint,
             result.source_bytes_verified,
             result.source_bytes_unavailable
-        ))
+        );
+        for notice in result.source_query_limits {
+            let _ = write!(
+                message,
+                "\n{} — {}",
+                notice.capture_sha256(),
+                notice.message()
+            );
+        }
+        Ok(message)
     }
     fn case_exporter(&self) -> &dyn irmind_app::CaseExporter {
         self.store.as_ref()
@@ -256,13 +268,14 @@ impl WorkspaceIo for RootWorkspaceIo {
             .credential_fields
             .iter()
             .map(|name| {
-                let present = match self.secret_backend.get(name) {
+                let key = source_query_settings::storage_credential_name(name);
+                let present = match self.secret_backend.get(&key) {
                     Ok(_) => true,
                     Err(AppError::SecretMissing) => false,
                     Err(error) => return Err(error.into()),
                 };
                 Ok(CredentialStatus {
-                    name: (*name).into(),
+                    name: name.clone(),
                     present,
                 })
             })
@@ -279,21 +292,23 @@ impl WorkspaceIo for RootWorkspaceIo {
         })
     }
     fn put_credential(&self, name: &str, value: &SecretString) -> Result<()> {
-        if !self.credential_fields.contains(&name) {
+        if !self.credential_fields.iter().any(|field| field == name) {
             return Err(anyhow!("unknown module credential field"));
         }
-        self.secret_backend.put(name, value)?;
-        if self.secret_backend.get(name)?.expose_secret() != value.expose_secret() {
+        let key = source_query_settings::storage_credential_name(name);
+        self.secret_backend.put(&key, value)?;
+        if self.secret_backend.get(&key)?.expose_secret() != value.expose_secret() {
             return Err(anyhow!("credential write verification failed"));
         }
         Ok(())
     }
     fn delete_credential(&self, name: &str) -> Result<()> {
-        if !self.credential_fields.contains(&name) {
+        if !self.credential_fields.iter().any(|field| field == name) {
             return Err(anyhow!("unknown module credential field"));
         }
-        self.secret_backend.delete(name)?;
-        match self.secret_backend.get(name) {
+        let key = source_query_settings::storage_credential_name(name);
+        self.secret_backend.delete(&key)?;
+        match self.secret_backend.get(&key) {
             Err(AppError::SecretMissing) => Ok(()),
             _ => Err(anyhow!("credential deletion verification failed")),
         }
@@ -348,11 +363,19 @@ impl WorkspaceIo for RootWorkspaceIo {
         match capability {
             "signer" => engine
                 .migrate_signer_backend(self.signer_backend.as_ref(), target_signer.as_ref())?,
-            "secrets" => engine.migrate_secret_backend(
-                self.secret_backend.as_ref(),
-                target_secrets.as_ref(),
-                &self.credential_fields,
-            )?,
+            "secrets" => {
+                let names = self
+                    .credential_fields
+                    .iter()
+                    .map(|name| source_query_settings::storage_credential_name(name))
+                    .collect::<Vec<_>>();
+                let names = names.iter().map(String::as_str).collect::<Vec<_>>();
+                engine.migrate_secret_backend(
+                    self.secret_backend.as_ref(),
+                    target_secrets.as_ref(),
+                    &names,
+                )?;
+            }
             _ => return Err(anyhow!("invalid keystore capability")),
         }
         let fingerprint = irmind_app::hex(&irmind_app::sha256(

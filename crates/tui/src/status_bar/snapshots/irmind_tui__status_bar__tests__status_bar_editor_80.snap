@@ -5,7 +5,7 @@ expression: "screen(&editor, 80)"
 Status bar · signed declarative preferences
 
 ╭ Live preview · example values ───────────────────────────────────────────────╮
-│Example local model · 120000 tok · 6% tokens · cost $0.10 (example)           │
+│120000 tok · 6% tokens · cost $0.10 (example) · 10485760 / 67108864 B billed  │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 › 1. Choose preset
   2. Segments and order

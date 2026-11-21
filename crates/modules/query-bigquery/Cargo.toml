@@ -1,0 +1,30 @@
+[package]
+name = "irmind-mod-query-bigquery"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
+irmind-app = { path = "../../app", version = "0.1.0" }
+irmind-calendar = { path = "../../calendar", version = "0.1.0" }
+irmind-domain = { path = "../../domain", version = "0.1.0" }
+irmind-http = { path = "../../http", version = "0.1.0", features = ["google-service-account"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots"] }
+secrecy = "0.10"
+serde_json = "1"
+tokio = { version = "1", default-features = false, features = ["macros"] }
+
+[dev-dependencies]
+ed25519-dalek = "2"
+irmind-http = { path = "../../http", version = "0.1.0", features = ["google-auth-test-support"] }
+irmind-infra = { path = "../../infra", version = "0.1.0" }
+irmind-mod-mapping-gcp-audit = { path = "../mapping-gcp-audit", version = "0.1.0" }
+irmind-mod-parser-gcp-audit = { path = "../parser-gcp-audit", version = "0.1.0" }
+irmind-security = { path = "../../security", version = "0.1.0" }
+irmind-testkit = { path = "../../testkit", version = "0.1.0" }
+tempfile = "3"
+
+[lints]
+workspace = true

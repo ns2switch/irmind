@@ -4,9 +4,24 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+## 0.6.0 — Budgeted cloud source queries
+
+**Format impact:** Case marker 5 and export V9 require the creating minor
+version. Use v0.5.x for case marker 4 and export V8, or re-ingest the verified
+originals in a new case.
+
+- Add budgeted source queries for CloudTrail in Athena, Cloud Audit Logs in
+  BigQuery, and supported Azure Log Analytics tables on the Analytics plan.
+  The main agent proposes structured queries within the analyst's adopted
+  source scope. Review exact plans when approval is required.
+- Retain signed captures as derived evidence for local timeline, search and
+  entity analysis. The tool, findings and verification disclose when the local
+  row limit may have hidden additional results.
+- Show billed scans and retained rows and bytes in `/budget` and the case
+  status bar, separately from ordinary object transfer usage.
 - Case marker 5 includes a separate source-query allocation, disabled at creation.
-  Export V9 includes a mandatory query-capture count. Open older cases and exports
-  with the IRMind version that created them or re-ingest the verified originals.
+  Export V9 records a mandatory query-capture count and authenticates the retained
+  capture bytes with the signed case journal.
 
 ## 0.5.7 — Fewer merge passes for disordered evidence
 

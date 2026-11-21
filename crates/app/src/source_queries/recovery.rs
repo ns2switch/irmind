@@ -79,7 +79,7 @@ impl SourceQueryRecoveryV1 {
         query_content_id("irmind-source-query-recovery-v1", self)
     }
 
-    pub(super) fn reservation(&self) -> &str {
+    pub fn reservation(&self) -> &str {
         &self.reservation
     }
 
