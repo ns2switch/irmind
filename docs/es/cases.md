@@ -6,6 +6,14 @@ Un caso contiene su cadena firmada, referencias a evidencia, grafo Parquet,
 snapshots de skills y ramas de subagentes. Los originales externos al directorio
 de datos permanecen en sus ubicaciones registradas. Sellar hace inmutable el caso.
 
+## Casos y exportaciones de una versión anterior
+
+La versión 0.6 usa el marcador de caso 5, artefactos Parquet V3 con mapeo y la
+exportación V9. Usa la versión que creó el caso para abrirlo, verificarlo o
+exportarlo. Para usar la versión actual, verifica los originales con la versión
+que creó el caso e ingiérelos en un caso nuevo. El caso original conserva sus
+aprobaciones, hallazgos confirmados y sello.
+
 ## Borrar un caso no sellado
 
 Desde un caso abierto, ejecuta `/case delete`. Desde `/home`, selecciona un caso

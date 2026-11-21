@@ -367,34 +367,4 @@ pub(super) const COMMANDS: &[Command] = &[
         shortcut: "",
         slash: false,
     },
-    Command {
-        name: "cred-add",
-        description: "Now in /settings keystore",
-        shortcut: "",
-        slash: false,
-    },
-    Command {
-        name: "cred-delete",
-        description: "Now in /settings keystore",
-        shortcut: "",
-        slash: false,
-    },
-    Command {
-        name: "passphrase",
-        description: "Now in /settings keystore",
-        shortcut: "",
-        slash: false,
-    },
-    Command {
-        name: "migrate-signer",
-        description: "Now in /settings keystore",
-        shortcut: "",
-        slash: false,
-    },
-    Command {
-        name: "migrate-secrets",
-        description: "Now in /settings keystore",
-        shortcut: "",
-        slash: false,
-    },
 ];

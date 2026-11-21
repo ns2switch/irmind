@@ -2,7 +2,7 @@
 
 This design is for parser, mapping, connector and evidence-store maintainers. It separates faithful source decoding from forensic interpretation, so a new mapping or target schema does not require changing a parser.
 
-**Status: implemented for the v0.3 source pipeline.** This document preserves the approved design; it does not change the historical v0.2.0 release. Phase A includes SourceDecoder/SourceMapper, bounded SourceRecordV1, mapping-owned compatibility projections, mapped-stage ParquetArtifactV3, SourceRecordSetV1/MappingProfileV1/MappingRunV1, export V6 and byte-identical seal-inventory V2. The decoded-record cache, its physical schema/SourceRecordStore port and RemapCommitV1 are deferred. Until those exist, reclassification means ingesting verified originals into a new case. The [common-schema core PR](https://github.com/ns2switch/irmind/pull/205) introduced the boundary as opt-in. The current CLI, TUI and demo use it as their sole writer; previous-version cases require their creating executable or re-ingestion. See [current architecture](architecture.md) and [earlier-version cases](case-migration.md).
+**Status: implemented for the v0.3 source pipeline.** This document preserves the approved design; it does not change the historical v0.2.0 release. Phase A includes SourceDecoder/SourceMapper, bounded SourceRecordV1, mapping-owned compatibility projections, mapped-stage ParquetArtifactV3, SourceRecordSetV1/MappingProfileV1/MappingRunV1, export V6 and byte-identical seal-inventory V2. The decoded-record cache, its physical schema/SourceRecordStore port and RemapCommitV1 are deferred. Until those exist, reclassification means ingesting verified originals into a new case. The [common-schema core PR](https://github.com/ns2switch/irmind/pull/205) introduced the boundary as opt-in. The current CLI, TUI and demo use it as their sole writer; previous-version cases require their creating executable or re-ingestion. See [current architecture](architecture.md) and [earlier-version cases](../cases.md#cases-and-exports-from-an-earlier-version).
 
 ## 1. Two stages, one explicit boundary
 
@@ -190,7 +190,7 @@ All targets share the existing total query deadline, result/token bounds, 4,096-
 
 ## 5. Custody: explicit fields, not overloaded versions
 
-The [V2 envelope](parquet-artifact-v2-wire.md) has seven closed groups and no extension map. Its parser/version and builder identify different responsibilities. Neither can honestly encode a mapping version, target schema or selection snapshot.
+The [V2 envelope](archive/parquet-artifact-v2-wire.md) has seven closed groups and no extension map. Its parser/version and builder identify different responsibilities. Neither can honestly encode a mapping version, target schema or selection snapshot.
 
 **Recommend a new `ParquetArtifactV3` envelope**, with its own `irmind-parquet-artifact-v3` domain tag. Preserve the existing V2 fields and add a distinct bounded pipeline block:
 

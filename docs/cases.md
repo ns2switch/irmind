@@ -4,6 +4,14 @@ A case contains its signed journal, evidence references, Parquet graph, skill
 snapshots and subagent branches. Originals outside IRMind's data directory remain
 at their recorded locations. Sealing makes a case immutable.
 
+## Cases and exports from an earlier version
+
+Version 0.6 uses case marker 5, mapped V3 Parquet artifacts and export V9. Use
+the creating version of IRMind to open, verify or export earlier cases. To use
+the current version, verify the originals with the creating version and ingest
+them into a new case. The original case retains its approvals, confirmed
+findings and seal.
+
 ## Delete an unsealed case
 
 From an open case, run `/case delete`. From `/home`, select a case with the arrows

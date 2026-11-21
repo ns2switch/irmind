@@ -396,7 +396,7 @@ impl ChainState {
             | AuditEventKind::SourceQueryBudgetV1 => {
                 self.metadata_entries.push(entry.clone());
             }
-            AuditEventKind::EvidenceIngested | AuditEventKind::GraphIndexed => {
+            AuditEventKind::EvidenceIngested => {
                 let hash = entry
                     .evidence
                     .as_deref()

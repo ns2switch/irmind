@@ -1,6 +1,8 @@
 # Explicit Parquet migration and export V5 boundaries
 
-> Historical design: the current ingestion path uses `SourceDecoder` and separately identified mappings. Legacy execution callbacks and artifact migration routes described here have been retired. See [the source/mapping design](source-mapping-design.md) and [current architecture](architecture.md).
+> **Status.** Implemented for v0.2. The V1/V2 migration path and export V5 were retired under the [pre-1.0 format policy](../decisions.md#pre-10-format-policy).
+
+> Historical design: the current ingestion path uses `SourceDecoder` and separately identified mappings. Legacy execution callbacks and artifact migration routes described here have been retired. See [the source/mapping design](../source-mapping-design.md) and [current architecture](../architecture.md).
 
 This page is for maintainers implementing explicit migration of open cases and mixed-version exports. It complements the [artifact V2 design](parquet-artifact-v2-design.md#compatibility-and-migration) without changing existing source, audit-entry or seal encodings.
 
@@ -101,14 +103,14 @@ After the `irmind-parquet-migration-v1` NUL tag, fields are:
 
 A set commitment is a big-endian `u64` count followed by a length-prefixed lowercase SHA-256. Source-set hashing uses `irmind-migration-sources-v1` + NUL, the count, and length-prefixed source hashes in lexical order. Artifact-set hashing uses `irmind-migration-artifacts-v1` + NUL, the count, and length-prefixed complete canonical artifact payloads ordered by relative path. These are the UTF-8 bytes of the lowercase hex string returned by `ParquetArtifact::encode`, as stored in the signed entry, not the decoded envelope bytes. Including the full envelope distinguishes equal-content files with different signed metadata. Strings and counts use the existing canonical encoding; unknown or trailing bytes are invalid.
 
-The migration directory uses `migration-<previous-artifact-commitment>`. Every replacement keeps bounded supersession references to the previous artifacts of the same source and schema family. The shared lineage interpreter recomputes the complete commitments, validates source/family coverage and parser mapping, and retires paths only after accepting the final analyst record. The independent [golden payload](../../crates/domain/tests/fixtures/parquet-migration-v1.hex) fixes this new encoding without modifying any historical golden.
+The migration directory uses `migration-<previous-artifact-commitment>`. Every replacement keeps bounded supersession references to the previous artifacts of the same source and schema family. The shared lineage interpreter recomputes the complete commitments, validates source/family coverage and parser mapping, and retires paths only after accepting the final analyst record. The independent [golden payload](../../../crates/domain/tests/fixtures/parquet-migration-v1.hex) fixes this new encoding without modifying any historical golden.
 
 
 ## Bounded V2 seal inventory
 
 Cases containing V2 artifacts use a fixed-size `SealInventoryV2` descriptor in the existing signed seal event. V1-only cases retain their explicit inventory byte for byte. The seal challenge and analyst fingerprint do not change.
 
-The descriptor is `irmind-seal-inventory-v2` + NUL, a big-endian `u64` item count, and a length-prefixed lowercase SHA-256. It uses the existing canonical hex envelope and strict decoding. The independent [golden](../../crates/domain/tests/fixtures/seal-inventory-v2.hex) and [SHA-256](../../crates/domain/tests/fixtures/seal-inventory-v2.sha256) pin the bytes; the alternate JSON-map CI job checks them too.
+The descriptor is `irmind-seal-inventory-v2` + NUL, a big-endian `u64` item count, and a length-prefixed lowercase SHA-256. It uses the existing canonical hex envelope and strict decoding. The independent [golden](../../../crates/domain/tests/fixtures/seal-inventory-v2.hex) and [SHA-256](../../../crates/domain/tests/fixtures/seal-inventory-v2.sha256) pin the bytes; the alternate JSON-map CI job checks them too.
 
 Items have a closed kind: legacy copied evidence (0), source manifest (1), or artifact manifest (2). Their identity is respectively the evidence hash, signed source name/URI, or relative artifact path. Each item hash is SHA-256 over `irmind-seal-inventory-item-v2` + NUL, its one-byte kind, length-prefixed UTF-8 identity, and length-prefixed canonical payload. Evidence uses its lowercase hash as payload; manifests use the canonical lowercase hex envelope. Different paths with identical file contents remain distinct items.
 

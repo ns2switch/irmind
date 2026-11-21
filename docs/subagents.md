@@ -95,4 +95,4 @@ Version 0.5 uses case marker 4 and export V8. Keep the creating executable for
 older cases or re-ingest verified originals into a new case; opening a case does
 not migrate it. See [configuration](configuration.md), the
 [format contract](development/subagents-format-contract.md) and
-[case version policy](development/case-migration.md).
+[case version policy](cases.md#cases-and-exports-from-an-earlier-version).

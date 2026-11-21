@@ -1,5 +1,7 @@
 # Source-bound partition replay
 
+> **Status.** Implemented for v0.2. Current mapped artifacts retain source-bound partition validation; the standalone V2 replay path is historical.
+
 This page explains source-bound profile routing during mixed-parser reconstruction. The optional callback is backward compatible and does not change signed bytes.
 
 ## Why the source must reach the profile router

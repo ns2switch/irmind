@@ -27,7 +27,7 @@ The baseline is [main at `8eb3857`](https://github.com/ns2switch/irmind/tree/8eb
 
 The current [V2 envelope](../../crates/domain/src/custody_manifest/artifact_v2.rs) admits exactly `irmind-events-v3`, `irmind-entities-v3` and `irmind-coobservations-v2`. Its [writer](../../crates/infra/src/parquet_store/writer/precise.rs) preserves microseconds, residual nanoseconds, precision, inference and scope columns. These identifiers and historical bytes remain unchanged.
 
-The [migration contract](parquet-v2-migration-contracts.md) currently pins parser versions and requires non-time normalized meaning to remain identical. Adding classifications and roles is a semantic change. It cannot be presented as the already approved precision-only migration.
+The [migration contract](archive/parquet-v2-migration-contracts.md) currently pins parser versions and requires non-time normalized meaning to remain identical. Adding classifications and roles is a semantic change. It cannot be presented as the already approved precision-only migration.
 
 Zeek and Suricata are included below as mapping targets. Their parser modules are not present in this baseline; the table does not claim they are delivered. Elastic and Chronicle mapping work follows the event-schema decision.
 

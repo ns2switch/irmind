@@ -345,10 +345,6 @@ pub(super) fn execute_command(state: &mut HomeState) -> HomeAction {
         "/quit" => state.confirm_exit = crate::ExitConfirmation::Pending,
         "/verify-export" => state.mode = Mode::VerifyExport,
         "/restart" if state.restart_required => return HomeAction::Restart,
-        "/cred-add" | "/cred-delete" | "/passphrase" | "/migrate-signer" | "/migrate-secrets" => {
-            state.notice = "Now in /settings".into();
-            return open_settings_section(state, SettingsSection::Keystore);
-        }
         value if value.starts_with("/settings ") => {
             let Some(section) = SettingsSection::parse(value[10..].trim()) else {
                 state.notice = "Choose model, connectors, keystore, preferences, or limits".into();

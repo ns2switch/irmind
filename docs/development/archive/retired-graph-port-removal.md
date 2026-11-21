@@ -1,5 +1,7 @@
 # Retiring unused buffered graph construction contracts
 
+> **Status.** Implemented for v0.3. The retired graph ports were removed; see the [current architecture](../architecture.md).
+
 This contract records the final pre-1.0 source-pipeline cleanup. It removes interfaces whose implementations no longer construct or verify an index.
 
 ## Motivation

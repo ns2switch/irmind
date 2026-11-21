@@ -5,7 +5,6 @@ use crate::{AppError, Engine, FixedAppError, hex, sha256};
 use std::collections::BTreeMap;
 
 const SNAPSHOT_PREFIX: &str = "configuration-approved-v2:";
-const LEGACY_PREFIX: &str = "configuration-approved:";
 const MAX_CANONICAL_BYTES: usize = 65_536;
 
 pub enum ConfigurationInspection {
@@ -29,7 +28,6 @@ pub struct ConfigDifference {
 
 enum Approved {
     None,
-    Legacy(String),
     Snapshot(PersistentConfig),
     RetiredWriter(PersistentConfig),
 }
@@ -37,24 +35,13 @@ enum Approved {
 fn last_approved(engine: &Engine<'_>, manifests: &[&ModuleManifest]) -> Result<Approved, AppError> {
     engine.verify_global_operations()?;
     let entries = engine.audit_log.global_operations()?;
-    let Some(entry) = entries.iter().rev().find(|entry| {
-        entry.operation.starts_with(SNAPSHOT_PREFIX) || entry.operation.starts_with(LEGACY_PREFIX)
-    }) else {
-        return Ok(Approved::None);
-    };
-    if let Some(payload) = entry.operation.strip_prefix(SNAPSHOT_PREFIX) {
-        return parse_snapshot(payload, manifests);
-    }
-    let fields = entry.operation.split(':').collect::<Vec<_>>();
-    if fields.len() != 4
-        || fields[0] != "configuration-approved"
-        || !valid_hash(fields[1])
-        || !valid_hash(fields[2])
-        || !matches!(fields[3], "true" | "false")
-    {
-        return Err(mismatch());
-    }
-    Ok(Approved::Legacy(fields[2].into()))
+    entries
+        .iter()
+        .rev()
+        .find_map(|entry| entry.operation.strip_prefix(SNAPSHOT_PREFIX))
+        .map_or(Ok(Approved::None), |payload| {
+            parse_snapshot(payload, manifests)
+        })
 }
 
 fn parse_snapshot(payload: &str, manifests: &[&ModuleManifest]) -> Result<Approved, AppError> {
@@ -225,13 +212,11 @@ impl Engine<'_> {
     pub fn confirm_all_subagent_plans(&self) -> Result<bool, AppError> {
         self.verify_global_operations()?;
         let entries = self.audit_log.global_operations()?;
-        let Some(entry) = entries.iter().rev().find(|entry| {
-            entry.operation.starts_with(SNAPSHOT_PREFIX)
-                || entry.operation.starts_with(LEGACY_PREFIX)
-        }) else {
-            return Ok(false);
-        };
-        let Some(payload) = entry.operation.strip_prefix(SNAPSHOT_PREFIX) else {
+        let Some(payload) = entries
+            .iter()
+            .rev()
+            .find_map(|entry| entry.operation.strip_prefix(SNAPSHOT_PREFIX))
+        else {
             return Ok(false);
         };
         let bytes = snapshot_bytes(payload)?;
@@ -259,7 +244,6 @@ impl Engine<'_> {
         let matches = match (&approved, &current) {
             (Approved::None, None) if !file_present => true,
             (Approved::None, Some(config)) => *config == PersistentConfig::default(),
-            (Approved::Legacy(hash), Some(config)) => config.fingerprint()? == *hash,
             (Approved::Snapshot(saved), Some(config)) => saved == config,
             _ => false,
         };
@@ -268,7 +252,6 @@ impl Engine<'_> {
         }
         let saved = match approved {
             Approved::None => Some(PersistentConfig::default()),
-            Approved::Legacy(_) => None,
             Approved::Snapshot(config) | Approved::RetiredWriter(config) => Some(config),
         };
         let differences = saved

@@ -1,6 +1,8 @@
 # Historical artifact V2 foundation and canonical layout
 
-Historical design: standalone V2 artifacts and their fixtures are retired. Current V3 envelopes retain the nested metadata core, with the current common physical schema IDs. See [source mapping](source-mapping-design.md) and the [pre-1.0 decisions](decisions.md).
+> **Status.** Implemented for v0.2. The standalone envelope was superseded by mapped V3; this document records the old wire contract.
+
+Historical design: standalone V2 artifacts and their fixtures are retired. Current V3 envelopes retain the nested metadata core, with the current common physical schema IDs. See [source mapping](../source-mapping-design.md) and the [pre-1.0 decisions](../decisions.md).
 
 This page is for maintainers checking the first implementation of the [approved artifact design](parquet-artifact-v2-design.md). It fixes the golden encoding before a writer can publish V2 files. It does not activate V2 ingestion, migrate a case or change an existing signed byte.
 

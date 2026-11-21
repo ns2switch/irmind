@@ -50,11 +50,7 @@ impl LocalStore {
     ) -> Result<(), AppError> {
         let mut files = BTreeMap::new();
         self.for_each_audit_entry(id, |entry| {
-            if matches!(
-                entry.kind,
-                irmind_domain::AuditEventKind::ParquetArtifactV1
-                    | irmind_domain::AuditEventKind::ParquetArtifactV2
-            ) {
+            if entry.kind.is_retired_case_format() {
                 return Err(AppError::Fixed(
                     irmind_app::FixedAppError::RetiredCaseFormat,
                 ));

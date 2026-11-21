@@ -84,7 +84,7 @@ La versión 0.5 usa marcador de caso 4 y export V8. Conserva el ejecutable cread
 para casos anteriores o reingiere originales verificados en un caso nuevo; abrir
 no migra. Consulta [configuración](configuration.md), el
 [contrato de formato](subagents-format-contract.md) y la
-[política de versiones](../development/case-migration.md).
+[política de versiones](cases.md#casos-y-exportaciones-de-una-versión-anterior).
 
 ## Recuperar un plan interrumpido
 

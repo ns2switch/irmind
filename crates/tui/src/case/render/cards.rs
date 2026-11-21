@@ -122,11 +122,7 @@ fn rejected_source_card(entry: &SignedEntry, engine: &Engine<'_>) -> Result<Opti
 fn is_hidden_custody_payload(kind: AuditEventKind) -> bool {
     matches!(
         kind,
-        AuditEventKind::SourceManifestV1
-            | AuditEventKind::SourceManifestV2
-            | AuditEventKind::ParquetArtifactV1
-            | AuditEventKind::ParquetArtifactV2
-            | AuditEventKind::SkillSnapshotV2
+        AuditEventKind::SourceManifestV2 | AuditEventKind::SkillSnapshotV2
     )
 }
 

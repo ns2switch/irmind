@@ -1,6 +1,8 @@
 # Proposal: precise event time in Parquet artifacts
 
-> Historical precision design for v0.2. Current V3 artifacts reuse checked time and partition metadata, but standalone earlier-format readers and precision migration routes are retired. See [current architecture](architecture.md) and [earlier-version cases](case-migration.md).
+> **Status.** Implemented for v0.2 and superseded by [mapped V3 artifacts](../source-mapping-design.md). Current cases have no standalone V1 or V2 reader or precision migration command.
+
+> Historical precision design for v0.2. Current V3 artifacts reuse checked time and partition metadata, but standalone earlier-format readers and precision migration routes are retired. See [current architecture](../architecture.md) and [earlier-version cases](case-migration.md).
 
 This document is for maintainers reviewing [issue #143](https://github.com/ns2switch/irmind/issues/143). It proposes a new artifact envelope and timestamp schema. Existing source manifests, audit entries, seals, exports and Parquet files remain unchanged. Implementation is split into compatible stages.
 
@@ -93,7 +95,7 @@ A query for a host scans its ordinary host bucket, any applicable overflow bucke
 
 ## Disk and latency estimate against the 15 GB reference
 
-These are **design estimates, not measurements of a V2 implementation**. The [recorded 15 GB optimized benchmark](benchmarks.md#sorted-entities-and-signed-co-observations) is the reference: 8,451,871,774 B of Parquet, including 5,723,788,884 B of co-observations; ingestion 447.208 s. Its p95 values are entity lookup 1.726 s, timeline 0.028 s, neighbors 0.578 s and direct path 0.617 s. The worst three-hop path took 10.056 s and correctly reported truncation. That cloud-shaped corpus has no endpoint-host partition, so it cannot by itself measure a host-partition gain.
+These are **design estimates, not measurements of a V2 implementation**. The [recorded 15 GB optimized benchmark](../benchmarks.md#sorted-entities-and-signed-co-observations) is the reference: 8,451,871,774 B of Parquet, including 5,723,788,884 B of co-observations; ingestion 447.208 s. Its p95 values are entity lookup 1.726 s, timeline 0.028 s, neighbors 0.578 s and direct path 0.617 s. The worst three-hop path took 10.056 s and correctly reported truncation. That cloud-shaped corpus has no endpoint-host partition, so it cannot by itself measure a host-partition gain.
 
 The current second-resolution UTC string has 20 UTF-8 bytes plus a 4-byte Arrow offset per time-bearing row before Parquet encoding. A numeric microsecond value uses 8 bytes. New physical columns are `UInt16` remainder (2 B), `UInt8` precision (1 B), packed inferred flag (1 bit), and optional `UInt64` offset (8 B), plus applicable validity bitmaps. A first-order estimate is about **19.5–19.75 B versus 24 B per time-bearing row**, a saving of roughly 4.25–4.5 B/row in uncompressed Arrow buffers. If a source supplies no offsets, Parquet can encode its all-null offset column compactly. This is not a prediction of compressed file size: dictionaries, RLE, nulls, row-group headers and source precision distributions can dominate, particularly in this repeated synthetic corpus. The reference generator's base row is 1,495 bytes and fills each base file with 699 records; 1,000 files repeated 15 times give **10,485,000 noise events**, excluding the small HuntEval/worst-path additions. Applied to events alone, the buffer estimate is about **44.6–47.2 MB less**, not GB of compressed disk. Entity/co-observation multiplicities must be counted before projecting the full store. These counts are derived from the unchanged generator, not a V2 benchmark run.
 

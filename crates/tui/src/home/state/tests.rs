@@ -103,6 +103,25 @@ fn connector_default_can_be_accepted_and_legacy_commands_redirect() {
 }
 
 #[test]
+fn retired_keystore_commands_are_absent_from_help_and_do_not_open_settings() {
+    let mut state = HomeState::new(Vec::new(), false);
+    for command in [
+        "/cred-add",
+        "/cred-delete",
+        "/passphrase",
+        "/migrate-signer",
+        "/migrate-secrets",
+    ] {
+        state.input = command.into();
+        assert!(matches!(execute_command(&mut state), HomeAction::None));
+        assert_eq!(state.mode, Mode::List);
+        assert_eq!(state.notice, "Unknown command; use /help");
+        assert!(command_options_for(&state, command).is_empty());
+        assert!(crate::case::command_registry::help_for(command).contains("Unknown command"));
+    }
+}
+
+#[test]
 fn model_form_accepts_url_and_secret_slashes_from_paste() {
     let mut state = HomeState::new(Vec::new(), false);
     state.mode = Mode::Model;

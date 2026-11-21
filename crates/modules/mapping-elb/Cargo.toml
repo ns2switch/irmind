@@ -10,7 +10,6 @@ irmind-app = { path = "../../app", version = "0.1.0" }
 irmind-mapping-tables = { path = "../../mapping-tables", version = "0.1.0" }
 
 [dev-dependencies]
-irmind-domain = { path = "../../domain", version = "0.1.0" }
 irmind-mod-parser-elb = { path = "../parser-elb", version = "0.1.0" }
 irmind-testkit = { path = "../../testkit", version = "0.1.0" }
 

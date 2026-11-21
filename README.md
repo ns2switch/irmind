@@ -109,7 +109,7 @@ You can ingest, inspect, and verify local evidence without a model. On later sta
 
 ## Modules
 
-Version 0.5 uses one source-decoder → identified mapping → V3 writer pipeline in the CLI, TUI and demo. It reads only CaseCreated version 4 and export V8; [earlier cases require their creating version or a new ingestion](docs/development/case-migration.md).
+Version 0.6 uses one source-decoder → identified mapping → V3 writer pipeline in the CLI, TUI and demo. It reads only CaseCreated version 5 and export V9; [earlier cases require their creating version or a new ingestion](docs/cases.md#cases-and-exports-from-an-earlier-version).
 
 The normal build includes every current product module and both keystores. No remote connector or LLM is enabled until selected and configured. A smaller build uses `--no-default-features --features keystore-file` (at least one signer and secrets backend is required). All modules are experimental.
 

@@ -1,5 +1,7 @@
 # Cases from an earlier version
 
+> **Status.** Superseded by the [current case format guidance](../../cases.md#cases-and-exports-from-an-earlier-version). This page records the v0.5 transition.
+
 This guide helps analysts keep a verifiable record when a pre-1.0 case or export uses a retired format.
 
 Version 0.5.0 uses CaseCreated version 4, mapped V3 Parquet artifacts and export V8. Cases and exports from 0.4.x require their creating executable. Opening a case does not migrate or rewrite it. A retired case or export format is rejected before reconstruction or export.
@@ -9,4 +11,4 @@ Version 0.5.0 uses CaseCreated version 4, mapped V3 Parquet artifacts and export
 3. Create a new case and ingest the verified originals with the current version. This produces a new signed chain. It does not carry forward analyst approvals, confirmed findings or seals from the earlier case.
 4. Check the resulting sources, mappings and artifacts with the current verification commands.
 
-Historical V1 to V2 procedures are retained in the [development archive](archive/v2-precision-migration.md) for users of the versions that supported them.
+Historical V1 to V2 procedures are retained in the [development archive](v2-precision-migration.md) for users of the versions that supported them.

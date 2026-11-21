@@ -45,7 +45,7 @@ pub(crate) enum CaseExit {
     Restart,
     Home,
     New,
-    Settings(Option<String>, bool),
+    Settings(Option<String>),
     Quit,
     Open(String),
     CaseCommand(String),
@@ -96,17 +96,13 @@ struct CaseEvidence {
     timeline: Vec<irmind_app::TimelineEvent>,
 }
 
-fn load_case_evidence(
-    engine: &Engine<'_>,
-    id: &CaseId,
-    conversation: &mut Conversation,
-) -> Result<CaseEvidence> {
+fn load_case_evidence(engine: &Engine<'_>, id: &CaseId) -> Result<CaseEvidence> {
     let _case_lock = engine.repo.lock_case(id)?;
     Ok(CaseEvidence {
         hashes: engine.evidence_store.evidence_hashes(id)?,
         entries: engine.audit_log.entries(id)?,
         operations: engine.audit_log.operations(id)?,
-        timeline: graph_timeline_or_notice(engine, id, conversation)?,
+        timeline: engine.graph.timeline(id, 30)?,
     })
 }
 
@@ -147,7 +143,7 @@ fn initial_state(
         entries,
         operations,
         timeline,
-    } = load_case_evidence(engine, id, &mut conversation)?;
+    } = load_case_evidence(engine, id)?;
     initial_context_hints(
         &mut conversation,
         io_ops,
@@ -253,13 +249,7 @@ fn no_case_evidence(
     copied_hashes_empty: bool,
     mut kinds: impl Iterator<Item = AuditEventKind>,
 ) -> bool {
-    copied_hashes_empty
-        && !kinds.any(|kind| {
-            matches!(
-                kind,
-                AuditEventKind::SourceManifestV1 | AuditEventKind::SourceManifestV2
-            )
-        })
+    copied_hashes_empty && !kinds.any(|kind| kind == AuditEventKind::SourceManifestV2)
 }
 
 fn add_context_hints(conversation: &mut Conversation, enabled: bool, context: HintContext) {
@@ -282,28 +272,6 @@ fn add_context_hints(conversation: &mut Conversation, enabled: bool, context: Hi
     ];
     for (_, hint) in hints.into_iter().filter(|(show, _)| *show) {
         conversation.push(Card::new(CardKind::Notice, "Hint", hint, false));
-    }
-}
-
-fn graph_timeline_or_notice(
-    engine: &Engine<'_>,
-    id: &CaseId,
-    conversation: &mut Conversation,
-) -> Result<Vec<irmind_app::TimelineEvent>> {
-    match engine.graph.timeline(id, 30) {
-        Ok(events) => Ok(events),
-        Err(irmind_app::AppError::Policy(reason))
-            if reason.starts_with("derived graph is unavailable until legacy evidence") =>
-        {
-            conversation.push(Card::new(
-                CardKind::Notice,
-                "",
-                "This case has an old derived index. Use /migrate to rebuild Parquet from its original evidence. If originals are unavailable, the signed case history remains readable without graph queries.",
-                false,
-            ));
-            Ok(Vec::new())
-        }
-        Err(error) => Err(error.into()),
     }
 }
 
@@ -601,11 +569,9 @@ mod hint_tests {
     #[test]
     fn signed_source_manifests_count_as_evidence_without_a_local_copy() {
         assert!(no_case_evidence(true, std::iter::empty()));
-        for kind in [
-            AuditEventKind::SourceManifestV1,
-            AuditEventKind::SourceManifestV2,
-        ] {
-            assert!(!no_case_evidence(true, std::iter::once(kind)));
-        }
+        assert!(!no_case_evidence(
+            true,
+            std::iter::once(AuditEventKind::SourceManifestV2)
+        ));
     }
 }

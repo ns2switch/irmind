@@ -73,7 +73,7 @@ Detection requires the bounded EVTX signature/header, not the extension alone. D
 
 See the [validation evidence and coverage limits](evtx-helper-validation.md).
 
-Related: [approved work order](plan.md#approved-parser-and-precision-work-order), [precise artifact design](parquet-artifact-v2-design.md), [Windows coverage](../parsers.md#windows-coverage), and [EVTX tracking issue](https://github.com/ns2switch/irmind/issues/47).
+Related: [approved work order](plan.md#approved-parser-and-precision-work-order), [precise artifact design](archive/parquet-artifact-v2-design.md), [Windows coverage](../parsers.md#windows-coverage), and [EVTX tracking issue](https://github.com/ns2switch/irmind/issues/47).
 
 
 ## Platform evidence

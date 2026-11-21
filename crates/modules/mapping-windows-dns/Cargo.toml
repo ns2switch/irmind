@@ -12,7 +12,6 @@ irmind-mapping-tables = { path = "../../mapping-tables", version = "0.1.0" }
 [dev-dependencies]
 irmind-domain = { path = "../../domain", version = "0.1.0" }
 irmind-mod-parser-windows-dns = { path = "../parser-windows-dns", version = "0.1.0" }
-irmind-testkit = { path = "../../testkit", version = "0.1.0" }
 
 [lints]
 workspace = true

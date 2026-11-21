@@ -8,7 +8,8 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 **Format impact:** Case marker 5 and export V9 require the creating minor
 version. Use v0.5.x for case marker 4 and export V8, or re-ingest the verified
-originals in a new case.
+originals in a new case. Settings approved by hash alone require a fresh signed
+approval in `/settings`.
 
 - Add budgeted source queries for CloudTrail in Athena, Cloud Audit Logs in
   BigQuery, and supported Azure Log Analytics tables on the Analytics plan.
@@ -474,7 +475,7 @@ mapped V3 case artifacts and export V6 only. It does not open, verify or export
 v0.2 cases or earlier exports. Keep the executable that created an earlier case,
 or verify its originals with that version and ingest them into a new case with
 0.3. No automatic migration runs when opening a case; previous approvals,
-findings and seals stay with the original case. See [earlier-version cases](docs/development/case-migration.md).
+findings and seals stay with the original case. See [earlier-version cases](docs/development/archive/case-migration.md).
 
 ### Added and changed
 
@@ -515,7 +516,7 @@ dense-entity lookup and deliberately worst-case path work remain tracked in
 
 - Add experimental Zeek TSV/JSON and Suricata EVE modules with bounded detection, streaming parsing, precise timestamps, host-aware partitions, source provenance and synthetic contract fixtures. They were not distributed in v0.1.x. Source detections remain unconfirmed findings.
 - Write artifact V2 by default in the CLI, TUI and isolated demo. Preserve UTC microseconds, residual nanoseconds, source precision and stable source/record ordering. Bound host partition cardinality at 64 ordinary hosts by default, with a hard ceiling of 1,024 and signed overflow.
-- Keep existing V1 cases readable without migration. Offer explicit, verified precision migration for open cases, retain historical signed generations and use export V5 for V2/mixed cases. See the [V1 → V2 migration guide](docs/development/case-migration.md).
+- Keep existing V1 cases readable without migration. Offer explicit, verified precision migration for open cases, retain historical signed generations and use export V5 for V2/mixed cases. See the [V1 → V2 migration guide](docs/development/archive/case-migration.md).
 - Improve ordered-source ingestion, bounded natural-run merging, authenticated global timeline pruning and entity extrema handling. Release-profile cloud/chronological benchmarks meet the 900-second 15 GB ingestion gate; the disordered stress corpus uses the separately approved 1,350-second gate, with unchanged query limits.
 - Ship the isolated `irmind-evtx` helper with the signed release packages, its own SBOM and unsafe inventory. Linux requires Landlock/seccomp; macOS and Windows require verified native containment. Windows uses one verified network witness per session and canonical serial source starts; hashing remains parallel. Each file is capped at 4 GiB, 8,000,000 records and a 600-second invocation deadline, with complete rejection on a limit.
 - Warn non-disruptively when a retired pre-0.1.6 parser may have omitted records. Existing signed bytes still authenticate; re-ingest verified originals into a new case to rebuild with current readers.

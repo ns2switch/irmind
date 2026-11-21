@@ -2732,7 +2732,6 @@ name = "irmind-mod-mapping-elb"
 version = "0.1.0"
 dependencies = [
  "irmind-app",
- "irmind-domain",
  "irmind-mapping-tables",
  "irmind-mod-parser-elb",
  "irmind-testkit",
@@ -3011,7 +3010,6 @@ dependencies = [
  "irmind-domain",
  "irmind-mapping-tables",
  "irmind-mod-parser-windows-dns",
- "irmind-testkit",
 ]
 
 [[package]]
@@ -3075,7 +3073,6 @@ dependencies = [
  "flate2",
  "irmind-app",
  "irmind-domain",
- "irmind-testkit",
 ]
 
 [[package]]
@@ -3202,7 +3199,6 @@ version = "0.1.0"
 dependencies = [
  "irmind-app",
  "irmind-domain",
- "irmind-testkit",
 ]
 
 [[package]]
@@ -3297,7 +3293,6 @@ version = "0.1.0"
 dependencies = [
  "irmind-app",
  "irmind-domain",
- "irmind-testkit",
 ]
 
 [[package]]
@@ -3306,7 +3301,6 @@ version = "0.1.0"
 dependencies = [
  "irmind-app",
  "irmind-domain",
- "irmind-testkit",
 ]
 
 [[package]]
@@ -3361,7 +3355,6 @@ version = "0.1.0"
 dependencies = [
  "irmind-app",
  "irmind-domain",
- "irmind-testkit",
 ]
 
 [[package]]
@@ -3457,7 +3450,6 @@ dependencies = [
  "irmind-http",
  "irmind-infra",
  "irmind-mod-mapping-udm",
- "irmind-mod-parser-json",
  "irmind-security",
  "irmind-testkit",
  "reqwest",
@@ -3478,7 +3470,6 @@ dependencies = [
  "irmind-http",
  "irmind-infra",
  "irmind-mod-mapping-ecs",
- "irmind-mod-parser-json",
  "irmind-security",
  "irmind-testkit",
  "reqwest",

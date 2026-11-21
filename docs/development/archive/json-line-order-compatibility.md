@@ -1,10 +1,12 @@
 # JSON serialization compatibility
 
+> **Status.** Historical release audit for v0.1.0–v0.1.5. The legacy parser identities and the compatibility paths described here have been retired.
+
 This page is for maintainers changing parser implementations or JSON dependency features. It defines the supported serialization contract and release-build checks.
 
 ## Release audit
 
-The [machine-readable audit](release-json-feature-audit.json) checks the locked build graph for every shipped target from v0.1.0 through v0.1.5: 23 graphs. None enables `serde_json/preserve_order`. Each tagged workflow builds `cargo build --release -p irmind --locked`; the audit uses that package, default features and target, excluding development dependencies.
+The [machine-readable audit](../release-json-feature-audit.json) checks the locked build graph for every shipped target from v0.1.0 through v0.1.5: 23 graphs. None enables `serde_json/preserve_order`. Each tagged workflow builds `cargo build --release -p irmind --locked`; the audit uses that package, default features and target, excluding development dependencies.
 
 In workspace tests, the AWS connector's development-only `aws-smithy-http-client/test-util` enables insertion-ordered JSON. Release dependency graphs exclude that utility. Every release-build job checks the shipped normal/build graph before compiling the binary.
 
@@ -26,4 +28,4 @@ For releases through v0.1.5, `json-stream-v2` uses explicit recursive lexicograp
 The `format_goldens` suite runs on the normal test graph and explicitly with `preserve_order`. It reuses the same checked-in fixtures. Add equivalent coverage when another JSON parser is integrated. See [the format rules](json-format-order.md) for reproduction commands.
 
 
-Current ingestion uses `json-stream-v3` with the same explicit lexical ordering. Historical parsing implementations are retired; the [current reader decision](decisions.md#current-parser-identities-and-reconstruction) defines regeneration. The historical golden fixtures and this release feature audit remain unchanged.
+Current ingestion uses `json-stream-v3` with the same explicit lexical ordering. Historical parsing implementations are retired; the [current reader decision](../decisions.md#current-parser-identities-and-reconstruction) defines regeneration. The historical golden fixtures and this release feature audit remain unchanged.

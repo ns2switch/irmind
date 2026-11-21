@@ -600,10 +600,7 @@ pub(super) fn apply_case_exit(state: &mut HomeState, exit: &case::CaseExit) {
         | case::CaseExit::Restart
         | case::CaseExit::CaseCommand(_) => Mode::List,
         case::CaseExit::New => Mode::New,
-        case::CaseExit::Settings(section, legacy) => {
-            if *legacy {
-                state.notice = "Now in /settings".into();
-            }
+        case::CaseExit::Settings(section) => {
             state.settings_return = Mode::Settings;
             section
                 .as_deref()
