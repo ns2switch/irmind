@@ -172,6 +172,9 @@ impl SourceQueryExecutor for AzureLogAnalytics {
     ) -> Result<SubmitObservationV1, AppError> {
         self.check(lease, SourceQueryLeasePhase::Submit, None)?;
         let previous = self.analytics_plan(cancel).await?;
+        if &previous != lease.source_metadata() {
+            return Err(SourceQueryError::Scope.into());
+        }
         let Ok(response) = self.query(lease.compiled(), cancel).await else {
             return Ok(SubmitObservationV1::Unknown);
         };
