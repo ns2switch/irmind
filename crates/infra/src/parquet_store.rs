@@ -175,7 +175,7 @@ impl ParquetStore {
         &self,
         id: &CaseId,
         staged: Vec<StagedArtifact>,
-    ) -> Result<Vec<irmind_domain::ParquetArtifactV2>, AppError> {
+    ) -> Result<Vec<irmind_domain::V3PhysicalManifest>, AppError> {
         let _finish_lock = self.finish_lock.lock().map_err(storage)?;
         let case_dir = self.case_dir(id)?;
         let mut artifacts = Vec::with_capacity(staged.len());

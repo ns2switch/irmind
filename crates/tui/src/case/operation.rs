@@ -4,7 +4,10 @@ use std::collections::BTreeMap;
 
 pub(super) type ActiveTask<'scope> = (
     CancellationToken,
-    std::thread::ScopedJoinHandle<'scope, Result<String, irmind_app::AppError>>,
+    std::thread::ScopedJoinHandle<
+        'scope,
+        Result<irmind_app::AnalystToolOutcome, irmind_app::AppError>,
+    >,
     &'static str,
 );
 

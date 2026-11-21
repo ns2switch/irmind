@@ -1,7 +1,7 @@
 use super::*;
 use sha2::{Digest, Sha256};
 
-fn artifact() -> ParquetArtifactV2 {
+fn artifact() -> V3PhysicalManifest {
     let partition = ArtifactPartitionV2 {
         date: "2026-11-04".into(),
         key_set: ARTIFACT_V2_SCOPE_KEYS.into(),
@@ -21,7 +21,7 @@ fn artifact() -> ParquetArtifactV2 {
             },
         ],
     };
-    ParquetArtifactV2 {
+    V3PhysicalManifest {
         path: format!("{}part.events.parquet", partition.path_prefix().unwrap()),
         size: 42,
         sha256: EvidenceHash::parse(&"b".repeat(64)).unwrap(),
@@ -58,17 +58,17 @@ fn unknown_semantics_schema_versions_counts_and_trailing_bytes_fail_closed() {
         put(&mut modified, to.as_bytes());
         modified.extend_from_slice(&bytes[position + old.len()..]);
         assert!(
-            ParquetArtifactV2::decode(&encode_payload(&modified).unwrap()).is_err(),
+            V3PhysicalManifest::decode(&encode_payload(&modified).unwrap()).is_err(),
             "{to}"
         );
     }
-    assert!(ParquetArtifactV2::decode(&format!("{golden}00")).is_err());
-    assert!(ParquetArtifactV2::decode(&"00".repeat(16_385)).is_err());
-    assert!(ParquetArtifactV2::decode(&golden[..golden.len() - 2]).is_err());
+    assert!(V3PhysicalManifest::decode(&format!("{golden}00")).is_err());
+    assert!(V3PhysicalManifest::decode(&"00".repeat(16_385)).is_err());
+    assert!(V3PhysicalManifest::decode(&golden[..golden.len() - 2]).is_err());
     let mut bytes = decode_payload(&golden, TAG).unwrap();
     let n = bytes.len();
     bytes[n - 8..].copy_from_slice(&129_u64.to_be_bytes());
-    assert!(ParquetArtifactV2::decode(&encode_payload(&bytes).unwrap()).is_err());
+    assert!(V3PhysicalManifest::decode(&encode_payload(&bytes).unwrap()).is_err());
 }
 
 #[test]
@@ -94,7 +94,7 @@ fn source_supersession_and_payload_limits_are_strict() {
     let mut value = original;
     value.superseded_hashes = vec![EvidenceHash::parse(&"0".repeat(64)).unwrap()];
     assert_eq!(
-        ParquetArtifactV2::decode(&value.encode().unwrap()).unwrap(),
+        V3PhysicalManifest::decode(&value.encode().unwrap()).unwrap(),
         value
     );
     for count in [128, 129] {
@@ -187,7 +187,7 @@ fn overflow_is_typed_signed_and_cannot_be_impersonated_by_a_host() {
     value.path = format!("{}part.parquet", value.partition.path_prefix().unwrap());
     let overflow_path = value.path.clone();
     assert_eq!(
-        ParquetArtifactV2::decode(&value.encode().unwrap()),
+        V3PhysicalManifest::decode(&value.encode().unwrap()),
         Ok(value.clone())
     );
     value.partition.scopes[0].value =
@@ -202,7 +202,7 @@ fn overflow_is_typed_signed_and_cannot_be_impersonated_by_a_host() {
         value.partition.all_scope_overflow = reason == PartitionOverflowReason::TupleBudget;
         value.path = format!("{}part.parquet", value.partition.path_prefix().unwrap());
         assert_eq!(
-            ParquetArtifactV2::decode(&value.encode().unwrap()),
+            V3PhysicalManifest::decode(&value.encode().unwrap()),
             Ok(value.clone())
         );
     }
@@ -233,7 +233,7 @@ fn common_schema_envelopes_match_independent_golden_bytes() {
         value.schema = schema;
         value.builder_version = "parquet-builder-common-event-v1".into();
         assert_eq!(value.encode().unwrap(), golden.trim());
-        assert_eq!(ParquetArtifactV2::decode(golden.trim()).unwrap(), value);
+        assert_eq!(V3PhysicalManifest::decode(golden.trim()).unwrap(), value);
         let bytes = decode_payload(golden.trim(), TAG).unwrap();
         assert_eq!(
             encode_payload(&Sha256::digest(bytes)).unwrap(),

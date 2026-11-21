@@ -4,6 +4,7 @@ import unittest
 import re
 
 WORKFLOW = Path(__file__).parents[1] / 'workflows/ci.yml'
+RELEASE = WORKFLOW.with_name('release.yml')
 
 
 class MacOSReleaseTests(unittest.TestCase):
@@ -18,7 +19,7 @@ class MacOSReleaseTests(unittest.TestCase):
         self.assertIn('name: "irmind-macos-${{ matrix.arch }}"', job)
 
     def test_every_intel_binary_is_checksummed_signed_verified_and_attested(self):
-        release = WORKFLOW.read_text().split('  release:\n', 1)[1].split('  verify_install_linux:', 1)[0]
+        release = WORKFLOW.read_text().split('  release:\n', 1)[1].split('  post_release:', 1)[0]
         for name in ('irmind-macos-x86_64', 'irmind-evtx-macos-x86_64'):
             self.assertIn(f' release/{name}\n', release)
             checksum_line = next(line for line in release.splitlines() if '> SHA256SUMS)' in line)
@@ -29,18 +30,24 @@ class MacOSReleaseTests(unittest.TestCase):
         self.assertIn("subject-path: 'release/irmind-*'", release)
 
     def test_optional_native_signing_does_not_skip_post_release_installation(self):
-        workflow = WORKFLOW.read_text()
+        caller = WORKFLOW.read_text().split('  post_release:\n', 1)[1]
+        self.assertIn('uses: ./.github/workflows/release.yml', caller)
+        self.assertIn("needs.release.result == 'success'", caller)
+        self.assertIn("github.event_name == 'push'", caller)
+        self.assertIn("startsWith(github.ref, 'refs/tags/v')", caller)
+        self.assertNotIn('needs.native_macos', caller)
+        workflow = RELEASE.read_text()
         for name in ('verify_install_linux', 'verify_install_macos', 'verify_install_windows'):
             with self.subTest(job=name):
                 job = workflow.split(f'  {name}:\n', 1)[1]
                 condition = re.search(r'^    if: (.+)$', job, re.MULTILINE).group(1)
                 self.assertIn('!cancelled()', condition)
-                self.assertIn("needs.release.result == 'success'", condition)
+                self.assertIn("github.event_name == 'push'", condition)
                 self.assertIn("startsWith(github.ref, 'refs/tags/v')", condition)
                 self.assertNotIn('needs.native_macos', condition)
 
     def test_clean_installation_runs_on_both_native_architectures(self):
-        job = WORKFLOW.read_text().split('  verify_install_macos:\n', 1)[1].split('  verify_install_windows:', 1)[0]
+        job = RELEASE.read_text().split('  verify_install_macos:\n', 1)[1].split('  verify_install_windows:', 1)[0]
         self.assertIn('runner: [macos-latest, macos-15-intel]', job)
         self.assertIn('attestations: read', job)
         self.assertIn('sh install.sh "$GITHUB_REF_NAME"', job)

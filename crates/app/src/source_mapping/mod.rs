@@ -1,4 +1,6 @@
 //! Pure mapping contracts and immutable per-ingestion selection.
+mod bounded_reader;
+pub use bounded_reader::BoundedSourceReader;
 mod catalog;
 mod decoder_selection;
 mod error;

@@ -1,6 +1,7 @@
 use super::CancellationToken;
 use flate2::read::MultiGzDecoder;
-use std::io::{self, Cursor, Read};
+use irmind_app::source_mapping::BoundedSourceReader;
+use std::io::{Cursor, Read};
 
 const MAX_GZIP_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
@@ -13,48 +14,8 @@ pub(super) fn sample(input: &[u8]) -> Vec<u8> {
     output
 }
 
-pub(super) struct Bounded<'a, R> {
-    inner: R,
-    bytes: u64,
-    limit: u64,
-    cancel: &'a CancellationToken,
-    exceeded: bool,
-}
-pub(super) fn bounded<R: Read>(inner: R, cancel: &CancellationToken) -> Bounded<'_, R> {
-    Bounded {
-        inner,
-        bytes: 0,
-        limit: MAX_GZIP_BYTES,
-        cancel,
-        exceeded: false,
-    }
-}
-impl<R> Bounded<'_, R> {
-    pub(super) fn exceeded(&self) -> bool {
-        self.exceeded
-    }
-    pub(super) fn inner(&self) -> &R {
-        &self.inner
-    }
-}
-impl<R: Read> Read for Bounded<'_, R> {
-    fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
-        if self.cancel.is_cancelled() {
-            return Err(io::Error::other("cancelled"));
-        }
-        let capacity = output.len().min(
-            usize::try_from(self.limit.saturating_sub(self.bytes))
-                .unwrap_or(usize::MAX)
-                .saturating_add(1),
-        );
-        let count = self.inner.read(&mut output[..capacity])?;
-        self.bytes = self.bytes.saturating_add(count as u64);
-        if self.bytes > self.limit {
-            self.exceeded = true;
-            return Err(io::Error::other("gzip size limit exceeded"));
-        }
-        Ok(count)
-    }
+pub(super) fn bounded<R: Read>(inner: R, cancel: &CancellationToken) -> BoundedSourceReader<'_, R> {
+    BoundedSourceReader::new(inner, cancel, MAX_GZIP_BYTES)
 }
 
 #[cfg(test)]
@@ -64,13 +25,7 @@ mod tests {
     #[test]
     fn decompressed_limit_and_cancellation_fail_closed() {
         let cancel = CancellationToken::new();
-        let mut reader = Bounded {
-            inner: Cursor::new(b"12345678"),
-            bytes: 0,
-            limit: 4,
-            cancel: &cancel,
-            exceeded: false,
-        };
+        let mut reader = BoundedSourceReader::new(Cursor::new(b"12345678"), &cancel, 4);
         assert!(reader.read_to_end(&mut Vec::new()).is_err());
         cancel.cancel();
         assert!(reader.read(&mut [0; 1]).is_err());

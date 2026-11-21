@@ -2,7 +2,7 @@ mod codec;
 mod group;
 mod pipeline;
 use super::{DomainError, EvidenceHash, MappingBindingV1, hash_payload, invalid};
-use crate::ParquetArtifactV2;
+use crate::V3PhysicalManifest;
 pub use pipeline::{ArtifactDerivationV1, ArtifactParentV1, ArtifactPipelineV1};
 
 pub(super) const TAG: &[u8] = b"irmind-parquet-artifact-v3\0";
@@ -11,12 +11,12 @@ pub const PARQUET_LAYOUT_BUILDER_V1: &str = "parquet-layout-common-event-v1";
 /// A separate derivation envelope; historical V2 encoding is never extended.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ParquetArtifactV3 {
-    core: ParquetArtifactV2,
+    core: V3PhysicalManifest,
     pipeline: ArtifactPipelineV1,
 }
 impl ParquetArtifactV3 {
     pub fn try_new(
-        core: ParquetArtifactV2,
+        core: V3PhysicalManifest,
         pipeline: ArtifactPipelineV1,
     ) -> Result<Self, DomainError> {
         core.validate()?;
@@ -41,7 +41,7 @@ impl ParquetArtifactV3 {
         value.encode()?;
         Ok(value)
     }
-    pub const fn core(&self) -> &ParquetArtifactV2 {
+    pub const fn core(&self) -> &V3PhysicalManifest {
         &self.core
     }
     pub fn validate(&self) -> Result<(), DomainError> {

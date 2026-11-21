@@ -7,12 +7,11 @@ use irmind_app::{
     },
     source_queries::{
         CaptureColumn, InspectedQueryPage, QUERY_MAX_RECORD_BYTES, QUERY_MAX_ROWS, QueryPageInput,
-        QueryPageSchema, SourceQueryError, SourceQueryPageDecoder, read_query_capture_pages,
+        QueryPageSchema, SourceQueryError, SourceQueryPageDecoder, decode_query_capture,
     },
 };
 use irmind_domain::{
-    DecodeAnnotationsV1, EventOrigin, EvidenceHash, IndexedTime, Provenance, SOURCE_MAX_BYTES,
-    SourceFormatV1, SourceKind, SourceRecordV1, SourceValue, Tainted,
+    IndexedTime, SOURCE_MAX_BYTES, SourceFormatV1, SourceRecordV1, SourceValue, Tainted,
 };
 use serde::de::{self, DeserializeSeed, Deserializer, MapAccess, SeqAccess, Visitor};
 use serde_json::value::RawValue;
@@ -94,69 +93,28 @@ impl SourceDecoder for AzureAnalyticsCaptureDecoder {
         input: SourceInput<'_>,
         emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
     ) -> Result<ParseReport, AppError> {
-        let meta = input.metadata;
-        if meta.source.kind() != SourceKind::ToolResult || meta.source.acquisition().is_none() {
-            return Err(SourceQueryError::Scope.into());
-        }
-        let id = self.identity();
-        let hash = EvidenceHash::from_bytes(meta.evidence_hash);
         let format =
             SourceFormatV1::try_new(self.file_format(), "entra-source-v1", BTreeMap::new())
                 .map_err(|_| SourceQueryError::Invalid)?;
-        let mut report = ParseReport {
-            accepted: 0,
-            rejected: 0,
-            samples: vec![],
-        };
-        let summary = read_query_capture_pages(input.reader, meta.cancel, |page, reader| {
-            if page.ordinal != 0 {
-                return Err(SourceQueryError::Invalid.into());
-            }
-            check_columns(page.columns)?;
-            let mut ordinal = 0;
-            let facts = read_page(reader, Some(page.columns), &mut |raw| {
-                if meta.cancel.is_cancelled() {
-                    return Err(AppError::Cancelled);
+        decode_query_capture(
+            input,
+            self.identity(),
+            format,
+            emit,
+            |page, reader, output| {
+                if page.ordinal != 0 {
+                    return Err(SourceQueryError::Invalid.into());
                 }
-                let origin = EventOrigin::try_new(hash.clone(), ordinal, None, id.name, id.version)
-                    .map_err(|_| SourceQueryError::Invalid)?;
-                ordinal += 1;
-                let record = decode_row(*self, page.columns, raw).and_then(|(time, fields)| {
-                    SourceRecordV1::try_from_source(
-                        origin,
-                        meta.source.clone(),
-                        Some(time),
-                        format.clone(),
-                        fields,
-                        DecodeAnnotationsV1::default(),
-                    )
-                    .ok()
-                });
-                if let Some(record) = record {
-                    let record_index = record.origin().record();
-                    emit(Tainted::from_external(
-                        record,
-                        Provenance::new(
-                            meta.evidence_hash,
-                            Some(record_index),
-                            SourceKind::ToolResult,
-                        ),
-                    ))?;
-                    report.accepted += 1;
-                } else {
-                    report.rejected += 1;
+                check_columns(page.columns)?;
+                let facts = read_page(reader, Some(page.columns), &mut |raw| {
+                    output.row(|| decode_row(*self, page.columns, raw))
+                })?;
+                if facts.rows != page.rows || facts.provider_partial != page.provider_partial {
+                    return Err(SourceQueryError::Invalid.into());
                 }
                 Ok(())
-            })?;
-            if facts.rows != page.rows || facts.provider_partial != page.provider_partial {
-                return Err(SourceQueryError::Invalid.into());
-            }
-            Ok(())
-        })?;
-        if summary.identity().0 != &hash {
-            return Err(SourceQueryError::Invalid.into());
-        }
-        Ok(report)
+            },
+        )
     }
 }
 
@@ -486,7 +444,7 @@ mod tests {
             source_mapping::SourceMetadata,
             source_queries::{CapturePageCompleteness, CapturePageMetadata, QueryCaptureWriter},
         };
-        use irmind_domain::{SourceDecoderIdentityV1, SourceReferenceV1};
+        use irmind_domain::{EvidenceHash, SourceDecoderIdentityV1, SourceKind, SourceReferenceV1};
         use std::io::Cursor;
 
         let wire = br#"{"tables":[{"name":"PrimaryResult","columns":[{"name":"TimeGenerated","type":"datetime"}],"rows":[["2026-01-01T00:00:00Z"]]}],"error":{"code":"PartialError"}}"#;
@@ -557,9 +515,10 @@ mod tests {
             "a".repeat(QUERY_MAX_RECORD_BYTES)
         );
         let error = read_page(&mut oversized.as_bytes(), None, &mut |_| Ok(())).unwrap_err();
-        assert!(
-            matches!(error, AppError::Policy(reason) if reason == SourceQueryError::Limit.to_string())
-        );
+        assert!(matches!(
+            error,
+            AppError::SourceQuery(SourceQueryError::Limit)
+        ));
         let duplicate = br#"{"error":{"code":"Failure","code":"PartialError"},"tables":[{"name":"PrimaryResult","columns":[],"rows":[]}]}"#;
         assert!(read_page(&mut duplicate.as_slice(), None, &mut |_| Ok(())).is_err());
     }

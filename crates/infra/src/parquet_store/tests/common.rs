@@ -121,7 +121,7 @@ fn common_queries_keep_roles_pid_scopes_and_closed_filters() {
         lookup.contains("source=1") && lookup.contains("destination=1"),
         "{lookup}"
     );
-    assert!(
+    assert_eq!(
         query
             .entity_timeline_native(
                 &id,
@@ -133,8 +133,8 @@ fn common_queries_keep_roles_pid_scopes_and_closed_filters() {
             )
             .unwrap()
             .lines()
-            .count()
-            == 1
+            .count(),
+        1
     );
     let failure = GraphQueryFilter::from_args(&BTreeMap::from([
         ("event_category".into(), "authentication".into()),

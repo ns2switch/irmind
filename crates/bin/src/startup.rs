@@ -342,15 +342,17 @@ impl PreparedStartup {
                 analyst: self.subagent_review.clone(),
             });
         }
+        let clock: Arc<dyn irmind_app::Clock> = Arc::new(SystemClock);
         if let Some(settings) = self
             .organization
             .as_ref()
             .and_then(|policy| policy.source_queries.as_ref())
         {
-            ports = ports.with_source_queries(settings.build(self.active.secret_backend.as_ref())?);
+            ports = ports
+                .with_source_queries(settings.build(self.active.secret_backend.as_ref(), &clock)?);
         }
         let engine = registry.bind(
-            Engine::new(ports, ExecutionMode::Attended, Arc::new(SystemClock))?
+            Engine::new(ports, ExecutionMode::Attended, clock)?
                 .with_case_lifecycle(self.store.clone())
                 .with_skills(services)?
                 .with_large_case_pipeline(self.store.clone(), Arc::new(JsonParser))

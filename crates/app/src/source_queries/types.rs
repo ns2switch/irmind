@@ -53,6 +53,12 @@ impl From<QueryTime> for String {
     }
 }
 impl QueryTime {
+    pub fn from_clock(clock: &dyn crate::Clock) -> Result<Self, crate::AppError> {
+        let index = IndexedTime::from_epoch_decimal(&clock.now()?.to_string(), false)
+            .map_err(|_| SourceQueryError::Invalid)?;
+        Ok(Self::parse(&index.to_rfc3339())?)
+    }
+
     pub fn parse(value: &str) -> Result<Self, SourceQueryError> {
         value.to_owned().try_into()
     }

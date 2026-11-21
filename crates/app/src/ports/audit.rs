@@ -27,6 +27,8 @@ pub enum AppError {
     Model(String),
     #[error("policy denied: {0}")]
     Policy(String),
+    #[error("policy denied: {0}")]
+    SourceQuery(#[from] crate::source_queries::SourceQueryError),
     #[error(
         "Cloud transfer limit reached: {used} reserved bytes, {requested} requested, limit {limit}. Use /budget; the organization ceiling still applies."
     )]

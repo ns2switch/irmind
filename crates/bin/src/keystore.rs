@@ -1,5 +1,7 @@
 use anyhow::{Context as _, Result, anyhow};
-use irmind_app::{SecretBackend, Signer, SignerBackend, hex, sha256};
+use irmind_app::{
+    AdapterStorageError, AppError, FixedAppError, SecretBackend, Signer, SignerBackend, hex, sha256,
+};
 use irmind_domain::Actor;
 #[cfg(feature = "keystore-file")]
 use secrecy::SecretString;
@@ -166,7 +168,10 @@ fn os_backend() -> Result<(Arc<dyn SignerBackend>, Arc<dyn SecretBackend>)> {
     }
     #[cfg(not(feature = "keystore-os"))]
     {
-        Err(anyhow!("OS keyring backend was not compiled"))
+        Err(AppError::Fixed(FixedAppError::AdapterStorage(
+            AdapterStorageError::SystemKeyringUnavailable,
+        ))
+        .into())
     }
 }
 
@@ -248,9 +253,7 @@ fn activate(
     let signer = match loaded {
         Ok(signer) => signer,
         Err(_) if selection.analyst_key_fingerprint.is_some() => {
-            return Err(anyhow!(
-                "configured analyst signing key is unavailable; restore it or migrate explicitly"
-            ));
+            return Err(AppError::Fixed(FixedAppError::ConfiguredAnalystSignerUnavailable).into());
         }
         Err(_) if allow_create && !has_cases => signer_backend.create(Actor::Analyst)?,
         Err(error) => return Err(error.into()),
@@ -337,48 +340,51 @@ fn interactive_setup(
 fn setup_error(home: &Path, error: &anyhow::Error) -> String {
     let detail = format!("{error:#}");
     tracing::error!(target: "irmind::operations", stage = "keystore", causes = %detail, "startup operation failed");
-    if detail.contains("configured analyst signing key is unavailable") {
-        "The configured analyst signing key is missing from this backend. Restore the key or use an explicit migration; no replacement key was created.".into()
-    } else if detail.contains("encrypted keystore file or directory is not accessible") {
-        format!(
-            "The vault at {} cannot be accessed with your user permissions. Check ownership and access, then retry.",
-            home.join("keystore.enc").display()
-        )
-    } else if detail.contains("cannot unlock encrypted keystore") {
-        format!(
-            "The passphrase is incorrect or the vault at {} is damaged. Retry; if this persists, restore a known-good vault. Details: {}",
-            home.join("keystore.enc").display(),
-            home.join("diagnostics.log").display()
-        )
-    } else if detail.contains("encrypted keystore operation failed") {
-        format!(
-            "The vault operation failed. Check directory access and free disk space, then retry. Diagnostics: {}",
-            home.join("diagnostics.log").display()
-        )
-    } else if detail.contains("open in another process") {
-        "The encrypted file is already open in another IRMind process. Close that session, then retry.".into()
-    } else if detail.contains("encrypted keystore not found") {
-        format!(
-            "The configured vault at {} is missing. Restore it or select another backend; no key was generated silently.",
-            home.join("keystore.enc").display()
-        )
-    } else if detail.contains("unknown encrypted keystore version") {
-        "The vault format is newer than this IRMind build. Upgrade IRMind; the file was not modified.".into()
-    } else if detail.contains("encrypted keystore parameters are unsafe") {
-        "The vault uses weak or invalid encryption parameters. Restore a valid vault; IRMind will not lower its minimums.".into()
-    } else if detail.contains("Permission denied") || detail.contains("permission denied") {
-        format!(
-            "The data directory {} cannot be accessed with your user permissions. Check ownership and access, then retry.",
-            home.display()
-        )
-    } else if detail.contains("keyring") || detail.contains("secret service") {
-        "The OS keyring is unavailable in this session. Choose the encrypted file backend; it works over SSH.".into()
-    } else {
-        format!(
-            "Keystore setup failed: {detail}. Retry or choose another backend. Diagnostics: {}",
-            home.join("diagnostics.log").display()
-        )
+    match error.downcast_ref::<AppError>() {
+        Some(AppError::Fixed(FixedAppError::ConfiguredAnalystSignerUnavailable)) =>
+            "The configured analyst signing key is missing from this backend. Restore the key or use an explicit migration. IRMind kept the existing key identity.".into(),
+        Some(AppError::Fixed(FixedAppError::AdapterStorage(storage))) => match storage {
+            AdapterStorageError::EncryptedKeystorePermissionDenied => format!(
+                "The vault at {} cannot be accessed with your user permissions. Check ownership and access, then retry.",
+                home.join("keystore.enc").display()
+            ),
+            AdapterStorageError::CannotUnlockEncryptedKeystore => format!(
+                "The passphrase is incorrect or the vault at {} is damaged. Retry and restore a known-good vault if the problem persists. Details: {}",
+                home.join("keystore.enc").display(),
+                home.join("diagnostics.log").display()
+            ),
+            AdapterStorageError::EncryptedKeystoreOperationFailed => format!(
+                "The vault operation failed. Check directory access and free disk space, then retry. Diagnostics: {}",
+                home.join("diagnostics.log").display()
+            ),
+            AdapterStorageError::EncryptedKeystoreIsOpenInAnotherProcess =>
+                "The encrypted file is already open in another IRMind process. Close that session, then retry.".into(),
+            AdapterStorageError::EncryptedKeystoreNotFound => format!(
+                "The configured vault at {} is missing. Restore it or select another backend.",
+                home.join("keystore.enc").display()
+            ),
+            AdapterStorageError::UnknownEncryptedKeystoreVersion =>
+                "The vault format is newer than this IRMind build. Upgrade IRMind.".into(),
+            AdapterStorageError::EncryptedKeystoreParametersAreUnsafe =>
+                "The vault uses weak or invalid encryption parameters. Restore a valid vault.".into(),
+            AdapterStorageError::SystemKeyringUnavailable =>
+                "The OS keyring is unavailable in this session. Choose the encrypted file backend for SSH.".into(),
+            _ => setup_fallback(home),
+        },
+        _ if error.chain().filter_map(|cause| cause.downcast_ref::<std::io::Error>())
+            .any(|cause| cause.kind() == std::io::ErrorKind::PermissionDenied) => format!(
+                "The data directory {} cannot be accessed with your user permissions. Check ownership and access, then retry.",
+                home.display()
+            ),
+        _ => setup_fallback(home),
     }
+}
+
+fn setup_fallback(home: &Path) -> String {
+    format!(
+        "Keystore setup failed. Retry or choose another backend. Diagnostics: {}",
+        home.join("diagnostics.log").display()
+    )
 }
 
 pub(super) fn select_migrated_backend(
@@ -405,6 +411,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn setup_guidance_depends_on_error_types_not_messages() {
+        let home = Path::new("synthetic");
+        let wrong_text = "cannot unlock encrypted keystore; keyring unavailable";
+        let raw = anyhow!(wrong_text);
+        assert!(setup_error(home, &raw).starts_with("Keystore setup failed."));
+        let missing = anyhow::Error::new(AppError::Fixed(FixedAppError::AdapterStorage(
+            AdapterStorageError::EncryptedKeystoreNotFound,
+        )))
+        .context(wrong_text);
+        assert!(setup_error(home, &missing).contains("configured vault"));
+        let denied = anyhow::Error::new(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "synthetic error text",
+        ))
+        .context(wrong_text);
+        assert!(setup_error(home, &denied).starts_with("The data directory"));
+    }
+
+    #[test]
     fn configured_fingerprint_never_creates_a_missing_vault() {
         let home = tempfile::tempdir().unwrap();
         let passphrase = SecretString::from("synthetic test passphrase".to_owned());
@@ -423,7 +448,12 @@ mod tests {
         )
         .err()
         .unwrap();
-        assert!(format!("{error:#}").contains("encrypted keystore not found"));
+        assert!(matches!(
+            error.downcast_ref::<AppError>(),
+            Some(AppError::Fixed(FixedAppError::AdapterStorage(
+                AdapterStorageError::EncryptedKeystoreNotFound
+            )))
+        ));
         assert!(!home.path().join("keystore.enc").exists());
     }
 
@@ -448,7 +478,12 @@ mod tests {
         )
         .err()
         .unwrap();
-        assert!(format!("{error:#}").contains("restore it or migrate explicitly"));
+        assert!(matches!(
+            error.downcast_ref::<AppError>(),
+            Some(AppError::Fixed(
+                FixedAppError::ConfiguredAnalystSignerUnavailable
+            ))
+        ));
         let reopened = FileKeystore::open(home.path(), &passphrase, false).unwrap();
         assert!(reopened.load(Actor::Analyst).is_err());
     }

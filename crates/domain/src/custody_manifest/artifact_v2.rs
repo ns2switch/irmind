@@ -43,8 +43,9 @@ impl ArtifactSchemaV2 {
 }
 
 /// Canonical acquisition and physical metadata embedded in the current V3 envelope.
+/// Physical Parquet metadata embedded in the V3 artifact envelope.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ParquetArtifactV2 {
+pub struct V3PhysicalManifest {
     pub path: String,
     pub size: u64,
     pub sha256: EvidenceHash,
@@ -59,7 +60,7 @@ pub struct ParquetArtifactV2 {
     pub superseded_hashes: Vec<EvidenceHash>,
 }
 
-impl ParquetArtifactV2 {
+impl V3PhysicalManifest {
     pub fn encode(&self) -> Result<String, DomainError> {
         self.validate()?;
         let mut bytes = TAG.to_vec();

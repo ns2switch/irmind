@@ -5,13 +5,10 @@ use irmind_app::source_mapping::{
 };
 use irmind_app::source_queries::{
     CaptureColumn, InspectedQueryPage, QueryPageInput, QueryPageSchema, SourceQueryError,
-    SourceQueryPageDecoder, canonical_query_json, read_query_capture_pages,
+    SourceQueryPageDecoder, canonical_query_json, decode_query_capture, read_query_json_page,
 };
 use irmind_app::{AppError, ParseReport, ParserIdentity, SourceDecoder};
-use irmind_domain::{
-    DecodeAnnotationsV1, EventOrigin, EvidenceHash, IndexedTime, Provenance, SourceFormatV1,
-    SourceKind, SourceRecordV1, SourceValue, Tainted,
-};
+use irmind_domain::{IndexedTime, SourceFormatV1, SourceRecordV1, SourceValue, Tainted};
 use serde_json::Value;
 use std::{collections::BTreeMap, io::BufReader};
 
@@ -50,77 +47,35 @@ impl SourceDecoder for AthenaCaptureDecoder {
         input: SourceInput<'_>,
         emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
     ) -> Result<ParseReport, AppError> {
-        let meta = input.metadata;
-        if meta.source.kind() != SourceKind::ToolResult || meta.source.acquisition().is_none() {
-            return Err(SourceQueryError::Scope.into());
-        }
-        let id = self.identity();
-        let hash = EvidenceHash::from_bytes(meta.evidence_hash);
         let format = SourceFormatV1::try_new("json", "source-json-v1", BTreeMap::new())
             .map_err(|_| SourceQueryError::Invalid)?;
-        let mut report = ParseReport {
-            accepted: 0,
-            rejected: 0,
-            samples: vec![],
-        };
-        let mut ordinal = 0;
-        let summary = read_query_capture_pages(input.reader, meta.cancel, |page, reader| {
-            if page.body_bytes > super::protocol::PAGE_LIMIT as u64 {
-                return Err(SourceQueryError::Limit.into());
-            }
-            let wire: Value = serde_json::from_reader(BufReader::new(reader))
-                .map_err(|_| SourceQueryError::Invalid)?;
-            let rows = checked_rows(&wire, page.ordinal == 0)?;
-            let native = columns(&wire)?;
-            if rows.len() as u64 != page.rows
-                || page.columns.len() != native.len()
-                || page.columns.iter().zip(native).any(|(signed, raw)| {
-                    raw["Name"] != signed.name || raw["Type"] != signed.native_type
-                })
-            {
-                return Err(SourceQueryError::Invalid.into());
-            }
-            for row in rows {
-                if meta.cancel.is_cancelled() {
-                    return Err(AppError::Cancelled);
+        decode_query_capture(
+            input,
+            self.identity(),
+            format,
+            emit,
+            |page, reader, output| {
+                if page.body_bytes > super::protocol::PAGE_LIMIT as u64 {
+                    return Err(SourceQueryError::Limit.into());
                 }
-                let origin = EventOrigin::try_new(hash.clone(), ordinal, None, id.name, id.version)
+                let wire: Value = serde_json::from_reader(BufReader::new(reader))
                     .map_err(|_| SourceQueryError::Invalid)?;
-                ordinal += 1;
-                let Some((time, fields)) = decode_row(row) else {
-                    report.rejected += 1;
-                    continue;
-                };
-                let record = SourceRecordV1::try_from_source(
-                    origin,
-                    meta.source.clone(),
-                    Some(time),
-                    format.clone(),
-                    fields,
-                    DecodeAnnotationsV1::default(),
-                );
-                match record {
-                    Ok(record) => {
-                        let record_index = record.origin().record();
-                        emit(Tainted::from_external(
-                            record,
-                            Provenance::new(
-                                meta.evidence_hash,
-                                Some(record_index),
-                                SourceKind::ToolResult,
-                            ),
-                        ))?;
-                        report.accepted += 1;
-                    }
-                    Err(_) => report.rejected += 1,
+                let rows = checked_rows(&wire, page.ordinal == 0)?;
+                let native = columns(&wire)?;
+                if rows.len() as u64 != page.rows
+                    || page.columns.len() != native.len()
+                    || page.columns.iter().zip(native).any(|(signed, raw)| {
+                        raw["Name"] != signed.name || raw["Type"] != signed.native_type
+                    })
+                {
+                    return Err(SourceQueryError::Invalid.into());
                 }
-            }
-            Ok(())
-        })?;
-        if summary.identity().0 != &hash {
-            return Err(SourceQueryError::Invalid.into());
-        }
-        Ok(report)
+                for row in rows {
+                    output.row(|| decode_row(row))?;
+                }
+                Ok(())
+            },
+        )
     }
 }
 
@@ -135,7 +90,7 @@ impl SourceQueryPageDecoder for AthenaCaptureDecoder {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        let wire = bounded_page(input)?;
+        let wire = read_query_json_page(input, super::protocol::PAGE_LIMIT as u64)?;
         let native = columns(&wire)?;
         let schema = QueryPageSchema::new(
             native
@@ -173,19 +128,6 @@ impl SourceQueryPageDecoder for AthenaCaptureDecoder {
             next_token,
         })
     }
-}
-
-fn bounded_page(input: &mut dyn QueryPageInput) -> Result<Value, AppError> {
-    use std::io::{Read as _, SeekFrom};
-    let size = input
-        .seek(SeekFrom::End(0))
-        .map_err(|_| SourceQueryError::Invalid)?;
-    if size > super::protocol::PAGE_LIMIT as u64 {
-        return Err(SourceQueryError::Limit.into());
-    }
-    input.rewind().map_err(|_| SourceQueryError::Invalid)?;
-    serde_json::from_reader(BufReader::new(input.take(size)))
-        .map_err(|_| SourceQueryError::Invalid.into())
 }
 
 pub(super) fn columns(wire: &Value) -> Result<&[Value], SourceQueryError> {

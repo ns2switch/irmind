@@ -1,4 +1,4 @@
-use super::{AuditEventKind, DomainError, EvidenceHash, ParquetArtifactV2, ParquetArtifactV3};
+use super::{AuditEventKind, DomainError, EvidenceHash, ParquetArtifactV3, V3PhysicalManifest};
 
 /// The supported case format contains only mapped V3 artifact envelopes.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -63,7 +63,7 @@ impl ParquetArtifact {
         bytes
     }
     /// The existing core encoding remains nested inside the V3 envelope.
-    pub fn precise_metadata(&self) -> Option<&ParquetArtifactV2> {
+    pub fn precise_metadata(&self) -> Option<&V3PhysicalManifest> {
         Some(self.value().core())
     }
     pub fn custody_identity(&self) -> Result<EvidenceHash, DomainError> {

@@ -31,6 +31,7 @@ fn executor(source: Value, limits: SourceQueryLimits) -> BigQuery {
         serde_json::from_value(source).unwrap(),
         limits,
         Credentials::SyntheticToken("synthetic-bearer".into()),
+        Arc::new(irmind_infra::SystemClock),
     )
     .unwrap()
 }
@@ -49,9 +50,13 @@ async fn service_account_exchanges_a_signed_assertion_and_reuses_the_token() {
         })
         .to_string(),
     );
-    let mut executor =
-        BigQuery::with_service_account(serde_json::from_value(source).unwrap(), limits, &account)
-            .unwrap();
+    let mut executor = BigQuery::with_service_account(
+        serde_json::from_value(source).unwrap(),
+        limits,
+        &account,
+        Arc::new(irmind_infra::SystemClock),
+    )
+    .unwrap();
     let server = MockServer::start(vec![
         MockResponse::json(r#"{"access_token":"synthetic-exchanged-token","token_type":"Bearer","expires_in":300}"#),
         MockResponse::json(DRY_RUN),

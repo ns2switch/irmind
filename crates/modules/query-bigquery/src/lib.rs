@@ -8,7 +8,7 @@ mod protocol;
 mod tests;
 
 use irmind_app::{
-    AppError, CancellationToken, Tool, async_trait,
+    AppError, CancellationToken, Clock, Tool, async_trait,
     source_queries::{
         AdmittedSourceQuery, CancelObservationV1, CompiledSourceQueryV1, ExecutionObservationV1,
         QueryAccounting, QueryEstimate, QueryExecutionRef, QueryExecutionStatus, QueryPreflightV1,
@@ -23,7 +23,7 @@ use irmind_http::google_auth::{
 };
 use secrecy::SecretString;
 use serde_json::json;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 pub use capture::BigQueryCaptureDecoder;
 
@@ -31,6 +31,7 @@ pub struct BigQuery {
     client: reqwest::Client,
     endpoint: reqwest::Url,
     source: ResolvedQuerySourceV1,
+    clock: Arc<dyn Clock>,
     limits: SourceQueryLimits,
     credentials: Credentials,
 }
@@ -49,19 +50,21 @@ impl BigQuery {
         source: ResolvedQuerySourceV1,
         limits: SourceQueryLimits,
         service_account: &SecretString,
+        clock: Arc<dyn Clock>,
     ) -> Result<Self, AppError> {
         let credentials = Credentials::ServiceAccount {
             account: GoogleServiceAccount::new(service_account, GoogleApi::BigQuery)
                 .map_err(auth_error)?,
             endpoint: google_token_endpoint().map_err(auth_error)?,
         };
-        Self::new(source, limits, credentials)
+        Self::new(source, limits, credentials, clock)
     }
 
     fn new(
         source: ResolvedQuerySourceV1,
         limits: SourceQueryLimits,
         credentials: Credentials,
+        clock: Arc<dyn Clock>,
     ) -> Result<Self, AppError> {
         limits.validate()?;
         compiler::table_layout(&source)?;
@@ -82,6 +85,7 @@ impl BigQuery {
             endpoint: reqwest::Url::parse("https://bigquery.googleapis.com/bigquery/v2/")
                 .map_err(|_| SourceQueryError::Invalid)?,
             source,
+            clock,
             limits,
             credentials,
         })
@@ -169,10 +173,7 @@ impl SourceQueryExecutor for BigQuery {
         let estimate = self.dry_run(compiled, cancel).await?;
         Ok(QueryPreflightV1 {
             plan_digest: irmind_app::hex(&irmind_app::sha256(&canonical_query_json(compiled)?)),
-            observed_at: QueryTime::parse(
-                &irmind_calendar::Utc::now()
-                    .to_rfc3339_opts(irmind_calendar::SecondsFormat::Secs, true),
-            )?,
+            observed_at: QueryTime::from_clock(self.clock.as_ref())?,
             accounting: QueryAccounting::ScanPriced,
             estimate: QueryEstimate {
                 unit: "billed_bytes".into(),

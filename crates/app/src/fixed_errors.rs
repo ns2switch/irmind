@@ -7,6 +7,8 @@ use thiserror::Error;
 
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
 pub enum FixedAppError {
+    #[error("configured analyst signing key is unavailable; restore it or migrate explicitly")]
+    ConfiguredAnalystSignerUnavailable,
     #[error(
         "the selected source decoder or mapping pipeline is unavailable; enable the matching parser module before ingestion"
     )]

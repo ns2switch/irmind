@@ -532,6 +532,8 @@ jobs:
         if: always()
         run: rm -rf native-macos
 
+  # Fulcio binds the certificate to this job's workflow path. Keep this job
+  # here so installed verifiers retain the exact ci.yml signing identity.
   release:
     needs: [dco, linux, json_formats, linux_arm64, windows, macos, native_macos, evtx_linux_compatibility, linux_verify_windows, macos_verify_windows]
     if: ${{ !cancelled() && (needs.native_macos.result == 'success' || needs.native_macos.result == 'skipped') && needs.linux.result == 'success' && needs.json_formats.result == 'success' && needs.linux_arm64.result == 'success' && needs.windows.result == 'success' && needs.macos.result == 'success' && needs.linux_verify_windows.result == 'success' && needs.macos_verify_windows.result == 'success' && needs.evtx_linux_compatibility.result == 'success' && (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_dry_run == true)) }}
@@ -697,97 +699,11 @@ jobs:
       - name: Clean release staging
         if: always()
         run: python3 -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('release', 'artifacts')) if p.is_dir()]"
-  verify_install_linux:
-    needs: release
-    if: ${{ !cancelled() && needs.release.result == 'success' && startsWith(github.ref, 'refs/tags/v') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-      attestations: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with: {persist-credentials: false}
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-        with: {cosign-release: 'v3.1.4'}
-      - name: Install and run the verified Linux release in a clean runner
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          test ! -e "$HOME/.local/bin/irmind"
-          test ! -e "$HOME/.local/bin/irmind-evtx"
-          trap 'rm -f "$HOME/.local/bin/irmind" "$HOME/.local/bin/irmind-evtx"' EXIT
-          sh install.sh "$GITHUB_REF_NAME"
-          test -x "$HOME/.local/bin/irmind-evtx"
-          "$HOME/.local/bin/irmind" --version
-  verify_install_macos:
-    needs: release
-    if: ${{ !cancelled() && needs.release.result == 'success' && startsWith(github.ref, 'refs/tags/v') }}
-    strategy:
-      fail-fast: false
-      matrix:
-        runner: [macos-latest, macos-15-intel]
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 15
-    permissions:
-      contents: read
-      attestations: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with: {persist-credentials: false}
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-        with: {cosign-release: 'v3.1.4'}
-      - name: Install and run the verified macOS release in a clean runner
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          test ! -e "$HOME/.local/bin/irmind"
-          test ! -e "$HOME/.local/bin/irmind-evtx"
-          trap 'rm -f "$HOME/.local/bin/irmind" "$HOME/.local/bin/irmind-evtx"' EXIT
-          sh install.sh "$GITHUB_REF_NAME"
-          test -x "$HOME/.local/bin/irmind-evtx"
-          "$HOME/.local/bin/irmind" --version
-  verify_install_windows:
-    needs: release
-    if: ${{ !cancelled() && needs.release.result == 'success' && startsWith(github.ref, 'refs/tags/v') }}
-    runs-on: windows-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-      attestations: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with: {persist-credentials: false}
-      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
-        with: {cosign-release: 'v3.1.4'}
-      - name: Install and run the verified Windows release in a clean runner
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $binary = Join-Path $env:LOCALAPPDATA 'IRMind\bin\irmind.exe'
-          $helper = Join-Path $env:LOCALAPPDATA 'IRMind\bin\irmind-evtx.exe'
-          if (Test-Path -LiteralPath $helper) { throw 'helper installer target is not clean' }
-          if (Test-Path -LiteralPath $binary) { throw 'installer target is not clean' }
-          try {
-            ./install.ps1 -Version $env:GITHUB_REF_NAME
-            if (-not (Test-Path -LiteralPath $helper -PathType Leaf)) { throw 'verified helper is missing' }
-            & $binary --version
-            if ($LASTEXITCODE -ne 0) { throw 'verified binary did not start' }
-          } finally {
-            Remove-Item -LiteralPath $binary,$helper -Force -ErrorAction SilentlyContinue
-          }
 
-  update_homebrew:
-    needs: [release, verify_install_linux, verify_install_macos, verify_install_windows]
-    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push' && needs.release.result == 'success' && needs.verify_install_linux.result == 'success' && needs.verify_install_macos.result == 'success' && needs.verify_install_windows.result == 'success' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    environment: release
+  post_release:
+    needs: release
+    if: ${{ !cancelled() && needs.release.result == 'success' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
     permissions:
       contents: read
-    steps:
-      - name: Ask the tap to verify and test this published release before updating
-        env:
-          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-        run: gh workflow run update.yml --repo ns2switch/homebrew-irmind --ref main -f tag="$GITHUB_REF_NAME"
+      attestations: read
+    uses: ./.github/workflows/release.yml

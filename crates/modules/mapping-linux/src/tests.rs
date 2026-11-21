@@ -45,7 +45,7 @@ fn bundled_tables_have_pinned_canonical_digests() {
             Box::new(HttpMapping::new().unwrap()),
         ),
     ] {
-        assert!(TableMapping::review(source).unwrap() == *mapper.manifest());
+        assert_eq!(TableMapping::review(source).unwrap(), *mapper.manifest());
     }
 }
 #[test]

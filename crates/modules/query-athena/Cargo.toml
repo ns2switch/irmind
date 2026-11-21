@@ -28,7 +28,3 @@ irmind-testkit = { path = "../../testkit", version = "0.1.0" }
 
 [lints]
 workspace = true
-
-[dependencies.irmind-calendar]
-path = "../../calendar"
-version = "0.1.0"

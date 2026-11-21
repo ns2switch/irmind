@@ -8,7 +8,7 @@ mod protocol;
 use aws_credential_types::Credentials;
 pub use compile::translate;
 use irmind_app::{
-    AppError, CancellationToken, Tool, async_trait,
+    AppError, CancellationToken, Clock, Tool, async_trait,
     source_queries::{
         AdmittedSourceQuery, CancelObservationV1, CompiledSourceQueryV1, ExecutionObservationV1,
         QueryAccounting, QueryEstimate, QueryExecutionRef, QueryPreflightV1, QueryResponsePage,
@@ -19,18 +19,20 @@ use irmind_app::{
 };
 use irmind_domain::AuthorizedCall;
 use serde_json::json;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 pub struct Athena {
     client: reqwest::Client,
     endpoint: reqwest::Url,
     source: ResolvedQuerySourceV1,
+    clock: Arc<dyn Clock>,
     limits: SourceQueryLimits,
     workgroup: String,
     credentials: Credentials,
 }
 
 impl Athena {
+    #[allow(clippy::too_many_arguments)]
     pub fn with_explicit_keys(
         source: ResolvedQuerySourceV1,
         limits: SourceQueryLimits,
@@ -39,6 +41,7 @@ impl Athena {
         secret_key: &str,
         session_token: Option<&str>,
         allow_cutoff_overrun: bool,
+        clock: Arc<dyn Clock>,
     ) -> Result<Self, AppError> {
         Self::new(
             source,
@@ -52,6 +55,7 @@ impl Athena {
                 "irmind-keyring",
             ),
             allow_cutoff_overrun,
+            clock,
         )
     }
 
@@ -63,6 +67,7 @@ impl Athena {
         dedicated_workgroup: &str,
         credentials: Credentials,
         allow_cutoff_overrun: bool,
+        clock: Arc<dyn Clock>,
     ) -> Result<Self, AppError> {
         let region = source.location();
         if !allow_cutoff_overrun {
@@ -95,6 +100,7 @@ impl Athena {
             client,
             endpoint,
             source,
+            clock,
             limits,
             workgroup: dedicated_workgroup.into(),
             credentials,
@@ -198,10 +204,7 @@ impl SourceQueryExecutor for Athena {
             // The workflow binds this compiler commitment to the complete
             // scope and reservation context when it builds the signed plan.
             plan_digest: irmind_app::hex(&irmind_app::sha256(&canonical_query_json(query)?)),
-            observed_at: QueryTime::parse(
-                &irmind_calendar::Utc::now()
-                    .to_rfc3339_opts(irmind_calendar::SecondsFormat::Secs, true),
-            )?,
+            observed_at: QueryTime::from_clock(self.clock.as_ref())?,
             accounting: QueryAccounting::ScanPriced,
             estimate: QueryEstimate {
                 unit: "billed_bytes".into(),

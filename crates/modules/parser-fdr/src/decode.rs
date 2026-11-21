@@ -94,9 +94,9 @@ impl SourceDecoder for FdrSourceDecoder {
             .unwrap_or(MAX_SOURCE)
             .min(MAX_SOURCE);
         if prefix == [0x1f, 0x8b] {
-            let compressed = crate::gzip::bounded(reader, cancel, MAX_SOURCE);
+            let compressed = crate::gzip::BoundedSourceReader::new(reader, cancel, MAX_SOURCE);
             let gzip = flate2::read::MultiGzDecoder::new(compressed);
-            let mut decoded = crate::gzip::bounded(gzip, cancel, ceiling);
+            let mut decoded = crate::gzip::BoundedSourceReader::new(gzip, cancel, ceiling);
             let mut callback_failed = false;
             let result = lines(&mut decoded, input.metadata, true, budget, &mut |record| {
                 let result = emit(record);
@@ -114,7 +114,7 @@ impl SourceDecoder for FdrSourceDecoder {
             }
             result
         } else {
-            let mut plain = crate::gzip::bounded(reader, cancel, ceiling);
+            let mut plain = crate::gzip::BoundedSourceReader::new(reader, cancel, ceiling);
             let mut callback_failed = false;
             let result = lines(&mut plain, input.metadata, false, budget, &mut |record| {
                 let result = emit(record);

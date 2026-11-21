@@ -8,7 +8,6 @@ license.workspace = true
 [dependencies]
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 irmind-app = { path = "../../app", version = "0.1.0" }
-irmind-calendar = { path = "../../calendar", version = "0.1.0" }
 irmind-domain = { path = "../../domain", version = "0.1.0" }
 irmind-http = { path = "../../http", version = "0.1.0" }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots"] }

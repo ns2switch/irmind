@@ -5,7 +5,8 @@ use super::{
 use crate::custody_manifest::mapping::{MappingBindingV1, wire};
 use crate::custody_manifest::{Reader, put};
 use crate::{
-    COMMON_DOMAIN_LOOKUP_POLICY, COMMON_EVENT_V1, EvidenceHash, ParquetArtifactV2, SOURCE_RECORD_V1,
+    COMMON_DOMAIN_LOOKUP_POLICY, COMMON_EVENT_V1, EvidenceHash, SOURCE_RECORD_V1,
+    V3PhysicalManifest,
 };
 
 const CORE_TAG: &[u8] = b"irmind-parquet-artifact-v2\0";
@@ -48,7 +49,7 @@ impl ParquetArtifactV3 {
     pub fn decode(payload: &str) -> Result<Self, DomainError> {
         let bytes = wire::decode(payload, TAG, wire::MAX_ARTIFACT)?;
         let mut r = Reader::new(&bytes[TAG.len()..]);
-        let core = ParquetArtifactV2::decode(&wire::encode(
+        let core = V3PhysicalManifest::decode(&wire::encode(
             r.bytes_limit(wire::MAX_SMALL)?,
             wire::MAX_SMALL,
         )?)?;

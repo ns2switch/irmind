@@ -1,7 +1,7 @@
 //! Organization-owned source-query settings. Secrets are resolved only from the keystore.
 use anyhow::Result;
 use irmind_app::{
-    AppError, SecretBackend, SourceMapper,
+    AppError, Clock, SecretBackend, SourceMapper,
     source_queries::{
         ResolvedQuerySourceV1, SourceQueryAllocationV1, SourceQueryError, SourceQueryExecutor,
         SourceQueryLimits, SourceQueryPageDecoder, SourceQueryPorts,
@@ -125,13 +125,17 @@ impl SourceQuerySettings {
         Ok(())
     }
 
-    pub(crate) fn build(&self, secrets: &dyn SecretBackend) -> Result<SourceQueryPorts> {
+    pub(crate) fn build(
+        &self,
+        secrets: &dyn SecretBackend,
+        clock: &Arc<dyn Clock>,
+    ) -> Result<SourceQueryPorts> {
         let mut ports = SourceQueryPorts::new().with_organization_ceiling(self.case_ceiling)?;
         for item in &self.sources {
             if !item.native.compiled() {
                 continue;
             }
-            let implementation = match item.implementation(secrets) {
+            let implementation = match item.implementation(secrets, clock) {
                 Ok(implementation) => implementation,
                 Err(AppError::SecretMissing) => continue,
                 Err(error) => return Err(error.into()),
@@ -203,6 +207,7 @@ impl ConfiguredQuerySource {
         subscription: &str,
         resource_group: &str,
         workspace_name: &str,
+        clock: &Arc<dyn Clock>,
     ) -> Result<QueryImplementation, AppError> {
         use irmind_app::SourceDecoder as _;
         use secrecy::ExposeSecret as _;
@@ -227,6 +232,7 @@ impl ConfiguredQuerySource {
             subscription,
             resource_group,
             workspace_name,
+            clock.clone(),
         )?;
         Ok(QueryImplementation {
             executor: Arc::new(exec),
@@ -241,7 +247,11 @@ impl ConfiguredQuerySource {
         })
     }
 
-    fn implementation(&self, secrets: &dyn SecretBackend) -> Result<QueryImplementation, AppError> {
+    fn implementation(
+        &self,
+        secrets: &dyn SecretBackend,
+        clock: &Arc<dyn Clock>,
+    ) -> Result<QueryImplementation, AppError> {
         match &self.native {
             #[cfg(feature = "query-athena")]
             Native::Athena {
@@ -264,6 +274,7 @@ impl ConfiguredQuerySource {
                     secret.expose_secret(),
                     session.as_ref().map(secrecy::ExposeSecret::expose_secret),
                     *allow_cutoff_overrun,
+                    clock.clone(),
                 )?;
                 Ok(QueryImplementation {
                     executor: Arc::new(exec),
@@ -282,6 +293,7 @@ impl ConfiguredQuerySource {
                     &secrets.get(&storage_credential_name(
                         &self.credential("service-account-json"),
                     ))?,
+                    clock.clone(),
                 )?;
                 Ok(QueryImplementation {
                     executor: Arc::new(exec),
@@ -297,10 +309,16 @@ impl ConfiguredQuerySource {
                 subscription,
                 resource_group,
                 workspace_name,
-            } => self.azure_implementation(secrets, subscription, resource_group, workspace_name),
+            } => self.azure_implementation(
+                secrets,
+                subscription,
+                resource_group,
+                workspace_name,
+                clock,
+            ),
             #[allow(unreachable_patterns)]
             _ => {
-                let _ = secrets;
+                let _ = (secrets, clock);
                 Err(SourceQueryError::Unavailable.into())
             }
         }

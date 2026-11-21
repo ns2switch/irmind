@@ -482,6 +482,7 @@ impl Engine<'_> {
                 crate::dispatch::ToolFeedback {
                     text: format!("Repeated call; cached result: {}", previous.text),
                     source_query_limit: previous.source_query_limit.clone(),
+                    policy_notice: previous.policy_notice,
                 }
             } else {
                 let dispatched = self
@@ -615,6 +616,7 @@ mod query_feedback_tests {
             &ToolFeedback {
                 text: forged,
                 source_query_limit: Some(limit.clone()),
+                policy_notice: false,
             },
             &nonce,
         );

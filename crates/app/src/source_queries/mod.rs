@@ -6,6 +6,7 @@ pub use budget::SourceQueryBudgetStatus;
 mod broker;
 mod canonical;
 mod capture;
+mod capture_rows;
 mod compile;
 mod completion;
 mod export;
@@ -28,6 +29,7 @@ pub use capture::{
     CaptureColumn, CaptureError, CapturePageCompleteness, CapturePageMetadata, QueryCapturePage,
     QueryCaptureSummary, QueryCaptureWriter, read_query_capture_pages, verify_query_capture,
 };
+pub use capture_rows::{QueryCaptureRows, decode_query_capture, read_query_json_page};
 pub use compile::*;
 pub use completion::{
     SignedSourceQuerySettlement, SourceQueryExecutionV1, SourceQueryLimitNotice,
@@ -98,11 +100,6 @@ pub enum SourceQueryError {
     Unavailable,
     #[error("source-query frequency or concurrency quota reached for this provider resource")]
     DispatchQuota,
-}
-impl From<SourceQueryError> for crate::AppError {
-    fn from(value: SourceQueryError) -> Self {
-        Self::Policy(value.to_string())
-    }
 }
 
 /// Collect notices only after authenticating the case chain and query journal.

@@ -53,8 +53,8 @@ impl CaseRuntime<'_, '_, '_> {
             self.state.entries.last().map_or(0, |entry| entry.seq);
         let engine = self.engine;
         let id = self.id;
-        self.start_task("Cloud objects", move |cancel| {
-            engine.request_tool_as_analyst(id, proposal, &cancel)
+        self.start_tool_task("Cloud objects", move |cancel| {
+            engine.request_tool_as_analyst_outcome(id, proposal, &cancel)
         });
         true
     }
@@ -123,8 +123,8 @@ impl CaseRuntime<'_, '_, '_> {
         }
         let engine = self.engine;
         let id = self.id;
-        self.start_task("Cloud object", move |cancel| {
-            engine.request_tool_as_analyst(id, proposal, &cancel)
+        self.start_tool_task("Cloud object", move |cancel| {
+            engine.request_tool_as_analyst_outcome(id, proposal, &cancel)
         });
         true
     }
@@ -201,14 +201,12 @@ fn read_proposal(source: &str, from: &str, to: &str, item: &ObjectEntry) -> Opti
     ]);
     if let Some(version) = &item.version {
         args.insert("version".into(), version.clone());
-    } else if let Some(etag) = item
-        .provider_checksum
-        .as_deref()
-        .and_then(|value| value.strip_prefix("etag:"))
-    {
-        args.insert("etag".into(), etag.into());
     } else {
-        return None;
+        let etag = item
+            .provider_checksum
+            .as_deref()
+            .and_then(|value| value.strip_prefix("etag:"))?;
+        args.insert("etag".into(), etag.into());
     }
     Some(ProposedCall {
         tool: Tool::ObjectRead,

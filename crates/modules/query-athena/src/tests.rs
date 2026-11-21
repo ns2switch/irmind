@@ -21,6 +21,7 @@ fn fixture(server: &MockServer) -> (Athena, Value) {
         "irmind_lab",
         Credentials::new("AKIDSYNTHETIC", "synthetic-secret", None, None, "synthetic"),
         true,
+        Arc::new(irmind_infra::SystemClock),
     )
     .unwrap();
     executor.endpoint = reqwest::Url::parse(server.origin()).unwrap();
@@ -172,7 +173,7 @@ async fn source_ip_and_account_filters_bind_without_widening_the_adopted_scope()
     let other_account = serde_json::from_value(plan["query"].clone()).unwrap();
     assert!(matches!(
         executor.compile(&executor.source, &other_account),
-        Err(AppError::Policy(_))
+        Err(AppError::SourceQuery(SourceQueryError::Scope))
     ));
     plan["query"]["filters"][1]["value"] = json!("2001:db8::9') OR ('x'='x");
     assert!(serde_json::from_value::<SourceQueryV1>(plan["query"].clone()).is_err());

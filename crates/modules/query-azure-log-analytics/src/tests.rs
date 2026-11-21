@@ -44,6 +44,7 @@ fn fixture(server: &MockServer) -> (AzureLogAnalytics, CompiledSourceQueryV1) {
         "41111111-2222-4333-8444-555555555555",
         "synthetic-rg",
         "synthetic-workspace",
+        Arc::new(irmind_infra::SystemClock),
     )
     .unwrap();
     let base = reqwest::Url::parse(server.origin()).unwrap();

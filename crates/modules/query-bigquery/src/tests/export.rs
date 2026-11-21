@@ -63,8 +63,13 @@ fn connect(
         "type":"service_account","client_email":"synthetic-export@gcp-test.iam.gserviceaccount.com",
         "private_key":KEY,"token_uri":"https://oauth2.googleapis.com/token"
     }).to_string());
-    let mut executor =
-        BigQuery::with_service_account(source.clone(), limits.clone(), &account).unwrap();
+    let mut executor = BigQuery::with_service_account(
+        source.clone(),
+        limits.clone(),
+        &account,
+        Arc::new(irmind_infra::SystemClock),
+    )
+    .unwrap();
     executor.endpoint = reqwest::Url::parse(server.origin())
         .unwrap()
         .join("bigquery/v2/")

@@ -15,8 +15,8 @@ impl CaseRuntime<'_, '_, '_> {
         };
         let engine = self.engine;
         let id = self.id;
-        self.start_task("SIEM alert", move |cancel| {
-            engine.request_tool_as_analyst(id, proposal, &cancel)
+        self.start_tool_task("SIEM alert", move |cancel| {
+            engine.request_tool_as_analyst_outcome(id, proposal, &cancel)
         });
         true
     }

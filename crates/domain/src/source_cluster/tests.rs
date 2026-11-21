@@ -143,7 +143,10 @@ fn signed_source_and_record_set_bind_context_without_changing_absent_encoding() 
         set.encode().unwrap(),
         include_str!("source-set-v1.hex").trim()
     );
-    assert!(crate::SourceRecordSetV1::decode(&set.encode().unwrap()).unwrap() == set);
+    assert_eq!(
+        crate::SourceRecordSetV1::decode(&set.encode().unwrap()).unwrap(),
+        set
+    );
     set.validate_manifest(&manifest).unwrap();
     manifest.cluster_context = None;
     assert!(set.validate_manifest(&manifest).is_err());

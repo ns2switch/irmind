@@ -13,7 +13,7 @@ fn typed_common_payload_and_new_envelopes_are_feature_independent() {
         include_str!("../../../domain/tests/fixtures/common-artifact-coobservations-v2.hex"),
     ] {
         assert_eq!(
-            irmind_domain::ParquetArtifactV2::decode(wire.trim())
+            irmind_domain::V3PhysicalManifest::decode(wire.trim())
                 .unwrap()
                 .encode()
                 .unwrap(),

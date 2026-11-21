@@ -12,9 +12,24 @@ use crate::{
     remote_tool_error, sha256,
 };
 
+/// A completed tool result or a policy response to an analyst request.
+pub enum AnalystToolOutcome {
+    Result(String),
+    PolicyNotice(String),
+}
+
+impl AnalystToolOutcome {
+    pub fn into_text(self) -> String {
+        match self {
+            Self::Result(text) | Self::PolicyNotice(text) => text,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub(crate) struct ToolFeedback {
     pub(crate) text: String,
+    pub(crate) policy_notice: bool,
     pub(crate) source_query_limit: Option<crate::source_queries::SourceQueryLimitNotice>,
 }
 
@@ -23,12 +38,22 @@ impl From<String> for ToolFeedback {
         Self {
             text,
             source_query_limit: None,
+            policy_notice: false,
         }
     }
 }
 impl From<&str> for ToolFeedback {
     fn from(text: &str) -> Self {
         text.to_owned().into()
+    }
+}
+
+impl ToolFeedback {
+    fn policy_notice(text: String) -> Self {
+        Self {
+            policy_notice: true,
+            ..text.into()
+        }
     }
 }
 
@@ -42,12 +67,32 @@ impl Engine<'_> {
         crate::run_async(self.request_tool_as_analyst_cancelable(id, proposal, cancel))
     }
 
+    pub fn request_tool_as_analyst_outcome(
+        &self,
+        id: &CaseId,
+        proposal: ProposedCall,
+        cancel: &CancellationToken,
+    ) -> Result<AnalystToolOutcome, AppError> {
+        crate::run_async(self.request_tool_as_analyst_outcome_cancelable(id, proposal, cancel))
+    }
+
     pub async fn request_tool_as_analyst_cancelable(
         &self,
         id: &CaseId,
         proposal: ProposedCall,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
+        self.request_tool_as_analyst_outcome_cancelable(id, proposal, cancel)
+            .await
+            .map(AnalystToolOutcome::into_text)
+    }
+
+    async fn request_tool_as_analyst_outcome_cancelable(
+        &self,
+        id: &CaseId,
+        proposal: ProposedCall,
+        cancel: &CancellationToken,
+    ) -> Result<AnalystToolOutcome, AppError> {
         if self.mode != irmind_domain::ExecutionMode::Attended
             || self.signer.actor() != irmind_domain::Actor::Analyst
         {
@@ -79,11 +124,15 @@ impl Engine<'_> {
         self.execute_proposal_from_origin(&case, proposal, crate::AuditOrigin::Analyst, cancel)
             .await
             .map(|feedback| {
-                if let Some(notice) = feedback.source_query_limit {
+                if feedback.policy_notice {
+                    return AnalystToolOutcome::PolicyNotice(feedback.text);
+                }
+                let result = if let Some(notice) = feedback.source_query_limit {
                     format!("{}\n{}", notice.message(), feedback.text)
                 } else {
                     feedback.text
-                }
+                };
+                AnalystToolOutcome::Result(result)
             })
     }
 
@@ -120,17 +169,16 @@ impl Engine<'_> {
                     let owned = id.clone();
                     return self
                         .blocking_local(move |local| {
-                            Ok(format!(
+                            Ok(ToolFeedback::policy_notice(format!(
                                 "denied: {reason}. {}",
                                 local
                                     .case_budget_unlocked(&owned)?
                                     .notice("case tool call limit")
-                            )
-                            .into())
+                            )))
                         })
                         .await;
                 }
-                Ok(format!("denied: {reason}").into())
+                Ok(ToolFeedback::policy_notice(format!("denied: {reason}")))
             }
             Decision::NeedsApproval(pending) => {
                 if let Some(reason) = self.pending_unavailable_reason(&pending) {
@@ -142,14 +190,16 @@ impl Engine<'_> {
                         None,
                     )
                     .await?;
-                    return Ok(format!("denied: {reason}").into());
+                    return Ok(ToolFeedback::policy_notice(format!("denied: {reason}")));
                 }
                 let id_owned = id.clone();
                 let mode = self.mode;
                 let challenge_id = self
                     .blocking_local(move |local| local.audit_pending(&id_owned, &pending, mode))
                     .await?;
-                Ok(format!("approval pending: {challenge_id}; request was not executed").into())
+                Ok(ToolFeedback::policy_notice(format!(
+                    "approval pending: {challenge_id}; request was not executed"
+                )))
             }
             Decision::Allow(call) => {
                 if let Some(reason) = self.unavailable_reason(&call) {
@@ -161,7 +211,7 @@ impl Engine<'_> {
                         None,
                     )
                     .await?;
-                    return Ok(format!("denied: {reason}").into());
+                    return Ok(ToolFeedback::policy_notice(format!("denied: {reason}")));
                 }
                 let (screened, hash) = self.execute_authorized(id, &call, false, cancel).await?;
                 let source_query_limit = self
@@ -169,6 +219,7 @@ impl Engine<'_> {
                     .await?;
                 Ok(ToolFeedback {
                     text: screened,
+                    policy_notice: false,
                     source_query_limit,
                 })
             }

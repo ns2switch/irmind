@@ -49,6 +49,7 @@ pub use common_event::{
 mod custody;
 mod diagnostics;
 mod dispatch;
+pub use dispatch::AnalystToolOutcome;
 mod engine;
 pub use adapter_storage_errors::AdapterStorageError;
 mod adapter_signature_errors;

@@ -2,20 +2,20 @@ use super::{DecodedSourceCommitmentV1, MappingError, MappingManifest};
 use crate::AppError;
 use irmind_domain::{
     ArtifactPipelineV1, COMMON_EVENT_BUILDER, EvidenceHash, MappingBindingV1, MappingIdentityV1,
-    MappingInputRefV1, MappingProfileV1, MappingRunV1, MappingSnapshotV1, ParquetArtifactV2,
-    ParquetArtifactV3, SourceManifestV2, SourceRecordSetV1,
+    MappingInputRefV1, MappingProfileV1, MappingRunV1, MappingSnapshotV1, ParquetArtifactV3,
+    SourceManifestV2, SourceRecordSetV1, V3PhysicalManifest,
 };
 
 /// Unsigned physical output. It is not a historical V2 custody envelope.
 #[derive(Clone)]
 pub struct MappedArtifactProjection {
-    physical: ParquetArtifactV2,
+    physical: V3PhysicalManifest,
     mapping: Option<MappingIdentityV1>,
     rows: u64,
 }
 impl MappedArtifactProjection {
     pub fn try_new(
-        physical: ParquetArtifactV2,
+        physical: V3PhysicalManifest,
         mapping: Option<MappingIdentityV1>,
         rows: u64,
     ) -> Result<Self, AppError> {
@@ -36,7 +36,7 @@ impl MappedArtifactProjection {
             rows,
         })
     }
-    pub const fn physical(&self) -> &ParquetArtifactV2 {
+    pub const fn physical(&self) -> &V3PhysicalManifest {
         &self.physical
     }
     pub const fn mapping(&self) -> Option<&MappingIdentityV1> {

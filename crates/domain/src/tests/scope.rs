@@ -244,7 +244,10 @@ fn remote_scope_requires_explicit_source_target_and_bounded_window() {
         "2026-10-23T12:00:00Z",
         "2026-10-23T13:00:00Z"
     ));
-    assert!(CaseScope::parse("analyst note").unwrap() == CaseScope::LocalOnly);
+    assert_eq!(
+        CaseScope::parse("analyst note").unwrap(),
+        CaseScope::LocalOnly
+    );
     assert!(
         CaseScope::parse(
             "v1;sources=a;accounts=b;hosts=;from=2026-02-30T00:00:00Z;to=2026-03-01T00:00:00Z"

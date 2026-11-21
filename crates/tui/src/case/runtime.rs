@@ -9,6 +9,7 @@ use super::{
     mpsc, seal_confirmation,
 };
 use crossterm::event::KeyEventKind;
+use irmind_app::AnalystToolOutcome;
 
 pub(super) struct CaseRuntime<'scope, 'env, 'ports> {
     pub terminal: &'env mut Terminal<CrosstermBackend<io::Stdout>>,
@@ -286,7 +287,9 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
         Ok(())
     }
 
-    fn finish_success(&mut self, label: &'static str, text: String) -> Result<()> {
+    fn finish_success(&mut self, label: &'static str, outcome: AnalystToolOutcome) -> Result<()> {
+        let is_policy_notice = matches!(outcome, AnalystToolOutcome::PolicyNotice(_));
+        let text = outcome.into_text();
         let text = if label == "Ingest" && self.io_ops.demo_mode() {
             super::demo_ingest_result(self.engine, self.id, 1)?
         } else {
@@ -315,10 +318,7 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
             );
         }
         if should_show_completion(label) {
-            if is_result_card_label(label)
-                && !text.starts_with("approval pending:")
-                && !text.starts_with("denied:")
-            {
+            if is_result_card_label(label) && !is_policy_notice {
                 self.state.result_cards.push((label, text));
             } else {
                 update(
@@ -420,6 +420,17 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
     pub(super) fn start_task<F>(&mut self, label: &'static str, work: F)
     where
         F: FnOnce(CancellationToken) -> Result<String, irmind_app::AppError> + Send + 'scope,
+    {
+        self.start_tool_task(label, move |cancel| {
+            work(cancel).map(AnalystToolOutcome::Result)
+        });
+    }
+
+    pub(super) fn start_tool_task<F>(&mut self, label: &'static str, work: F)
+    where
+        F: FnOnce(CancellationToken) -> Result<AnalystToolOutcome, irmind_app::AppError>
+            + Send
+            + 'scope,
     {
         let cancel = self.shutdown.child_token();
         let worker_cancel = cancel.clone();

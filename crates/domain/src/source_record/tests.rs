@@ -184,7 +184,7 @@ fn cluster_metadata_changes_the_record_commitment_but_not_original_fields_or_tai
         .clone()
         .with_cluster_identity(identity.clone())
         .unwrap();
-    assert!(tagged.fields() == original.fields());
+    assert_eq!(tagged.fields(), original.fields());
     assert_eq!(tagged.origin(), original.origin());
     assert_ne!(canonical(&tagged), canonical(&original));
     assert!(tagged.retained_bytes() > original.retained_bytes());
@@ -193,5 +193,5 @@ fn cluster_metadata_changes_the_record_commitment_but_not_original_fields_or_tai
         .with_cluster_identity(identity)
         .unwrap();
     assert_eq!(tainted.provenance(), &provenance);
-    tainted.inspect(|source| assert!(source.fields() == tagged.fields()));
+    tainted.inspect(|source| assert_eq!(source.fields(), tagged.fields()));
 }

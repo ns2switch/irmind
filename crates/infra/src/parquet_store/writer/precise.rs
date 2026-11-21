@@ -6,7 +6,7 @@ use super::{
 };
 use arrow_array::{BooleanArray, TimestampMicrosecondArray, UInt8Array, UInt16Array};
 use arrow_schema::Schema;
-use irmind_domain::{ARTIFACT_V2_STABLE_ORDER, ARTIFACT_V2_TIME_SEMANTICS, ParquetArtifactV2};
+use irmind_domain::{ARTIFACT_V2_STABLE_ORDER, ARTIFACT_V2_TIME_SEMANTICS, V3PhysicalManifest};
 
 #[cfg(test)]
 impl RecordRow {
@@ -202,8 +202,8 @@ pub(super) fn manifest(
     parser: irmind_app::ParserIdentity<'_>,
     size: u64,
     digest: &[u8; 32],
-) -> Result<ParquetArtifactV2, AppError> {
-    Ok(ParquetArtifactV2 {
+) -> Result<V3PhysicalManifest, AppError> {
+    Ok(V3PhysicalManifest {
         path: sink.relative_path.clone(),
         size,
         sha256: EvidenceHash::from_bytes(*digest),

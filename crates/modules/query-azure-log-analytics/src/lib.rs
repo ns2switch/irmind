@@ -8,7 +8,7 @@ mod protocol;
 mod tests;
 
 use irmind_app::{
-    AppError, CancellationToken, Tool, async_trait,
+    AppError, CancellationToken, Clock, Tool, async_trait,
     source_queries::{
         AdmittedSourceQuery, CancelObservationV1, CompiledSourceQueryV1, ExecutionObservationV1,
         QueryAccounting, QueryEstimate, QueryExecutionRef, QueryExecutionStatus, QueryPreflightV1,
@@ -20,7 +20,11 @@ use irmind_app::{
 use irmind_domain::AuthorizedCall;
 use secrecy::{ExposeSecret as _, SecretString};
 use serde_json::json;
-use std::{collections::BTreeMap, sync::Mutex, time::Duration};
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 struct ReadyResponse {
     reference: QueryExecutionRef,
@@ -35,6 +39,7 @@ pub struct AzureLogAnalytics {
     arm: reqwest::Url,
     logs: reqwest::Url,
     source: ResolvedQuerySourceV1,
+    clock: Arc<dyn Clock>,
     limits: SourceQueryLimits,
     table_path: String,
     client_id: String,
@@ -53,6 +58,7 @@ impl AzureLogAnalytics {
         subscription: &str,
         resource_group: &str,
         workspace_name: &str,
+        clock: Arc<dyn Clock>,
     ) -> Result<Self, AppError> {
         limits.validate()?;
         if source.module() != compiler::MODULE
@@ -91,6 +97,7 @@ impl AzureLogAnalytics {
             arm: parse("https://management.azure.com/")?,
             logs: parse("https://api.loganalytics.azure.com/v1/")?,
             source,
+            clock,
             limits,
             table_path,
             client_id: client_id.into(),
@@ -151,10 +158,7 @@ impl SourceQueryExecutor for AzureLogAnalytics {
         let metadata = self.analytics_plan(cancel).await?;
         Ok(QueryPreflightV1 {
             plan_digest: irmind_app::hex(&irmind_app::sha256(&canonical_query_json(compiled)?)),
-            observed_at: QueryTime::parse(
-                &irmind_calendar::Utc::now()
-                    .to_rfc3339_opts(irmind_calendar::SecondsFormat::Secs, true),
-            )?,
+            observed_at: QueryTime::from_clock(self.clock.as_ref())?,
             accounting: QueryAccounting::AnalyticsNoQueryCharge,
             estimate: QueryEstimate {
                 unit: "scanned_bytes".into(),

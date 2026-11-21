@@ -33,9 +33,9 @@ pub(super) fn preflight(
 }
 
 fn count_gzip(reader: impl Read, cancel: &CancellationToken) -> Result<u64, AppError> {
-    let compressed = gzip::bounded(reader, cancel, MAX_SOURCE);
+    let compressed = gzip::BoundedSourceReader::new(reader, cancel, MAX_SOURCE);
     let gzip = flate2::read::MultiGzDecoder::new(compressed);
-    let mut reader = gzip::bounded(gzip, cancel, MAX_SOURCE);
+    let mut reader = gzip::BoundedSourceReader::new(gzip, cancel, MAX_SOURCE);
     // Reused for every member and every read, regardless of decoded size.
     let mut buffer = [0; COUNT_BUFFER_BYTES];
     let mut bytes = 0u64;

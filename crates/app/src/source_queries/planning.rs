@@ -197,10 +197,7 @@ impl Engine<'_> {
     }
 
     pub(super) fn query_now(&self) -> Result<QueryTime, AppError> {
-        let index =
-            irmind_domain::IndexedTime::from_epoch_decimal(&self.clock.now()?.to_string(), false)
-                .map_err(|_| SourceQueryError::Invalid)?;
-        Ok(QueryTime::parse(&index.to_rfc3339())?)
+        QueryTime::from_clock(self.clock.as_ref())
     }
 }
 

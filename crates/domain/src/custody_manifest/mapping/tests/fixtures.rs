@@ -2,7 +2,7 @@ use super::super::*;
 use crate::{
     ARTIFACT_V2_MAX_DATE_TUPLES, ARTIFACT_V2_PARTITION_POLICY, ARTIFACT_V2_SCOPE_KEYS,
     ARTIFACT_V2_STABLE_ORDER, ARTIFACT_V2_TIME_SEMANTICS, ArtifactPartitionV2, ArtifactSchemaV2,
-    COMMON_EVENT_BUILDER, ParquetArtifactV2,
+    COMMON_EVENT_BUILDER, V3PhysicalManifest,
 };
 
 pub(super) fn hash(letter: char) -> EvidenceHash {
@@ -28,7 +28,7 @@ pub(super) fn mapped(
         source.decoder().clone(),
         Some(snapshot.mapping().clone()),
     );
-    let core = ParquetArtifactV2 {
+    let core = V3PhysicalManifest {
         path: format!("date=2026-01-02/part-{part}.parquet"),
         size: 100,
         sha256: hash(physical),

@@ -275,7 +275,7 @@ fn prepared_outputs_bind_only_after_complete_source_manifest_and_row_accounting(
     use irmind_domain::{
         ARTIFACT_V2_MAX_DATE_TUPLES, ARTIFACT_V2_PARTITION_POLICY, ARTIFACT_V2_SCOPE_KEYS,
         ARTIFACT_V2_STABLE_ORDER, ARTIFACT_V2_TIME_SEMANTICS, ArtifactPartitionV2,
-        ArtifactSchemaV2, COMMON_EVENT_BUILDER, ParquetArtifactV2,
+        ArtifactSchemaV2, COMMON_EVENT_BUILDER, V3PhysicalManifest,
     };
     let source = SourceReferenceV1::file("logs/record.json").unwrap();
     let cancel = CancellationToken::new();
@@ -304,7 +304,7 @@ fn prepared_outputs_bind_only_after_complete_source_manifest_and_row_accounting(
         rejected_records: 0,
         rejected_sample: vec![],
     };
-    let core = ParquetArtifactV2 {
+    let core = V3PhysicalManifest {
         path: "date=unknown/part.parquet".into(),
         size: 123,
         sha256: EvidenceHash::from_bytes([8; 32]),

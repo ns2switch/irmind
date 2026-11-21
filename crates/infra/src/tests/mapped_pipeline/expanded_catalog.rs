@@ -165,7 +165,7 @@ fn expanded_catalog_groups_and_artifacts_are_identical_with_one_or_many_workers(
             .unwrap();
         (profiles, files, fs::read(export).unwrap())
     };
-    assert!(run(1, &paths) == run(256, &reversed));
+    assert_eq!(run(1, &paths), run(256, &reversed));
 }
 
 fn write_disordered_sources(originals: &Path) -> Vec<String> {

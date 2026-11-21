@@ -50,7 +50,7 @@ pub(super) use row::RecordRow;
 pub(super) struct StagedArtifact {
     pub rows: Option<u64>,
     pub temporary: PathBuf,
-    pub manifest: irmind_domain::ParquetArtifactV2,
+    pub manifest: irmind_domain::V3PhysicalManifest,
 }
 
 pub(super) struct ArtifactSink {

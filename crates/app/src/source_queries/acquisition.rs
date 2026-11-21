@@ -259,9 +259,7 @@ impl Engine<'_> {
             let (bytes, token) = match transferred {
                 Ok(value) => value,
                 Err(AppError::Cancelled) => return Err(AppError::Cancelled),
-                Err(AppError::Policy(reason))
-                    if reason == SourceQueryError::Limit.to_string() && cursor.ordinal() > 0 =>
-                {
+                Err(AppError::SourceQuery(SourceQueryError::Limit)) if cursor.ordinal() > 0 => {
                     local_limit = true;
                     break;
                 }
@@ -282,9 +280,7 @@ impl Engine<'_> {
                 cancel,
             ) {
                 Ok(token) => token,
-                Err(AppError::Policy(reason))
-                    if reason == SourceQueryError::Limit.to_string() && cursor.ordinal() > 0 =>
-                {
+                Err(AppError::SourceQuery(SourceQueryError::Limit)) if cursor.ordinal() > 0 => {
                     local_limit = true;
                     break;
                 }
