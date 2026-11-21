@@ -287,7 +287,8 @@ mod tests {
                 }
             }
         }
-        assert_eq!(specs.len(), 23);
+        assert_eq!(specs.len(), 24);
+        assert!(names.contains(Tool::SourceQuery.as_str()));
     }
 
     #[test]
