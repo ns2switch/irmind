@@ -1,6 +1,33 @@
 use super::CaseRuntime;
 
 impl CaseRuntime<'_, '_, '_> {
+    pub(super) fn show_source_query_budget(&mut self) {
+        let status = match self.engine.source_query_budget(self.id, self.shutdown) {
+            Ok(status) if status.revision != 0 || status.organization.is_some() => status,
+            Ok(_) => return,
+            Err(error) => {
+                self.state.messages.push(error.to_string());
+                return;
+            }
+        };
+        let allocation = status.allocation;
+        if !allocation.enabled {
+            self.state
+                .messages
+                .push("Source queries are disabled for this case.".into());
+            return;
+        }
+        let scan_cap = allocation
+            .scan_bytes
+            .map_or_else(|| "unallocated".into(), |cap| cap.to_string());
+        self.state.messages.push(format!(
+            "Source queries\nBilled scan bytes · {} used · {} reserved · {scan_cap} allocated\nRetained rows · {} used · {} reserved · {} allocated\nRetained bytes · {} used · {} reserved · {} allocated",
+            status.used.scan_bytes, status.held.scan_bytes,
+            status.used.retained_rows, status.held.retained_rows, allocation.retained_rows,
+            status.used.retained_bytes, status.held.retained_bytes, allocation.retained_bytes,
+        ));
+    }
+
     pub(super) fn source_query_command(&mut self, prompt: &str) -> bool {
         let Some(args) = prompt.strip_prefix("/source-query") else {
             return false;

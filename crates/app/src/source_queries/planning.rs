@@ -123,6 +123,7 @@ impl Engine<'_> {
     ) -> Result<(String, u64), AppError> {
         let scope = self.live_query_scope(call, binding, query, cancel)?;
         let entries = self.audit_log.entries(call.case_id())?;
+        self.check_live_query_allocation(&entries)?;
         let journal = super::SourceQueryJournal::replay(
             &entries,
             operations,
