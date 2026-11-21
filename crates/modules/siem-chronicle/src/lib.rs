@@ -12,7 +12,7 @@ use irmind_app::{
     modules::{Module, ModuleConfig, ModuleManifest, ModuleRegistry},
 };
 use irmind_domain::{AuthorizedCall, Tool};
-use secrecy::ExposeSecret as _;
+use irmind_http::google_auth::{GoogleAccessToken, GoogleApi};
 pub use source::ChronicleSourceDecoder;
 
 pub struct Chronicle {
@@ -121,9 +121,7 @@ impl Chronicle {
             .credentials
             .token(&self.client, &self.token_endpoint, cancel)
             .await?;
-        let raw = self
-            .read(endpoint, token.expose_secret(), 5_000_000, cancel)
-            .await?;
+        let raw = self.read(endpoint, &token, 5_000_000, cancel).await?;
         response::validate(&raw, call)?;
         Ok(raw)
     }
@@ -138,14 +136,17 @@ impl Chronicle {
     async fn read(
         &self,
         endpoint: reqwest::Url,
-        token: &str,
+        token: &GoogleAccessToken,
         limit: usize,
         cancel: &CancellationToken,
     ) -> Result<Vec<u8>, AppError> {
+        let request = token
+            .authorize(GoogleApi::Chronicle, self.client.get(endpoint))
+            .map_err(|_| AppError::RemoteTool)?;
         let response = tokio::select! {
             biased;
             () = cancel.cancelled() => return Err(AppError::Cancelled),
-            response = self.client.get(endpoint).bearer_auth(token).send() => response.map_err(|_| AppError::RemoteTool)?,
+            response = request.send() => response.map_err(|_| AppError::RemoteTool)?,
         };
         if !response.status().is_success() {
             return Err(AppError::RemoteTool);

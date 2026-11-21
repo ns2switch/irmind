@@ -1,6 +1,7 @@
 use super::*;
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use irmind_testkit::{MockResponse, MockServer};
+use secrecy::ExposeSecret as _;
 use secrecy::SecretString;
 use serde_json::{Value, json};
 const RESPONSE: &str = r#"{"events":[],"moreDataAvailable":false}"#;
@@ -165,13 +166,22 @@ fn token_cache_is_memory_only_and_errors_do_not_leak_authentication_data() {
     runtime.block_on(async {
         let cancel = CancellationToken::new();
         for _ in 0..2 {
-            assert_eq!(
-                credentials
-                    .token(&client, &endpoint, &cancel)
-                    .await
-                    .unwrap()
-                    .expose_secret(),
-                "synthetic-token"
+            let token = credentials
+                .token(&client, &endpoint, &cancel)
+                .await
+                .unwrap();
+            let request = token
+                .authorize(GoogleApi::Chronicle, client.get(endpoint.clone()))
+                .unwrap()
+                .build()
+                .unwrap();
+            assert_eq!(request.headers()["authorization"], "Bearer synthetic-token");
+            assert!(request.headers()["authorization"].is_sensitive());
+            assert!(!format!("{token:?} {request:?}").contains("synthetic-token"));
+            assert!(
+                token
+                    .authorize(GoogleApi::BigQuery, client.get(endpoint.clone()))
+                    .is_err()
             );
         }
     });

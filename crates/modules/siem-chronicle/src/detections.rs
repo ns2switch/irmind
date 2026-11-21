@@ -1,7 +1,6 @@
 //! Documented legacySearchDetections: server window and explicit instance namespace.
 use super::{AppError, CancellationToken, Chronicle, invalid_query};
 use irmind_domain::{AuthorizedCall, IndexedTime, UtcTimestamp};
-use secrecy::ExposeSecret as _;
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
 const MAX_BYTES: usize = 5_000_000;
@@ -79,7 +78,7 @@ impl Chronicle {
         for _ in 0..MAX_PAGES {
             let url = self.detection_url(rule, &from, &to, &scan.next)?;
             let raw = self
-                .read(url, token.expose_secret(), MAX_BYTES - scan.bytes, cancel)
+                .read(url, &token, MAX_BYTES - scan.bytes, cancel)
                 .await?;
             scan.bytes += raw.len();
             scan.accept(Page::parse(&raw)?, id, &from, &to)?;

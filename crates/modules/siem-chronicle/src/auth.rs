@@ -1,6 +1,8 @@
 //! Chronicle's fixed OAuth scope and public error mapping.
 use crate::{AppError, CancellationToken, invalid_config};
-use irmind_http::google_auth::{GoogleApi, GoogleAuthError, GoogleServiceAccount};
+use irmind_http::google_auth::{
+    GoogleAccessToken, GoogleApi, GoogleAuthError, GoogleServiceAccount,
+};
 use secrecy::SecretString;
 
 pub(super) struct Credentials(GoogleServiceAccount);
@@ -17,7 +19,7 @@ impl Credentials {
         client: &reqwest::Client,
         endpoint: &reqwest::Url,
         cancel: &CancellationToken,
-    ) -> Result<SecretString, AppError> {
+    ) -> Result<GoogleAccessToken, AppError> {
         self.0
             .token(client, endpoint, cancel)
             .await
