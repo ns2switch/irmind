@@ -93,4 +93,51 @@ mod tests {
         assert!(!output.contains("synthetic-secret"));
         assert!(!output.contains("remote_dependency"));
     }
+
+    #[cfg(feature = "query-bigquery")]
+    #[test]
+    fn google_credentials_and_assertion_are_redacted_in_diagnostics() {
+        use irmind_http::google_auth::{GoogleApi, GoogleServiceAccount};
+        use secrecy::{ExposeSecret as _, SecretString};
+
+        let pem = include_str!(
+            "../../modules/siem-chronicle/tests/fixtures/synthetic-service-account.pem"
+        );
+        let config = |key: &str| {
+            SecretString::from(
+                serde_json::json!({
+                    "type": "service_account",
+                    "client_email": "synthetic@fixture.iam.gserviceaccount.com",
+                    "private_key": key,
+                    "token_uri": "https://oauth2.googleapis.com/token"
+                })
+                .to_string(),
+            )
+        };
+        let credentials = GoogleServiceAccount::new(&config(pem), GoogleApi::BigQuery).unwrap();
+        let assertion = credentials.assertion(1_794_960_000).unwrap();
+        let error = GoogleServiceAccount::new(
+            &config("synthetic-invalid-private-material"),
+            GoogleApi::BigQuery,
+        )
+        .err()
+        .unwrap();
+        let buffer = Arc::new(Mutex::new(Vec::new()));
+        let captured = Arc::clone(&buffer);
+        let layer = tracing_subscriber::fmt::layer()
+            .with_writer(move || BufferWriter(Arc::clone(&captured)))
+            .with_filter(tracing_subscriber::filter::filter_fn(operational_target));
+        tracing::subscriber::with_default(tracing_subscriber::registry().with(layer), || {
+            tracing::info!(target: "irmind::operations", ?assertion, ?error, "synthetic credential diagnostics");
+        });
+        let output = String::from_utf8(buffer.lock().unwrap().clone()).unwrap();
+        assert!(output.contains("synthetic credential diagnostics"));
+        for secret in [
+            pem.lines().nth(1).unwrap(),
+            assertion.expose_secret(),
+            "synthetic-invalid-private-material",
+        ] {
+            assert!(!output.contains(secret));
+        }
+    }
 }

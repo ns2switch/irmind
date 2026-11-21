@@ -52,6 +52,7 @@ fn storage_reason(message: &'static str) -> AppError {
 
 pub struct LocalStore {
     db: Mutex<Connection>,
+    query_dispatch_ready: bool,
     parquet: ParquetStore,
     graph_catalog: Mutex<std::collections::HashMap<CaseId, graph_port::CachedCatalog>>,
     evidence_dir: PathBuf,

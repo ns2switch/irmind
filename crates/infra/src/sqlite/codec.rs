@@ -91,7 +91,7 @@ pub(super) fn append_entry_tx(tx: &Transaction<'_>, entry: &SignedEntry) -> Resu
         ],
     )
     .map_err(storage)?;
-    Ok(())
+    super::source_query_dispatch::record_slot_release(tx, entry)
 }
 
 pub(super) fn append_global_operation_tx(

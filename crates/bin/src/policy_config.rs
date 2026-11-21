@@ -1,4 +1,4 @@
-use crate::cli::terminal_safe_path;
+use crate::{cli::terminal_safe_path, source_query_settings::SourceQuerySettings};
 use anyhow::{Context, Result, anyhow};
 use irmind_domain::{CaseScope, PolicyRules, Tool};
 use serde::Deserialize;
@@ -22,6 +22,7 @@ struct PolicyFile {
     denied_tools: Vec<String>,
     #[serde(default)]
     scope: Option<ScopePolicyFile>,
+    source_queries: Option<SourceQuerySettings>,
 }
 
 fn default_object_read_bytes() -> u64 {
@@ -77,7 +78,13 @@ impl ScopePolicyFile {
     }
 }
 
-pub(crate) fn load_policy(path: &Path) -> Result<(PolicyRules, String)> {
+pub(crate) struct LoadedPolicy {
+    pub(crate) rules: PolicyRules,
+    pub(crate) fingerprint: String,
+    pub(crate) source_queries: Option<SourceQuerySettings>,
+}
+
+pub(crate) fn load_policy(path: &Path) -> Result<LoadedPolicy> {
     let raw =
         std::fs::read(path).with_context(|| format!("read policy {}", terminal_safe_path(path)))?;
     let source = std::str::from_utf8(&raw).context("policy must be UTF-8")?;
@@ -104,8 +111,18 @@ pub(crate) fn load_policy(path: &Path) -> Result<(PolicyRules, String)> {
     policy
         .validate()
         .map_err(|_| anyhow!("invalid policy limits or scope"))?;
-    let fingerprint = irmind_app::hex(&irmind_app::sha256(&raw));
-    Ok((policy, fingerprint))
+    if let Some(queries) = &file.source_queries {
+        let scope = policy
+            .scope
+            .as_ref()
+            .ok_or_else(|| anyhow!("source queries require an explicit organization scope"))?;
+        queries.validate(scope)?;
+    }
+    Ok(LoadedPolicy {
+        rules: policy,
+        fingerprint: irmind_app::hex(&irmind_app::sha256(&raw)),
+        source_queries: file.source_queries,
+    })
 }
 
 #[cfg(test)]

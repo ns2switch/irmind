@@ -560,7 +560,7 @@ impl SourceQuerySettlementV1 {
         Self::decode(&super::canonical_query_json(&record)?)
     }
 
-    pub(super) fn reservation(&self) -> &str {
+    pub fn reservation(&self) -> &str {
         &self.reservation
     }
     pub fn decode(bytes: &[u8]) -> Result<Self, SourceQueryError> {

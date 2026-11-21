@@ -151,7 +151,10 @@ impl SourceQueryExecutor for AzureLogAnalytics {
         let metadata = self.analytics_plan(cancel).await?;
         Ok(QueryPreflightV1 {
             plan_digest: irmind_app::hex(&irmind_app::sha256(&canonical_query_json(compiled)?)),
-            observed_at: QueryTime::parse(&irmind_calendar::Utc::now().to_rfc3339())?,
+            observed_at: QueryTime::parse(
+                &irmind_calendar::Utc::now()
+                    .to_rfc3339_opts(irmind_calendar::SecondsFormat::Secs, true),
+            )?,
             accounting: QueryAccounting::AnalyticsNoQueryCharge,
             estimate: QueryEstimate {
                 unit: "scanned_bytes".into(),

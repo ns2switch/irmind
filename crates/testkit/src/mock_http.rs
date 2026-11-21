@@ -118,6 +118,19 @@ pub fn run_http_safety_contract() -> Result<(), String> {
 
 impl MockServer {
     pub fn start(script: Vec<MockResponse>) -> Result<Self, String> {
+        let count = script.len();
+        let mut script = script.into_iter();
+        Self::start_with(count, move |_, _| {
+            script.next().ok_or_else(|| "missing mock response".into())
+        })
+    }
+
+    /// Respond to a fixed number of requests, including provider-issued job
+    /// identities derived from the signed plan at runtime.
+    pub fn start_with(
+        count: usize,
+        reply: impl FnMut(usize, &RecordedRequest) -> Result<MockResponse, String> + Send + 'static,
+    ) -> Result<Self, String> {
         let listener = TcpListener::bind("127.0.0.1:0").map_err(|error| error.to_string())?;
         listener
             .set_nonblocking(true)
@@ -126,7 +139,7 @@ impl MockServer {
             .local_addr()
             .map_err(|error| error.to_string())?
             .port();
-        let task = thread::spawn(move || serve(&listener, &script));
+        let task = thread::spawn(move || serve(&listener, count, reply));
         Ok(Self {
             origin: format!("http://127.0.0.1:{port}/"),
             task,
@@ -143,10 +156,14 @@ impl MockServer {
     }
 }
 
-fn serve(listener: &TcpListener, script: &[MockResponse]) -> Result<Vec<RecordedRequest>, String> {
+fn serve(
+    listener: &TcpListener,
+    count: usize,
+    mut reply: impl FnMut(usize, &RecordedRequest) -> Result<MockResponse, String>,
+) -> Result<Vec<RecordedRequest>, String> {
     let mut requests = Vec::new();
     let deadline = Instant::now() + Duration::from_secs(5);
-    let mut quiet_until = if script.is_empty() {
+    let mut quiet_until = if count == 0 {
         Some(Instant::now() + Duration::from_millis(80))
     } else {
         None
@@ -159,12 +176,12 @@ fn serve(listener: &TcpListener, script: &[MockResponse]) -> Result<Vec<Recorded
             return Err(format!(
                 "mock server received {} of {} expected requests",
                 requests.len(),
-                script.len()
+                count
             ));
         }
         match listener.accept() {
             Ok((mut stream, _)) => {
-                if requests.len() >= script.len() {
+                if requests.len() >= count {
                     return Err("EDR followed a redirect or made an unexpected request".into());
                 }
                 // Accepted sockets can inherit nonblocking mode on macOS and Windows.
@@ -178,10 +195,10 @@ fn serve(listener: &TcpListener, script: &[MockResponse]) -> Result<Vec<Recorded
                     .set_write_timeout(Some(Duration::from_secs(2)))
                     .map_err(|error| error.to_string())?;
                 let request = read_request(&stream)?;
-                let response = &script[requests.len()];
+                let response = reply(requests.len(), &request)?;
                 requests.push(request);
-                write_response(&mut stream, response)?;
-                if requests.len() == script.len() {
+                write_response(&mut stream, &response)?;
+                if requests.len() == count {
                     quiet_until = Some(Instant::now() + Duration::from_millis(80));
                 }
             }

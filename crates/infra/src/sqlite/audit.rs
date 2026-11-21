@@ -106,6 +106,13 @@ impl AuditLog for LocalStore {
         tx.commit().map_err(storage)
     }
 
+    fn append_source_query_dispatch(
+        &self,
+        dispatch: &irmind_app::source_queries::SourceQueryDispatch<'_>,
+    ) -> Result<(), AppError> {
+        self.append_coordinated_query(dispatch)
+    }
+
     fn entries(&self, id: &CaseId) -> Result<Vec<SignedEntry>, AppError> {
         let conn = self.conn()?;
         let mut stmt = conn.prepare("SELECT case_id,seq,at,actor,origin,kind,payload,evidence,prev,hash,sig,public_key FROM audit WHERE case_id=?1 ORDER BY seq").map_err(storage)?;

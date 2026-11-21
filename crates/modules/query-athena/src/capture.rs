@@ -101,9 +101,14 @@ impl SourceDecoder for AthenaCaptureDecoder {
                 );
                 match record {
                     Ok(record) => {
+                        let record_index = record.origin().record();
                         emit(Tainted::from_external(
                             record,
-                            Provenance::new(meta.evidence_hash, None, SourceKind::ToolResult),
+                            Provenance::new(
+                                meta.evidence_hash,
+                                Some(record_index),
+                                SourceKind::ToolResult,
+                            ),
                         ))?;
                         report.accepted += 1;
                     }

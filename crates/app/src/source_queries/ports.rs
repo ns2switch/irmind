@@ -272,10 +272,16 @@ pub(super) struct QuerySourceBinding {
     pub mapping: irmind_domain::MappingIdentityV1,
 }
 
+struct ConfiguredQuerySource {
+    binding: QuerySourceBinding,
+    executor: Arc<dyn SourceQueryExecutor>,
+    decoder: Arc<dyn super::SourceQueryPageDecoder>,
+}
+
 #[derive(Default)]
 pub struct SourceQueryPorts {
     executors: BTreeMap<String, Arc<dyn SourceQueryExecutor>>,
-    bindings: BTreeMap<String, QuerySourceBinding>,
+    bindings: BTreeMap<String, ConfiguredQuerySource>,
     page_decoders: BTreeMap<(String, String, String), Arc<dyn super::SourceQueryPageDecoder>>,
     pub(super) organization_ceiling: Option<super::SourceQueryAllocationV1>,
 }
@@ -323,28 +329,60 @@ impl SourceQueryPorts {
         Ok(())
     }
 
-    /// Associate an explicitly selected source with the local implementation
-    /// identities and limits agreed by its executor. This grants no authority.
+    /// Associate an explicitly selected source with a registered implementation.
     pub fn bind_source(
         &mut self,
         source: ResolvedQuerySourceV1,
         limits: SourceQueryLimits,
         mapping: irmind_domain::MappingIdentityV1,
     ) -> Result<(), SourceQueryError> {
+        let executor = self.executor(source.module())?.clone();
+        let decoder = self
+            .page_decoders
+            .get(&page_decoder_key(&source))
+            .ok_or(SourceQueryError::Unavailable)?
+            .clone();
+        self.register_configured_source(source, limits, mapping, executor, decoder)
+    }
+
+    /// Pin a provider instance and page decoder to one configured source.
+    /// The case broker still requires the matching signed source adoption.
+    pub fn register_configured_source(
+        &mut self,
+        source: ResolvedQuerySourceV1,
+        limits: SourceQueryLimits,
+        mapping: irmind_domain::MappingIdentityV1,
+        executor: Arc<dyn SourceQueryExecutor>,
+        decoder: Arc<dyn super::SourceQueryPageDecoder>,
+    ) -> Result<(), SourceQueryError> {
         limits.validate()?;
-        self.page_decoder(&source)?;
+        let descriptor = executor.descriptor();
+        descriptor.validate()?;
+        let identity = decoder.identity();
+        irmind_domain::SourceDecoderIdentityV1::try_new(identity.name, identity.version)
+            .map_err(|_| SourceQueryError::Invalid)?;
         if self.bindings.len() >= 64
             || self.bindings.contains_key(source.id())
             || mapping.target() != irmind_domain::COMMON_EVENT_V1
+            || descriptor.id != source.module()
+            || descriptor.version != source.module_version()
+            || !descriptor
+                .datasets
+                .iter()
+                .any(|known| known == source.dataset())
         {
             return Err(SourceQueryError::Invalid);
         }
         self.bindings.insert(
             source.id().into(),
-            QuerySourceBinding {
-                source,
-                limits,
-                mapping,
+            ConfiguredQuerySource {
+                binding: QuerySourceBinding {
+                    source,
+                    limits,
+                    mapping,
+                },
+                executor,
+                decoder,
             },
         );
         Ok(())
@@ -361,22 +399,36 @@ impl SourceQueryPorts {
     pub(super) fn binding(&self, source: &str) -> Result<&QuerySourceBinding, SourceQueryError> {
         self.bindings
             .get(source)
+            .map(|source| &source.binding)
             .ok_or(SourceQueryError::Unavailable)
+    }
+
+    fn configured_source(
+        &self,
+        source: &ResolvedQuerySourceV1,
+    ) -> Result<&ConfiguredQuerySource, SourceQueryError> {
+        let configured = self
+            .bindings
+            .get(source.id())
+            .ok_or(SourceQueryError::Unavailable)?;
+        if &configured.binding.source != source {
+            return Err(SourceQueryError::Scope);
+        }
+        Ok(configured)
     }
 
     pub fn page_decoder(
         &self,
         source: &ResolvedQuerySourceV1,
     ) -> Result<&dyn super::SourceQueryPageDecoder, SourceQueryError> {
-        let key = (
-            source.module().into(),
-            source.module_version().into(),
-            source.dataset().into(),
-        );
-        self.page_decoders
-            .get(&key)
-            .map(AsRef::as_ref)
-            .ok_or(SourceQueryError::Unavailable)
+        Ok(self.configured_source(source)?.decoder.as_ref())
+    }
+
+    pub(super) fn executor_for(
+        &self,
+        source: &ResolvedQuerySourceV1,
+    ) -> Result<&Arc<dyn SourceQueryExecutor>, SourceQueryError> {
+        Ok(&self.configured_source(source)?.executor)
     }
 
     pub fn executor(
@@ -387,4 +439,12 @@ impl SourceQueryPorts {
             .get(module)
             .ok_or(SourceQueryError::Unavailable)
     }
+}
+
+fn page_decoder_key(source: &ResolvedQuerySourceV1) -> (String, String, String) {
+    (
+        source.module().into(),
+        source.module_version().into(),
+        source.dataset().into(),
+    )
 }
