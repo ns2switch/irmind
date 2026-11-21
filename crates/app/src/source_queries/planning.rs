@@ -53,15 +53,14 @@ impl Engine<'_> {
             return Err(SourceQueryError::Unavailable.into());
         }
         let compiled = executor.compile(&binding.source, &query)?;
-        let (revision, allocation) = self.source_query_allocation(case)?;
-        if !allocation.enabled {
-            return Err(SourceQueryError::Disabled.into());
-        }
-        let scope = self.live_query_scope(call, binding, &query, cancel)?;
         let operations = self.audit_log.global_operations()?;
         self.verify_global_operation_entries(&operations)?;
         let adoption = active_source_adoption(&binding.source, &operations)?;
         adoption.check_limits(binding)?;
+        let (scope, revision) = {
+            let _case_lock = self.repo.lock_case(case)?;
+            self.query_preflight_state(call, binding, &query, &operations, cancel)?
+        };
         let preflight = tokio::select! {
             biased;
             () = cancel.cancelled() => return Err(AppError::Cancelled),
@@ -78,7 +77,8 @@ impl Engine<'_> {
             .operation
             .hash
             != adoption.operation.hash
-            || self.live_query_scope(call, binding, &query, cancel)? != scope
+            || self.query_preflight_state(call, binding, &query, &current, cancel)?
+                != (scope.clone(), revision)
         {
             return Err(SourceQueryError::Approval.into());
         }
@@ -111,6 +111,28 @@ impl Engine<'_> {
             // Query-specific consent is layered on the normal engine policy.
             needs_analyst_approval: plan.requires_approval(threshold, false),
         })
+    }
+
+    fn query_preflight_state(
+        &self,
+        call: &AuthorizedCall,
+        binding: &QuerySourceBinding,
+        query: &SourceQueryV1,
+        operations: &[crate::SignedOperation],
+        cancel: &CancellationToken,
+    ) -> Result<(String, u64), AppError> {
+        let scope = self.live_query_scope(call, binding, query, cancel)?;
+        let entries = self.audit_log.entries(call.case_id())?;
+        let journal = super::SourceQueryJournal::replay(
+            &entries,
+            operations,
+            self.verifier.as_ref(),
+            cancel,
+        )?;
+        let revision = journal
+            .broker
+            .preflight_revision(&binding.source, &binding.limits)?;
+        Ok((scope, revision))
     }
 
     fn live_query_scope(

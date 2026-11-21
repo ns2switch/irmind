@@ -10,6 +10,8 @@ class ScopeTests(unittest.TestCase):
             "crates/fs/src/lib.rs", "crates/modules/keystore-file/src/lib.rs",
             "crates/infra/src/windows_security.rs", "crates/tui/src/case.rs",
             "crates/modules/storage-object/src/lib.rs",
+            "crates/modules/query-athena/src/lib.rs",
+            "crates/app/src/source_queries/page.rs",
             ".github/workflows/ci.yml",
         ):
             self.assertTrue(platform_path(path), path)

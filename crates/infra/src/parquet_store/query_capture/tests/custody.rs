@@ -420,6 +420,7 @@ mod signed_dispatch {
     struct SimulatedExecutor {
         store: Arc<LocalStore>,
         compiled: CompiledSourceQueryV1,
+        preflights: AtomicUsize,
         submissions: AtomicUsize,
         complete: bool,
     }
@@ -485,6 +486,7 @@ mod signed_dispatch {
             compiled: &CompiledSourceQueryV1,
             _: &CancellationToken,
         ) -> Result<QueryPreflightV1, AppError> {
+            self.preflights.fetch_add(1, Ordering::SeqCst);
             let plan: serde_json::Value = serde_json::from_slice(include_bytes!(
                 "../../../../../../docs/development/source-query-format-vectors/plan.json"
             ))
@@ -660,6 +662,7 @@ mod signed_dispatch {
         let executor = Arc::new(SimulatedExecutor {
             store: store.clone(),
             compiled: serde_json::from_value(plan["compiled"].clone()).unwrap(),
+            preflights: AtomicUsize::new(0),
             submissions: AtomicUsize::new(0),
             complete,
         });
@@ -740,6 +743,19 @@ mod signed_dispatch {
         );
         assert_eq!(executor.submissions.load(Ordering::SeqCst), 1);
         verify_unknown_observation(&engine, &store, &case);
+        let retry = engine
+            .request_tool_as_analyst(
+                &case,
+                irmind_app::ProposedCall {
+                    tool: irmind_app::Tool::SourceQuery,
+                    args: authorized.proposal_args().clone(),
+                },
+                &cancel,
+            )
+            .unwrap_or_else(|error| error.to_string());
+        assert!(!retry.contains("requires analyst approval"), "{retry}");
+        assert_eq!(executor.preflights.load(Ordering::SeqCst), 0);
+        assert!(engine.verify(&case).is_ok());
     }
 
     fn check_tool_plan(
@@ -761,6 +777,7 @@ mod signed_dispatch {
             )
             .unwrap();
         assert!(feedback.contains("requires analyst approval"));
+        assert_eq!(executor.preflights.load(Ordering::SeqCst), 1);
         assert_eq!(executor.submissions.load(Ordering::SeqCst), 0);
         let last = store.last_entry(case).unwrap().unwrap();
         assert_eq!(last.kind, AuditEventKind::SourceQueryPlanV1);
