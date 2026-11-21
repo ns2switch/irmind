@@ -164,6 +164,25 @@ pub(super) fn configured_registry(
         &mut registry,
         &mut config_issues,
     )?;
+    #[cfg(feature = "query-azure-log-analytics")]
+    {
+        use irmind_app::SourceDecoder as _;
+        use irmind_mod_query_azure_log_analytics::AzureAnalyticsCaptureDecoder as Decoder;
+        for decoder in [Decoder::SignIn, Decoder::Audit, Decoder::Activity] {
+            let identity = decoder.identity();
+            let identity =
+                irmind_domain::SourceDecoderIdentityV1::try_new(identity.name, identity.version)
+                    .map_err(|_| irmind_app::source_queries::SourceQueryError::Invalid)?;
+            registry.add_source_mapper(std::sync::Arc::new(
+                irmind_mod_mapping_entra::EntraMapping::for_capture(
+                    decoder.file_format(),
+                    &identity,
+                )
+                .map_err(irmind_app::source_mapping::MappingError::into_app)?,
+            ))?;
+            registry.add_source_decoder(std::sync::Arc::new(decoder))?;
+        }
+    }
     #[cfg(feature = "query-bigquery")]
     {
         registry.add_source_decoder(std::sync::Arc::new(
