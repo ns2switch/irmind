@@ -27,6 +27,22 @@ impl Engine<'_> {
         approved: bool,
         cancel: &CancellationToken,
     ) -> Result<(String, String), AppError> {
+        if call.tool() == &Tool::SourceQuery {
+            let prepared = self.plan_source_query(call, cancel).await?;
+            if prepared.needs_analyst_approval {
+                return Ok((
+                    format!(
+                        "Source query plan {} requires analyst approval. Review it with /source-query show {}.",
+                        prepared.plan_id, prepared.plan_id,
+                    ),
+                    String::new(),
+                ));
+            }
+            let acquired = self
+                .run_source_query_plan(id, &prepared.plan_id, None, cancel)
+                .await?;
+            return Ok((acquired.display_summary(), acquired.capture.as_str().into()));
+        }
         self.prepare_siem_dispatch(id, call).await?;
         let payload = if call.tool() == &Tool::ObjectRead {
             match self.object_reservation_payload(id, call).await {

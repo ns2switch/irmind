@@ -195,6 +195,25 @@ fn remote_catalog() -> Vec<ToolSpec> {
             parameters: json!({"type":"object","properties":{"source":{"type":"string"},"account":{"type":"string"},"from":{"type":"string","description":"UTC YYYY-MM-DDTHH:MM:SSZ"},"to":{"type":"string","description":"UTC YYYY-MM-DDTHH:MM:SSZ"},"alert_id":{"type":"string","description":"Exact alert ID, not a query"}},"required":["source","account","from","to","alert_id"],"additionalProperties":false}),
         },
         ToolSpec {
+            name: "source_query",
+            description: "Read a configured source inside the signed case scope. Use structured filters and a bounded UTC interval. Inspect the signed plan if analyst approval is required. Analyze captured evidence locally afterwards.",
+            parameters: json!({
+                "type":"object","additionalProperties":false,
+                "required":["version","source","dataset","from","to","filters","fields","result","limit"],
+                "properties":{
+                    "version":{"type":"integer","enum":[1]},
+                    "source":{"type":"string"},"dataset":{"type":"string"},
+                    "from":{"type":"string","description":"Inclusive UTC timestamp"},
+                    "to":{"type":"string","description":"Exclusive UTC timestamp"},
+                    "filters":{"type":"array","maxItems":16,"items":{"type":"object","additionalProperties":false,"required":["field","op","value"],
+                        "properties":{"field":{"type":"string"},"op":{"type":"string"},"value":{}}}},
+                    "fields":{"type":"array","maxItems":32,"items":{"type":"string"}},
+                    "result":{"type":"string","enum":["events"]},
+                    "limit":{"type":"integer","minimum":1,"maximum":100_000}
+                }
+            }),
+        },
+        ToolSpec {
             name: "cloud_audit_events",
             description: "Read at most 20 CloudTrail management events by exact event name from a scoped AWS account and UTC window of at most 24 hours",
             parameters: json!({"type":"object","properties":{"source":{"type":"string"},"account":{"type":"string","description":"12-digit AWS account ID"},"project":{"type":"string","description":"Cloud project ID where supported by the configured connector"},"from":{"type":"string","description":"UTC YYYY-MM-DDTHH:MM:SSZ"},"to":{"type":"string","description":"UTC YYYY-MM-DDTHH:MM:SSZ"},"event_name":{"type":"string","description":"Exact API event name, e.g. AssumeRole"}},"required":["source","from","to","event_name"],"oneOf":[{"required":["account"]},{"required":["project"]}],"additionalProperties":false}),
