@@ -86,7 +86,7 @@ struct Page {
     sha256: String,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct CaptureColumn {
     pub name: String,

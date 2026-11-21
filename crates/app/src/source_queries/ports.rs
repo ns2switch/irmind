@@ -264,6 +264,7 @@ pub trait SourceQueryExecutor: Send + Sync {
 #[derive(Default)]
 pub struct SourceQueryPorts {
     executors: BTreeMap<String, Arc<dyn SourceQueryExecutor>>,
+    page_decoders: BTreeMap<(String, String, String), Arc<dyn super::SourceQueryPageDecoder>>,
 }
 impl SourceQueryPorts {
     pub fn new() -> Self {
@@ -278,6 +279,43 @@ impl SourceQueryPorts {
         self.executors.insert(descriptor.id, executor);
         Ok(())
     }
+    pub fn add_page_decoder(
+        &mut self,
+        module: &str,
+        version: &str,
+        dataset: &str,
+        decoder: Arc<dyn super::SourceQueryPageDecoder>,
+    ) -> Result<(), SourceQueryError> {
+        let descriptor = self.executor(module)?.descriptor();
+        let identity = decoder.identity();
+        irmind_domain::SourceDecoderIdentityV1::try_new(identity.name, identity.version)
+            .map_err(|_| SourceQueryError::Invalid)?;
+        let key = (module.into(), version.into(), dataset.into());
+        if descriptor.version != version
+            || !descriptor.datasets.iter().any(|name| name == dataset)
+            || self.page_decoders.contains_key(&key)
+        {
+            return Err(SourceQueryError::Invalid);
+        }
+        self.page_decoders.insert(key, decoder);
+        Ok(())
+    }
+
+    pub fn page_decoder(
+        &self,
+        source: &ResolvedQuerySourceV1,
+    ) -> Result<&dyn super::SourceQueryPageDecoder, SourceQueryError> {
+        let key = (
+            source.module().into(),
+            source.module_version().into(),
+            source.dataset().into(),
+        );
+        self.page_decoders
+            .get(&key)
+            .map(AsRef::as_ref)
+            .ok_or(SourceQueryError::Unavailable)
+    }
+
     pub fn executor(
         &self,
         module: &str,
