@@ -65,6 +65,7 @@ existing production catalog root is not used or accepted by these vectors.
 | `azure-analytics.json`, `azure-basic-rejected.json` | Analytics eligibility with missing scan telemetry represented as null; Basic rejected even though its query might succeed. |
 | `partial-result-shape.json` | Shape of a local-limit partial result. Deliberately not linked into the positive chain; changing counts without rebuilding capture/proofs is invalid. |
 | `recovery-rejected-shape.json` | A priced Athena execution cannot be acknowledged as an expired unknown Analytics execution. |
+| `recovery.json`, `recovery-preimage.hex`, `signed-recovery-chain.json`, `signed-recovery-configuration.json` | Exact Analyst acknowledgement at the Analytics expiry boundary. Replay releases the execution slot and preserves the accounting hold and unknown observation. |
 | `azure-partial-response.json` | HTTP-success-shaped Azure response with PartialError; never a complete result. |
 | `malicious-literal.json` | SQL-looking text remains one BigQuery STRING parameter, with no new syntax. |
 | `negative-cases.json`, `schemas.json` | Required future rejection cases, exact example member sets and closed enum spellings. Rejection names are proposed application errors. |

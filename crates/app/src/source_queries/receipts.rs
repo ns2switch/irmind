@@ -225,6 +225,10 @@ impl SourceQueryPlanV1 {
         self.preflight.accounting
     }
 
+    pub(super) fn analytics_expiry_seconds(&self) -> Option<u64> {
+        super::recovery::analytics_lifetime(&self.source, &self.preflight)
+    }
+
     pub(super) fn source(&self) -> &ResolvedQuerySourceV1 {
         &self.source
     }

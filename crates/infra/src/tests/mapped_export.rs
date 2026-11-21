@@ -303,6 +303,54 @@ fn source_query_adoption_persists_only_valid_canonical_scope() {
 mod seed;
 
 #[test]
+fn source_query_recovery_requires_a_signed_expired_analytics_observation() {
+    use irmind_app::source_queries::{SourceQueryJournal, SourceQueryRecoveryV1};
+    let config: SignedOperation = serde_json::from_slice(include_bytes!(
+        "../../../../docs/development/source-query-format-vectors/signed-recovery-configuration.json"
+    )).unwrap();
+    let mut chain: Vec<SignedEntry> = serde_json::from_slice(include_bytes!(
+        "../../../../docs/development/source-query-format-vectors/signed-recovery-chain.json"
+    ))
+    .unwrap();
+    let record =
+        include_bytes!("../../../../docs/development/source-query-format-vectors/recovery.json");
+    assert_eq!(chain[7].payload.as_bytes(), record);
+    let vector = hex::decode(
+        include_str!(
+            "../../../../docs/development/source-query-format-vectors/recovery-preimage.hex"
+        )
+        .trim(),
+    )
+    .unwrap();
+    assert_eq!(
+        SourceQueryRecoveryV1::decode(record)
+            .unwrap()
+            .content_id()
+            .unwrap(),
+        hex(&sha256(&vector))
+    );
+    let signer = LocalSigner {
+        key: SigningKey::from_bytes(&[77; 32]),
+        actor: Actor::Analyst,
+    };
+    let verifier = LocalVerifier::from_signer(&signer)
+        .with_trusted_key(&chain[6].actor, &chain[6].public_key)
+        .unwrap();
+    let cancel = CancellationToken::new();
+    let operations = [config];
+    let prior = SourceQueryJournal::replay(&chain[..7], &operations, &verifier, &cancel).unwrap();
+    let recovered = SourceQueryJournal::replay(&chain, &operations, &verifier, &cancel).unwrap();
+    assert_eq!(recovered.held(), prior.held());
+    assert_eq!(recovered.used(), prior.used());
+    assert_eq!(recovered.captures().len(), 0);
+    let recovery = chain.last_mut().unwrap();
+    recovery.at -= 1;
+    recovery.hash = sha256(&recovery.canonical());
+    recovery.sig = signer.sign(&recovery.hash).unwrap();
+    assert!(SourceQueryJournal::replay(&chain, &operations, &verifier, &cancel).is_err());
+}
+
+#[test]
 fn source_query_reservation_and_submit_intent_survive_reopen_as_one_batch() {
     use irmind_app::CaseMutation;
     let root = tempfile::tempdir().unwrap();

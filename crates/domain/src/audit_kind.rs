@@ -18,6 +18,7 @@ pub enum AuditEventKind {
     SourceQueryExecutionV1,
     SourceQueryResultV1,
     SourceQuerySettlementV1,
+    SourceQueryRecoveryV1,
     CaseScopeChanged,
     CaseSealed,
     Denied,
@@ -70,7 +71,7 @@ pub enum AuditEventKind {
 }
 
 impl AuditEventKind {
-    pub const ALL: [Self; 63] = [
+    pub const ALL: [Self; 64] = [
         Self::Allowed,
         Self::ApprovalDenied,
         Self::ApprovalGranted,
@@ -86,6 +87,7 @@ impl AuditEventKind {
         Self::SourceQueryExecutionV1,
         Self::SourceQueryResultV1,
         Self::SourceQuerySettlementV1,
+        Self::SourceQueryRecoveryV1,
         Self::CaseScopeChanged,
         Self::CaseSealed,
         Self::Denied,
@@ -153,6 +155,7 @@ impl AuditEventKind {
             Self::SourceQueryExecutionV1 => "SourceQueryExecutionV1",
             Self::SourceQueryResultV1 => "SourceQueryResultV1",
             Self::SourceQuerySettlementV1 => "SourceQuerySettlementV1",
+            Self::SourceQueryRecoveryV1 => "SourceQueryRecoveryV1",
             Self::CaseScopeChanged => "CaseScopeChanged",
             Self::CaseSealed => "CaseSealed",
             Self::Denied => "Denied",
@@ -236,6 +239,7 @@ impl AuditEventKind {
                 | Self::SourceQueryExecutionV1
                 | Self::SourceQueryResultV1
                 | Self::SourceQuerySettlementV1
+                | Self::SourceQueryRecoveryV1
         )
     }
 
@@ -260,7 +264,7 @@ mod tests {
 
     #[test]
     fn wire_names_are_stable_and_unknown_names_fail() {
-        const EXPECTED: [&str; 63] = [
+        const EXPECTED: [&str; 64] = [
             "Allowed",
             "ApprovalDenied",
             "ApprovalGranted",
@@ -276,6 +280,7 @@ mod tests {
             "SourceQueryExecutionV1",
             "SourceQueryResultV1",
             "SourceQuerySettlementV1",
+            "SourceQueryRecoveryV1",
             "CaseScopeChanged",
             "CaseSealed",
             "Denied",

@@ -12,6 +12,69 @@ pub struct SourceQueryResources {
     pub retained_bytes: u64,
 }
 
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn settlement_underflow_leaves_every_counter_and_hold_intact() {
+        let case = CaseId::parse("11111111-1111-4111-8111-111111111111").unwrap();
+        let mut broker = SourceQueryBroker::new(
+            case,
+            SourceQueryAllocationV1::default(),
+            SourceQueryAllocationV1::default(),
+        )
+        .unwrap();
+        let resources = SourceQueryResources {
+            scan_bytes: 5,
+            retained_rows: 7,
+            retained_bytes: 9,
+        };
+        broker.held = SourceQueryResources {
+            retained_bytes: 8,
+            ..resources
+        };
+        let held = broker.held;
+        let id = "synthetic".to_owned();
+        broker.holds.insert(
+            id.clone(),
+            SourceQueryHold {
+                id: id.clone(),
+                plan: String::new(),
+                attempt: 1,
+                reservation_seq: 1,
+                intent_hash: None,
+                decoder: super::super::receipts::Decoder {
+                    id: String::new(),
+                    version: String::new(),
+                },
+                mapping: decode_mapping(),
+                accounting: QueryAccounting::ScanPriced,
+                analytics_expiry_seconds: None,
+                source: (String::new(), String::new(), String::new()),
+                resources,
+                slot_released: false,
+            },
+        );
+        assert_eq!(
+            broker.settle(&id, Some(1), 1, 1),
+            Err(SourceQueryError::Budget)
+        );
+        assert_eq!(broker.held(), held);
+        assert_eq!(broker.used(), SourceQueryResources::default());
+        assert_eq!(broker.pending(&id).unwrap().resources(), resources);
+    }
+
+    fn decode_mapping() -> super::super::receipts::Mapping {
+        let plan = SourceQueryPlanV1::decode(include_bytes!(
+            "../../../../docs/development/source-query-format-vectors/plan.json"
+        ))
+        .unwrap();
+        plan.mapping
+    }
+}
+
 impl SourceQueryResources {
     fn add(self, other: Self) -> Result<Self, SourceQueryError> {
         Ok(Self {
@@ -35,6 +98,23 @@ impl SourceQueryResources {
             && self.retained_rows <= limit.retained_rows
             && self.retained_bytes <= limit.retained_bytes
     }
+
+    fn checked_sub(self, other: Self) -> Result<Self, SourceQueryError> {
+        Ok(Self {
+            scan_bytes: self
+                .scan_bytes
+                .checked_sub(other.scan_bytes)
+                .ok_or(SourceQueryError::Budget)?,
+            retained_rows: self
+                .retained_rows
+                .checked_sub(other.retained_rows)
+                .ok_or(SourceQueryError::Budget)?,
+            retained_bytes: self
+                .retained_bytes
+                .checked_sub(other.retained_bytes)
+                .ok_or(SourceQueryError::Budget)?,
+        })
+    }
 }
 
 #[derive(Clone)]
@@ -47,8 +127,10 @@ pub struct SourceQueryHold {
     pub(super) decoder: super::receipts::Decoder,
     pub(super) mapping: super::receipts::Mapping,
     pub(super) accounting: QueryAccounting,
+    pub(super) analytics_expiry_seconds: Option<u64>,
     source: (String, String, String),
     resources: SourceQueryResources,
+    slot_released: bool,
 }
 
 impl SourceQueryHold {
@@ -226,7 +308,7 @@ impl SourceQueryBroker {
             || self
                 .holds
                 .values()
-                .filter(|hold| hold.source == source)
+                .filter(|hold| !hold.slot_released && hold.source == source)
                 .count() as u64
                 >= limits.concurrency
         {
@@ -257,7 +339,9 @@ impl SourceQueryBroker {
             mapping: plan.mapping.clone(),
             source,
             accounting,
+            analytics_expiry_seconds: plan.analytics_expiry_seconds(),
             resources,
+            slot_released: false,
         };
         self.holds.insert(hold.id.clone(), hold.clone());
         self.plans.insert(plan_id);
@@ -278,10 +362,7 @@ impl SourceQueryBroker {
         retained_rows: u64,
         retained_bytes: u64,
     ) -> Result<(), SourceQueryError> {
-        if self.settled.contains(id) {
-            return Err(SourceQueryError::AlreadySettled);
-        }
-        let hold = self.holds.get(id).ok_or(SourceQueryError::Invalid)?;
+        let hold = self.pending(id)?;
         let scan_bytes = match (hold.accounting, scanned_bytes) {
             (QueryAccounting::ScanPriced, Some(bytes)) => bytes,
             (QueryAccounting::AnalyticsNoQueryCharge, None) => 0,
@@ -297,9 +378,7 @@ impl SourceQueryBroker {
             retained_rows,
             retained_bytes,
         })?;
-        self.held.scan_bytes -= hold.resources.scan_bytes;
-        self.held.retained_rows -= hold.resources.retained_rows;
-        self.held.retained_bytes -= hold.resources.retained_bytes;
+        self.held = self.held.checked_sub(hold.resources)?;
         self.used = used;
         self.holds.remove(id);
         self.settled.insert(id.to_owned());
@@ -310,6 +389,26 @@ impl SourceQueryBroker {
         if self.settled.contains(id) {
             return Err(SourceQueryError::AlreadySettled);
         }
-        self.holds.get(id).ok_or(SourceQueryError::Invalid)
+        let hold = self.holds.get(id).ok_or(SourceQueryError::Invalid)?;
+        if hold.slot_released {
+            return Err(SourceQueryError::AlreadySettled);
+        }
+        Ok(hold)
+    }
+
+    pub(super) fn release_expired_analytics_slot(
+        &mut self,
+        id: &str,
+    ) -> Result<(), SourceQueryError> {
+        let hold = self.holds.get_mut(id).ok_or(SourceQueryError::Invalid)?;
+        if hold.slot_released
+            || hold.analytics_expiry_seconds.is_none()
+            || hold.accounting != QueryAccounting::AnalyticsNoQueryCharge
+            || hold.resources.scan_bytes != 0
+        {
+            return Err(SourceQueryError::Unresolved);
+        }
+        hold.slot_released = true;
+        Ok(())
     }
 }
