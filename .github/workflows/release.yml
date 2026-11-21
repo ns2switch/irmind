@@ -82,17 +82,3 @@ jobs:
           } finally {
             Remove-Item -LiteralPath $binary,$helper -Force -ErrorAction SilentlyContinue
           }
-
-  update_homebrew:
-    needs: [verify_install_linux, verify_install_macos, verify_install_windows]
-    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push' && needs.verify_install_linux.result == 'success' && needs.verify_install_macos.result == 'success' && needs.verify_install_windows.result == 'success' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    environment: release
-    permissions:
-      contents: read
-    steps:
-      - name: Ask the tap to verify and test this published release before updating
-        env:
-          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-        run: gh workflow run update.yml --repo ns2switch/homebrew-irmind --ref main -f tag="$GITHUB_REF_NAME"
