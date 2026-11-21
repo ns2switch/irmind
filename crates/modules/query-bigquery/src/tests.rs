@@ -167,6 +167,7 @@ async fn real_sink_table_names_and_both_layouts_are_explicit_on_the_wire() {
             assert_eq!(table, format!("{base}_20261116"));
             assert!(sql.contains(&format!("`synthetic-project.audit.{base}_*`")));
             assert!(sql.contains("_TABLE_SUFFIX BETWEEN @first_day AND @last_day"));
+            assert!(sql.contains("REGEXP_CONTAINS(_TABLE_SUFFIX, r'^[0-9]{8}$')"));
             for (index, day) in [(3, "20261116"), (4, "20261117")] {
                 assert_eq!(
                     body["configuration"]["query"]["queryParameters"][index]["parameterValue"]["value"],

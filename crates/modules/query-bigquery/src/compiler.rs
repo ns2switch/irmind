@@ -66,6 +66,7 @@ pub(super) fn translate(
                 return Err(SourceQueryError::Unsupported);
             }
             predicates.push("_TABLE_SUFFIX BETWEEN @first_day AND @last_day".to_owned());
+            predicates.push("REGEXP_CONTAINS(_TABLE_SUFFIX, r'^[0-9]{8}$')".to_owned());
             bindings.push(json!({"name":"first_day","type":"text","value":first_day}));
             bindings.push(json!({"name":"last_day","type":"text","value":last_day}));
             format!("{table}_*")
