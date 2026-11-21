@@ -1017,10 +1017,16 @@ dependencies = [
 name = "irmind-http"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "reqwest",
+ "ring",
+ "secrecy",
+ "serde",
+ "serde_json",
  "sha2",
  "tokio",
  "tokio-util",
+ "zeroize",
 ]
 
 [[package]]
