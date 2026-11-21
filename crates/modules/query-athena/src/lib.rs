@@ -1,6 +1,8 @@
 #![forbid(unsafe_code)]
 
+mod capture;
 mod compile;
+pub use capture::AthenaCaptureDecoder;
 mod protocol;
 
 use aws_credential_types::Credentials;
