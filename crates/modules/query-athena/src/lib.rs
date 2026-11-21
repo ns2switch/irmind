@@ -31,6 +31,30 @@ pub struct Athena {
 }
 
 impl Athena {
+    pub fn with_explicit_keys(
+        source: ResolvedQuerySourceV1,
+        limits: SourceQueryLimits,
+        workgroup: &str,
+        access_key: &str,
+        secret_key: &str,
+        session_token: Option<&str>,
+        allow_cutoff_overrun: bool,
+    ) -> Result<Self, AppError> {
+        Self::new(
+            source,
+            limits,
+            workgroup,
+            Credentials::new(
+                access_key,
+                secret_key,
+                session_token.map(str::to_owned),
+                None,
+                "irmind-keyring",
+            ),
+            allow_cutoff_overrun,
+        )
+    }
+
     /// The profile must opt in to Athena's cancellation threshold. Policies
     /// requiring a strictly enforced hard scan ceiling leave this profile unavailable.
     pub fn new(

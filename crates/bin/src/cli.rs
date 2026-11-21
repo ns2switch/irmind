@@ -58,6 +58,10 @@ pub(super) enum Command {
         #[command(subcommand)]
         command: CaseCommand,
     },
+    SourceQuery {
+        #[command(subcommand)]
+        command: source_query::SourceQueryCommand,
+    },
     Ingest {
         case_id: String,
         path: PathBuf,
@@ -408,6 +412,7 @@ mod automation;
 mod automation_graph;
 mod graph_filter;
 mod ingest;
+mod source_query;
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
