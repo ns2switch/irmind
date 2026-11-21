@@ -1,12 +1,14 @@
 # Bounded direct mapped-artifact writing
 
+> **Status.** Direct writing is implemented. References to coexistence with V1/V2 describe the original rollout. The current release writes mapped V3.
+
 This design is for evidence-store and ingestion maintainers. It describes writing final mapped Parquet files once, without creating signed intermediate Parquet parents during initial ingestion.
 
 ## Existing boundary
 
 LargeCaseStore::prepare_local_batch returns one PreparedSource per original. LargeCaseUseCases signs each acquisition independently and requires each initial artifact to name that single source hash. This is correct for the existing implementation, but cannot retain a partition writer across many source files and atomically bind its final output to every contributing acquisition.
 
-Keep that route unchanged for V1/V2. Do not join outputs by silently weakening the single-source check or assigning a multi-source artifact to the last file's manifest.
+The original rollout retained that route for V1/V2. Do not join outputs by silently weakening the single-source check or assigning a multi-source artifact to the last file's manifest.
 
 ## Proposed additive local contract
 

@@ -8,7 +8,7 @@ The module is compiled by default behind the `parser-linux` feature. A bounded c
 
 Classic authentication lines use the same per-ingestion year/offset form, command options and typed context as [syslog](syslog-parser.md). The application owns their shared pure calendar cursor. Each file has independent state; the parser commits a December/January candidate only after the entire row validates. Fixed offsets require explicit confirmation; IANA/DST remains [issue #161](https://github.com/ns2switch/irmind/issues/161). Signed parser versions bind context and basis, and the historical resolver reconstructs the recorded interpretation. SourceManifestV2, artifact and export encodings stay unchanged.
 
-Journald `__REALTIME_TIMESTAMP` is interpreted as UTC microseconds. Audit epoch fractions and explicit authentication offsets retain their full source representation. Normalized text preserves fractional UTC time and the original data. The current V1 index still uses seconds; the approved artifact-V2 work follows this parser. Unknown fields remain in raw record text.
+Journald `__REALTIME_TIMESTAMP` is interpreted as UTC microseconds. Audit epoch fractions and explicit authentication offsets retain their full source representation. Normalized text preserves fractional UTC time and the original data. Mapped V3 stores the checked UTC instant and its source precision. Unknown fields remain in raw record text.
 
 ## Mapping
 

@@ -1,5 +1,7 @@
 # Typed common-event core
 
+> **Status.** The typed core is implemented. The v0.3 rollout details record the original design. Current custody uses [mapped V3 and export V9](../cases.md#cases-and-exports-from-an-earlier-version).
+
 This page is for parser and evidence-store maintainers. It describes the first implementation layer of the [common-event design](common-event-schema.md). Source-specific interpretation is separate work.
 
 ## Validated boundary
@@ -10,13 +12,13 @@ The context uses a closed `CommonField` map with checked `CommonValue` variants 
 
 The application pairs the projection with the existing indexed record and its tainted provenance. Before staging, it corroborates the source hash, record index, real offset, parser identity and timestamp. An opaque checked view ties the canonical encoding to an immutable event borrow. The writer reuses those checked bytes instead of serializing the same event twice; provenance, time and size checks remain in place. Canonical JSON orders every object recursively and uses checked integer timestamps. Enabling `serde_json/preserve_order` cannot change it.
 
-New ingestion follows the [source/mapping boundary](source-mapping-design.md): a registered `SourceDecoder` emits bounded `Tainted<SourceRecordV1>` values from original fields; a frozen `MappingCatalog` selects a pure `SourceMapper`; the writer validates origin, time, projection and role-bearing observations. The native modules have nondefault `mapping-json-compat` and `mapping-journald-compat` composition features; registering them does not activate the writer. No `parse_common_*` method or normalization bridge remains in `StreamingEventParser`.
+New ingestion follows the [source/mapping boundary](source-mapping-design.md): a registered `SourceDecoder` emits bounded `Tainted<SourceRecordV1>` values from original fields; a frozen `MappingCatalog` selects a pure `SourceMapper`; the writer validates origin, time, projection and role-bearing observations. The CLI, TUI and demo use this mapped writer. No `parse_common_*` method or normalization bridge remains in `StreamingEventParser`.
 
-`mapping-json-compat` and `mapping-journald-compat` are independent extraction-only native modules. Their recursive historical projections cannot be expressed by finite tables. Their identities include content-addressed source/build manifests. They preserve role-free search identities without inventing classifications. The new [table interpreter](mapping-tables.md) supports bounded declarative mappings and shares the same contracts. Missing mappings produce an explicit unclassified event. Parsers without a registered raw decoder retain their unchanged historical route.
+`mapping-json-compat` and `mapping-journald-compat` are independent extraction-only native modules. Their recursive historical projections cannot be expressed by finite tables. Their identities include content-addressed source/build manifests. They preserve role-free search identities without inventing classifications. The new [table interpreter](mapping-tables.md) supports bounded declarative mappings and shares the same contracts. Missing mappings produce an explicit unclassified event. Supported parsers register raw decoders.
 
 ## Physical schemas and reconstruction
 
-Historical V1/V2 envelopes and export V5 remain unchanged. New mapped artifacts use `ParquetArtifactV3`, authenticated profiles and receipts, and export V6. New schema identifiers and the new builder `parquet-builder-common-event-v1` select the typed layout:
+The v0.3 rollout introduced `ParquetArtifactV3`, authenticated profiles and receipts, and export V6. The current export version is V9. Standalone V1/V2 artifacts require their creating executable. New schema identifiers and the new builder `parquet-builder-common-event-v1` select the typed layout:
 
 | Schema | Additional columns |
 | --- | --- |
@@ -32,7 +34,7 @@ Unknown codes, incompatible column types and schema/builder metadata mismatches 
 
 V6 verification checks the common physical columns and file metadata after authenticating each derived frame's complete hash. A bounded file-range reader exposes only that frame to the Parquet reader; it neither extracts evidence to temporary storage nor reads neighboring frames. The direct `bytes` dependency supplies the return type required by Parquet's `ChunkReader` interface. The package is already present in the lockfile; no new package or feature is introduced.
 
-Old store constructors keep their historical writers. `open_mapped` explicitly selects the new decoder/mapping writer for supported sources in new batched ingestion. Merely opening a case does not reparse its sources or change its generation.
+The store uses the decoder/mapping writer for supported sources in new batched ingestion. Merely opening a case does not reparse its sources or change its generation.
 
 The unsigned normalized spool stores each observation vector once. Deserialization recreates its JSON cache before memory accounting or batch construction; final schemas, batch inputs and golden bytes remain unchanged. The writer also reuses already sorted legacy entity pairs. These changes do not implement co-observation by reference or the separate bounded-metadata proposal.
 
@@ -42,15 +44,15 @@ Existing tools accept optional `event_category`, `event_type`, `event_outcome` a
 
 Unclassified or historical records cannot match a classification or role they do not have. Filtered results explain incomplete schema coverage. A graph summary reports common, categorized and known-outcome counts. Absence of classified matches is not proof that the activity did not occur.
 
-Entity lookup separates identity scopes and reports per-role observation counts. A PID without a lifetime identifier is source/record scoped; its reuse cannot bridge unrelated events. Same-value source and destination occurrences remain distinguishable, while event timelines deduplicate the source/record reference. Neighbor/path searches retain the existing 4,096-record sample, 3-hop, 200-expansion, 50-neighbor and 10-second budgets. Historical entity-only artifacts retain a bounded fallback.
+Entity lookup separates identity scopes and reports per-role observation counts. A PID without a lifetime identifier is source/record scoped; its reuse cannot bridge unrelated events. Same-value source and destination occurrences remain distinguishable, while event timelines deduplicate the source/record reference. Neighbor/path searches retain the existing 4,096-record sample, 3-hop, 200-expansion, 50-neighbor and 10-second budgets. Role-free observations in current artifacts remain available to the bounded query path.
 
 A retained homogeneous scope/role/field batch computes timestamp extrema once and combines that group's extrema into the total. Mixed batches and scopes beyond the 20-detail cap retain the general path. Counts, precision markers, invalid-code rejection and the scope-detail limit are unchanged.
 
 ## Compatibility boundary
 
-No semantic migration is implemented. `CommonEventMigrationV1` is deferred. V1/V2 cases remain readable without migration; new semantic interpretation requires re-ingestion into a new case. The existing precision-only migration cannot activate a common-schema replacement.
+No semantic migration is implemented. `CommonEventMigrationV1` is deferred. V1/V2 cases require their creating executable. Re-ingest verified originals into a new case to apply new semantics. Precision-only migration was retired.
 
-Source-specific semantic mappings and the Elastic/Chronicle connectors follow the core separately. A source alert never becomes a confirmed report finding automatically. Model-facing and terminal-facing projections still pass through the existing guard and redaction paths.
+Source-specific semantic mappings and the Elastic/Chronicle connectors were delivered separately from the core. A source alert never becomes a confirmed report finding automatically. Model-facing and terminal-facing projections still pass through the existing guard and redaction paths.
 
 ## Validation and measurement
 

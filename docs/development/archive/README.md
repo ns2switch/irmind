@@ -15,3 +15,4 @@ These pages record earlier contracts and implementation decisions. Use the [arch
 | [Parquet v2 port transition](parquet-v2-port-transition.md) | Implemented for v0.2 and superseded by the [separate source decoder and mapping pipeline](../source-mapping-design.md). The mixed V1/V2 writers and readers have been retired. |
 | [Retired graph port removal](retired-graph-port-removal.md) | Implemented for v0.3. The retired graph ports were removed; see the [current architecture](../architecture.md). |
 | [V1 to V2 precise-time migration](v2-precision-migration.md) | Retired analyst procedure for v0.2. |
+| [Early large-case custody format](parquet-custody-design.md) | V1 artifacts and V3/V4 exports, superseded by the mapped pipeline. |

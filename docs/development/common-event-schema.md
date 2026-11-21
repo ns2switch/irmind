@@ -292,13 +292,13 @@ This is a proposed tool shape, not a new CLI command. One category/type selector
 
 For `neighbors`/`path`, event predicates apply to every supporting record at every hop, not just the initial entity lookup. Role predicates apply to the selected observations, not to the entity's global identity. Preserve current caps: up to 20 returned neighbors, 4,096 sampled matching records, three path hops, 200 expanded entities, 50 candidate neighbors per expansion and the 10-second query deadline. Keep token/result limits, cancellation, per-artifact hash verification and partial/truncated labels. The implementation must test any narrower tool-specific limits too.
 
-Mixed old/new cases remain queryable. Do not infer a failure outcome for a legacy record from a familiar text key. Unmapped legacy classifications and unspecified roles do not match the corresponding typed filter; results report incomplete schema coverage. Distinguish "no matching classified events" from "no such activity occurred". With no new filters, historical queries retain their existing behavior and legacy observations.
+Mapped V3 cases can contain classified and unclassified events. The typed filters match the reported category, outcome and role. Unclassified events and unspecified roles can reduce coverage, which results report. Distinguish "no matching classified events" from "no such activity occurred".
 
 ## Compatibility and explicit migration
 
 Increment every parser/normalizer version whose output changes. Declarative definitions/engine versions are pinned by their signed hash; module code upgrades never reinterpret an old signed definition in place. Connector normalization versions are pinned independently of live API response versions. The source manifest, artifact schema and builder together identify how a generation was produced.
 
-Existing V1 and V2 cases remain readable and exportable without migration. Keep strict historical readers and existing goldens. Reading a case cannot reparse it, change its source manifest or add inferred categories. Historical raw fields remain accessible, with guarded display and the existing parser-retirement caveats. This does not promise byte reconstruction for parser versions already retired before this proposal.
+V1 and V2 case formats require their creating version. The current version offers re-ingestion of verified originals into a new case. Opening a supported case preserves its source manifests and recorded classifications. See [the current case format policy](../cases.md#cases-and-exports-from-an-earlier-version). The remainder of this section records the deferred migration design.
 
 Reuse the existing explicit migration **workflow**, not its precision-only authorization. Propose a new, domain-separated `CommonEventMigrationV1` record that binds:
 

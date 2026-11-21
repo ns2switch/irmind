@@ -1,5 +1,7 @@
 # Large-case custody format
 
+> **Status.** Implemented for early custody formats and superseded by [mapped V3 artifacts](../source-mapping-design.md) and [current case formats](../../cases.md).
+
 This page is for maintainers reviewing the versioned large-case custody format. The signed audit encoding and seal challenge remain unchanged. Legacy v3 exports remain verifiable; cases with source manifests use streaming v4 packages.
 
 ## Legacy constraint

@@ -270,19 +270,19 @@ The [analyst-approved acceptance decision](decisions.md#analyst-approved-release
 
 Next, implement EVTX as an isolated official decoder helper and request dependency/distribution review before merging. Then implement experimental Elastic and Chronicle connectors, requesting review before introducing JWT dependencies or new credentials. Prepare v0.2.0 with a complete changelog, optional V1→V2 migration guidance and the existing signatures, attestations, SBOM and verified installers. Opening a case never performs an implicit migration.
 
-## Current release and common-schema sequence
+## Historical release and common-schema sequence
 
-The [public roadmap](roadmap.md) defines the current order; earlier milestone and phase notes are historical where they differ. Finish the restored Zeek/Suricata modules and publish v0.2.0 with artifact V2, optional explicit precision migration, export V5 and the isolated EVTX helper. No schema-common implementation or new SIEM connector is part of that release.
+The [public roadmap](roadmap.md) defines the current order. The v0.2 plan was to finish the restored Zeek/Suricata modules and publish v0.2.0 with artifact V2, optional explicit precision migration, export V5 and the isolated EVTX helper. No schema-common implementation or new SIEM connector is part of that release.
 
 For v0.3, implement the [common event schema](https://github.com/ns2switch/irmind/blob/6dfa5ef620f044892dbf1cfac9f27d5ffed22bbb/docs/development/common-event-schema.md) in separate core and mapping changes. The core covers types, fixed codes, physical schemas, writer/readers, bounded typed filters and verify/export; the approved SourceDecoder → frozen SourceMapper pipeline produces V3 artifacts and export V6. No interpretation is added to parsers. A source with no mapping is explicitly unclassified; all current parsers provide a raw decoder; there is no historical ingestion route. Review the core before merging it. Initial mappings cover EVTX, Linux authentication/auditd, CloudTrail, ECS, OCSF, Zeek and Suricata. Community issues cover remaining mappings. Elastic and Chronicle follow the core and still require credential/dependency review.
 
-CommonEventMigrationV1 is deferred: existing cases remain readable, with no automatic semantic migration. Re-ingest verified originals into a new case when new classifications are needed. Benchmark 1 GiB representative sources three times and the complete 15 GB matrix once, in release builds on the same runner class. Keep current targets.
+CommonEventMigrationV1 is deferred. Earlier case formats require their creating executable. Re-ingest verified originals into a new case when new classifications are needed. Benchmark 1 GiB representative sources three times and the complete 15 GB matrix once, in release builds on the same runner class. Keep current targets.
 
 Skills move to v0.4, subagents to v0.5, public launch follows subagents, source-side queries move to v0.6 and detection/reports/engine API to v0.7.
 
 ## v0.2.0 release scope
 
-The release includes precise artifact V2 in the CLI/TUI/demo, optional explicit V1 precision migration, mixed-generation export V5, isolated EVTX and the restored experimental Zeek/Suricata modules. It does not include Elastic, Chronicle or the new common event schemas. Existing cases stay readable and never migrate on open. Semantic migration remains deferred; re-ingestion into a new case is available.
+The release includes precise artifact V2 in the CLI/TUI/demo, optional explicit V1 precision migration, mixed-generation export V5, isolated EVTX and the restored experimental Zeek/Suricata modules. It does not include Elastic, Chronicle or the new common event schemas. That release retained V1 case readers and never migrated on open. Semantic migration remains deferred; re-ingestion into a new case is available.
 
 Keep the evaluation-only warning. H5 is accepted by analyst decision, with the greeting and a later [partial real-model investigation](manual-validation.md#result-record) recorded. Outstanding hash-citation, `/verify`, export and live-connector checks remain pending; this is not validation for real incidents. Signed release assets use the existing tag workflow with main/helper SBOMs, Sigstore, provenance and clean installer checks. Native signing/notarization and the recorded post-release performance work remain separate.
 

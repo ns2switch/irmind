@@ -396,7 +396,9 @@ The local Linux detect/parse ASAN fuzz run completed a 600-second budget (601 se
 
 ## Timestamp and host-partition comparison
 
-The release-only benchmark compares the current V1 writer with the explicit V2 writer using identical source bytes and four-source batches on the same standard Linux runner. V1/V2 here identify artifact writers, not retired parser versions; both use current readers. It retains the 1 GB and 15 GB CloudTrail corpus and adds 15 GB journald endpoint corpora with exactly 1, 64, 1,024 and 1,025 hosts. Each endpoint file belongs to one host; the extra 24/25 hosts share the first files so the 1,000-file corpus contains every declared host. The production Linux parser preserves source microseconds. Source generation and parser selection are deterministic; both writers record an explicit parser selection.
+These measurements record the historical V1/V2 rollout. Current builds use mapped V3.
+
+The release-only benchmark compared the then-default V1 writer with the explicit V2 writer using identical source bytes and four-source batches on the same standard Linux runner. V1/V2 here identify artifact writers, not retired parser versions; both use current readers. It retains the 1 GB and 15 GB CloudTrail corpus and adds 15 GB journald endpoint corpora with exactly 1, 64, 1,024 and 1,025 hosts. Each endpoint file belongs to one host; the extra 24/25 hosts share the first files so the 1,000-file corpus contains every declared host. The production Linux parser preserves source microseconds. Source generation and parser selection are deterministic; both writers record an explicit parser selection.
 
 The wall timer includes source generation, file writes/removal, selected-parser ingestion, signed custody and final compaction. The phase counters exclude source generation. Compare the two writers on the same scenario; these wall measurements are not isolated parser throughput.
 

@@ -182,7 +182,7 @@ The first target remains `irmind-common-event-v1`, derived from ECS 9.5 with its
 
 A future ECS 9.6-derived `irmind-common-event-v2` has its own domain types, code table, encoder and mappings. It does not mutate V1. A mapper declares exactly one target; shared Rust helpers may support separate mapper registrations. A new target gets distinct physical IDs whenever codes or meanings differ, even if column types happen to be identical. The approved V1 physical IDs are not reused with different semantics.
 
-One case may contain active sources mapped to different targets, plus historical V1/V2 artifacts. Query adapters translate a requested semantic selector through each target's explicit compatibility table. Unsupported selectors never become unfiltered scans. Results include coverage: sources/records matched, unmapped, legacy, excluded by target or unavailable for that selector. Unknown schema identifiers fail closed; known but unclassified input is valid.
+A future V3 case may contain active sources mapped to different targets. Earlier case and artifact formats require their creating executable. Query adapters translate a requested semantic selector through each target's explicit compatibility table. Unsupported selectors never become unfiltered scans. Results include coverage: sources/records matched, unmapped, legacy, excluded by target or unavailable for that selector. Unknown schema identifiers fail closed; known but unclassified input is valid.
 
 Default queries use one active generation per source-record set and deduplicate event references by the immutable source/ordinal key. Keeping V1 and V2 target generations for comparison must not double-count events. Cross-target entity merging requires an explicit lossless identity-compatibility rule; equal strings alone are insufficient. Role membership is not a directed attack edge.
 
@@ -226,9 +226,12 @@ Full reproducibility verification regenerates decoded records with the signed pa
 
 ### Preserve today's output
 
-Retain the current published parser+legacy-normalizer implementations for their historical signed identities. Refactoring shared decoding must pass byte-for-byte legacy GraphRecord/Parquet golden and reconstruction tests. Published parser versions must not silently acquire new common semantics. Already retired pre-0.1.6 readers do not become supported by this proposal; their existing warnings and re-ingest guidance stay in place.
-
-The new raw-source API is separate and explicitly versioned. A parser without that capability keeps its published legacy route and reports no new-source-contract coverage; it is never adapted by reading normalized JSON. On the new route, a raw decoder must exist before the unmapped constructor can run. Adding it may share framing code, but cannot reconstruct a SourceRecord by reparsing the lossy normalized `GraphRecord.text`. Source-contract/framing changes get a new decoder identity; mapping-only changes do not. Opening a case never reclassifies it.
+The current release uses mapped V3 throughout. Earlier formats and their
+decoder/normalizer identities require the creating executable. All supported
+parsers supply a raw SourceDecoder. A decoder may share framing code. It derives
+SourceRecord from the verified evidence bytes, and a source-contract or framing
+change requires a new decoder identity. A mapping-only change keeps the decoder
+identity. Opening a case preserves its recorded classifications.
 
 ### Deferred: cache decoded records or reread originals?
 
