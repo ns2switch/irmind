@@ -79,7 +79,7 @@ pub fn translate(
     bindings.push(binding("date_from", "text", json!(&from[..10])));
     bindings.push(binding("date_to", "text", json!(&to[..10])));
     let sql = format!(
-        "SELECT eventtime,eventname,eventid,recipientaccountid,sourceipaddress,useridentity FROM {database}.{table} WHERE {} ORDER BY eventtime,eventid LIMIT {}",
+        "SELECT eventtime,eventname,eventid,recipientaccountid,sourceipaddress,json_format(CAST(useridentity AS JSON)) AS useridentity,eventversion,eventsource,awsregion,useragent,errorcode,errormessage,requestparameters,responseelements,eventtype FROM {database}.{table} WHERE {} ORDER BY eventtime,eventid LIMIT {}",
         where_parts.join(" AND "),
         query.limit()
     );
@@ -90,7 +90,7 @@ pub fn translate(
             "version": "1",
             "sha256": irmind_app::hex(&irmind_app::sha256(b"irmind-athena-cloudtrail-v1"))
         },
-        "required_fields": ["eventid", "eventname", "eventtime", "recipientaccountid", "sourceipaddress", "useridentity"],
+        "required_fields": ["awsregion","errorcode","errormessage","eventid","eventname","eventsource","eventtime","eventtype","eventversion","recipientaccountid","requestparameters","responseelements","sourceipaddress","useragent","useridentity"],
         "order": ["eventtime", "eventid"]
     });
     CompiledSourceQueryV1::decode(&canonical_query_json(&snapshot)?)

@@ -213,16 +213,11 @@ impl Athena {
         {
             return Err(SourceQueryError::Limit.into());
         }
-        let next_token = match page.get("NextToken") {
-            None => None,
-            Some(token) => Some(
-                token
-                    .as_str()
-                    .filter(|t| !t.is_empty() && t.len() <= 4096)
-                    .ok_or(SourceQueryError::Invalid)?
-                    .into(),
-            ),
-        };
+        let next_token = page
+            .get("NextToken")
+            .and_then(Value::as_str)
+            .filter(|token| !token.is_empty() && token.len() <= 4096)
+            .map(str::to_owned);
         let chunks: ObjectStream = Box::pin(futures_util::stream::iter(
             (0..bytes.len()).step_by(64 * 1024).map(move |offset| {
                 Ok(bytes[offset..(offset + 64 * 1024).min(bytes.len())].to_vec())
