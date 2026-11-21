@@ -353,9 +353,9 @@ impl SourceQueryPlanV1 {
                 Ok(())
             }
             ("query-athena" | "query-bigquery", QueryAccounting::ScanPriced, Some(limit))
-                if preflight
-                    .provider_ceiling
-                    .is_some_and(|ceiling| ceiling > 0 && ceiling <= limit)
+                if preflight.provider_ceiling.is_some_and(|ceiling| {
+                    (super::QUERY_MIN_BILLED_BYTES..=limit).contains(&ceiling)
+                }) && preflight.estimate.unit == "billed_bytes"
                     && preflight.estimate.value.is_none_or(|bytes| bytes <= limit) =>
             {
                 Ok(())

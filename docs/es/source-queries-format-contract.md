@@ -218,10 +218,26 @@ prueba. En otro caso conservar desconocido/reserva y bloquear trabajo incompatib
 Poll/fetch no reinician plazo, frecuencia ni filas/bytes acumulados.
 
 Una liquidación por reserva, enlazada a observación terminal y retención real.
-Procesados, escaneados y facturados separados; desconocidos `null` con motivo.
-Cancelar también puede consumir. El cutoff de Athena dispara cancelación, no es
-frontera física exacta: registrar exceso y bloquear nuevas consultas; no disponible
-si la organización exige ese tope exacto. No extender deuda de tokens al escaneo.
+Los bytes procesados, escaneados y facturados quedan separados. Para una fuente
+de pago, `scan_charged` coincide con `usage.billed_bytes`. Si faltan los bytes
+facturados, la reserva queda pendiente aunque se conozca el escaneo. Antes del
+envío se reserva el techo firmado completo en bytes facturables. La estimación
+del *dry run* no reduce la reserva.
+
+- BigQuery bajo demanda usa `totalBytesBilled` para liquidar y el techo reservado
+  como `maximumBytesBilled`. Los bytes procesados por sí solos no dan una
+  estimación fiable de la facturación. El mínimo es de 10.485.760 bytes por tabla
+  referenciada y por consulta. [Precios de Google](https://cloud.google.com/bigquery/pricing) · [Estadísticas de BigQuery](https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/Job#JobStatistics2).
+- Athena sobre S3 bajo demanda redondea hacia arriba el umbral del workgroup y
+  el escaneo terminal a unidades de 1.048.576 bytes, con un mínimo de diez
+  unidades. Un fallo definitivo no genera cargo de escaneo de Athena. Cancelar
+  puede generar un cargo. El umbral dispara la cancelación, por lo que se cobra
+  cualquier exceso conocido y se bloquean nuevas consultas al agotar el
+  presupuesto. La fuente no está disponible si la organización exige un límite
+  físico exacto. [Precios de Athena](https://aws.amazon.com/athena/pricing/) · [Límites del workgroup](https://docs.aws.amazon.com/athena/latest/ug/workgroups-setting-control-limits-cloudwatch.html).
+
+Los contadores desconocidos se registran como `null` con un motivo. La deuda de
+tokens del modelo no concede capacidad de escaneo.
 
 Timeout Azure no reconciliable queda unknown y ocupa el hueco de ejecución.
 Recuperación propuesta: reconocimiento Analyst firmado tras la vida máxima
@@ -273,7 +289,7 @@ campos nullable presentes. J ordena claves; la lista define pertenencia.
 | SourceQueryReservationV1 / source-query-reservation-v1 | plan,task_id,approval,allocation_revision,scan_bytes,retained_rows,retained_bytes,at; Agent/broker. approval=null solo si todas las reglas lo permiten. |
 | SourceQueryExecutionV1 / source-query-execution-v1 | plan,reservation,previous,attempt,phase,execution_key,provider_id,provider_request_id,started_at,observed_at,provider_at,status,usage,source_observation,reason; Agent. previous encadena observaciones del intento. |
 | SourceQueryResultV1 / source-query-result-v1 | plan,reservation,execution,capture_sha256,capture_bytes,page_count,page_commitment,row_count,rejected_rows,completeness,coverage,decoder,mapping,at; Agent. execution anterior, nunca liquidación futura. |
-| SourceQuerySettlementV1 / source-query-settlement-v1 | plan,reservation,execution,result,scan_charged,retained_rows,retained_bytes,usage,uncertainty,at; Agent/broker, una sola vez. result=null sin captura admitida; no liquidar normalmente escaneo desconocido. |
+| SourceQuerySettlementV1 / source-query-settlement-v1 | plan,reservation,execution,result,scan_charged,retained_rows,retained_bytes,usage,uncertainty,at; Agent/broker, una sola vez. result=null sin captura admitida; la facturación desconocida impide la liquidación ordinaria. |
 | SourceQueryRecoveryV1 / source-query-recovery-v1 | plan,reservation,execution,action,reason,not_before,at; Analyst. Solo reconocer ejecución Analytics expirada no reconciliable; no concede escaneo ni afirma éxito. |
 
 SourceQueryExecutionV1.phase: intent, accepted, running o terminal; status:
