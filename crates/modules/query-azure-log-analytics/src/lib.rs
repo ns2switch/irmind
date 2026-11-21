@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
+mod capture;
 mod compiler;
 mod protocol;
 #[cfg(test)]
@@ -25,6 +26,8 @@ struct ReadyResponse {
     reference: QueryExecutionRef,
     response: reqwest::Response,
 }
+
+pub use capture::AzureAnalyticsCaptureDecoder;
 
 pub struct AzureLogAnalytics {
     client: reqwest::Client,
