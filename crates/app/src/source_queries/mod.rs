@@ -1,5 +1,8 @@
 //! Bounded, principal-only source-query admission. Providers never grant authority.
+mod acquisition;
 mod admission;
+mod budget;
+pub use budget::SourceQueryBudgetStatus;
 mod broker;
 mod canonical;
 mod capture;
@@ -7,6 +10,9 @@ mod compile;
 mod completion;
 mod export;
 mod journal;
+mod page;
+mod plan_execution;
+mod planning;
 mod ports;
 mod receipts;
 mod recovery;
@@ -14,22 +20,25 @@ mod reservation;
 #[cfg(test)]
 mod tests;
 mod types;
+pub use acquisition::AcquiredSourceQuery;
 pub use admission::{SignedSourceQueryAdmission, SourceQueryAuthority};
 pub use broker::{SourceQueryBroker, SourceQueryHold, SourceQueryResources};
 pub use canonical::{canonical_query_json, query_content_id};
 pub use capture::{
-    CaptureColumn, CaptureError, CapturePageCompleteness, CapturePageMetadata, QueryCaptureSummary,
-    QueryCaptureWriter, verify_query_capture,
+    CaptureColumn, CaptureError, CapturePageCompleteness, CapturePageMetadata, QueryCapturePage,
+    QueryCaptureSummary, QueryCaptureWriter, read_query_capture_pages, verify_query_capture,
 };
 pub use compile::*;
 pub use completion::{
-    SignedSourceQuerySettlement, SourceQueryExecutionV1, SourceQueryResultV1,
-    SourceQuerySettlementV1,
+    SignedSourceQuerySettlement, SourceQueryExecutionV1, SourceQueryLimitNotice,
+    SourceQueryResultV1, SourceQuerySettlementV1,
 };
 pub use export::{
     verify_query_capture_section, write_query_capture_section, write_stored_query_capture_section,
 };
 pub use journal::SourceQueryJournal;
+pub use page::{InspectedQueryPage, QueryPageInput, QueryPageSchema, SourceQueryPageDecoder};
+pub use planning::PreparedSourceQuery;
 pub use ports::*;
 pub(crate) use receipts::BudgetReplay;
 pub use receipts::{
@@ -82,6 +91,8 @@ pub enum SourceQueryError {
     AlreadySettled,
     #[error("source-query field or operator has no exact translation")]
     Unsupported,
+    #[error("source-query page changed the columns or types fixed by its first page")]
+    PageSchemaChanged,
     #[error("source-query module is unavailable")]
     Unavailable,
 }
@@ -89,4 +100,16 @@ impl From<SourceQueryError> for crate::AppError {
     fn from(value: SourceQueryError) -> Self {
         Self::Policy(value.to_string())
     }
+}
+
+/// Collect notices only after authenticating the case chain and query journal.
+pub(crate) fn result_limit_notices(
+    entries: &[crate::SignedEntry],
+) -> Result<Vec<SourceQueryLimitNotice>, SourceQueryError> {
+    entries
+        .iter()
+        .filter(|entry| entry.kind == crate::AuditEventKind::SourceQueryResultV1)
+        .map(|entry| SourceQueryResultV1::decode(entry.payload.as_bytes()))
+        .filter_map(|result| result.map(|item| item.limit_notice()).transpose())
+        .collect()
 }

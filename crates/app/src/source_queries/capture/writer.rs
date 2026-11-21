@@ -1,4 +1,5 @@
 use super::{
+    super::{SourceQueryError, SourceQueryPageDecoder, page::QueryPageSequence},
     CaptureColumn, CaptureError, Decoder, Descriptor, EvidenceHash, MAX_CHUNK, Page,
     QUERY_CAPTURE_MAGIC, QUERY_MAX_BYTES, QUERY_MAX_PAGES, QUERY_MAX_RECORD_BYTES, QUERY_MAX_ROWS,
     Read, Seek, SeekFrom, SourceDecoderIdentityV1, Write, checked_total, checked_value, io,
@@ -43,6 +44,7 @@ pub struct QueryCaptureWriter<S> {
     page_bytes: u64,
     admit_bytes: u64,
     admit_rows: u64,
+    sequence: QueryPageSequence,
 }
 
 impl<S: Read + Write + Seek> QueryCaptureWriter<S> {
@@ -68,7 +70,54 @@ impl<S: Read + Write + Seek> QueryCaptureWriter<S> {
             page_bytes: 0,
             admit_bytes,
             admit_rows,
+            sequence: QueryPageSequence::default(),
         })
+    }
+
+    /// Check the exact decoder version and provider schema before adding the page.
+    /// The input is already bounded by the held reservation; framing overhead is
+    /// checked by `stage_page` before any copy into the capture staging file.
+    pub fn stage_inspected_page(
+        &mut self,
+        page: &mut (impl Read + Seek),
+        decoder: &dyn SourceQueryPageDecoder,
+        next_token: Option<&str>,
+        acquisition_rows: u64,
+        cancel: &CancellationToken,
+    ) -> Result<Option<String>, crate::AppError> {
+        let identity = decoder.identity();
+        if identity.name != self.decoder.id() || identity.version != self.decoder.version() {
+            return Err(SourceQueryError::Invalid.into());
+        }
+        let inspection = decoder.inspect_page(
+            page,
+            self.pages.len() as u64,
+            self.sequence.schema(),
+            cancel,
+        )?;
+        if inspection.next_token.as_deref() != next_token {
+            return Err(SourceQueryError::Unresolved.into());
+        }
+        let next = inspection.next_token.clone();
+        let mut sequence = self.sequence.clone();
+        let remaining = acquisition_rows
+            .min(self.admit_rows)
+            .checked_sub(self.rows)
+            .ok_or(SourceQueryError::Limit)?;
+        let metadata = sequence.accept(inspection, remaining)?;
+        page.rewind().map_err(read_error)?;
+        self.stage_page(metadata, page, cancel)?;
+        self.sequence = sequence;
+        Ok(next)
+    }
+
+    pub fn inspected_counts(&self) -> (u64, u64, bool) {
+        self.sequence.counts()
+    }
+
+    /// Upper bound for the next body, before provider metadata framing.
+    pub const fn remaining_capture_bytes(&self) -> u64 {
+        self.admit_bytes.saturating_sub(self.page_bytes)
     }
 
     pub fn stage_page(

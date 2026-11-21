@@ -50,6 +50,12 @@ pub(super) const COMMANDS: &[Command] = &[
         slash: true,
     },
     Command {
+        name: "source-query",
+        description: "Show and explicitly approve an exact signed source-query plan",
+        shortcut: "",
+        slash: true,
+    },
+    Command {
         name: "objects",
         description: "List scoped cloud objects with an estimated transfer size",
         shortcut: "",

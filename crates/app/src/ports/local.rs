@@ -370,6 +370,7 @@ pub trait ExportVerifier: Send + Sync {
             source_manifests: 0,
             source_bytes_verified: 0,
             source_bytes_unavailable: 0,
+            source_query_limits: Vec::new(),
         })
     }
 }
@@ -382,6 +383,7 @@ pub struct ExportVerification {
     pub source_manifests: usize,
     pub source_bytes_verified: usize,
     pub source_bytes_unavailable: usize,
+    pub source_query_limits: Vec<crate::source_queries::SourceQueryLimitNotice>,
 }
 
 pub trait LargeCaseExporter: Send + Sync {

@@ -2426,12 +2426,18 @@ dependencies = [
 name = "irmind-http"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "reqwest",
+ "ring",
+ "secrecy",
+ "serde",
+ "serde_json",
  "sha2 0.10.9",
  "tempfile",
  "tokio",
  "tokio-rustls",
  "tokio-util",
+ "zeroize",
 ]
 
 [[package]]
@@ -3383,11 +3389,9 @@ dependencies = [
  "reqwest",
  "ring",
  "secrecy",
- "serde",
  "serde_json",
  "tempfile",
  "tokio",
- "zeroize",
 ]
 
 [[package]]

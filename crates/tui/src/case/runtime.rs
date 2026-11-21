@@ -431,6 +431,8 @@ fn is_result_card_label(label: &str) -> bool {
     matches!(
         label,
         "SIEM alert"
+            | "Show source query plan"
+            | "Acquire source query"
             | "Cloud objects"
             | "Cloud object"
             | "Entity lookup"

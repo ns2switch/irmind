@@ -88,6 +88,7 @@ fn execution_leases_bind_the_exact_source_phase_and_job() {
     let another = QueryExecutionRef::new(&plan, 1, "native-job-b").unwrap();
     let source: ResolvedQuerySourceV1 = serde_json::from_value(wire["source"].clone()).unwrap();
     let lease = AdmittedSourceQuery {
+        attempt: 1,
         case_id: case(),
         plan,
         reservation: SourceQueryReservationV1::decode(RESERVATION)
@@ -97,6 +98,7 @@ fn execution_leases_bind_the_exact_source_phase_and_job() {
         source,
         compiled: serde_json::from_value(wire["compiled"].clone()).unwrap(),
         limits: serde_json::from_value(wire["limits"].clone()).unwrap(),
+        source_metadata: wire["preflight"]["source_metadata"].clone(),
         execution_key: "intent-a".into(),
         phase: SourceQueryLeasePhase::Fetch,
         execution: Some(job.clone()),

@@ -22,13 +22,21 @@ impl ParquetStore {
             .get(binding.profile())
             .ok_or_else(invalid_source)?;
         let sources = group_sources(profile, inputs)?;
-        let catalog = self
-            .mapping_catalog
-            .as_ref()
-            .ok_or_else(invalid_source)?
+        let first = sources.first().ok_or_else(invalid_source)?;
+        let active = self.mapping_catalog.as_ref().ok_or_else(invalid_source)?;
+        let decoder = first.0.decoder();
+        if first.0.reference().kind() == irmind_domain::SourceKind::ToolResult
+            && !active.supports_decoder(decoder.id(), decoder.version())
+        {
+            return Err(AppError::Policy(format!(
+                "Capture reconstruction requires source decoder {} {}. Use an IRMind build that includes that version",
+                decoder.id(),
+                decoder.version()
+            )));
+        }
+        let catalog = active
             .frozen_for_profile(profile)
             .map_err(irmind_app::source_mapping::MappingError::into_app)?;
-        let first = sources.first().ok_or_else(invalid_source)?;
         let selection = catalog
             .decoder_selection(first.0.decoder().id(), first.0.decoder().version())
             .map_err(irmind_app::source_mapping::MappingError::into_app)?;
