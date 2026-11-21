@@ -1,7 +1,8 @@
 use super::{
     AdmittedSourceQuery, SignedSourceQueryAdmission, SourceQueryAuthority, SourceQueryError,
     SourceQueryExecutionV1, SourceQueryJournal, SourceQueryLeasePhase, SourceQueryPlanV1,
-    SourceQueryReservationV1, SubmitObservationV1, canonical_query_json,
+    SourceQueryReservationV1, SubmitObservationV1, admission::require_active_adoption,
+    canonical_query_json,
 };
 use crate::{
     Actor, AppError, AuditEventKind, AuthorizedCall, CancellationToken, CaseId, CaseScope, Engine,
@@ -54,8 +55,11 @@ impl Engine<'_> {
         let Actor::Agent(principal) = agent else {
             return Err(SourceQueryError::Scope.into());
         };
+        let _global_lock = self.audit_log.lock_global_operations()?;
         let operations = self.audit_log.global_operations()?;
         self.verify_global_operation_entries(&operations)?;
+        let plan = SourceQueryPlanV1::decode(admission.plan.payload.as_bytes())?;
+        require_active_adoption(&plan, &operations)?;
         let mut entries = self.audit_log.entries(case)?;
         let contains = |entry: &crate::SignedEntry| {
             entry
