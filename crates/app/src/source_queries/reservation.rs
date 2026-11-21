@@ -25,15 +25,18 @@ impl Engine<'_> {
             case,
             admission,
             requires_policy_approval,
+            false,
             cancel,
         )
     }
 
+    #[allow(clippy::too_many_lines)]
     fn persist_source_query_reservation_unlocked(
         &self,
         case: &CaseId,
         admission: SignedSourceQueryAdmission<'_>,
         requires_policy_approval: bool,
+        dispatch: bool,
         cancel: &CancellationToken,
     ) -> Result<(), AppError> {
         self.verify_unlocked_cancelable(case, cancel)?;
@@ -97,6 +100,16 @@ impl Engine<'_> {
         }
         let before = entries.len();
         entries.extend([admission.reservation.clone(), admission.intent.clone()]);
+        if dispatch {
+            entries.push(self.signed_entry_after(
+                case,
+                entries.last(),
+                crate::AuditOrigin::Policy,
+                AuditEventKind::Allowed,
+                Tool::SourceQuery.as_str(),
+                None,
+            )?);
+        }
         // Replay also detects a duplicate, previously decided or stale plan.
         SourceQueryJournal::replay(&entries, &operations, self.verifier.as_ref(), cancel)?;
         if cancel.is_cancelled() {
@@ -235,6 +248,7 @@ impl Engine<'_> {
             case,
             admission,
             requires_policy_approval,
+            true,
             cancel,
         )
     }

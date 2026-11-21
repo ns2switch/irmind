@@ -25,6 +25,23 @@ pub struct AcquiredSourceQuery {
     pub completeness: Vec<String>,
 }
 
+impl AcquiredSourceQuery {
+    pub fn display_summary(&self) -> String {
+        let coverage = if self.completeness.is_empty() {
+            "complete".to_owned()
+        } else {
+            self.completeness.join(", ")
+        };
+        format!(
+            "Source query capture {}. Rows indexed {}, rows rejected {}. Coverage {}.",
+            self.capture.as_str(),
+            self.rows,
+            self.rejected_rows,
+            coverage,
+        )
+    }
+}
+
 struct StagedQuery {
     file: tempfile::NamedTempFile,
     summary: super::QueryCaptureSummary,
@@ -337,7 +354,7 @@ impl Engine<'_> {
         Ok(record)
     }
 
-    fn sign_query_frame(
+    pub(super) fn sign_query_frame(
         &self,
         case: &CaseId,
         previous: Option<&SignedEntry>,
@@ -485,7 +502,7 @@ async fn download_page(
     }
 }
 
-fn query_payload(record: &impl serde::Serialize) -> Result<String, AppError> {
+pub(super) fn query_payload(record: &impl serde::Serialize) -> Result<String, AppError> {
     String::from_utf8(canonical_query_json(record)?).map_err(|_| SourceQueryError::Invalid.into())
 }
 

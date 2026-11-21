@@ -90,9 +90,41 @@ fn engine_query_capture_survives_reopen_reconstruction_seal_and_v9_export() {
         .unwrap(),
         1
     );
+    check_missing_capture_decoder(&engine, &case, root.path(), decoder.as_ref(), &cancel);
     let notices = check_citation_notices(&engine, &case, &hash, &cancel);
     engine.seal(&case).unwrap();
     check_v9_export(root.path(), store.as_ref(), &case, &notices, &cancel);
+}
+
+fn check_missing_capture_decoder(
+    engine: &Engine<'_>,
+    case: &CaseId,
+    root: &Path,
+    parser: &dyn irmind_app::StreamingEventParser,
+    cancel: &CancellationToken,
+) {
+    let empty_catalog = Arc::new(irmind_app::source_mapping::MappingCatalog::default());
+    let store = LocalStore::open_mapped(root, empty_catalog).unwrap();
+    let error = irmind_app::LargeCaseUseCases {
+        engine,
+        store: &store,
+        parser,
+    }
+    .verify_parquet_rebuild(case, root, cancel)
+    .unwrap_err()
+    .to_string();
+    let identity = TestDecoder.identity();
+    assert!(
+        error.contains(&format!(
+            "Capture reconstruction requires source decoder {} {}.",
+            identity.name, identity.version
+        )),
+        "{error}"
+    );
+    assert!(
+        error.contains("Use an IRMind build that includes that version"),
+        "{error}"
+    );
 }
 
 fn check_citation_notices(
@@ -450,10 +482,18 @@ mod signed_dispatch {
         async fn preflight(
             &self,
             _: &irmind_domain::AuthorizedCall,
-            _: &CompiledSourceQueryV1,
+            compiled: &CompiledSourceQueryV1,
             _: &CancellationToken,
         ) -> Result<QueryPreflightV1, AppError> {
-            Err(SourceQueryError::Unavailable.into())
+            let plan: serde_json::Value = serde_json::from_slice(include_bytes!(
+                "../../../../../../docs/development/source-query-format-vectors/plan.json"
+            ))
+            .unwrap();
+            let mut preflight: QueryPreflightV1 =
+                serde_json::from_value(plan["preflight"].clone()).unwrap();
+            preflight.plan_digest =
+                irmind_app::hex(&irmind_app::sha256(&canonical_query_json(compiled)?));
+            Ok(preflight)
         }
 
         async fn submit(
@@ -470,8 +510,9 @@ mod signed_dispatch {
             let _lock = irmind_app::Repository::lock_case(self.store.as_ref(), lease.case_id())?;
             let entries = self.store.entries(lease.case_id())?;
             assert!(
-                matches!(&entries[entries.len() - 2..], [reservation, intent]
-                if reservation.kind == AuditEventKind::SourceQueryReservationV1
+                matches!(&entries[entries.len() - 3..], [reservation, intent, dispatch]
+                if dispatch.kind == AuditEventKind::Allowed
+                    && reservation.kind == AuditEventKind::SourceQueryReservationV1
                     && intent.kind == AuditEventKind::SourceQueryExecutionV1
                     && intent.prev == reservation.hash)
             );
@@ -582,19 +623,24 @@ mod signed_dispatch {
 
     #[test]
     fn ambiguous_submission_is_only_called_once_after_durable_intent() {
-        signed_dispatch(false);
+        signed_dispatch(false, false);
     }
 
     #[test]
     fn signed_dispatch_fetches_and_atomically_publishes_a_partial_capture() {
-        signed_dispatch(true);
+        signed_dispatch(true, false);
+    }
+
+    #[test]
+    fn signed_dispatch_through_the_normal_tool_path_requires_exact_approval() {
+        signed_dispatch(true, true);
     }
 
     #[allow(
         clippy::too_many_lines,
         reason = "Use one signed fixture for both dispatch outcomes"
     )]
-    fn signed_dispatch(complete: bool) {
+    fn signed_dispatch(complete: bool, from_tool: bool) {
         let root = tempfile::tempdir().unwrap();
         let identity = TestDecoder.identity();
         let (catalog, template) = synthetic_catalog_and_result(identity);
@@ -627,6 +673,13 @@ mod signed_dispatch {
                 Arc::new(TestDecoder),
             )
             .unwrap();
+        queries
+            .bind_source(
+                serde_json::from_value(plan["source"].clone()).unwrap(),
+                serde_json::from_value(plan["limits"].clone()).unwrap(),
+                catalog.manifests().next().unwrap().identity().clone(),
+            )
+            .unwrap();
         let decoder = Arc::new(
             catalog
                 .decoder_selection(identity.name, identity.version)
@@ -650,6 +703,10 @@ mod signed_dispatch {
             configuration: &configuration,
         };
         let cancel = CancellationToken::new();
+        if from_tool {
+            check_tool_plan(&engine, &case, &store, &authorized, &executor, &cancel);
+            return;
+        }
         let mut tampered = chain[3].clone();
         tampered.sig[0] ^= 1;
         assert!(
@@ -683,6 +740,50 @@ mod signed_dispatch {
         );
         assert_eq!(executor.submissions.load(Ordering::SeqCst), 1);
         verify_unknown_observation(&engine, &store, &case);
+    }
+
+    fn check_tool_plan(
+        engine: &Engine<'_>,
+        case: &CaseId,
+        store: &LocalStore,
+        authorized: &irmind_domain::AuthorizedCall,
+        executor: &SimulatedExecutor,
+        cancel: &CancellationToken,
+    ) {
+        let feedback = engine
+            .request_tool_as_analyst(
+                case,
+                irmind_app::ProposedCall {
+                    tool: irmind_app::Tool::SourceQuery,
+                    args: authorized.proposal_args().clone(),
+                },
+                cancel,
+            )
+            .unwrap();
+        assert!(feedback.contains("requires analyst approval"));
+        assert_eq!(executor.submissions.load(Ordering::SeqCst), 0);
+        let last = store.last_entry(case).unwrap().unwrap();
+        assert_eq!(last.kind, AuditEventKind::SourceQueryPlanV1);
+        let plan = SourceQueryPlanV1::decode(last.payload.as_bytes()).unwrap();
+        let id = plan.content_id().unwrap();
+        assert!(feedback.contains(&id));
+        assert!(
+            engine
+                .source_query_plan_text(case, &id, cancel)
+                .unwrap()
+                .contains("aws-lab")
+        );
+        let result = engine
+            .run_source_query_plan_blocking(
+                case,
+                &id,
+                "Synthetic analyst confirmed the exact plan",
+                cancel,
+            )
+            .unwrap();
+        assert_eq!(result.rows, 2);
+        assert!(engine.verify(case).is_ok());
+        assert_eq!(executor.submissions.load(Ordering::SeqCst), 1);
     }
 
     fn check_acquired(

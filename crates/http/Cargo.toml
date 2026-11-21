@@ -5,11 +5,21 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
+[features]
+google-service-account = ["dep:base64", "dep:ring", "dep:secrecy", "dep:serde", "dep:serde_json", "dep:zeroize"]
+google-auth-test-support = ["google-service-account"]
+
 [dependencies]
+base64 = { version = "0.22", optional = true }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-native-roots"] }
+ring = { version = "=0.17.14", optional = true }
+secrecy = { version = "0.10", optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
 sha2 = "0.10"
 tokio = { version = "1", default-features = false, features = ["macros"] }
 tokio-util = { version = "0.7", default-features = false }
+zeroize = { version = "1", optional = true }
 
 [dev-dependencies]
 tempfile = "3"
