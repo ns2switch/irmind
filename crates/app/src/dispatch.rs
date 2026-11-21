@@ -56,7 +56,7 @@ impl Engine<'_> {
             ));
         }
         let id_owned = id.clone();
-        let _case_lock = self
+        let case_lock = self
             .blocking_local(move |local| local.repo.lock_case(&id_owned))
             .await?;
         let id_owned = id.clone();
@@ -70,6 +70,12 @@ impl Engine<'_> {
         if case.sealed {
             return Err(AppError::Sealed);
         }
+        let _case_lock = if proposal.tool == Tool::SourceQuery {
+            drop(case_lock);
+            None
+        } else {
+            Some(case_lock)
+        };
         self.execute_proposal_from_origin(&case, proposal, crate::AuditOrigin::Analyst, cancel)
             .await
             .map(|feedback| {
@@ -176,7 +182,7 @@ impl Engine<'_> {
         hash: String,
         cancel: &CancellationToken,
     ) -> Result<Option<crate::source_queries::SourceQueryLimitNotice>, AppError> {
-        if tool != &Tool::SourceQuery {
+        if tool != &Tool::SourceQuery || hash.is_empty() {
             return Ok(None);
         }
         let case = id.clone();
@@ -270,6 +276,9 @@ impl Engine<'_> {
     }
 
     fn pending_unavailable_reason(&self, pending: &PendingApproval) -> Option<&'static str> {
+        if pending.proposal().tool == Tool::SourceQuery {
+            return Some("case policy denied source-query preflight");
+        }
         self.source_unavailable_reason(
             &pending.proposal().tool,
             pending.proposal().args.get("source").map(String::as_str),
@@ -278,7 +287,15 @@ impl Engine<'_> {
 
     fn source_unavailable_reason(&self, tool: &Tool, source: Option<&str>) -> Option<&'static str> {
         match tool {
-            Tool::SourceQuery => Some("source queries require a configured source-query module"),
+            Tool::SourceQuery
+                if !source.is_some_and(|source| {
+                    self.source_queries
+                        .as_ref()
+                        .is_some_and(|ports| ports.available_source(source))
+                }) =>
+            {
+                Some("source queries require a configured source-query module")
+            }
             Tool::SiemSearch | Tool::SiemGetAlert if !self.siem_available(source) => {
                 Some("SIEM source unavailable")
             }

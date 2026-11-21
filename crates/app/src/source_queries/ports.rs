@@ -335,6 +335,14 @@ impl SourceQueryPorts {
         Ok(())
     }
 
+    pub(crate) fn available(&self) -> bool {
+        !self.bindings.is_empty()
+    }
+
+    pub(crate) fn available_source(&self, source: &str) -> bool {
+        self.bindings.contains_key(source)
+    }
+
     pub(super) fn binding(&self, source: &str) -> Result<&QuerySourceBinding, SourceQueryError> {
         self.bindings
             .get(source)

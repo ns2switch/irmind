@@ -9,6 +9,7 @@ mod completion;
 mod export;
 mod journal;
 mod page;
+mod plan_execution;
 mod planning;
 mod ports;
 mod receipts;

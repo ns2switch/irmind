@@ -398,6 +398,13 @@ impl Engine<'_> {
         let mut tools: Vec<_> = tool_catalog::catalog()
             .into_iter()
             .filter(|spec| match spec.name {
+                "source_query" => {
+                    self.source_queries
+                        .as_deref()
+                        .is_some_and(crate::source_queries::SourceQueryPorts::available)
+                        && self.mode == ExecutionMode::Attended
+                        && self.signer.actor() == Actor::Analyst
+                }
                 "siem_search" | "siem_get_alert" => !self.siems.is_empty(),
                 "cloud_audit_events" | "cloud_identity" => !self.cloud_audits.is_empty(),
                 "edr_host_info" => self
