@@ -1,6 +1,7 @@
 mod compaction;
 mod delegation;
 mod limits;
+use limits::TurnLimit;
 mod preparation;
 mod skills;
 mod usage;
@@ -189,7 +190,7 @@ impl Engine<'_> {
             &case.id,
             model,
             &mut turn,
-            "model round limit",
+            TurnLimit::ModelRounds,
             cancel,
             on_text,
         )
@@ -273,7 +274,7 @@ impl Engine<'_> {
         let round = self.shared_round_number(id, turn, round).await?;
         if round.0 > round.1 {
             return self
-                .finish_limited_turn(id, model, turn, "model round limit", cancel, on_text)
+                .finish_limited_turn(id, model, turn, TurnLimit::ModelRounds, cancel, on_text)
                 .await
                 .map(Some);
         }
@@ -281,7 +282,7 @@ impl Engine<'_> {
         let request = turn.request();
         if used_tokens >= turn.budget.model_tokens {
             return self
-                .finish_limited_turn(id, model, turn, "model token limit", cancel, on_text)
+                .finish_limited_turn(id, model, turn, TurnLimit::ModelTokens, cancel, on_text)
                 .await
                 .map(Some);
         }
@@ -401,20 +402,13 @@ impl Engine<'_> {
             .await?;
         if turn.cloud_limit_reached {
             return self
-                .finish_limited_turn(
-                    id,
-                    model,
-                    turn,
-                    "case cloud transfer limit",
-                    cancel,
-                    on_text,
-                )
+                .finish_limited_turn(id, model, turn, TurnLimit::CloudTransfer, cancel, on_text)
                 .await
                 .map(Some);
         }
         if completed as u64 >= turn.budget.tool_calls {
             return self
-                .finish_limited_turn(id, model, turn, "case tool call limit", cancel, on_text)
+                .finish_limited_turn(id, model, turn, TurnLimit::ToolCalls, cancel, on_text)
                 .await
                 .map(Some);
         }

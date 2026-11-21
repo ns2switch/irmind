@@ -154,7 +154,9 @@ impl Engine<'_> {
         cancel: &CancellationToken,
     ) -> Result<ToolFeedback, AppError> {
         let id = &case.id;
-        let decision = self.evaluate_proposal(case, proposal, origin).await?;
+        let (decision, quota_reached) = self
+            .evaluate_proposal_with_quota(case, proposal, origin)
+            .await?;
         match decision {
             Decision::Deny(reason) => {
                 self.audit_local(
@@ -165,7 +167,7 @@ impl Engine<'_> {
                     None,
                 )
                 .await?;
-                if reason == "case tool call quota reached" {
+                if quota_reached {
                     let owned = id.clone();
                     return self
                         .blocking_local(move |local| {
@@ -256,19 +258,33 @@ impl Engine<'_> {
         proposal: ProposedCall,
         origin: crate::AuditOrigin,
     ) -> Result<Decision, AppError> {
+        self.evaluate_proposal_with_quota(case, proposal, origin)
+            .await
+            .map(|(decision, _)| decision)
+    }
+
+    async fn evaluate_proposal_with_quota(
+        &self,
+        case: &Case,
+        proposal: ProposedCall,
+        origin: crate::AuditOrigin,
+    ) -> Result<(Decision, bool), AppError> {
         let proposal_payload = format!("{} {:?}", proposal.tool.as_str(), proposal.args);
         let case_owned = case.clone();
         self.blocking_local(move |local| {
             let id = &case_owned.id;
             let current = local.repo.get_case(id)?;
             if current.sealed {
-                return Ok(Decision::Deny("case is sealed"));
+                return Ok((Decision::Deny("case is sealed"), false));
             }
             if proposal.tool == Tool::SourceQuery
                 && crate::source_queries::SourceQueryV1::from_proposal(&proposal.args).is_err()
             {
-                return Ok(Decision::Deny(
-                    "source query arguments must match the bounded structured schema",
+                return Ok((
+                    Decision::Deny(
+                        "source query arguments must match the bounded structured schema",
+                    ),
+                    false,
                 ));
             }
             let policy = local.policy_for_case_unlocked(id)?;
@@ -280,15 +296,18 @@ impl Engine<'_> {
                 None,
             )?;
             let completed_calls = local.completed_calls_unlocked(id)?;
-            if let Err(reason) = policy.permits(&proposal.tool, completed_calls) {
-                return Ok(Decision::Deny(reason));
+            if let Err(denial) = policy.check_tool_admission(&proposal.tool, completed_calls) {
+                return Ok((
+                    Decision::Deny(denial.reason()),
+                    denial == irmind_domain::ToolAdmissionDenial::CaseQuotaReached,
+                ));
             }
             let next_seq = local
                 .audit_log
                 .last_entry(id)?
                 .map_or(1, |entry| entry.seq + 1);
             let now = local.clock.now()?;
-            if origin == crate::AuditOrigin::Model {
+            let decision = if origin == crate::AuditOrigin::Model {
                 let tainted = Tainted::from_external(
                     proposal,
                     Provenance::new(
@@ -297,7 +316,7 @@ impl Engine<'_> {
                         SourceKind::ModelProposal,
                     ),
                 );
-                Ok(irmind_domain::evaluate_tainted_with_rules(
+                irmind_domain::evaluate_tainted_with_rules(
                     &current,
                     tainted,
                     next_seq,
@@ -305,12 +324,13 @@ impl Engine<'_> {
                     local.turn_has_detections(id)?,
                     now,
                     &policy,
-                ))
+                )
             } else {
-                Ok(irmind_domain::evaluate_with_rules(
+                irmind_domain::evaluate_with_rules(
                     &current, proposal, next_seq, local.mode, now, &policy,
-                ))
-            }
+                )
+            };
+            Ok((decision, false))
         })
         .await
     }

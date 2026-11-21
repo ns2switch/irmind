@@ -46,6 +46,22 @@ impl Default for PolicyRules {
     }
 }
 
+/// Admission denial for limits configured by the organization or case.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ToolAdmissionDenial {
+    ToolDenied,
+    CaseQuotaReached,
+}
+
+impl ToolAdmissionDenial {
+    pub const fn reason(self) -> &'static str {
+        match self {
+            Self::ToolDenied => "tool denied by policy",
+            Self::CaseQuotaReached => "case tool call quota reached",
+        }
+    }
+}
+
 impl PolicyRules {
     pub fn validate(&self) -> Result<(), DomainError> {
         if self.max_tool_calls_per_case == 0
@@ -83,11 +99,20 @@ impl PolicyRules {
     }
 
     pub fn permits(&self, tool: &Tool, completed_calls: usize) -> Result<(), &'static str> {
+        self.check_tool_admission(tool, completed_calls)
+            .map_err(ToolAdmissionDenial::reason)
+    }
+
+    pub fn check_tool_admission(
+        &self,
+        tool: &Tool,
+        completed_calls: usize,
+    ) -> Result<(), ToolAdmissionDenial> {
         if self.denied_tools.contains(tool) {
-            return Err("tool denied by policy");
+            return Err(ToolAdmissionDenial::ToolDenied);
         }
         if completed_calls >= self.max_tool_calls_per_case {
-            return Err("case tool call quota reached");
+            return Err(ToolAdmissionDenial::CaseQuotaReached);
         }
         Ok(())
     }

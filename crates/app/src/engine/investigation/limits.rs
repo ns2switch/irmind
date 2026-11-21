@@ -4,11 +4,31 @@ use crate::{
     Engine, LlmPort, MessageRole, ModelProgress,
 };
 
-fn continuation_hint(reason: &str) -> &'static str {
-    if reason == "model round limit" {
-        "Use /continue to resume."
-    } else {
-        "Use /budget to review or increase the signed case allocation before /continue; the organization ceiling still applies."
+#[derive(Clone, Copy)]
+pub(super) enum TurnLimit {
+    ModelRounds,
+    ModelTokens,
+    ToolCalls,
+    CloudTransfer,
+}
+
+impl TurnLimit {
+    fn reason(self) -> &'static str {
+        match self {
+            Self::ModelRounds => "model round limit",
+            Self::ModelTokens => "model token limit",
+            Self::ToolCalls => "case tool call limit",
+            Self::CloudTransfer => "case cloud transfer limit",
+        }
+    }
+
+    fn continuation_hint(self) -> &'static str {
+        match self {
+            Self::ModelRounds => "Use /continue to resume.",
+            _ => {
+                "Use /budget to review or increase the signed case allocation before /continue; the organization ceiling still applies."
+            }
+        }
     }
 }
 
@@ -52,10 +72,11 @@ impl Engine<'_> {
         id: &CaseId,
         model: &dyn LlmPort,
         turn: &mut TurnContext,
-        reason: &str,
+        limit: TurnLimit,
         cancel: &CancellationToken,
         on_text: &(dyn Fn(ModelProgress) + Send + Sync),
     ) -> Result<String, AppError> {
+        let reason = limit.reason();
         self.audit_local(
             id,
             crate::AuditOrigin::Policy,
@@ -66,13 +87,10 @@ impl Engine<'_> {
         .await?;
         let used = self.used_model_tokens(id).await?;
         let remaining = turn.budget.model_tokens.saturating_sub(used);
-        let hint = continuation_hint(reason);
+        let hint = limit.continuation_hint();
         let owned = id.clone();
-        let reason_owned = reason.to_owned();
         let notice = self
-            .blocking_local(move |local| {
-                Ok(local.case_budget_unlocked(&owned)?.notice(&reason_owned))
-            })
+            .blocking_local(move |local| Ok(local.case_budget_unlocked(&owned)?.notice(reason)))
             .await?;
         let rounds = self
             .shared_round_number(id, turn, (1, self.policy.max_model_rounds_per_turn))
