@@ -229,6 +229,32 @@ impl PolicyRules {
     }
 }
 
+/// Historical adoptions remain available for verification. A live submission
+/// must match the latest adoption of its source, including the signed ceilings.
+pub(super) fn require_active_adoption(
+    plan: &SourceQueryPlanV1,
+    authenticated: &[SignedOperation],
+) -> Result<(), AppError> {
+    for operation in authenticated.iter().rev() {
+        let Some(encoded) = operation.operation.strip_prefix(CONFIGURATION_PREFIX) else {
+            continue;
+        };
+        if operation.actor != Actor::Analyst || encoded.len() > QUERY_MAX_RECORD_BYTES * 2 {
+            return Err(SourceQueryError::Approval.into());
+        }
+        let bytes = hex::decode(encoded).map_err(|_| SourceQueryError::Approval)?;
+        let (adoption, _) = decode_adoption(&bytes)?;
+        if adoption.source.id() == plan.source().id() {
+            return if plan.adoption() == crate::hex(&operation.hash) {
+                Ok(())
+            } else {
+                Err(SourceQueryError::Approval.into())
+            };
+        }
+    }
+    Err(SourceQueryError::Approval.into())
+}
+
 pub(super) fn adopted_threshold(
     plan: &SourceQueryPlanV1,
     operation: &SignedOperation,
@@ -274,4 +300,29 @@ pub(super) fn adopted_threshold(
         return Err(SourceQueryError::Scope.into());
     }
     Ok(rules.scan_approval_threshold.unwrap_or(0))
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn superseded_source_adoption_cannot_authorize_a_live_submission() {
+        let plan = SourceQueryPlanV1::decode(include_bytes!(
+            "../../../../docs/development/source-query-format-vectors/plan.json"
+        ))
+        .unwrap();
+        let latest: SignedOperation = serde_json::from_slice(include_bytes!(
+            "../../../../docs/development/source-query-format-vectors/signed-configuration.json"
+        ))
+        .unwrap();
+        assert!(require_active_adoption(&plan, std::slice::from_ref(&latest)).is_ok());
+
+        // The caller authenticates this history before applying the live check.
+        let mut replacement = latest.clone();
+        replacement.hash[0] ^= 1;
+        assert!(require_active_adoption(&plan, &[latest, replacement]).is_err());
+        assert!(require_active_adoption(&plan, &[]).is_err());
+    }
 }
