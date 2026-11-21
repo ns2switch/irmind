@@ -90,21 +90,25 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             || self.approval_command(&prompt)?
             || self.evidence_command(&prompt))
         {
-            let first_word = prompt.split_whitespace().next().unwrap_or_default();
-            if first_word.strip_prefix('/').is_some_and(|name| {
-                !name.is_empty()
-                    && name
-                        .bytes()
-                        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
-            }) {
-                self.state
-                    .messages
-                    .push("Unknown command; use /help.".into());
-            } else {
-                self.investigate_prompt(prompt);
-            }
+            self.unhandled_input(prompt);
         }
         Ok(false)
+    }
+
+    fn unhandled_input(&mut self, prompt: String) {
+        let first_word = prompt.split_whitespace().next().unwrap_or_default();
+        if first_word.strip_prefix('/').is_some_and(|name| {
+            !name.is_empty()
+                && name
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        }) {
+            self.state
+                .messages
+                .push("Unknown command; use /help.".into());
+        } else {
+            self.investigate_prompt(prompt);
+        }
     }
 
     fn deletion_destination(&mut self, prompt: &str) -> Option<bool> {
