@@ -80,6 +80,12 @@ fn common_events(
         &mut |entry| {
             let mut result = Ok(());
             entry.inspect(|row| {
+                if source.kind() == SourceKind::ToolResult {
+                    assert_eq!(
+                        entry.provenance().record_index(),
+                        Some(row.origin().record())
+                    );
+                }
                 result = mapper
                     .map(row)
                     .map_err(irmind_app::source_mapping::MappingError::into_app)
