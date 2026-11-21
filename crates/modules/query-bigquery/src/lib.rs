@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
+mod capture;
 mod compiler;
 mod protocol;
 #[cfg(test)]
@@ -20,6 +21,8 @@ use irmind_domain::AuthorizedCall;
 use secrecy::{ExposeSecret as _, SecretString};
 use serde_json::json;
 use std::time::Duration;
+
+pub use capture::BigQueryCaptureDecoder;
 
 pub struct BigQuery {
     client: reqwest::Client,

@@ -109,6 +109,11 @@ async fn capped_jobs_reconcile_by_id_and_keep_earlier_pages_on_error() {
             .all(|call| call.headers["authorization"] == "Bearer synthetic-bearer")
     );
     assert!(calls[4].target.contains("pageToken=opaque%2B%2F%3F"));
+    assert!(
+        calls[4]
+            .target
+            .contains("formatOptions.useInt64Timestamp=true")
+    );
     assert!(calls[5].target.contains("/cancel?location=EU"));
 }
 

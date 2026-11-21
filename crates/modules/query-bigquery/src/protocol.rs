@@ -15,7 +15,7 @@ pub(super) struct DryRun {
 }
 
 const META_LIMIT: usize = 256 * 1024;
-const PAGE_LIMIT: usize = 8 * 1024 * 1024;
+pub(super) const PAGE_LIMIT: usize = 8 * 1024 * 1024;
 
 pub(super) fn job_id(key: &str) -> Result<String, SourceQueryError> {
     if key.len() != 64
@@ -230,6 +230,7 @@ impl BigQuery {
         let mut params = vec![
             ("location", self.source.location()),
             ("maxResults", "1000"),
+            ("formatOptions.useInt64Timestamp", "true"),
             ("timeoutMs", "1000"),
         ];
         if let Some(token) = token {
