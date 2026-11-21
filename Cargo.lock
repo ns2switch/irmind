@@ -2342,6 +2342,7 @@ dependencies = [
  "irmind-mod-parser-vpc-flow",
  "irmind-mod-parser-windows-dns",
  "irmind-mod-parser-zeek",
+ "irmind-mod-query-athena",
  "irmind-mod-query-bigquery",
  "irmind-mod-siem-chronicle",
  "irmind-mod-siem-elastic",
@@ -3371,6 +3372,26 @@ dependencies = [
  "irmind-testkit",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "irmind-mod-query-athena"
+version = "0.1.0"
+dependencies = [
+ "aws-credential-types",
+ "aws-sigv4",
+ "futures-util",
+ "http",
+ "irmind-app",
+ "irmind-calendar",
+ "irmind-domain",
+ "irmind-http",
+ "irmind-mod-mapping-cloudtrail",
+ "irmind-mod-parser-json",
+ "irmind-testkit",
+ "reqwest",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
