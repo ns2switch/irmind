@@ -6,6 +6,14 @@ use super::{
 use secrecy::ExposeSecret as _;
 use serde_json::Value;
 
+const MEBIBYTE: u64 = 1 << 20;
+pub(super) const MINIMUM_BILLED_BYTES: u64 = 10 * MEBIBYTE;
+
+pub(super) struct DryRun {
+    pub(super) billed_bytes: u64,
+    pub(super) reliable: bool,
+}
+
 const META_LIMIT: usize = 256 * 1024;
 const PAGE_LIMIT: usize = 8 * 1024 * 1024;
 
@@ -73,7 +81,7 @@ impl BigQuery {
         &self,
         compiled: &CompiledSourceQueryV1,
         cancel: &CancellationToken,
-    ) -> Result<u64, AppError> {
+    ) -> Result<DryRun, AppError> {
         let wire = json!({"jobReference":{"projectId":self.source.owner(),"location":self.source.location()},
             "configuration":{"dryRun":true,"query":self.statement(compiled)?}});
         let response = self
@@ -89,10 +97,32 @@ impl BigQuery {
         if !result["status"]["errorResult"].is_null() || result["configuration"]["dryRun"] != true {
             return Err(AppError::RemoteTool);
         }
-        count(&result["statistics"]["query"]["totalBytesProcessed"])
-            .or_else(|| count(&result["statistics"]["totalBytesProcessed"]))
-            .filter(|estimate| Some(*estimate) <= self.limits.scan_bytes)
-            .ok_or(SourceQueryError::Budget.into())
+        let stats = &result["statistics"];
+        let query_stats = &stats["query"];
+        let processed = count(&query_stats["totalBytesProcessed"])
+            .or_else(|| count(&stats["totalBytesProcessed"]))
+            .ok_or(SourceQueryError::Unresolved)?;
+        let reported = count(&query_stats["totalBytesBilled"]).filter(|bytes| *bytes != 0);
+        let minimum_estimate = processed
+            .div_ceil(MEBIBYTE)
+            .checked_mul(MEBIBYTE)
+            .ok_or(SourceQueryError::Budget)?
+            .max(MINIMUM_BILLED_BYTES);
+        let billed_bytes = reported.unwrap_or(minimum_estimate);
+        if billed_bytes < MINIMUM_BILLED_BYTES || Some(billed_bytes) > self.limits.scan_bytes {
+            return Err(SourceQueryError::Budget.into());
+        }
+        // A wildcard can touch multiple tables, each with its own billing floor.
+        // Preview estimates never reduce the hold or the provider ceiling.
+        let reliable = reported.is_some()
+            && matches!(
+                query_stats["totalBytesProcessedAccuracy"].as_str(),
+                Some("PRECISE" | "UPPER_BOUND")
+            );
+        Ok(DryRun {
+            billed_bytes,
+            reliable,
+        })
     }
 
     pub(super) async fn insert(

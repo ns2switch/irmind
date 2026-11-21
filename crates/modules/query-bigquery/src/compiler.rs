@@ -3,6 +3,13 @@ use super::{
     SourceQueryLimits, SourceQueryModuleV1, SourceQueryV1, canonical_query_json, json,
 };
 use irmind_app::source_queries::{QueryOperator, QueryResultKind, check_query_capabilities};
+use irmind_calendar::{DateTime, Duration, FixedOffset};
+
+#[derive(Clone, Copy)]
+pub(super) enum TableLayout {
+    TimestampPartitioned,
+    DateSharded,
+}
 
 pub(super) const MODULE: &str = "query-bigquery";
 const DATASET: &str = "cloud-audit-logs";
@@ -28,26 +35,12 @@ pub(super) fn translate(
     limits: &SourceQueryLimits,
 ) -> Result<CompiledSourceQueryV1, SourceQueryError> {
     check_query_capabilities(query, source, &descriptor(), limits)?;
-    let (dataset, table) = source
-        .table()
-        .split_once('.')
-        .ok_or(SourceQueryError::Invalid)?;
-    if !identifier(source.owner(), true)
-        || !identifier(dataset, false)
-        || !identifier(table, false)
-        || !source
-            .partitions()
-            .iter()
-            .any(|part| part.name == "partition_date")
-        || !query.from().as_str()[26..29].eq("000")
-        || !query.to().as_str()[26..29].eq("000")
-    {
+    let (dataset, table, layout) = table_layout(source)?;
+    if &query.from().as_str()[26..29] != "000" || &query.to().as_str()[26..29] != "000" {
         return Err(SourceQueryError::Unsupported);
     }
     let mut predicates = vec![
         "timestamp >= @from AND timestamp < @to".to_owned(),
-        "_PARTITIONDATE BETWEEN DATE(@from) AND DATE(TIMESTAMP_SUB(@to, INTERVAL 1 MICROSECOND))"
-            .to_owned(),
         "resource.labels.project_id = @project".to_owned(),
     ];
     let mut bindings = vec![
@@ -55,6 +48,29 @@ pub(super) fn translate(
         json!({"name":"to","type":"timestamp","value":query.to().as_str()}),
         json!({"name":"project","type":"text","value":source.owner()}),
     ];
+    let table = match layout {
+        TableLayout::TimestampPartitioned => table.to_owned(),
+        TableLayout::DateSharded => {
+            let from = DateTime::<FixedOffset>::parse_from_rfc3339(query.from().as_str())
+                .map_err(|_| SourceQueryError::Invalid)?;
+            let last = DateTime::<FixedOffset>::parse_from_rfc3339(query.to().as_str())
+                .map_err(|_| SourceQueryError::Invalid)?
+                .checked_sub_signed(Duration::microseconds(1))
+                .ok_or(SourceQueryError::Invalid)?;
+            let first_day = from.date_naive().format("%Y%m%d").to_string();
+            let last_day = last.date_naive().format("%Y%m%d").to_string();
+            if [&first_day, &last_day]
+                .iter()
+                .any(|date| date.len() != 8 || !date.bytes().all(|b| b.is_ascii_digit()))
+            {
+                return Err(SourceQueryError::Unsupported);
+            }
+            predicates.push("_TABLE_SUFFIX BETWEEN @first_day AND @last_day".to_owned());
+            bindings.push(json!({"name":"first_day","type":"text","value":first_day}));
+            bindings.push(json!({"name":"last_day","type":"text","value":last_day}));
+            format!("{table}_*")
+        }
+    };
     for (index, filter) in query.filters().iter().enumerate() {
         if filter.field != "event.action" {
             return Err(SourceQueryError::Unsupported);
@@ -76,6 +92,38 @@ pub(super) fn translate(
         "translator":{"id":"bigquery-cloud-audit","version":"1","sha256":irmind_app::hex(&irmind_app::sha256(b"irmind-bigquery-cloud-audit-v1"))}
     });
     CompiledSourceQueryV1::decode(&canonical_query_json(&wire)?)
+}
+
+pub(super) fn table_layout(
+    source: &ResolvedQuerySourceV1,
+) -> Result<(&str, &str, TableLayout), SourceQueryError> {
+    let (dataset, table) = source
+        .table()
+        .split_once('.')
+        .ok_or(SourceQueryError::Invalid)?;
+    if !identifier(source.owner(), true)
+        || !identifier(dataset, false)
+        || !matches!(
+            table,
+            "cloudaudit_googleapis_com_activity"
+                | "cloudaudit_googleapis_com_data_access"
+                | "cloudaudit_googleapis_com_system_event"
+        )
+    {
+        return Err(SourceQueryError::Unsupported);
+    }
+    let [binding] = source.partitions() else {
+        return Err(SourceQueryError::Invalid);
+    };
+    if binding.name != "layout" || binding.kind != "text" {
+        return Err(SourceQueryError::Invalid);
+    }
+    let layout = match binding.value.as_str() {
+        Some("timestamp-partitioned") => TableLayout::TimestampPartitioned,
+        Some("date-sharded") => TableLayout::DateSharded,
+        _ => return Err(SourceQueryError::Unsupported),
+    };
+    Ok((dataset, table, layout))
 }
 
 pub(super) fn identifier(text: &str, hyphen: bool) -> bool {

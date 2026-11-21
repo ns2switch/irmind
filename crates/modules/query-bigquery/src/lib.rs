@@ -36,9 +36,12 @@ impl BigQuery {
         access_token: SecretString,
     ) -> Result<Self, AppError> {
         limits.validate()?;
+        compiler::table_layout(&source)?;
         if source.module() != compiler::MODULE
             || source.module_version() != "1"
-            || limits.scan_bytes.is_none()
+            || limits
+                .scan_bytes
+                .is_none_or(|cap| cap < protocol::MINIMUM_BILLED_BYTES)
             || !compiler::identifier(source.owner(), true)
             || !compiler::identifier(source.location(), true)
             || access_token.expose_secret().is_empty()
@@ -117,14 +120,18 @@ impl SourceQueryExecutor for BigQuery {
             observed_at: QueryTime::parse(&irmind_calendar::Utc::now().to_rfc3339())?,
             accounting: QueryAccounting::ScanPriced,
             estimate: QueryEstimate {
-                unit: "scanned_bytes".into(),
-                value: Some(estimate),
+                unit: "billed_bytes".into(),
+                value: Some(estimate.billed_bytes),
                 basis: "dry_run".into(),
-                reliable: true,
+                reliable: estimate.reliable,
             },
             provider_ceiling: self.limits.scan_bytes,
             source_metadata: json!({"location": self.source.location()}),
-            uncertainty: vec![],
+            uncertainty: if estimate.reliable {
+                vec![]
+            } else {
+                vec!["dry_run_billed_bytes_unverified".into()]
+            },
         })
     }
 
