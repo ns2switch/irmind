@@ -96,13 +96,7 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
     }
 
     fn unhandled_input(&mut self, prompt: String) {
-        let first_word = prompt.split_whitespace().next().unwrap_or_default();
-        if first_word.strip_prefix('/').is_some_and(|name| {
-            !name.is_empty()
-                && name
-                    .bytes()
-                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
-        }) {
+        if retired_keystore_command(&prompt) {
             self.state
                 .messages
                 .push("Unknown command; use /help.".into());
@@ -725,6 +719,13 @@ mod graph;
 mod objects;
 mod siem;
 
+fn retired_keystore_command(input: &str) -> bool {
+    matches!(
+        input.split_whitespace().next(),
+        Some("/cred-add" | "/cred-delete" | "/passphrase" | "/migrate-signer" | "/migrate-secrets")
+    )
+}
+
 fn command_destination(prompt: &str) -> Option<super::CaseExit> {
     match prompt {
         "/new" => Some(super::CaseExit::New),
@@ -742,7 +743,17 @@ fn command_destination(prompt: &str) -> Option<super::CaseExit> {
 
 #[cfg(test)]
 mod tests {
-    use super::scope_expansion;
+    use super::{retired_keystore_command, scope_expansion};
+
+    #[test]
+    fn retired_keystore_inputs_do_not_block_slash_skills() {
+        assert!(retired_keystore_command("/cred-add example"));
+        assert!(retired_keystore_command("/migrate-secrets"));
+        assert!(!retired_keystore_command(
+            "/windows-triage Review these events"
+        ));
+        assert!(!retired_keystore_command("/settings keystore"));
+    }
 
     #[test]
     #[allow(clippy::unwrap_used)]
