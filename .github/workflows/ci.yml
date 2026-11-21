@@ -731,6 +731,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_profile_benchmark && !inputs.release_dry_run && !inputs.profile_linux && startsWith(github.ref, 'refs/heads/') }}
     permissions:
       contents: read
+      attestations: read
     uses: ./.github/workflows/release.yml
     with:
       profile_benchmark: true
