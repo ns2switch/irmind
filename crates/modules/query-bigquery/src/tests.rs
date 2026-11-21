@@ -3,6 +3,8 @@ use futures_util::TryStreamExt as _;
 use irmind_testkit::{MockResponse, MockServer};
 use serde_json::Value;
 
+mod export;
+
 fn compiled_fixture() -> (Value, SourceQueryLimits, Value) {
     let plan: Value = serde_json::from_slice(include_bytes!(
         "../../../../docs/development/source-query-format-vectors/plan.json"
