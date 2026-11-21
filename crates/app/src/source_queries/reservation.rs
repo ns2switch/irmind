@@ -9,6 +9,15 @@ use crate::{
     SignedEntry, Tool,
 };
 
+/// Binds an authenticated case batch to the quota and reservation it consumes.
+#[non_exhaustive]
+pub struct SourceQueryDispatch<'a> {
+    pub entries: &'a [SignedEntry],
+    pub source: &'a super::ResolvedQuerySourceV1,
+    pub limits: &'a super::SourceQueryLimits,
+    pub reservation: &'a str,
+}
+
 impl Engine<'_> {
     /// Record the reservation and the submit intent in the same transaction
     /// before handing authority to a source-query executor.
@@ -85,7 +94,7 @@ impl Engine<'_> {
         }
         let mut journal =
             SourceQueryJournal::replay(&entries, &operations, self.verifier.as_ref(), cancel)?;
-        journal.broker.reserve_authenticated(
+        let hold = journal.broker.reserve_authenticated(
             admission,
             SourceQueryAuthority {
                 principal: &principal,
@@ -118,7 +127,18 @@ impl Engine<'_> {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        self.audit_log.append_batch(&entries[before..])
+        let batch = &entries[before..];
+        if dispatch {
+            self.audit_log
+                .append_source_query_dispatch(&SourceQueryDispatch {
+                    entries: batch,
+                    source: plan.source(),
+                    limits: plan.limits(),
+                    reservation: hold.id(),
+                })
+        } else {
+            self.audit_log.append_batch(batch)
+        }
     }
 
     /// Submit an already authorized, signed source-query plan. This is the

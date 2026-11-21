@@ -18,8 +18,10 @@ impl LocalStore {
     fn open_store(root: &Path, parquet: ParquetStore) -> Result<Self, AppError> {
         let (evidence_dir, seal_dir, lock_dir) = Self::prepare_directories(root)?;
         let db = Self::open_database(root)?;
+        let query_dispatch_ready = super::source_query_dispatch::consistent(&db)?;
         let store = Self {
             db: Mutex::new(db),
+            query_dispatch_ready,
             parquet,
             graph_catalog: Mutex::new(std::collections::HashMap::new()),
             evidence_dir,
@@ -71,7 +73,7 @@ impl LocalStore {
         db.busy_timeout(std::time::Duration::from_secs(30))
             .map_err(storage)?;
         super::schema::validate_existing(&db)?;
-        db.execute_batch("PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;
+        db.execute_batch("PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;
             CREATE TABLE IF NOT EXISTS cases (id TEXT PRIMARY KEY, title TEXT NOT NULL, scope TEXT NOT NULL, severity TEXT NOT NULL DEFAULT 'medium', sealed INTEGER NOT NULL DEFAULT 0, seal_pending INTEGER NOT NULL DEFAULT 0);
             CREATE TABLE IF NOT EXISTS audit (case_id TEXT NOT NULL, seq INTEGER NOT NULL, at INTEGER NOT NULL, actor TEXT NOT NULL, origin TEXT NOT NULL,
                 kind TEXT NOT NULL, payload TEXT NOT NULL, evidence TEXT, prev BLOB NOT NULL, hash BLOB NOT NULL,
@@ -96,6 +98,7 @@ impl LocalStore {
             CREATE TRIGGER IF NOT EXISTS global_operational_audit_no_delete BEFORE DELETE ON global_operational_audit BEGIN SELECT RAISE(ABORT,'global operational audit is append only'); END;
         ").map_err(storage)?;
         super::lifecycle::install(&db)?;
+        super::source_query_dispatch::install(&db)?;
         Ok(db)
     }
 

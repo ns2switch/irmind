@@ -819,6 +819,7 @@ mod signed_dispatch {
         assert_eq!(result.rows, 2);
         assert!(engine.verify(case).is_ok());
         assert_eq!(executor.submissions.load(Ordering::SeqCst), 1);
+        check_released_dispatch_slot(store, case);
         let status = engine.source_query_budget(case, cancel).unwrap();
         assert_eq!(status.used.scan_bytes, 10 << 20);
         assert_eq!(status.used.retained_rows, 2);
@@ -854,6 +855,25 @@ mod signed_dispatch {
         assert_eq!(current.allocation.scan_bytes, Some(64 << 20));
         assert_eq!(current.used, status.used);
         assert!(engine.verify(case).is_ok());
+    }
+
+    fn check_released_dispatch_slot(store: &LocalStore, case: &CaseId) {
+        let settlement = store
+            .entries(case)
+            .unwrap()
+            .into_iter()
+            .find(|entry| entry.kind == AuditEventKind::SourceQuerySettlementV1)
+            .unwrap();
+        let release: Vec<u8> = store
+            .conn()
+            .unwrap()
+            .query_row(
+                "SELECT release_hash FROM source_query_dispatch WHERE case_id=?1",
+                [case.as_str()],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(release, settlement.hash);
     }
 
     fn check_acquired(

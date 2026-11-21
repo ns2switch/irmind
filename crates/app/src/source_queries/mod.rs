@@ -45,6 +45,7 @@ pub use receipts::{
     SourceQueryApprovalV1, SourceQueryBudgetV1, SourceQueryPlanV1, SourceQueryReservationV1,
 };
 pub use recovery::SourceQueryRecoveryV1;
+pub use reservation::SourceQueryDispatch;
 pub use types::*;
 
 pub const QUERY_MAX_RECORD_BYTES: usize = 128 * 1024;
@@ -95,6 +96,8 @@ pub enum SourceQueryError {
     PageSchemaChanged,
     #[error("source-query module is unavailable")]
     Unavailable,
+    #[error("source-query frequency or concurrency quota reached for this provider resource")]
+    DispatchQuota,
 }
 impl From<SourceQueryError> for crate::AppError {
     fn from(value: SourceQueryError) -> Self {
