@@ -1,6 +1,8 @@
 //! Bounded, principal-only source-query admission. Providers never grant authority.
 mod acquisition;
 mod admission;
+mod budget;
+pub use budget::SourceQueryBudgetStatus;
 mod broker;
 mod canonical;
 mod capture;

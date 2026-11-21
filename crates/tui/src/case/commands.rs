@@ -142,6 +142,7 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                 }
                 Err(error) => self.state.messages.push(error.to_string()),
             }
+            self.show_source_query_budget();
             self.state.overlay_scroll = 0;
             return true;
         }

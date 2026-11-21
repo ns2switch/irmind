@@ -87,6 +87,29 @@ impl<'a> BudgetReplay<'a> {
     pub(crate) const fn current(&self) -> (u64, SourceQueryAllocationV1) {
         (self.revision, self.allocation)
     }
+
+    pub(super) fn next(
+        &self,
+        budget: SourceQueryAllocationV1,
+        reason: &str,
+        at: QueryTime,
+    ) -> Result<SourceQueryBudgetV1, SourceQueryError> {
+        if !text(reason, 1024) {
+            return Err(SourceQueryError::Invalid);
+        }
+        Ok(SourceQueryBudgetV1 {
+            version: 1,
+            case_id: self.case.to_owned(),
+            revision: self
+                .revision
+                .checked_add(1)
+                .ok_or(SourceQueryError::Limit)?,
+            previous: self.previous.clone(),
+            budget,
+            reason: reason.to_owned(),
+            at,
+        })
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -168,7 +191,7 @@ pub struct SourceQueryPlanV1 {
     configuration: Configuration,
     policy: Policy,
     allocation_revision: u64,
-    preflight: QueryPreflightV1,
+    pub(super) preflight: QueryPreflightV1,
     limits: SourceQueryLimits,
     pub(super) decoder: Decoder,
     pub(super) mapping: Mapping,
