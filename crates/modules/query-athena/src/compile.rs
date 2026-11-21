@@ -103,11 +103,22 @@ fn filter_binding(
     let value = filter.value.as_str().ok_or(SourceQueryError::Invalid)?;
     Ok(match filter.field.as_str() {
         "event.action" => ("eventname = ?", "text", json!(value)),
-        "source.ip" => (
-            "TRY_CAST(sourceipaddress AS IPADDRESS) = CAST(? AS IPADDRESS)",
-            "ip",
-            json!(value),
-        ),
+        "source.ip" => {
+            let address = value
+                .parse::<std::net::IpAddr>()
+                .map_err(|_| SourceQueryError::Invalid)?;
+            // Athena's IPADDRESS folds IPv4-mapped IPv6 into IPv4. The common
+            // event schema preserves the family, so require the original family.
+            let predicate = match address {
+                std::net::IpAddr::V4(_) => {
+                    "(strpos(sourceipaddress, ':') = 0 AND TRY_CAST(sourceipaddress AS IPADDRESS) = CAST(? AS IPADDRESS))"
+                }
+                std::net::IpAddr::V6(_) => {
+                    "(strpos(sourceipaddress, ':') > 0 AND TRY_CAST(sourceipaddress AS IPADDRESS) = CAST(? AS IPADDRESS))"
+                }
+            };
+            (predicate, "ip", json!(value))
+        }
         "cloud.account.id" if value == account => ("recipientaccountid = ?", "text", json!(value)),
         "cloud.account.id" => return Err(SourceQueryError::Scope),
         "@timestamp" => {

@@ -148,6 +148,17 @@ async fn source_ip_and_account_filters_bind_without_widening_the_adopted_scope()
     assert!(!compiled.text().contains("2001:db8::9"));
     assert!(!compiled.text().contains("111122223333"));
     assert_eq!(compiled.bindings()[4].kind, "ip");
+    assert!(compiled.text().contains("strpos(sourceipaddress, ':') > 0"));
+    let mut ipv4_query = plan["query"].clone();
+    ipv4_query["filters"][1]["value"] = json!("203.0.113.9");
+    let ipv4 = executor
+        .compile(
+            &executor.source,
+            &serde_json::from_value(ipv4_query).unwrap(),
+        )
+        .unwrap();
+    assert!(ipv4.text().contains("strpos(sourceipaddress, ':') = 0"));
+    assert_eq!(ipv4.bindings()[4].value, "203.0.113.9");
     executor
         .start(&compiled, &"a".repeat(64), &CancellationToken::new())
         .await

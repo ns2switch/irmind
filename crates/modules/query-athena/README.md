@@ -6,7 +6,8 @@ to Athena's threshold cancellation behavior. The adapter starts with a
 date-partitioned CloudTrail table and always restricts the adopted AWS account.
 
 The `source.ip` equality filter uses Athena's IPADDRESS type and an IP binding,
-so equivalent IPv6 spellings compare by address. An account filter must equal
+so equivalent IPv6 spellings compare by address. It preserves the IP family
+for IPv4-mapped IPv6 addresses. An account filter must equal
 the adopted account. [Athena data types](https://docs.aws.amazon.com/athena/latest/ug/data-types.html).
 
 Admission is based on the billed-byte ceiling. The adapter rounds the workgroup
