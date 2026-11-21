@@ -164,6 +164,16 @@ pub(super) fn configured_registry(
         &mut registry,
         &mut config_issues,
     )?;
+    #[cfg(feature = "query-bigquery")]
+    {
+        registry.add_source_decoder(std::sync::Arc::new(
+            irmind_mod_query_bigquery::BigQueryCaptureDecoder,
+        ))?;
+        registry.add_source_mapper(std::sync::Arc::new(
+            irmind_mod_mapping_gcp_audit::CloudAuditMapping::for_capture()
+                .map_err(irmind_app::source_mapping::MappingError::into_app)?,
+        ))?;
+    }
     #[cfg(feature = "query-athena")]
     {
         registry.add_source_decoder(std::sync::Arc::new(

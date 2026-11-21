@@ -1214,6 +1214,7 @@ dependencies = [
  "irmind-mod-parser-windows-dns",
  "irmind-mod-parser-zeek",
  "irmind-mod-query-athena",
+ "irmind-mod-query-bigquery",
  "irmind-security",
  "libfuzzer-sys",
  "serde_json",
@@ -1224,10 +1225,16 @@ dependencies = [
 name = "irmind-http"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "reqwest",
+ "ring",
+ "secrecy",
+ "serde",
+ "serde_json",
  "sha2 0.10.9",
  "tokio",
  "tokio-util",
+ "zeroize",
 ]
 
 [[package]]
@@ -1691,6 +1698,21 @@ dependencies = [
  "irmind-domain",
  "irmind-http",
  "reqwest",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "irmind-mod-query-bigquery"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "irmind-app",
+ "irmind-calendar",
+ "irmind-domain",
+ "irmind-http",
+ "reqwest",
+ "secrecy",
  "serde_json",
  "tokio",
 ]

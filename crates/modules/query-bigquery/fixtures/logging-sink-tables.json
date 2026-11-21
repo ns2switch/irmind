@@ -1,0 +1,182 @@
+{
+  "schema": {
+    "fields": [
+      {
+        "name": "timestamp",
+        "type": "TIMESTAMP",
+        "mode": "NULLABLE"
+      },
+      {
+        "name": "insertId",
+        "type": "STRING",
+        "mode": "NULLABLE"
+      },
+      {
+        "name": "resource",
+        "type": "RECORD",
+        "mode": "NULLABLE",
+        "fields": [
+          {
+            "name": "type",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "labels",
+            "type": "RECORD",
+            "mode": "NULLABLE",
+            "fields": [
+              {
+                "name": "project_id",
+                "type": "STRING",
+                "mode": "NULLABLE"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "protopayload_auditlog",
+        "type": "RECORD",
+        "mode": "NULLABLE",
+        "fields": [
+          {
+            "name": "serviceName",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "methodName",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "resourceName",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "authenticationInfo",
+            "type": "RECORD",
+            "mode": "NULLABLE",
+            "fields": [
+              {
+                "name": "principalEmail",
+                "type": "STRING",
+                "mode": "NULLABLE"
+              }
+            ]
+          },
+          {
+            "name": "requestMetadata",
+            "type": "RECORD",
+            "mode": "NULLABLE",
+            "fields": [
+              {
+                "name": "callerIp",
+                "type": "STRING",
+                "mode": "NULLABLE"
+              }
+            ]
+          },
+          {
+            "name": "requestJson",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          },
+          {
+            "name": "responseJson",
+            "type": "STRING",
+            "mode": "NULLABLE"
+          }
+        ]
+      }
+    ]
+  },
+  "sources": [
+    {
+      "layout": "timestamp-partitioned",
+      "base": "cloudaudit_googleapis_com_activity",
+      "table": {
+        "tableReference": {
+          "projectId": "synthetic-project",
+          "datasetId": "audit",
+          "tableId": "cloudaudit_googleapis_com_activity"
+        },
+        "type": "TABLE",
+        "timePartitioning": {
+          "type": "DAY",
+          "field": "timestamp"
+        }
+      }
+    },
+    {
+      "layout": "date-sharded",
+      "base": "cloudaudit_googleapis_com_activity",
+      "table": {
+        "tableReference": {
+          "projectId": "synthetic-project",
+          "datasetId": "audit",
+          "tableId": "cloudaudit_googleapis_com_activity_20261116"
+        },
+        "type": "TABLE"
+      }
+    },
+    {
+      "layout": "timestamp-partitioned",
+      "base": "cloudaudit_googleapis_com_data_access",
+      "table": {
+        "tableReference": {
+          "projectId": "synthetic-project",
+          "datasetId": "audit",
+          "tableId": "cloudaudit_googleapis_com_data_access"
+        },
+        "type": "TABLE",
+        "timePartitioning": {
+          "type": "DAY",
+          "field": "timestamp"
+        }
+      }
+    },
+    {
+      "layout": "date-sharded",
+      "base": "cloudaudit_googleapis_com_data_access",
+      "table": {
+        "tableReference": {
+          "projectId": "synthetic-project",
+          "datasetId": "audit",
+          "tableId": "cloudaudit_googleapis_com_data_access_20261116"
+        },
+        "type": "TABLE"
+      }
+    },
+    {
+      "layout": "timestamp-partitioned",
+      "base": "cloudaudit_googleapis_com_system_event",
+      "table": {
+        "tableReference": {
+          "projectId": "synthetic-project",
+          "datasetId": "audit",
+          "tableId": "cloudaudit_googleapis_com_system_event"
+        },
+        "type": "TABLE",
+        "timePartitioning": {
+          "type": "DAY",
+          "field": "timestamp"
+        }
+      }
+    },
+    {
+      "layout": "date-sharded",
+      "base": "cloudaudit_googleapis_com_system_event",
+      "table": {
+        "tableReference": {
+          "projectId": "synthetic-project",
+          "datasetId": "audit",
+          "tableId": "cloudaudit_googleapis_com_system_event_20261116"
+        },
+        "type": "TABLE"
+      }
+    }
+  ]
+}
