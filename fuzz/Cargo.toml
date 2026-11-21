@@ -12,6 +12,7 @@ export = ["dep:irmind-infra"]
 cargo-fuzz = true
 
 [dependencies]
+irmind-mod-query-azure-log-analytics = { path = "../crates/modules/query-azure-log-analytics", version = "0.1.0" }
 irmind-mod-parser-s3-access = { path = "../crates/modules/parser-s3-access", version = "0.1.0" }
 irmind-mod-parser-elb = { path = "../crates/modules/parser-elb", version = "0.1.0" }
 irmind-mod-parser-iis-w3c = { path = "../crates/modules/parser-iis-w3c", version = "0.1.0" }
@@ -352,6 +353,13 @@ bench = false
 [[bin]]
 name = "parser_s3_access"
 path = "fuzz_targets/parser_s3_access.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "query_page_azure_analytics"
+path = "fuzz_targets/query_page_azure_analytics.rs"
 test = false
 doc = false
 bench = false

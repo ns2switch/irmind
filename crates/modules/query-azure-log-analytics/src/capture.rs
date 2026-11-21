@@ -6,8 +6,8 @@ use irmind_app::{
         json::{SourceJsonLimits, decode_json_value},
     },
     source_queries::{
-        CaptureColumn, QUERY_MAX_RECORD_BYTES, QUERY_MAX_ROWS, SourceQueryError,
-        read_query_capture_pages,
+        CaptureColumn, InspectedQueryPage, QUERY_MAX_RECORD_BYTES, QUERY_MAX_ROWS, QueryPageInput,
+        QueryPageSchema, SourceQueryError, SourceQueryPageDecoder, read_query_capture_pages,
     },
 };
 use irmind_domain::{
@@ -24,12 +24,67 @@ use std::{
 };
 
 /// Decoder for the primary event table in a retained Analytics acquisition.
-pub struct AzureAnalyticsCaptureDecoder;
+#[derive(Clone, Copy)]
+pub enum AzureAnalyticsCaptureDecoder {
+    SignIn,
+    Audit,
+    Activity,
+}
+
+impl AzureAnalyticsCaptureDecoder {
+    pub fn for_dataset(dataset: &str) -> Result<Self, SourceQueryError> {
+        match dataset {
+            "entra-signins" | "entra-noninteractive-signins" => Ok(Self::SignIn),
+            "entra-audit" => Ok(Self::Audit),
+            "azure-activity" => Ok(Self::Activity),
+            _ => Err(SourceQueryError::Unsupported),
+        }
+    }
+
+    pub const fn file_format(self) -> &'static str {
+        match self {
+            Self::SignIn => "entra-signin-table",
+            Self::Audit => "entra-audit-table",
+            Self::Activity => "azure-activity-table",
+        }
+    }
+
+    fn event_time(self, fields: &SourceValue) -> Option<IndexedTime> {
+        let original = match self {
+            Self::SignIn => fields.field("CreatedDateTime"),
+            Self::Audit => fields.field("ActivityDateTime"),
+            Self::Activity => None,
+        };
+        IndexedTime::from_rfc3339(
+            original
+                .or_else(|| fields.field("TimeGenerated"))?
+                .as_text()?,
+            false,
+        )
+        .ok()
+    }
+
+    fn matches_table(self, fields: &SourceValue) -> bool {
+        match (self, fields.field("Type").and_then(SourceValue::as_text)) {
+            (Self::SignIn, Some("SigninLogs" | "AADNonInteractiveUserSignInLogs"))
+            | (Self::Audit, Some("AuditLogs"))
+            | (Self::Activity, Some("AzureActivity")) => true,
+            // The query targets a fixed table. Type can be absent in synthetic
+            // replies or projections which do not return that reserved column.
+            (_, None) => fields.field("Type").is_none(),
+            _ => false,
+        }
+    }
+}
 
 impl SourceDecoder for AzureAnalyticsCaptureDecoder {
     fn identity(&self) -> ParserIdentity<'_> {
         ParserIdentity {
-            name: "query-azure-analytics",
+            name: match self {
+                Self::SignIn => "query-azure-analytics-signin",
+                Self::Audit => "query-azure-analytics-audit",
+                Self::Activity => "query-azure-analytics-activity",
+            },
             version: "1",
         }
     }
@@ -45,8 +100,9 @@ impl SourceDecoder for AzureAnalyticsCaptureDecoder {
         }
         let id = self.identity();
         let hash = EvidenceHash::from_bytes(meta.evidence_hash);
-        let format = SourceFormatV1::try_new("azure-analytics", "1", BTreeMap::new())
-            .map_err(|_| SourceQueryError::Invalid)?;
+        let format =
+            SourceFormatV1::try_new(self.file_format(), "entra-source-v1", BTreeMap::new())
+                .map_err(|_| SourceQueryError::Invalid)?;
         let mut report = ParseReport {
             accepted: 0,
             rejected: 0,
@@ -58,14 +114,14 @@ impl SourceDecoder for AzureAnalyticsCaptureDecoder {
             }
             check_columns(page.columns)?;
             let mut ordinal = 0;
-            let facts = read_page(reader, page.columns, &mut |raw| {
+            let facts = read_page(reader, Some(page.columns), &mut |raw| {
                 if meta.cancel.is_cancelled() {
                     return Err(AppError::Cancelled);
                 }
                 let origin = EventOrigin::try_new(hash.clone(), ordinal, None, id.name, id.version)
                     .map_err(|_| SourceQueryError::Invalid)?;
                 ordinal += 1;
-                let record = decode_row(page.columns, raw).and_then(|(time, fields)| {
+                let record = decode_row(*self, page.columns, raw).and_then(|(time, fields)| {
                     SourceRecordV1::try_from_source(
                         origin,
                         meta.source.clone(),
@@ -99,6 +155,47 @@ impl SourceDecoder for AzureAnalyticsCaptureDecoder {
     }
 }
 
+impl SourceQueryPageDecoder for AzureAnalyticsCaptureDecoder {
+    fn inspect_page(
+        &self,
+        input: &mut dyn QueryPageInput,
+        ordinal: u64,
+        _: Option<&QueryPageSchema>,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<InspectedQueryPage, AppError> {
+        if ordinal != 0 {
+            return Err(SourceQueryError::Invalid.into());
+        }
+        let first = read_page(input, None, &mut |_| {
+            if cancel.is_cancelled() {
+                Err(AppError::Cancelled)
+            } else {
+                Ok(())
+            }
+        })?;
+        input.rewind().map_err(|_| SourceQueryError::Invalid)?;
+        let mut rejected = 0;
+        let checked = read_page(input, Some(&first.columns), &mut |row| {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            rejected += u64::from(decode_row(*self, &first.columns, row).is_none());
+            Ok(())
+        })?;
+        if first != checked {
+            return Err(SourceQueryError::Invalid.into());
+        }
+        Ok(InspectedQueryPage {
+            schema: QueryPageSchema::new(first.columns, vec![])?,
+            rows: first.rows,
+            rejected,
+            provider_partial: first.provider_partial,
+            total_rows: None,
+            next_token: None,
+        })
+    }
+}
+
 fn check_columns(columns: &[CaptureColumn]) -> Result<(), SourceQueryError> {
     let mut names = BTreeSet::new();
     if columns.len() > 1024
@@ -114,7 +211,11 @@ fn check_columns(columns: &[CaptureColumn]) -> Result<(), SourceQueryError> {
     Ok(())
 }
 
-fn decode_row(columns: &[CaptureColumn], raw: &RawValue) -> Option<(IndexedTime, SourceValue)> {
+fn decode_row(
+    decoder: AzureAnalyticsCaptureDecoder,
+    columns: &[CaptureColumn],
+    raw: &RawValue,
+) -> Option<(IndexedTime, SourceValue)> {
     let SourceValue::Array(cells) =
         decode_json_value(raw.get().as_bytes(), SourceJsonLimits::default()).ok()?
     else {
@@ -131,19 +232,25 @@ fn decode_row(columns: &[CaptureColumn], raw: &RawValue) -> Option<(IndexedTime,
             .collect(),
     )
     .ok()?;
-    let time = IndexedTime::from_rfc3339(fields.field("TimeGenerated")?.as_text()?, false).ok()?;
-    Some((time, fields))
+    if fields.validate().ok()? > SOURCE_MAX_BYTES - 4096 {
+        return None;
+    }
+    if !decoder.matches_table(&fields) {
+        return None;
+    }
+    Some((decoder.event_time(&fields)?, fields))
 }
 
 #[derive(Debug, PartialEq, Eq)]
 struct PageFacts {
     rows: u64,
     provider_partial: bool,
+    columns: Vec<CaptureColumn>,
 }
 
 fn read_page(
     input: &mut dyn Read,
-    columns: &[CaptureColumn],
+    columns: Option<&[CaptureColumn]>,
     emit: &mut dyn FnMut(&RawValue) -> Result<(), AppError>,
 ) -> Result<PageFacts, AppError> {
     let budget = Cell::new(QUERY_MAX_RECORD_BYTES);
@@ -157,7 +264,8 @@ fn read_page(
     };
     let mut deserializer = serde_json::Deserializer::from_reader(reader);
     let document = WireReader {
-        columns,
+        expected: columns,
+        columns: None,
         budget: &budget,
         row: &mut callback,
     };
@@ -202,11 +310,13 @@ impl Read for FragmentBudget<'_> {
 
 #[derive(serde::Deserialize)]
 struct ProviderStatus {
-    code: String,
+    #[serde(rename = "code")]
+    _code: Option<String>,
 }
 
 struct WireReader<'a> {
-    columns: &'a [CaptureColumn],
+    expected: Option<&'a [CaptureColumn]>,
+    columns: Option<Vec<CaptureColumn>>,
     budget: &'a Cell<usize>,
     row: &'a mut dyn FnMut(&RawValue) -> Result<(), ()>,
 }
@@ -232,10 +342,9 @@ impl<'de> Visitor<'de> for WireReader<'_> {
             match key.as_str() {
                 "tables" => rows = Some(map.next_value_seed(Tables(&mut self))?),
                 "error" => {
-                    let error = map.next_value::<ProviderStatus>()?;
-                    if error.code != "PartialError" {
-                        return Err(de::Error::custom("unsupported Analytics result status"));
-                    }
+                    let _error = map.next_value::<ProviderStatus>()?;
+                    // A recognized PartialError and an unknown status both
+                    // preclude a complete capture.
                     provider_partial = true;
                 }
                 "statistics" | "render" => {
@@ -248,6 +357,9 @@ impl<'de> Visitor<'de> for WireReader<'_> {
         Ok(PageFacts {
             rows: rows.ok_or_else(|| de::Error::missing_field("tables"))?,
             provider_partial,
+            columns: self
+                .columns
+                .ok_or_else(|| de::Error::missing_field("columns"))?,
         })
     }
 }
@@ -307,15 +419,13 @@ impl<'de> Visitor<'de> for Table<'_, '_> {
                 "name" if map.next_value::<String>()? == "PrimaryResult" => {}
                 "columns" => {
                     let columns = map.next_value::<Vec<CaptureColumn>>()?;
-                    if columns.len() != self.0.columns.len()
-                        || columns.iter().zip(self.0.columns).any(|(raw, signed)| {
-                            raw.name != signed.name || raw.native_type != signed.native_type
-                        })
-                    {
+                    if self.0.expected.is_some_and(|expected| expected != columns) {
                         return Err(de::Error::custom(
                             "Analytics columns differ from capture metadata",
                         ));
                     }
+                    check_columns(&columns).map_err(de::Error::custom)?;
+                    self.0.columns = Some(columns);
                 }
                 "rows" => rows = Some(map.next_value_seed(Rows(self.0))?),
                 _ => return Err(de::Error::custom("unexpected Analytics table member")),
@@ -375,7 +485,7 @@ mod tests {
         use std::io::Cursor;
 
         let wire = br#"{"tables":[{"name":"PrimaryResult","columns":[{"name":"TimeGenerated","type":"datetime"}],"rows":[["2026-01-01T00:00:00Z"]]}],"error":{"code":"PartialError"}}"#;
-        let decoder = AzureAnalyticsCaptureDecoder;
+        let decoder = AzureAnalyticsCaptureDecoder::SignIn;
         let id = decoder.identity();
         let identity = SourceDecoderIdentityV1::try_new(id.name, id.version).unwrap();
         let cancel = CancellationToken::new();
@@ -441,12 +551,12 @@ mod tests {
             r#"{{"tables":[{{"name":"{}"}}]}}"#,
             "a".repeat(QUERY_MAX_RECORD_BYTES)
         );
-        let error = read_page(&mut oversized.as_bytes(), &[], &mut |_| Ok(())).unwrap_err();
+        let error = read_page(&mut oversized.as_bytes(), None, &mut |_| Ok(())).unwrap_err();
         assert!(
             matches!(error, AppError::Policy(reason) if reason == SourceQueryError::Limit.to_string())
         );
         let duplicate = br#"{"error":{"code":"Failure","code":"PartialError"},"tables":[{"name":"PrimaryResult","columns":[],"rows":[]}]}"#;
-        assert!(read_page(&mut duplicate.as_slice(), &[], &mut |_| Ok(())).is_err());
+        assert!(read_page(&mut duplicate.as_slice(), None, &mut |_| Ok(())).is_err());
     }
 
     #[test]
@@ -463,8 +573,9 @@ mod tests {
             },
         ];
         let mut timestamps = Vec::new();
-        let facts = read_page(&mut wire.as_slice(), &columns, &mut |raw| {
-            let (time, fields) = decode_row(&columns, raw).unwrap();
+        let facts = read_page(&mut wire.as_slice(), Some(&columns), &mut |raw| {
+            let (time, fields) =
+                decode_row(AzureAnalyticsCaptureDecoder::SignIn, &columns, raw).unwrap();
             timestamps.push(time);
             if timestamps.len() == 1 {
                 let value = fields
@@ -482,7 +593,8 @@ mod tests {
             facts,
             PageFacts {
                 rows: 2,
-                provider_partial: true
+                provider_partial: true,
+                columns: columns.to_vec(),
             }
         );
         assert_eq!(timestamps[0].instant().submicro_nanos(), 700);
@@ -490,6 +602,82 @@ mod tests {
 
         let mut mismatched = columns;
         mismatched[1].native_type = "string".into();
-        assert!(read_page(&mut wire.as_slice(), &mismatched, &mut |_| Ok(())).is_err());
+        assert!(read_page(&mut wire.as_slice(), Some(&mismatched), &mut |_| Ok(())).is_err());
+    }
+
+    #[test]
+    fn local_and_captured_log_analytics_tables_have_identical_events() {
+        use irmind_domain::SourceDecoderIdentityV1;
+        use irmind_mod_mapping_entra::EntraMapping;
+        use irmind_mod_parser_entra::EntraSourceDecoder;
+        use serde_json::json;
+
+        let cases = [
+            (
+                AzureAnalyticsCaptureDecoder::SignIn,
+                json!({
+                    "Type":"SigninLogs","TimeGenerated":"2026-01-01T00:00:02Z",
+                    "CreatedDateTime":"2026-01-01T00:00:00.123456Z","ResultType":"0",
+                    "OperationName":"Sign-in activity","AADTenantId":"synthetic-tenant",
+                    "UserPrincipalName":"synthetic@example.invalid","IPAddress":"203.0.113.8"
+                }),
+            ),
+            (
+                AzureAnalyticsCaptureDecoder::Audit,
+                json!({
+                    "Type":"AuditLogs","TimeGenerated":"2026-01-01T00:00:02Z",
+                    "ActivityDateTime":"2026-01-01T00:00:00.123456Z","Result":"success",
+                    "ActivityDisplayName":"Add user","AADTenantId":"synthetic-tenant"
+                }),
+            ),
+            (
+                AzureAnalyticsCaptureDecoder::Activity,
+                json!({
+                    "Type":"AzureActivity","TimeGenerated":"2026-01-01T00:00:02Z",
+                    "OperationNameValue":"synthetic/activity","ActivityStatusValue":"Failed",
+                    "SubscriptionId":"synthetic-subscription","Caller":"synthetic-user",
+                    "CallerIpAddress":"203.0.113.8"
+                }),
+            ),
+        ];
+        for (decoder, file) in cases {
+            let fields = file.as_object().unwrap();
+            let columns = fields
+                .keys()
+                .map(|name| {
+                    let kind = if matches!(
+                        name.as_str(),
+                        "TimeGenerated" | "CreatedDateTime" | "ActivityDateTime"
+                    ) {
+                        "datetime"
+                    } else {
+                        "string"
+                    };
+                    json!({"name": name, "type":kind})
+                })
+                .collect::<Vec<_>>();
+            let row = fields.values().cloned().collect::<Vec<_>>();
+            let page = json!({"tables":[{"name":"PrimaryResult", "columns":columns,"rows":[row]}]});
+            let id = decoder.identity();
+            let id = SourceDecoderIdentityV1::try_new(id.name, id.version).unwrap();
+            let all = EntraMapping::all().unwrap();
+            let file_mapper = all
+                .iter()
+                .find(|mapper| {
+                    irmind_app::SourceMapper::manifest(*mapper).selectors()[0]
+                        .format()
+                        .is_some_and(|(format, _)| format == decoder.file_format())
+                })
+                .unwrap();
+            let capture_mapper = EntraMapping::for_capture(decoder.file_format(), &id).unwrap();
+            irmind_testkit::assert_capture_mapping_equivalent(
+                file.to_string().as_bytes(),
+                page.to_string().as_bytes(),
+                &EntraSourceDecoder,
+                &decoder,
+                file_mapper,
+                &capture_mapper,
+            );
+        }
     }
 }

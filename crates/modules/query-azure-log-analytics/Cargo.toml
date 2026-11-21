@@ -20,6 +20,8 @@ uuid = "1"
 zeroize = "1"
 
 [dev-dependencies]
+irmind-mod-mapping-entra = { path = "../mapping-entra", version = "0.1.0" }
+irmind-mod-parser-entra = { path = "../parser-entra", version = "0.1.0" }
 irmind-testkit = { path = "../../testkit", version = "0.1.0" }
 
 [lints]
