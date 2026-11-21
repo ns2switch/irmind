@@ -157,12 +157,15 @@ def source_command_names(source: str, enum_name: str) -> set[str]:
 
 def source_cli() -> tuple[set[str], set[str], set[str]]:
     source = (ROOT / "crates/bin/src/cli.rs").read_text(encoding="utf-8")
-    filter_source = (ROOT / "crates/bin/src/cli/graph_filter.rs").read_text(encoding="utf-8")
+    nested_sources = "\n".join(
+        (ROOT / "crates/bin/src/cli" / name).read_text(encoding="utf-8")
+        for name in ("graph_filter.rs", "source_query.rs")
+    )
     root_commands = source_command_names(source, "Command")
     case_commands = source_command_names(source, "CaseCommand")
     fields = re.findall(
         r"#\[arg\(long(?:,|\))[^\]]*\]\s*(?:pub\([^)]*\)\s*)?([a-z][a-z0-9_]*)\s*:",
-        source + filter_source,
+        source + nested_sources,
     )
     flags = {"--help", "--version"} | {"--" + field.replace("_", "-") for field in fields}
     return root_commands, case_commands, flags
@@ -231,6 +234,10 @@ def binary_cli(binary: Path) -> tuple[set[str], set[str], set[str]]:
         help_outputs.append(help_text(binary, command))
     for command in sorted(case_commands - {"help"}):
         help_outputs.append(help_text(binary, "case", command))
+    if "source-query" in root_commands:
+        query_help = help_text(binary, "source-query")
+        for command in sorted(command_names(query_help) - {"help"}):
+            help_outputs.append(help_text(binary, "source-query", command))
     available_flags = set().union(*(set(FLAG.findall(output)) for output in help_outputs))
     return root_commands, case_commands, available_flags
 
