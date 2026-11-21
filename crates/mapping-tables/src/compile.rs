@@ -31,6 +31,38 @@ impl TableMapping {
         };
         Self::compile(definition, provenance)
     }
+    /// Reuse a reviewed builtin definition with a capture decoder. Only the
+    /// selection identity changes; the typed field, role and outcome rules
+    /// are compiled by the same interpreter.
+    pub fn capture_alias(
+        &self,
+        id: &str,
+        decoder: &irmind_domain::SourceDecoderIdentityV1,
+    ) -> Result<Self, MappingError> {
+        let MappingProvenance::BundledDefinition {
+            canonical,
+            interpreter,
+        } = self.manifest.provenance()
+        else {
+            return Err(MappingError::InvalidDefinition);
+        };
+        let mut definition: Definition = serde_json::from_slice(canonical).map_err(invalid)?;
+        definition.id = id.into();
+        definition.parser = decoder.id().into();
+        definition.parser_versions = vec![decoder.version().into()];
+        let canonical = serde_json::to_vec(&definition).map_err(invalid)?;
+        if canonical.len() > LIMIT {
+            return Err(MappingError::InvalidDefinition);
+        }
+        Self::compile(
+            definition,
+            MappingProvenance::BundledDefinition {
+                canonical,
+                interpreter: interpreter.clone(),
+            },
+        )
+    }
+
     /// Canonical data can be reviewed and signed without activating a mapper.
     pub fn review(contents: &str) -> Result<MappingManifest, MappingError> {
         let definition = parse_toml(contents)?;

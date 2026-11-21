@@ -116,6 +116,61 @@ impl SourceQueryExecutionV1 {
         })
     }
 
+    pub(super) fn accepts_execution(
+        &self,
+        reservation: &str,
+        job: &super::QueryExecutionRef,
+    ) -> bool {
+        self.phase == Phase::Accepted
+            && self.reservation == reservation
+            && self.plan == job.plan()
+            && self.attempt == job.attempt()
+            && self.provider_id.as_deref() == Some(job.provider_id())
+    }
+
+    pub(super) fn observed_execution(
+        mut self,
+        observation: super::ExecutionObservationV1,
+        at: QueryTime,
+    ) -> Result<Self, SourceQueryError> {
+        use super::QueryExecutionStatus as Provider;
+        if self.phase != Phase::Accepted
+            || at.as_str() < self.observed_at.as_str()
+            || self.usage.query_price_basis != observation.usage.query_price_basis
+        {
+            return Err(SourceQueryError::Invalid);
+        }
+        self.previous = Some(self.content_id()?);
+        self.phase = Phase::Terminal;
+        self.status = match observation.status {
+            Provider::Succeeded => Status::Succeeded,
+            Provider::Failed => Status::Failed,
+            Provider::Cancelled => Status::Cancelled,
+            Provider::Partial => Status::Partial,
+            _ => Status::Unknown,
+        };
+        self.observed_at = at;
+        self.usage = observation.usage;
+        self.provider_request_id = observation.request_id;
+        self.source_observation = observation.source_observation;
+        if self.status == Status::Unknown {
+            self.reason = Some("provider_outcome_unknown".into());
+        }
+        Ok(self)
+    }
+
+    pub(super) fn proof_time(&self) -> &QueryTime {
+        &self.observed_at
+    }
+
+    pub(super) fn is_provider_partial(&self) -> bool {
+        self.status == Status::Partial
+    }
+
+    pub(super) fn is_terminal_known(&self) -> bool {
+        self.phase == Phase::Terminal && self.status != Status::Unknown
+    }
+
     pub(super) fn unknown_analytics_observed_at(&self) -> Result<&QueryTime, SourceQueryError> {
         if self.phase != Phase::Terminal
             || self.status != Status::Unknown
@@ -259,6 +314,39 @@ pub struct SourceQueryResultV1 {
 }
 
 impl SourceQueryResultV1 {
+    pub(super) fn for_capture(
+        terminal: &SourceQueryExecutionV1,
+        plan: &super::SourceQueryPlanV1,
+        capture: &QueryCaptureSummary,
+        rejected_rows: u64,
+        completeness: Vec<String>,
+    ) -> Result<Self, SourceQueryError> {
+        let record = Self {
+            version: 1,
+            case_id: terminal.case_id.clone(),
+            plan: terminal.plan.clone(),
+            reservation: terminal.reservation.clone(),
+            execution: terminal.content_id()?,
+            capture_sha256: capture.capture_sha256.as_str().into(),
+            capture_bytes: capture.bytes,
+            page_count: capture.page_count,
+            page_commitment: capture.page_commitment.as_str().into(),
+            row_count: capture
+                .rows
+                .checked_sub(rejected_rows)
+                .ok_or(SourceQueryError::Invalid)?,
+            rejected_rows,
+            completeness,
+            coverage: vec![],
+            decoder: plan.decoder.clone(),
+            mapping: plan.mapping.clone(),
+            at: terminal.proof_time().clone(),
+        };
+        let record = Self::decode(&super::canonical_query_json(&record)?)?;
+        record.verify_capture(capture)?;
+        Ok(record)
+    }
+
     pub(super) fn reservation(&self) -> &str {
         &self.reservation
     }
@@ -408,6 +496,30 @@ pub struct SourceQuerySettlementV1 {
 }
 
 impl SourceQuerySettlementV1 {
+    pub(super) fn for_terminal(
+        terminal: &SourceQueryExecutionV1,
+        result: Option<&SourceQueryResultV1>,
+    ) -> Result<Self, SourceQueryError> {
+        if !terminal.is_terminal_known() {
+            return Err(SourceQueryError::Unresolved);
+        }
+        let record = Self {
+            version: 1,
+            case_id: terminal.case_id.clone(),
+            plan: terminal.plan.clone(),
+            reservation: terminal.reservation.clone(),
+            execution: terminal.content_id()?,
+            result: result.map(SourceQueryResultV1::content_id).transpose()?,
+            scan_charged: terminal.usage.billed_bytes,
+            retained_rows: result.map_or(0, |r| r.row_count + r.rejected_rows),
+            retained_bytes: result.map_or(0, |r| r.capture_bytes),
+            usage: terminal.usage.clone(),
+            uncertainty: vec![],
+            at: terminal.proof_time().clone(),
+        };
+        Self::decode(&super::canonical_query_json(&record)?)
+    }
+
     pub(super) fn reservation(&self) -> &str {
         &self.reservation
     }
