@@ -86,13 +86,18 @@ pub(crate) fn entity_panel(findings: &[Finding], tab: usize, selected: usize) ->
                 "proposed"
             };
             format!(
-                "{} {} {:?} {}\n{}\n[evidence: {}]",
+                "{} {} {:?} {}\n{}\n[evidence: {}]{}",
                 if index == selected { '>' } else { ' ' },
                 finding.id,
                 finding.kind,
                 status,
                 finding.value,
-                finding.evidence_hash
+                finding.evidence_hash,
+                if finding.source_query_limited {
+                    "\nSource query reached a local limit. More results may exist."
+                } else {
+                    ""
+                }
             )
         })
         .collect::<Vec<_>>()

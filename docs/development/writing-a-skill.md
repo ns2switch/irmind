@@ -45,3 +45,12 @@ catalog publication is separate from inclusion in the binary and remains pending
 its production publisher key. Do not duplicate an included skill name.
 
 Validate a local folder without installing it with `cargo run -p irmind --example validate_skill --locked -- <skill-directory>`. This development example uses FileSkillPackageStore and TomlSkillCompiler, not an approximate second validator.
+
+
+### Source queries
+
+If a skill declares `source_query`, include a step for the local-limit notice
+in the tool metadata. Treat the result as partial. Narrow the time range or
+add filters before repeating the query, within the approved scope and budget.
+Use local evidence tools to investigate retained rows. A capped capture
+cannot establish that further activity did not occur.

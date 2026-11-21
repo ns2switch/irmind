@@ -43,6 +43,7 @@ mod tests {
                 id: id.clone(),
                 plan: String::new(),
                 attempt: 1,
+                requested_rows: 7,
                 reservation_seq: 1,
                 intent_hash: None,
                 decoder: super::super::receipts::Decoder {
@@ -122,6 +123,7 @@ pub struct SourceQueryHold {
     id: String,
     pub(super) plan: String,
     pub(super) attempt: u64,
+    pub(super) requested_rows: u64,
     pub(super) reservation_seq: u64,
     pub(super) intent_hash: Option<[u8; 32]>,
     pub(super) decoder: super::receipts::Decoder,
@@ -337,6 +339,7 @@ impl SourceQueryBroker {
             id,
             plan: plan_id.clone(),
             attempt: plan.attempt,
+            requested_rows: plan.requested_rows(),
             reservation_seq,
             intent_hash,
             decoder: plan.decoder.clone(),

@@ -42,6 +42,7 @@ impl Engine<'_> {
                     pointer
                 );
             }
+            write_query_limit(&mut report, finding);
         }
         for kind in [
             FindingKind::Ioc,
@@ -56,6 +57,7 @@ impl Engine<'_> {
                 .filter(|finding| finding.confirmed && finding.kind == kind)
             {
                 let _ = writeln!(report, "{}", render_confirmed(finding));
+                write_query_limit(&mut report, finding);
             }
         }
         Ok(report)
@@ -93,5 +95,11 @@ fn render_confirmed(finding: &Finding) -> String {
             }
         }
         _ => format!("- {value} [evidence: {}]", finding.evidence_hash),
+    }
+}
+
+fn write_query_limit(report: &mut String, finding: &Finding) {
+    if finding.source_query_limited {
+        report.push_str("  - Source query reached a local limit. More results may exist.\n");
     }
 }

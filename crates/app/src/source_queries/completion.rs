@@ -54,6 +54,68 @@ pub struct SourceQueryExecutionV1 {
 }
 
 impl SourceQueryExecutionV1 {
+    pub(super) fn execution_key(&self) -> &str {
+        &self.execution_key
+    }
+
+    pub(super) fn submit_observation(
+        &self,
+        reply: &super::SubmitObservationV1,
+        at: QueryTime,
+    ) -> Result<Self, SourceQueryError> {
+        if self.phase != Phase::Intent || at.as_str() < self.observed_at.as_str() {
+            return Err(SourceQueryError::Invalid);
+        }
+        let (phase, status, provider_id, reason) = match reply {
+            super::SubmitObservationV1::Accepted(job)
+                if job.plan() == self.plan && job.attempt() == self.attempt =>
+            {
+                (
+                    Phase::Accepted,
+                    Status::Pending,
+                    Some(job.provider_id().into()),
+                    None,
+                )
+            }
+            super::SubmitObservationV1::Accepted(_) => return Err(SourceQueryError::Scope),
+            super::SubmitObservationV1::NotSubmitted => (
+                Phase::Terminal,
+                Status::Failed,
+                None,
+                Some("provider_confirmed_not_submitted".into()),
+            ),
+            super::SubmitObservationV1::Unknown => (
+                Phase::Terminal,
+                Status::Unknown,
+                None,
+                Some("submission_outcome_unknown".into()),
+            ),
+        };
+        let mut usage = self.usage.clone();
+        if status == Status::Failed && usage.query_price_basis == QueryAccounting::ScanPriced {
+            usage.billed_bytes = Some(0);
+        }
+        Ok(Self {
+            version: 1,
+            case_id: self.case_id.clone(),
+            plan: self.plan.clone(),
+            reservation: self.reservation.clone(),
+            previous: Some(self.content_id()?),
+            attempt: self.attempt,
+            phase,
+            execution_key: self.execution_key.clone(),
+            provider_id,
+            provider_request_id: None,
+            started_at: self.started_at.clone(),
+            observed_at: at,
+            provider_at: None,
+            status,
+            usage,
+            source_observation: None,
+            reason,
+        })
+    }
+
     pub(super) fn unknown_analytics_observed_at(&self) -> Result<&QueryTime, SourceQueryError> {
         if self.phase != Phase::Terminal
             || self.status != Status::Unknown
@@ -155,6 +217,26 @@ impl SourceQueryExecutionV1 {
     }
 }
 
+/// A display notice derived exclusively from the authenticated result receipt.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SourceQueryLimitNotice {
+    capture_sha256: String,
+    captured_rows: u64,
+}
+
+impl SourceQueryLimitNotice {
+    pub fn capture_sha256(&self) -> &str {
+        &self.capture_sha256
+    }
+
+    pub fn message(&self) -> String {
+        format!(
+            "Source query reached a local limit after {} captured rows. More results may exist. Narrow the time range or add filters before querying again.",
+            self.captured_rows
+        )
+    }
+}
+
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SourceQueryResultV1 {
@@ -223,6 +305,22 @@ impl SourceQueryResultV1 {
 
     pub fn capture_identity(&self) -> (&str, u64) {
         (&self.capture_sha256, self.capture_bytes)
+    }
+
+    pub fn limit_notice(&self) -> Option<SourceQueryLimitNotice> {
+        self.hit_local_limit().then(|| SourceQueryLimitNotice {
+            capture_sha256: self.capture_sha256.clone(),
+            captured_rows: self.row_count + self.rejected_rows,
+        })
+    }
+
+    fn hit_local_limit(&self) -> bool {
+        self.completeness.iter().any(|cause| cause == "local_limit")
+    }
+
+    fn fits_requested_rows(&self, requested: u64) -> bool {
+        let total = self.row_count + self.rejected_rows;
+        total < requested || (total == requested && self.hit_local_limit())
     }
 
     pub fn case_id(&self) -> &str {
@@ -438,6 +536,7 @@ impl SourceQueryBroker {
                     || result.plan != settlement.plan
                     || result.reservation != settlement.reservation
                     || result.execution != execution_id
+                    || !result.fits_requested_rows(pending.requested_rows)
                     || result.capture_bytes != settlement.retained_bytes
                     || result.row_count + result.rejected_rows != settlement.retained_rows
                     || entry.seq <= execution_seq
@@ -532,6 +631,29 @@ fn bounded_reasons(values: &[String]) -> bool {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn exact_row_limit_requires_an_explicit_signed_local_limit() {
+        let template =
+            include_bytes!("../../../../docs/development/source-query-format-vectors/result.json");
+        let mut wire: serde_json::Value = serde_json::from_slice(template).unwrap();
+        let complete = SourceQueryResultV1::decode(template).unwrap();
+        let rows = wire["row_count"].as_u64().unwrap();
+        assert!(complete.fits_requested_rows(rows + 1));
+        assert!(!complete.fits_requested_rows(rows));
+        assert!(complete.limit_notice().is_none());
+
+        wire["completeness"] = serde_json::json!(["local_limit", "provider_partial"]);
+        let limited =
+            SourceQueryResultV1::decode(&super::super::canonical_query_json(&wire).unwrap())
+                .unwrap();
+        assert!(!limited.fits_requested_rows(rows - 1));
+        assert!(limited.fits_requested_rows(rows));
+        assert_eq!(
+            limited.limit_notice().unwrap().capture_sha256(),
+            complete.capture_identity().0
+        );
+    }
 
     #[test]
     fn athena_billing_verifies_rounding_and_handles_failed_or_unresolved_executions() {

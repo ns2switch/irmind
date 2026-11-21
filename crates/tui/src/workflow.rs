@@ -82,6 +82,52 @@ impl CaseWorkflow<'_, '_> {
         self.engine.verify_cancelable(id, cancel)
     }
 
+    pub(crate) fn verify_summary(
+        &self,
+        id: &CaseId,
+        cancel: &CancellationToken,
+    ) -> Result<String, AppError> {
+        if self.requires_source_root(id)? {
+            return self
+                .verify_with_query_notices(
+                    id,
+                    cancel,
+                    "select the original source root with /verify <path>",
+                )
+                .and_then(|message| Err(AppError::Policy(message)));
+        }
+        let (count, notices) = self.engine.verify_with_query_limits(id, cancel)?;
+        Ok(self.with_query_limit_lines(id, format!("Verified {count} audit entries"), &notices))
+    }
+
+    fn verify_with_query_notices(
+        &self,
+        id: &CaseId,
+        cancel: &CancellationToken,
+        message: &str,
+    ) -> Result<String, AppError> {
+        let (_, notices) = self.engine.verify_with_query_limits(id, cancel)?;
+        Ok(self.with_query_limit_lines(id, message.into(), &notices))
+    }
+
+    fn with_query_limit_lines(
+        &self,
+        id: &CaseId,
+        mut message: String,
+        notices: &[irmind_app::source_queries::SourceQueryLimitNotice],
+    ) -> String {
+        use std::fmt::Write as _;
+        for notice in notices {
+            let _ = write!(
+                message,
+                "\n{} — {}",
+                notice.capture_sha256(),
+                notice.message()
+            );
+        }
+        self.with_orphan_cleanup_notice(id, message)
+    }
+
     pub(crate) fn verify_with_source_root(
         &self,
         id: &CaseId,
@@ -109,13 +155,14 @@ impl CaseWorkflow<'_, '_> {
                 ),
             )));
         }
-        Ok(self.with_orphan_cleanup_notice(
+        self.verify_with_query_notices(
             id,
-            format!(
+            cancel,
+            &format!(
                 "Verified {} of {} original sources; {} were not sampled",
                 report.checked, report.total, report.unchecked
             ),
-        ))
+        )
     }
 
     pub(crate) fn with_orphan_cleanup_notice(&self, id: &CaseId, mut message: String) -> String {

@@ -124,6 +124,18 @@ impl Engine<'_> {
         self.verify_unlocked_cancelable(id, cancel)
     }
 
+    /// Return capture warnings from the same verified snapshot as the entry count.
+    pub fn verify_with_query_limits(
+        &self,
+        id: &CaseId,
+        cancel: &CancellationToken,
+    ) -> Result<(usize, Vec<crate::source_queries::SourceQueryLimitNotice>), AppError> {
+        let _case_lock = self.repo.lock_case(id)?;
+        let count = self.verify_unlocked_cancelable(id, cancel)?;
+        let notices = crate::source_queries::result_limit_notices(&self.audit_log.entries(id)?)?;
+        Ok((count, notices))
+    }
+
     /// Inspect signed history when an original is missing. This does not mark
     /// evidence or the case as verified and must only back a read-only view.
     pub fn inspect_signed_chain_only(
