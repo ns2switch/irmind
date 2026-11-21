@@ -17,6 +17,10 @@ on:
         description: Build and verify signed release artifacts without creating a tag or release
         type: boolean
         default: false
+      release_profile_benchmark:
+        description: Compare the default release profile with ThinLTO on synthetic evidence
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -50,7 +54,7 @@ jobs:
         run: python3 .github/scripts/check_dco.py
   linux:
     needs: dco
-    if: ${{ !cancelled() && needs.dco.result == 'success' && needs.dco.outputs.run_ci == 'true' }}
+    if: ${{ !cancelled() && needs.dco.result == 'success' && needs.dco.outputs.run_ci == 'true' && (github.event_name != 'workflow_dispatch' || !inputs.release_profile_benchmark) }}
     runs-on: ubuntu-22.04
     timeout-minutes: 120
     env:
@@ -708,7 +712,6 @@ jobs:
       attestations: read
     uses: ./.github/workflows/release.yml
 
-
   # Keep the protected deployment and its environment secret in the caller.
   update_homebrew:
     needs: post_release
@@ -723,3 +726,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: gh workflow run update.yml --repo ns2switch/homebrew-irmind --ref main -f tag="$GITHUB_REF_NAME"
+
+  release_profile:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_profile_benchmark && !inputs.release_dry_run && !inputs.profile_linux && startsWith(github.ref, 'refs/heads/') }}
+    permissions:
+      contents: read
+    uses: ./.github/workflows/release.yml
+    with:
+      profile_benchmark: true

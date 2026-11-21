@@ -1,12 +1,16 @@
 name: Release installation and distribution
 on:
   workflow_call:
+    inputs:
+      profile_benchmark:
+        type: boolean
+        default: false
 permissions:
   contents: read
   attestations: read
 jobs:
   verify_install_linux:
-    if: ${{ !cancelled() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+    if: ${{ !cancelled() && !inputs.profile_benchmark && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -28,7 +32,7 @@ jobs:
           test -x "$HOME/.local/bin/irmind-evtx"
           "$HOME/.local/bin/irmind" --version
   verify_install_macos:
-    if: ${{ !cancelled() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+    if: ${{ !cancelled() && !inputs.profile_benchmark && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
     strategy:
       fail-fast: false
       matrix:
@@ -54,7 +58,7 @@ jobs:
           test -x "$HOME/.local/bin/irmind-evtx"
           "$HOME/.local/bin/irmind" --version
   verify_install_windows:
-    if: ${{ !cancelled() && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+    if: ${{ !cancelled() && !inputs.profile_benchmark && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
     runs-on: windows-latest
     timeout-minutes: 15
     permissions:
@@ -82,3 +86,28 @@ jobs:
           } finally {
             Remove-Item -LiteralPath $binary,$helper -Force -ErrorAction SilentlyContinue
           }
+
+  benchmark_profiles:
+    if: ${{ inputs.profile_benchmark && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      RUSTFLAGS: -C link-arg=-fuse-ld=mold
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
+      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2
+        with: {tool: 'mold@2.42.1', checksum: true, fallback: none}
+      - name: Compare release builds and signed-format goldens
+        run: bash .github/scripts/benchmark_release_profile.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: release-profile-comparison
+          path: |
+            release-profile-*.txt
+            release-profile-*.json
+          if-no-files-found: error
