@@ -134,3 +134,43 @@ impl QueryPageSequence {
         })
     }
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    fn page(native_type: &str, rows: u64, next: Option<&str>) -> InspectedQueryPage {
+        InspectedQueryPage {
+            schema: QueryPageSchema::new(
+                vec![CaptureColumn {
+                    name: "event_time".into(),
+                    native_type: native_type.into(),
+                }],
+                Vec::new(),
+            )
+            .unwrap(),
+            rows,
+            rejected: u64::from(rows > 0),
+            provider_partial: false,
+            total_rows: Some(6),
+            next_token: next.map(str::to_owned),
+        }
+    }
+
+    #[test]
+    fn schema_drift_rejects_the_page_and_a_short_final_page_commits_partial() {
+        let mut seq = QueryPageSequence::default();
+        let first = seq.accept(page("datetime", 2, Some("next")), 10).unwrap();
+        assert_eq!(first.completeness, CapturePageCompleteness::Complete);
+        assert!(matches!(
+            seq.accept(page("timestamp", 2, None), 8),
+            Err(SourceQueryError::PageSchemaChanged)
+        ));
+        assert_eq!(seq.counts(), (2, 1, false));
+        assert!(seq.accept(page("datetime", 9, None), 8).is_err());
+        let last = seq.accept(page("datetime", 2, None), 8).unwrap();
+        assert_eq!(last.completeness, CapturePageCompleteness::ProviderPartial);
+        assert_eq!(seq.counts(), (4, 2, true));
+    }
+}
