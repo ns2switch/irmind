@@ -50,10 +50,13 @@ bytes. [On-demand pricing](https://cloud.google.com/bigquery/pricing) ·
 ## Service-account authentication design
 
 The application obtains short-lived Google access tokens from the configured
-service account. The token exchange uses the pinned Google OAuth endpoint and
-the BigQuery read-only scope. The private key remains in the IRMind keystore.
-Tokens are used only in HTTP authorization and are excluded from signed plans,
-captures, diagnostics and exports.
+service account. The exchange uses the pinned Google OAuth endpoint and the
+BigQuery-specific scope supported by [jobs.insert](https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/jobs/insert#authorization-scopes).
+The IAM grants restrict table access to approved datasets and allow job
+creation in the query project. Queries use the structured compiler. The
+private key remains in the IRMind keystore. Tokens are used only in HTTP
+authorization and are excluded from signed plans, captures, diagnostics and
+exports.
 
 The shared implementation can move the existing RS256 signing and bounded
 OAuth token exchange from the Chronicle adapter into `irmind-http`. An optional
