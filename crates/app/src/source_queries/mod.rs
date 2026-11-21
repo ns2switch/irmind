@@ -45,6 +45,16 @@ pub const QUERY_CASE_MAX_ROWS: u64 = 1_000_000;
 pub const QUERY_CASE_MAX_BYTES: u64 = 1_000_000_000;
 pub const QUERY_DEFAULT_INTERVAL_SECONDS: u64 = 31 * 86_400;
 pub const QUERY_MAX_INTERVAL_SECONDS: u64 = 366 * 86_400;
+const QUERY_BILLING_MEGABYTE: u64 = 1 << 20;
+const QUERY_MIN_BILLED_BYTES: u64 = 10 * QUERY_BILLING_MEGABYTE;
+
+fn rounded_scan_billed_bytes(bytes: u64) -> Option<u64> {
+    bytes
+        .div_ceil(QUERY_BILLING_MEGABYTE)
+        .checked_mul(QUERY_BILLING_MEGABYTE)
+        .map(|rounded| rounded.max(QUERY_MIN_BILLED_BYTES))
+}
+
 pub const QUERY_MAX_PAGES: u64 = 4096;
 pub const QUERY_CAPTURE_MAGIC: &[u8] = b"IRMIND-QUERY-CAPTURE-V1\0";
 

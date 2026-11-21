@@ -138,6 +138,18 @@ impl SourceQueryExecutionV1 {
         Ok(record)
     }
 
+    fn matches_athena_billing(&self) -> bool {
+        let expected = match self.status {
+            Status::Succeeded | Status::Partial | Status::Cancelled => self
+                .usage
+                .scanned_bytes
+                .and_then(super::rounded_scan_billed_bytes),
+            Status::Failed => Some(0),
+            _ => None,
+        };
+        expected.is_some() && expected == self.usage.billed_bytes
+    }
+
     pub fn content_id(&self) -> Result<String, SourceQueryError> {
         query_content_id("irmind-source-query-execution-v1", self)
     }
@@ -317,7 +329,7 @@ impl SourceQuerySettlementV1 {
         match record.usage.query_price_basis {
             QueryAccounting::ScanPriced
                 if record.scan_charged.is_none()
-                    || record.scan_charged != record.usage.scanned_bytes =>
+                    || record.scan_charged != record.usage.billed_bytes =>
             {
                 return Err(SourceQueryError::Unresolved);
             }
@@ -406,6 +418,9 @@ impl SourceQueryBroker {
             || settlement.at.as_str() < execution.observed_at.as_str()
             || execution_seq >= settlement_entry.seq
         {
+            return Err(SourceQueryError::Unresolved.into());
+        }
+        if pending.is_athena() && !execution.matches_athena_billing() {
             return Err(SourceQueryError::Unresolved.into());
         }
         let result = match (settlement.result.as_deref(), result_entry) {
@@ -511,4 +526,30 @@ fn validate_links(values: &[&str]) -> Result<(), SourceQueryError> {
 
 fn bounded_reasons(values: &[String]) -> bool {
     values.len() <= 32 && values.iter().all(|value| text(value, 256))
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn athena_billing_verifies_rounding_and_handles_failed_or_unresolved_executions() {
+        let mut observation = SourceQueryExecutionV1::decode(include_bytes!(
+            "../../../../docs/development/source-query-format-vectors/execution.json"
+        ))
+        .unwrap();
+        assert!(observation.matches_athena_billing());
+        observation.usage.billed_bytes = observation.usage.scanned_bytes;
+        assert!(!observation.matches_athena_billing());
+        observation.status = Status::Cancelled;
+        observation.usage.scanned_bytes = Some((10 << 20) + 1);
+        observation.usage.billed_bytes = Some(11 << 20);
+        assert!(observation.matches_athena_billing());
+        observation.status = Status::Failed;
+        observation.usage.billed_bytes = Some(0);
+        assert!(observation.matches_athena_billing());
+        observation.status = Status::Unknown;
+        assert!(!observation.matches_athena_billing());
+    }
 }
