@@ -118,6 +118,7 @@ pub struct QueryCapturePage<'a> {
     pub body_offset: u64,
     pub body_bytes: u64,
     pub columns: &'a [CaptureColumn],
+    pub provider_partial: bool,
 }
 
 /// Walk the same framing used by offline verification. A decoder may stage
@@ -257,6 +258,7 @@ impl<R: Read> CaptureReader<'_, R> {
             body_offset: self.bytes,
             body_bytes,
             columns: &page.columns,
+            provider_partial: page.completeness == CapturePageCompleteness::ProviderPartial as u8,
         };
         let mut body = PageBody {
             reader: self,
