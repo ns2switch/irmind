@@ -136,7 +136,9 @@ fn real_clock_preflight_and_exact_v9_citation() {
         table("Analytics"),
     ])
     .unwrap();
-    let (executor, _) = fixture(&server);
+    let (mut executor, _) = fixture(&server);
+    let clock = Arc::new(case_contract::ObservedClock::default());
+    executor.clock = clock.clone();
     let wire: Value = serde_json::from_slice(include_bytes!(
         "../../../../docs/development/source-query-format-vectors/plan.json"
     ))
@@ -162,7 +164,7 @@ fn real_clock_preflight_and_exact_v9_citation() {
         &decoder_identity,
     )
     .unwrap();
-    case_contract::acquire_and_export(&fixture, executor, decoder, mapper);
+    case_contract::acquire_and_export(&fixture, executor, decoder, mapper, clock.as_ref());
     let calls = server.finish().unwrap();
     assert!(calls[7].target.ends_with("/query"));
 }

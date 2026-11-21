@@ -26,12 +26,26 @@ use std::{
     fs,
     io::{Cursor, Read as _},
     path::Path,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 
 pub(super) const AT: &str = "2026-11-16T12:00:00Z";
 pub(super) const FIRST: &str = "unreferenced-capture-row";
 pub(super) const CITED: &str = "cited-capture-row";
+
+#[derive(Default)]
+pub(super) struct ObservedClock(AtomicU64);
+
+impl irmind_app::Clock for ObservedClock {
+    fn now(&self) -> Result<u64, AppError> {
+        let seconds = SystemClock.now()?;
+        self.0.store(seconds, Ordering::SeqCst);
+        Ok(seconds)
+    }
+}
 
 struct FixtureSigner(Actor, SigningKey);
 impl Signer for FixtureSigner {
@@ -59,6 +73,7 @@ pub(super) fn acquire_and_export<D: SourceQueryPageDecoder + 'static>(
     executor: impl SourceQueryExecutor + 'static,
     decoder: D,
     mapping: impl SourceMapper + 'static,
+    preflight_clock: &ObservedClock,
 ) -> Vec<u8> {
     let root = tempfile::tempdir().unwrap();
     let source = &fixture.source;
@@ -99,7 +114,7 @@ pub(super) fn acquire_and_export<D: SourceQueryPageDecoder + 'static>(
             .change_source_query_budget(&case.id, allocation, "Synthetic allocation", &cancel)
             .unwrap()
     );
-    let result = run_query(&engine, &store, &case.id, fixture, &cancel);
+    let result = run_query(&engine, &store, &case.id, fixture, &cancel, preflight_clock);
     let (hash, _) = result.capture_identity();
     let finding_id = engine
         .add_entity(
@@ -166,6 +181,7 @@ fn run_query(
     case: &irmind_domain::CaseId,
     fixture: &Fixture,
     cancel: &CancellationToken,
+    preflight_clock: &ObservedClock,
 ) -> SourceQueryResultV1 {
     let args = fixture
         .query
@@ -205,7 +221,13 @@ fn run_query(
         .instant()
         .unix_micros();
     assert!(observed.ends_with(".000000000Z"));
-    assert!((before..=after).contains(&time.div_euclid(1_000_000)));
+    let observed_seconds = time.div_euclid(1_000_000);
+    assert!((before..=after).contains(&observed_seconds));
+    assert_eq!(
+        u64::try_from(observed_seconds).unwrap(),
+        preflight_clock.0.load(Ordering::SeqCst),
+        "the preflight must read the injected clock"
+    );
     if feedback.contains("requires analyst approval") {
         let plan = SourceQueryPlanV1::decode(plan.payload.as_bytes()).unwrap();
         engine

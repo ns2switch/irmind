@@ -491,7 +491,7 @@ fn status_bar_is_one_signed_snapshot_and_invalid_templates_leave_it_unchanged() 
             true,
         )
         .unwrap();
-    assert!(file.load().unwrap().status_bar.as_ref() == Some(&template));
+    assert_eq!(file.load().unwrap().status_bar.as_ref(), Some(&template));
     assert_eq!(audit.global_operations().unwrap().len(), 1);
     let mut invalid = template;
     invalid.separator = "\x1b[2J".into();

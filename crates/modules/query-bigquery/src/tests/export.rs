@@ -27,12 +27,15 @@ fn real_clock_preflight_and_exact_v9_citation_with_oauth_without_exported_creden
         .to_string(),
     )])
     .unwrap();
-    let executor = connect(&fixture.source, &fixture.limits, &server, &oauth);
+    let mut executor = connect(&fixture.source, &fixture.limits, &server, &oauth);
+    let clock = Arc::new(case_contract::ObservedClock::default());
+    executor.clock = clock.clone();
     let bytes = case_contract::acquire_and_export(
         &fixture,
         executor,
         BigQueryCaptureDecoder,
         irmind_mod_mapping_gcp_audit::CloudAuditMapping::for_capture().unwrap(),
+        clock.as_ref(),
     );
     let requests = oauth.finish().unwrap();
     let body = std::str::from_utf8(&requests[0].body).unwrap();

@@ -240,7 +240,9 @@ fn real_clock_preflight_and_exact_v9_citation() {
         MockResponse::json(&page.to_string()),
     ])
     .unwrap();
-    let (executor, plan) = fixture(&server);
+    let (mut executor, plan) = fixture(&server);
+    let clock = Arc::new(case_contract::ObservedClock::default());
+    executor.clock = clock.clone();
     let fixture = case_contract::Fixture {
         source: executor.source.clone(),
         limits: executor.limits.clone(),
@@ -253,6 +255,7 @@ fn real_clock_preflight_and_exact_v9_citation() {
         executor,
         AthenaCaptureDecoder,
         irmind_mod_mapping_cloudtrail::CloudTrailMapping::for_capture().unwrap(),
+        clock.as_ref(),
     );
     let calls = server.finish().unwrap();
     assert_eq!(
