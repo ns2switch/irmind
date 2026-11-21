@@ -7,6 +7,7 @@ mod compile;
 mod completion;
 mod export;
 mod journal;
+mod page;
 mod ports;
 mod receipts;
 mod recovery;
@@ -30,6 +31,7 @@ pub use export::{
     verify_query_capture_section, write_query_capture_section, write_stored_query_capture_section,
 };
 pub use journal::SourceQueryJournal;
+pub use page::{InspectedQueryPage, QueryPageInput, QueryPageSchema, SourceQueryPageDecoder};
 pub use ports::*;
 pub(crate) use receipts::BudgetReplay;
 pub use receipts::{
@@ -82,6 +84,8 @@ pub enum SourceQueryError {
     AlreadySettled,
     #[error("source-query field or operator has no exact translation")]
     Unsupported,
+    #[error("source-query page changed the columns or types fixed by its first page")]
+    PageSchemaChanged,
     #[error("source-query module is unavailable")]
     Unavailable,
 }
