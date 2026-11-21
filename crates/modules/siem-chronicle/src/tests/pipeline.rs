@@ -149,4 +149,21 @@ fn authorized_response_becomes_signed_mapped_evidence_and_queryable_roles() {
         .format_version,
         9
     );
+    let exported = std::fs::read(export).unwrap();
+    let account: serde_json::Value = serde_json::from_str(&account()).unwrap();
+    let private_key_line = account["private_key"]
+        .as_str()
+        .unwrap()
+        .lines()
+        .nth(1)
+        .unwrap();
+    for secret in ["synthetic-token", private_key_line] {
+        assert!(!result.contains(secret));
+        assert!(entries.iter().all(|entry| !entry.payload.contains(secret)));
+        assert!(
+            !exported
+                .windows(secret.len())
+                .any(|bytes| bytes == secret.as_bytes())
+        );
+    }
 }
