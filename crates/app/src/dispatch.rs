@@ -159,7 +159,7 @@ impl Engine<'_> {
                 }
                 let (screened, hash) = self.execute_authorized(id, &call, false, cancel).await?;
                 let source_query_limit = self
-                    .query_limit_for_tool_result(id, call.tool(), hash)
+                    .query_limit_for_tool_result(id, call.tool(), hash, cancel)
                     .await?;
                 Ok(ToolFeedback {
                     text: screened,
@@ -174,13 +174,17 @@ impl Engine<'_> {
         id: &CaseId,
         tool: &Tool,
         hash: String,
+        cancel: &CancellationToken,
     ) -> Result<Option<crate::source_queries::SourceQueryLimitNotice>, AppError> {
         if tool != &Tool::SourceQuery {
             return Ok(None);
         }
         let case = id.clone();
+        let cancel = cancel.clone();
         self.blocking_local(move |local| {
+            let _lock = local.repo.lock_case(&case)?;
             let entries = local.audit_log.entries(&case)?;
+            local.verify_source_query_journal(&entries, &cancel, false)?;
             let notices = crate::source_queries::result_limit_notices(&entries)?;
             Ok(notices
                 .into_iter()
