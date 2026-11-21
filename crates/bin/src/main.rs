@@ -229,15 +229,25 @@ impl WorkspaceIo for RootWorkspaceIo {
         write_private_output(path, bytes)
     }
     fn verify_export(&self, path: &Path, expected_key: &str) -> Result<String> {
+        use std::fmt::Write as _;
         let result =
             irmind_app::verify_export_details(&LocalExportVerifier, path, Some(expected_key))?;
-        Ok(format!(
+        let mut message = format!(
             "Verified {} entries; analyst key {}; original bytes verified {}; unavailable {}",
             result.entries,
             result.analyst_key_fingerprint,
             result.source_bytes_verified,
             result.source_bytes_unavailable
-        ))
+        );
+        for notice in result.source_query_limits {
+            let _ = write!(
+                message,
+                "\n{} — {}",
+                notice.capture_sha256(),
+                notice.message()
+            );
+        }
+        Ok(message)
     }
     fn case_exporter(&self) -> &dyn irmind_app::CaseExporter {
         self.store.as_ref()

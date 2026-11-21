@@ -22,6 +22,7 @@ pub(super) fn proposed_finding(
         evidence_hash: field("evidence_hash")?.clone(),
         confirmed: false,
         dismissed: false,
+        source_query_limited: false,
         details,
     };
     if finding.value.trim().is_empty()

@@ -57,7 +57,10 @@ impl Engine<'_> {
         }
         let key = delegation_key(calls)?;
         if let Some(previous) = turn.previous.get(&key) {
-            return Ok(format!("Repeated delegation; cached result: {previous}"));
+            return Ok(format!(
+                "Repeated delegation; cached result: {}",
+                previous.text
+            ));
         }
         let Ok(tasks) = proposed_tasks(calls) else {
             return Ok("The task plan was rejected: use 1–16 bounded tasks with exact source hashes, closed types and explicit budgets; approval fields are not accepted.".into());
@@ -105,7 +108,7 @@ impl Engine<'_> {
             None,
         )
         .await?;
-        turn.previous.insert(key, screened.text.clone());
+        turn.previous.insert(key, screened.text.clone().into());
         Ok(screened.text)
     }
 

@@ -182,7 +182,7 @@ fn v9_export_authenticates_retained_parents_receipts_schema_and_public_key() {
         String::from_utf8(payload).unwrap(),
     );
     let revised = engine.source_query_allocation(&case.id).unwrap();
-    assert_eq!((revised.0, revised.1.scan_bytes), (1, Some(10_000_000)));
+    assert_eq!((revised.0, revised.1.scan_bytes), (1, Some(32 << 20)));
     for (name, second) in [("a.json", "01"), ("b.json", "02")] {
         fs::write(root.path().join(name), format!(
             "{{\"eventTime\":\"2026-11-01T00:00:{second}.000001Z\",\"eventName\":\"Login\",\"sourceIPAddress\":\"203.0.113.77\"}}"
@@ -303,6 +303,54 @@ fn source_query_adoption_persists_only_valid_canonical_scope() {
 mod seed;
 
 #[test]
+fn source_query_recovery_requires_a_signed_expired_analytics_observation() {
+    use irmind_app::source_queries::{SourceQueryJournal, SourceQueryRecoveryV1};
+    let config: SignedOperation = serde_json::from_slice(include_bytes!(
+        "../../../../docs/development/source-query-format-vectors/signed-recovery-configuration.json"
+    )).unwrap();
+    let mut chain: Vec<SignedEntry> = serde_json::from_slice(include_bytes!(
+        "../../../../docs/development/source-query-format-vectors/signed-recovery-chain.json"
+    ))
+    .unwrap();
+    let record =
+        include_bytes!("../../../../docs/development/source-query-format-vectors/recovery.json");
+    assert_eq!(chain[7].payload.as_bytes(), record);
+    let vector = hex::decode(
+        include_str!(
+            "../../../../docs/development/source-query-format-vectors/recovery-preimage.hex"
+        )
+        .trim(),
+    )
+    .unwrap();
+    assert_eq!(
+        SourceQueryRecoveryV1::decode(record)
+            .unwrap()
+            .content_id()
+            .unwrap(),
+        hex(&sha256(&vector))
+    );
+    let signer = LocalSigner {
+        key: SigningKey::from_bytes(&[77; 32]),
+        actor: Actor::Analyst,
+    };
+    let verifier = LocalVerifier::from_signer(&signer)
+        .with_trusted_key(&chain[6].actor, &chain[6].public_key)
+        .unwrap();
+    let cancel = CancellationToken::new();
+    let operations = [config];
+    let prior = SourceQueryJournal::replay(&chain[..7], &operations, &verifier, &cancel).unwrap();
+    let recovered = SourceQueryJournal::replay(&chain, &operations, &verifier, &cancel).unwrap();
+    assert_eq!(recovered.held(), prior.held());
+    assert_eq!(recovered.used(), prior.used());
+    assert_eq!(recovered.captures().len(), 0);
+    let recovery = chain.last_mut().unwrap();
+    recovery.at -= 1;
+    recovery.hash = sha256(&recovery.canonical());
+    recovery.sig = signer.sign(&recovery.hash).unwrap();
+    assert!(SourceQueryJournal::replay(&chain, &operations, &verifier, &cancel).is_err());
+}
+
+#[test]
 fn source_query_reservation_and_submit_intent_survive_reopen_as_one_batch() {
     use irmind_app::CaseMutation;
     let root = tempfile::tempdir().unwrap();
@@ -374,7 +422,7 @@ fn source_query_broker_requires_the_pinned_analyst_and_agent_proofs() {
     let allocation = SourceQueryAllocationV1 {
         enabled: true,
         analytics_allowed: false,
-        scan_bytes: Some(10_000_000),
+        scan_bytes: Some(32 << 20),
         retained_rows: 1_000_000,
         retained_bytes: 1_000_000_000,
     };
@@ -421,7 +469,7 @@ fn source_query_broker_requires_the_pinned_analyst_and_agent_proofs() {
         assert_eq!(broker.held().retained_rows, 0);
     }
     let hold = broker.reserve_authenticated(candidate, authority).unwrap();
-    assert_eq!(hold.resources().scan_bytes, 1_000_000);
+    assert_eq!(hold.resources().scan_bytes, 11 << 20);
 
     check_capture_spools_require_durable_intent(&broker, hold.id(), &chain);
     check_signed_settlement(&mut broker, &chain, &principal, &verifier);
@@ -521,7 +569,7 @@ fn check_signed_settlement(
     broker
         .settle_authenticated(receipts, principal, verifier)
         .unwrap();
-    assert_eq!(broker.used().scan_bytes, 4096);
+    assert_eq!(broker.used().scan_bytes, 10 << 20);
     assert_eq!(broker.used().retained_bytes, 2391);
     assert!(
         broker

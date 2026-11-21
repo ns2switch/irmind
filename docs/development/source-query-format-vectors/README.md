@@ -57,7 +57,7 @@ existing production catalog root is not used or accepted by these vectors.
 | --- | --- |
 | `case-created-v5.json`, `v9-magic.hex`, `v9-empty-tail.hex` | Ordered creation payload with independent source-query allocation; magic and one mandatory zero capture count. |
 | `configuration-adoption.json`, `signed-configuration.json`, `configuration-audit-preimage.hex` | Analyst adoption of the exact source/policy via the existing global operation signature. Its hash is referenced by the plan, never a self-reference inside the operation. |
-| `budget.json` through `settlement.json`, matching preimages, `identities.json` | New domain identities and acyclic plan/approval/reservation/execution/result/settlement links. Unknown scan estimates require consent; settlement charges observed Athena scans. |
+| `budget.json` through `settlement.json`, matching preimages, `identities.json` | New domain identities and acyclic plan/approval/reservation/execution/result/settlement links. Unknown scan estimates require consent; settlement charges 10,485,760 billed bytes for a 4,096-byte Athena scan against an 11,534,336-byte reservation. |
 | `athena-submit-request.json` | Exact synthetic parameterized request, adapter-owned identifiers, fixed workgroup and deterministic idempotency key. A real translator must additionally prove its supported timestamp precision and schema. |
 | `page-0.json`, `page-1.json`, `page-metadata.json` | Synthetic Athena response envelopes; the first-page column header is not an event. Native rows retain source fields rather than inventing a normalized original. |
 | `capture-descriptor.json`, `capture.hex`, `pages-preimage.hex` | Exact two-page captured source; stream-container framing and ordered page commitment. `capture_sha256` hashes decoded capture bytes. |
@@ -65,6 +65,7 @@ existing production catalog root is not used or accepted by these vectors.
 | `azure-analytics.json`, `azure-basic-rejected.json` | Analytics eligibility with missing scan telemetry represented as null; Basic rejected even though its query might succeed. |
 | `partial-result-shape.json` | Shape of a local-limit partial result. Deliberately not linked into the positive chain; changing counts without rebuilding capture/proofs is invalid. |
 | `recovery-rejected-shape.json` | A priced Athena execution cannot be acknowledged as an expired unknown Analytics execution. |
+| `recovery.json`, `recovery-preimage.hex`, `signed-recovery-chain.json`, `signed-recovery-configuration.json` | Exact Analyst acknowledgement at the Analytics expiry boundary. Replay releases the execution slot and preserves the accounting hold and unknown observation. |
 | `azure-partial-response.json` | HTTP-success-shaped Azure response with PartialError; never a complete result. |
 | `malicious-literal.json` | SQL-looking text remains one BigQuery STRING parameter, with no new syntax. |
 | `negative-cases.json`, `schemas.json` | Required future rejection cases, exact example member sets and closed enum spellings. Rejection names are proposed application errors. |

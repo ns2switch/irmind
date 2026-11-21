@@ -243,22 +243,40 @@ conflicting work. Poll/fetch retries obey deadline/rate/call bounds and cannot
 reset acquisition row/byte caps.
 
 Settlement is once per reservation and references an earlier terminal observation
-plus actual admitted-retention counts. Preserve reported processed/scanned/billed
-bytes separately; unknown counters are `null` with a reason, not zero. Provider
-cancellations can still cost scans. Athena's cutoff is a cancellation trigger,
-not a physically exact byte boundary: retain the overrun, block subsequent scans
-and mark the contract not suitable for an organization requiring an exact hard
-byte cap. Do not extend model-token debt capacity to scans.
+plus actual admitted-retention counts. Preserve processed, scanned and billed
+bytes separately. For a priced source, `scan_charged` must equal
+`usage.billed_bytes`. Missing billed bytes keep the hold unresolved, including
+when raw scan telemetry is available. The full signed per-query billed-byte
+ceiling is reserved before submission. A dry-run estimate cannot reduce that hold.
+
+- BigQuery on demand uses `totalBytesBilled` for settlement and the reserved
+  ceiling as `maximumBytesBilled`. A processed-byte estimate alone cannot establish
+  reliable billable usage. The on-demand minimum is 10,485,760 bytes for a
+  referenced table and for the query. [Google pricing](https://cloud.google.com/bigquery/pricing) · [BigQuery job statistics](https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/Job#JobStatistics2).
+- Athena S3 on demand rounds the workgroup cutoff and the terminal scanned
+  bytes up to 1,048,576-byte units with a 10-unit minimum. A definitive failed
+  query has no Athena scan charge. Cancellation can incur a charge. The cutoff
+  triggers cancellation, so a known overrun is charged in full and further
+  admission stops when the budget is exhausted. This source remains unavailable
+  under an exact hard-cap policy. [Athena pricing](https://aws.amazon.com/athena/pricing/) · [Athena workgroup controls](https://docs.aws.amazon.com/athena/latest/ug/workgroups-setting-control-limits-cloudwatch.html).
+
+Use `null` with a reason for unknown counters. Model-token debt does not grant
+scan capacity.
 
 For a non-reconcilable synchronous Azure timeout, record `unknown`, not success
 or cancellation. An unresolved job blocks that source's execution slot. Proposed
 recovery is a separate Analyst-signed acknowledgement after a documented
 provider maximum lifetime covering queueing as well as execution: release the slot only, keep the uncertainty and
 observed consumption; do not turn unknown scan usage into zero or authorize a
-scan-priced adapter through this path. This bounded recovery rule is a review
-point, not an implemented exception. If that complete lifetime is not documented, this recovery is unavailable; a
-600-second running-time limit alone does not establish it. If remote termination
-is mandatory policy and cannot be verified, the adapter is unavailable.
+scan-priced adapter through this path. For the public Azure Analytics v1 route,
+the rule adds the documented three-minute concurrency queue maximum to the
+ten-minute running maximum. The resulting 780-second minimum starts at the
+signed unknown observation. Eligibility requires the recognized module version
+and an Analytics table with successful provisioning in the signed preflight.
+The Analyst signature and its audit timestamp bind the exact reservation and
+observation. A route without both documented limits has no recovery rule.
+If remote termination is mandatory policy and cannot be verified, the adapter
+is unavailable. [Azure Monitor service limits](https://learn.microsoft.com/en-us/azure/azure-monitor/fundamentals/service-limits#user-query-throttling)
 
 ## 5. Azure Analytics check and credential proposal
 
@@ -305,7 +323,7 @@ so this list defines membership rather than serialization order.
 | `SourceQueryReservationV1` / `source-query-reservation-v1` | `plan,task_id,approval,allocation_revision,scan_bytes,retained_rows,retained_bytes,at`; Agent/broker. `approval=null` is allowed only if all policy and plan-consent rules permit it. |
 | `SourceQueryExecutionV1` / `source-query-execution-v1` | `plan,reservation,previous,attempt,phase,execution_key,provider_id,provider_request_id,started_at,observed_at,provider_at,status,usage,source_observation,reason`; Agent. `previous` chains observations for the same attempt. |
 | `SourceQueryResultV1` / `source-query-result-v1` | `plan,reservation,execution,capture_sha256,capture_bytes,page_count,page_commitment,row_count,rejected_rows,completeness,coverage,decoder,mapping,at`; Agent. `execution` is the earlier terminal/partial observation, never a later settlement. |
-| `SourceQuerySettlementV1` / `source-query-settlement-v1` | `plan,reservation,execution,result,scan_charged,retained_rows,retained_bytes,usage,uncertainty,at`; Agent/broker, exactly once. `result=null` for no admitted capture; unresolved scan usage prevents ordinary settlement. |
+| `SourceQuerySettlementV1` / `source-query-settlement-v1` | `plan,reservation,execution,result,scan_charged,retained_rows,retained_bytes,usage,uncertainty,at`; Agent/broker, exactly once. `result=null` for no admitted capture; unresolved billed usage prevents ordinary settlement. |
 | `SourceQueryRecoveryV1` / `source-query-recovery-v1` | `plan,reservation,execution,action,reason,not_before,at`; Analyst. Only acknowledgement of a documented expired non-reconcilable Analytics execution; no grant of scan capacity or assertion of provider success. |
 
 `SourceQueryExecutionV1.phase` is intent, accepted, running or terminal;
