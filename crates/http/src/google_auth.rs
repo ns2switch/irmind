@@ -43,8 +43,36 @@ pub struct GoogleServiceAccount {
     token: Mutex<Option<Token>>,
 }
 struct Token {
-    secret: SecretString,
+    access: GoogleAccessToken,
     expires: Instant,
+}
+
+/// A token may only authorize requests made for its original service.
+#[derive(Clone)]
+pub struct GoogleAccessToken {
+    api: GoogleApi,
+    secret: SecretString,
+}
+
+impl GoogleAccessToken {
+    pub fn authorize(
+        &self,
+        api: GoogleApi,
+        request: reqwest::RequestBuilder,
+    ) -> Result<reqwest::RequestBuilder, GoogleAuthError> {
+        if self.api != api {
+            return Err(GoogleAuthError::InvalidConfiguration);
+        }
+        Ok(request.bearer_auth(self.secret.expose_secret()))
+    }
+}
+
+impl std::fmt::Debug for GoogleAccessToken {
+    fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        out.debug_struct("GoogleAccessToken")
+            .field("api", &self.api)
+            .finish_non_exhaustive()
+    }
 }
 #[derive(Deserialize)]
 struct ServiceAccount {
@@ -100,7 +128,7 @@ impl GoogleServiceAccount {
         client: &reqwest::Client,
         endpoint: &reqwest::Url,
         cancel: &CancellationToken,
-    ) -> Result<SecretString, GoogleAuthError> {
+    ) -> Result<GoogleAccessToken, GoogleAuthError> {
         if cancel.is_cancelled() {
             return Err(GoogleAuthError::Cancelled);
         }
@@ -115,7 +143,7 @@ impl GoogleServiceAccount {
                 .lock()
                 .map_err(|_| GoogleAuthError::ExchangeFailed)?;
             if let Some(token) = cache.as_ref().filter(|t| t.expires > Instant::now()) {
-                return Ok(token.secret.clone());
+                return Ok(token.access.clone());
             }
         }
         let now = SystemTime::now()
@@ -154,7 +182,10 @@ impl GoogleServiceAccount {
         {
             return Err(GoogleAuthError::ExchangeFailed);
         }
-        let secret = token.access_token;
+        let access = GoogleAccessToken {
+            api: self.api,
+            secret: token.access_token,
+        };
         let expires = Instant::now()
             .checked_add(Duration::from_secs(u64::from(token.expires_in - 30)))
             .ok_or(GoogleAuthError::ExchangeFailed)?;
@@ -162,10 +193,10 @@ impl GoogleServiceAccount {
             .token
             .lock()
             .map_err(|_| GoogleAuthError::ExchangeFailed)? = Some(Token {
-            secret: secret.clone(),
+            access: access.clone(),
             expires,
         });
-        Ok(secret)
+        Ok(access)
     }
     pub fn assertion(&self, now: u64) -> Result<SecretString, GoogleAuthError> {
         let expiry = now
