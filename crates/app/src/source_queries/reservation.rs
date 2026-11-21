@@ -64,6 +64,9 @@ impl Engine<'_> {
         let plan = SourceQueryPlanV1::decode(admission.plan.payload.as_bytes())?;
         require_active_adoption(&plan, &operations)?;
         let mut entries = self.audit_log.entries(case)?;
+        if dispatch {
+            self.check_live_query_allocation(&entries)?;
+        }
         let contains = |entry: &crate::SignedEntry| {
             entry
                 .seq

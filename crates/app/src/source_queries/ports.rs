@@ -272,10 +272,20 @@ pub struct SourceQueryPorts {
     executors: BTreeMap<String, Arc<dyn SourceQueryExecutor>>,
     bindings: BTreeMap<String, QuerySourceBinding>,
     page_decoders: BTreeMap<(String, String, String), Arc<dyn super::SourceQueryPageDecoder>>,
+    pub(super) organization_ceiling: Option<super::SourceQueryAllocationV1>,
 }
 impl SourceQueryPorts {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn with_organization_ceiling(
+        mut self,
+        ceiling: super::SourceQueryAllocationV1,
+    ) -> Result<Self, SourceQueryError> {
+        ceiling.validate()?;
+        self.organization_ceiling = Some(ceiling);
+        Ok(self)
     }
     pub fn add(&mut self, executor: Arc<dyn SourceQueryExecutor>) -> Result<(), SourceQueryError> {
         let descriptor = executor.descriptor();
