@@ -377,3 +377,38 @@ o añade filtros antes de proponer otra consulta remota.
 
 Consulta la [validación manual de consultas en origen](source-query-validation.md)
 para un ejercicio opcional a cargo del analista con cada proveedor.
+
+### Athena
+
+Usa un workgroup dedicado que haga obligatoria su configuración y tenga un
+tope de escaneo por consulta. Declara el workgroup y confirma explícitamente
+en la política de la fuente que el escaneo puede superar el tope antes de
+cancelarse. Configura la tabla particionada de CloudTrail. Restringe la identidad
+de consulta al workgroup, los datos de origen y la ubicación de resultados.
+[Workgroup y bytes facturados](../../crates/modules/query-athena/README.md) · [Acciones IAM por recurso](source-queries-design.md).
+
+### BigQuery
+
+Crea un sink de Cloud Logging hacia un dataset dedicado de BigQuery. Declara
+el diseño de tablas particionadas por instante o por día. Da a la cuenta de
+servicio acceso al dataset seleccionado y permiso para crear jobs en el
+proyecto de consulta. Guarda su JSON en el keystore de IRMind.
+[Configuración del sink, las tablas y la cuenta de servicio](../../crates/modules/query-bigquery/README.md).
+
+### Azure Log Analytics
+
+Registra una aplicación Microsoft Entra de un solo tenant para el flujo de
+credenciales de cliente. Guarda el ID del tenant, el ID de cliente y el secreto
+en el keystore. Indica en la política la suscripción, el grupo de recursos,
+el nombre y el ID del workspace y la tabla Analytics.
+[Registro de la aplicación y autenticación de la API](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/api/access-api).
+
+Limita los permisos de la entidad de servicio al workspace adoptado. El
+adaptador necesita `Microsoft.OperationalInsights/workspaces/read` y
+`Microsoft.OperationalInsights/workspaces/tables/read` para las dos
+comprobaciones de metadatos. Concede
+`Microsoft.OperationalInsights/workspaces/query/read` y restringe el acceso
+a las tablas adoptadas con permisos por tabla o una asignación de RBAC granular.
+La aplicación no necesita permisos de ingesta, cambios de roles, claves
+compartidas o administración del workspace.
+[Acceso al workspace y las tablas](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/manage-access) · [RBAC granular](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/granular-rbac-log-analytics) · [Permisos para el plan de tabla](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-table-plans).

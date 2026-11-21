@@ -368,3 +368,36 @@ before proposing another remote acquisition.
 
 See [Manual validation of source queries](development/source-query-validation.md)
 for an optional analyst-run exercise with each provider.
+
+### Athena
+
+Use a dedicated workgroup with enforced settings and a per-query scan cutoff.
+Set the workgroup and the explicit cutoff-overrun acknowledgement in the
+source policy. Configure the partitioned CloudTrail table and give the query
+identity access only to the adopted workgroup, source data and its result
+location. [Workgroup and billed-byte configuration](../crates/modules/query-athena/README.md) · [IAM actions by resource](development/source-queries-design.md#4-credentials-scope-and-minimum-permissions).
+
+### BigQuery
+
+Create a Cloud Logging sink to a dedicated BigQuery dataset. Declare its
+timestamp-partitioned or daily-sharded layout in the source and grant the
+query service account access to the selected dataset and job creation in the
+query project. Store the service-account JSON in IRMind's keystore.
+[Sink, layout and service-account configuration](../crates/modules/query-bigquery/README.md).
+
+### Azure Log Analytics
+
+Create a single-tenant Microsoft Entra app registration for client credentials.
+Store the tenant ID, application client ID and client secret in IRMind's
+keystore. Specify the subscription, resource group, workspace name, workspace
+ID and Analytics table in the source policy.
+[Microsoft Entra app and API authentication](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/api/access-api).
+
+Scope the app's service-principal grants to the adopted workspace. The adapter
+needs `Microsoft.OperationalInsights/workspaces/read` and
+`Microsoft.OperationalInsights/workspaces/tables/read` for the two metadata
+checks. Grant `Microsoft.OperationalInsights/workspaces/query/read` and
+restrict data access to the adopted tables using table-level permissions or
+a granular RBAC assignment. No log ingestion, role changes, shared keys or
+workspace administration permissions are required.
+[Workspace and table access](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/manage-access) · [Granular RBAC](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/granular-rbac-log-analytics) · [Table plan permissions](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-table-plans).
