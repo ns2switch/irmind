@@ -61,16 +61,19 @@ pub struct InspectedQueryPage {
     pub rows: u64,
     pub rejected: u64,
     pub provider_partial: bool,
+    /// Total rows when the protocol reports one.
+    pub total_rows: Option<u64>,
     /// A token read from the page in its native protocol, not from query data.
     pub next_token: Option<String>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(crate) struct QueryPageSequence {
     schema: Option<QueryPageSchema>,
     rows: u64,
     rejected: u64,
     partial: bool,
+    expected_rows: Option<u64>,
 }
 
 impl QueryPageSequence {
@@ -105,12 +108,21 @@ impl QueryPageSequence {
             .rejected
             .checked_add(page.rejected)
             .ok_or(SourceQueryError::Limit)?;
-        let partial = page.provider_partial;
+        let expected = self.expected_rows.or(page.total_rows);
+        let partial = page.provider_partial
+            || self
+                .expected_rows
+                .zip(page.total_rows)
+                .is_some_and(|(first, current)| first != current)
+            || expected.is_some_and(|expected| {
+                rows > expected || (page.next_token.is_none() && rows != expected)
+            });
         let columns = page.schema.columns.clone();
         self.schema.get_or_insert(page.schema);
         self.rows = rows;
         self.rejected = rejected;
         self.partial |= partial;
+        self.expected_rows = expected;
         Ok(CapturePageMetadata {
             columns,
             rows: page.rows,
