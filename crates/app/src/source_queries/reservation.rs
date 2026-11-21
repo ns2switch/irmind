@@ -143,6 +143,7 @@ impl Engine<'_> {
         let lease = AdmittedSourceQuery {
             case_id: case.clone(),
             plan: plan.content_id()?,
+            attempt: plan.attempt,
             reservation: reservation.content_id()?,
             source: plan.source().clone(),
             compiled: plan.compiled().clone(),
