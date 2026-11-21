@@ -261,9 +261,16 @@ pub trait SourceQueryExecutor: Send + Sync {
         cancel: &CancellationToken,
     ) -> Result<CancelObservationV1, AppError>;
 }
+pub(super) struct QuerySourceBinding {
+    pub source: ResolvedQuerySourceV1,
+    pub limits: SourceQueryLimits,
+    pub mapping: irmind_domain::MappingIdentityV1,
+}
+
 #[derive(Default)]
 pub struct SourceQueryPorts {
     executors: BTreeMap<String, Arc<dyn SourceQueryExecutor>>,
+    bindings: BTreeMap<String, QuerySourceBinding>,
     page_decoders: BTreeMap<(String, String, String), Arc<dyn super::SourceQueryPageDecoder>>,
 }
 impl SourceQueryPorts {
@@ -299,6 +306,39 @@ impl SourceQueryPorts {
         }
         self.page_decoders.insert(key, decoder);
         Ok(())
+    }
+
+    /// Associate an explicitly selected source with the local implementation
+    /// identities and limits agreed by its executor. This grants no authority.
+    pub fn bind_source(
+        &mut self,
+        source: ResolvedQuerySourceV1,
+        limits: SourceQueryLimits,
+        mapping: irmind_domain::MappingIdentityV1,
+    ) -> Result<(), SourceQueryError> {
+        limits.validate()?;
+        self.page_decoder(&source)?;
+        if self.bindings.len() >= 64
+            || self.bindings.contains_key(source.id())
+            || mapping.target() != irmind_domain::COMMON_EVENT_V1
+        {
+            return Err(SourceQueryError::Invalid);
+        }
+        self.bindings.insert(
+            source.id().into(),
+            QuerySourceBinding {
+                source,
+                limits,
+                mapping,
+            },
+        );
+        Ok(())
+    }
+
+    pub(super) fn binding(&self, source: &str) -> Result<&QuerySourceBinding, SourceQueryError> {
+        self.bindings
+            .get(source)
+            .ok_or(SourceQueryError::Unavailable)
     }
 
     pub fn page_decoder(

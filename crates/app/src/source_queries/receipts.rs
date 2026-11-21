@@ -176,6 +176,73 @@ pub struct SourceQueryPlanV1 {
 }
 
 impl SourceQueryPlanV1 {
+    pub(super) fn prepare(
+        input: super::planning::PlanInput<'_>,
+        mut preflight: QueryPreflightV1,
+    ) -> Result<Self, SourceQueryError> {
+        let binding = input.binding;
+        let owner = binding.source.owner().to_owned();
+        let (accounts, projects, workspaces) = match binding.source.module() {
+            "query-athena" => (vec![owner], vec![], vec![]),
+            "query-bigquery" => (vec![], vec![owner], vec![]),
+            "query-azure-log-analytics" => (vec![], vec![], vec![owner]),
+            _ => return Err(SourceQueryError::Scope),
+        };
+        let adoption = crate::hex(&input.adoption.operation.hash);
+        let scope = Scope {
+            accounts,
+            projects,
+            workspaces,
+            regions: vec![binding.source.location().into()],
+            from: input.query.from().clone(),
+            to: input.query.to().clone(),
+            proof: input.scope_proof,
+        };
+        if preflight.plan_digest != fingerprint(&input.compiled)? {
+            return Err(SourceQueryError::Invalid);
+        }
+        preflight.plan_digest = fingerprint(&serde_json::json!({
+            "compiled": input.compiled, "source": binding.source,
+            "scope": scope, "limits": binding.limits,
+        }))?;
+        let mapping = &binding.mapping;
+        let result = Self {
+            version: 1,
+            case_id: input.case.as_str().into(),
+            task_id: None,
+            attempt: input.attempt,
+            query: input.query,
+            compiled: input.compiled,
+            source: binding.source.clone(),
+            scope,
+            configuration: Configuration {
+                sha256: fingerprint(&binding.source)?,
+                adoption: adoption.clone(),
+            },
+            policy: Policy {
+                sha256: fingerprint(&input.adoption.policy)?,
+                rules: input.adoption.policy.clone(),
+                adoption,
+            },
+            allocation_revision: input.revision,
+            preflight,
+            limits: binding.limits.clone(),
+            decoder: Decoder {
+                id: input.decoder.name.into(),
+                version: input.decoder.version.into(),
+            },
+            mapping: Mapping {
+                id: mapping.id().into(),
+                version: mapping.version().into(),
+                target: mapping.target().into(),
+                sha256: mapping.implementation().as_str().into(),
+            },
+            at: input.at,
+        };
+        result.validate()?;
+        Ok(result)
+    }
+
     pub fn decode(bytes: &[u8]) -> Result<Self, SourceQueryError> {
         let plan: Self = decode_record(bytes)?;
         plan.validate()?;

@@ -337,7 +337,7 @@ impl Engine<'_> {
         Ok(record)
     }
 
-    fn sign_query_frame(
+    pub(super) fn sign_query_frame(
         &self,
         case: &CaseId,
         previous: Option<&SignedEntry>,

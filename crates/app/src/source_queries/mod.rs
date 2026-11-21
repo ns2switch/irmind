@@ -9,6 +9,7 @@ mod completion;
 mod export;
 mod journal;
 mod page;
+mod planning;
 mod ports;
 mod receipts;
 mod recovery;
@@ -34,6 +35,7 @@ pub use export::{
 };
 pub use journal::SourceQueryJournal;
 pub use page::{InspectedQueryPage, QueryPageInput, QueryPageSchema, SourceQueryPageDecoder};
+pub use planning::PreparedSourceQuery;
 pub use ports::*;
 pub(crate) use receipts::BudgetReplay;
 pub use receipts::{
