@@ -1,17 +1,17 @@
 use irmind_app::source_queries::{
-    CompiledSourceQueryV1, QueryBinding, QueryOperator, QueryResultKind, ResolvedQuerySourceV1,
-    SourceQueryError, SourceQueryLimits, SourceQueryModuleV1, SourceQueryV1, canonical_query_json,
-    check_query_capabilities,
+    CompiledSourceQueryV1, QueryBinding, QueryOperator, QueryPredicate, QueryResultKind, QueryTime,
+    ResolvedQuerySourceV1, SourceQueryError, SourceQueryLimits, SourceQueryModuleV1, SourceQueryV1,
+    canonical_query_json, check_query_capabilities,
 };
 use serde_json::{Value, json};
 
 pub(super) const MODULE: &str = "query-athena";
 const DATASET: &str = "cloudtrail-management";
-const FIELDS: &[(&str, &str)] = &[
-    ("@timestamp", "eventtime"),
-    ("event.action", "eventname"),
-    ("source.ip", "sourceipaddress"),
-    ("cloud.account.id", "recipientaccountid"),
+const FIELDS: &[&str] = &[
+    "@timestamp",
+    "event.action",
+    "source.ip",
+    "cloud.account.id",
 ];
 
 pub(super) fn descriptor() -> SourceQueryModuleV1 {
@@ -19,7 +19,7 @@ pub(super) fn descriptor() -> SourceQueryModuleV1 {
         id: MODULE.into(),
         version: "1".into(),
         datasets: vec![DATASET.into()],
-        fields: FIELDS.iter().map(|(field, _)| (*field).into()).collect(),
+        fields: FIELDS.iter().map(|field| (*field).into()).collect(),
         operators: vec![QueryOperator::Eq],
         result_kinds: vec![QueryResultKind::Events],
         accounting: irmind_app::source_queries::QueryAccounting::ScanPriced,
@@ -61,22 +61,9 @@ pub fn translate(
         "recipientaccountid = ?".to_owned(),
     ];
     for (index, filter) in query.filters().iter().enumerate() {
-        let (_, column) = FIELDS
-            .iter()
-            .find(|(field, _)| *field == filter.field)
-            .filter(|(_, column)| *column == "eventname")
-            .ok_or(SourceQueryError::Unsupported)?;
-        let kind = if filter.field == "source.ip" {
-            "ip"
-        } else {
-            "text"
-        };
-        where_parts.push(format!("{column} = ?"));
-        bindings.push(binding(
-            &format!("filter{index}"),
-            kind,
-            filter.value.clone(),
-        ));
+        let (predicate, kind, value) = filter_binding(filter, source.owner())?;
+        where_parts.push(predicate.into());
+        bindings.push(binding(&format!("filter{index}"), kind, value));
     }
     // The adopted partition declaration identifies the physical key. The
     // compiler derives a contiguous interval instead of trusting a model list.
@@ -107,6 +94,35 @@ pub fn translate(
         "order": ["eventtime", "eventid"]
     });
     CompiledSourceQueryV1::decode(&canonical_query_json(&snapshot)?)
+}
+
+fn filter_binding(
+    filter: &QueryPredicate,
+    account: &str,
+) -> Result<(&'static str, &'static str, Value), SourceQueryError> {
+    let value = filter.value.as_str().ok_or(SourceQueryError::Invalid)?;
+    Ok(match filter.field.as_str() {
+        "event.action" => ("eventname = ?", "text", json!(value)),
+        "source.ip" => (
+            "TRY_CAST(sourceipaddress AS IPADDRESS) = CAST(? AS IPADDRESS)",
+            "ip",
+            json!(value),
+        ),
+        "cloud.account.id" if value == account => ("recipientaccountid = ?", "text", json!(value)),
+        "cloud.account.id" => return Err(SourceQueryError::Scope),
+        "@timestamp" => {
+            let time = QueryTime::parse(value)?;
+            if !time.as_str().ends_with(".000000000Z") {
+                return Err(SourceQueryError::Unsupported);
+            }
+            (
+                "from_iso8601_timestamp(eventtime) = from_iso8601_timestamp(?)",
+                "timestamp",
+                json!(time.as_str()),
+            )
+        }
+        _ => return Err(SourceQueryError::Unsupported),
+    })
 }
 
 fn binding(name: &str, kind: &str, value: Value) -> QueryBinding {

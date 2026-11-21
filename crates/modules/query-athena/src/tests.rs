@@ -6,13 +6,14 @@ use serde_json::Value;
 const PLAN: &[u8] =
     include_bytes!("../../../../docs/development/source-query-format-vectors/plan.json");
 const JOB: &str = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
-const CUTOFF: &str = r#"{"WorkGroup":{"Name":"irmind_lab","State":"ENABLED","Configuration":{"EnforceWorkGroupConfiguration":true,"BytesScannedCutoffPerQuery":1000000}}}"#;
+const CUTOFF: &str = r#"{"WorkGroup":{"Name":"irmind_lab","State":"ENABLED","Configuration":{"EnforceWorkGroupConfiguration":true,"BytesScannedCutoffPerQuery":11534335,"EngineVersion":{"EffectiveEngineVersion":"Athena engine version 3"}}}}"#;
 
 fn fixture(server: &MockServer) -> (Athena, Value) {
     let mut plan: Value = serde_json::from_slice(PLAN).unwrap();
     plan["query"]["fields"] = json!(["@timestamp", "event.action", "source.ip"]);
     let source =
         ResolvedQuerySourceV1::decode(&canonical_query_json(&plan["source"]).unwrap()).unwrap();
+    plan["limits"]["scan_bytes"] = json!(11 * 1024 * 1024);
     let limits = serde_json::from_value(plan["limits"].clone()).unwrap();
     let mut executor = Athena::new(
         source,
@@ -52,7 +53,10 @@ async fn protocol_keeps_the_same_submission_key_and_preserves_partial_results() 
     let query = SourceQueryV1::decode(&canonical_query_json(&plan["query"]).unwrap()).unwrap();
     let compiled = executor.compile(&executor.source, &query).unwrap();
     let token = "a".repeat(64);
-    assert_eq!(executor.scan_cutoff(&cancel).await.unwrap(), 1_000_000);
+    assert_eq!(
+        executor.scan_cutoff(&cancel).await.unwrap(),
+        11 * 1024 * 1024
+    );
     assert!(executor.start(&compiled, &token, &cancel).await.is_err());
     assert_eq!(
         executor.start(&compiled, &token, &cancel).await.unwrap(),
@@ -68,6 +72,7 @@ async fn protocol_keeps_the_same_submission_key_and_preserves_partial_results() 
         Some(4096)
     );
     let page = executor.fetch_page(JOB, None, &cancel).await.unwrap();
+    assert_eq!(protocol::billable_bytes(4096), Some(10 * 1024 * 1024));
     assert_eq!(page.next_token.as_deref(), Some("next/+opaque"));
     let bytes = page.chunks.try_concat().await.unwrap();
     assert_eq!(serde_json::from_slice::<Value>(&bytes).unwrap(), first_page);
@@ -119,4 +124,80 @@ async fn literals_stay_outside_sql_and_cancelled_requests_make_no_connection() {
         Err(AppError::Cancelled)
     ));
     assert!(server.finish().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn source_ip_and_account_filters_bind_without_widening_the_adopted_scope() {
+    let server = MockServer::start(vec![MockResponse::json(
+        &json!({"QueryExecutionId":JOB}).to_string(),
+    )])
+    .unwrap();
+    let (executor, mut plan) = fixture(&server);
+    plan["query"]["filters"] = json!([
+        {"field":"cloud.account.id","op":"eq","value":"111122223333"},
+        {"field":"source.ip","op":"eq","value":"2001:db8::9"}
+    ]);
+    let query = serde_json::from_value(plan["query"].clone()).unwrap();
+    let compiled = executor.compile(&executor.source, &query).unwrap();
+    assert!(
+        compiled
+            .text()
+            .contains("TRY_CAST(sourceipaddress AS IPADDRESS) = CAST(? AS IPADDRESS)")
+    );
+    assert_eq!(compiled.text().matches("recipientaccountid = ?").count(), 2);
+    assert!(!compiled.text().contains("2001:db8::9"));
+    assert!(!compiled.text().contains("111122223333"));
+    assert_eq!(compiled.bindings()[4].kind, "ip");
+    executor
+        .start(&compiled, &"a".repeat(64), &CancellationToken::new())
+        .await
+        .unwrap();
+    let calls = server.finish().unwrap();
+    let body: Value = serde_json::from_slice(&calls[0].body).unwrap();
+    assert_eq!(body["ExecutionParameters"][3], "'111122223333'");
+    assert_eq!(body["ExecutionParameters"][4], "'2001:db8::9'");
+
+    plan["query"]["filters"][0]["value"] = json!("999999999999");
+    let other_account = serde_json::from_value(plan["query"].clone()).unwrap();
+    assert!(matches!(
+        executor.compile(&executor.source, &other_account),
+        Err(AppError::Policy(_))
+    ));
+    plan["query"]["filters"][1]["value"] = json!("2001:db8::9') OR ('x'='x");
+    assert!(serde_json::from_value::<SourceQueryV1>(plan["query"].clone()).is_err());
+}
+
+#[tokio::test]
+async fn usage_and_workgroup_cutoff_use_billed_units() {
+    let observations = |state: &str, scanned: Option<u64>| {
+        MockResponse::json(
+            &json!({"QueryExecution":{"QueryExecutionId":JOB,"WorkGroup":"irmind_lab",
+            "Status":{"State":state},"Statistics":{"DataScannedInBytes":scanned}}})
+            .to_string(),
+        )
+    };
+    let server = MockServer::start(vec![
+        MockResponse::json(CUTOFF),
+        observations("SUCCEEDED", Some(4096)),
+        observations("CANCELLED", Some(10 * (1 << 20) + 1)),
+        observations("FAILED", Some(4096)),
+        observations("SUCCEEDED", None),
+    ])
+    .unwrap();
+    let (mut executor, _) = fixture(&server);
+    executor.limits.scan_bytes = Some(11 * (1 << 20) - 1);
+    let cancel = CancellationToken::new();
+    assert!(executor.scan_cutoff(&cancel).await.is_err());
+    for (raw, billed) in [
+        (Some(4096), Some(10 * (1 << 20))),
+        (Some(10 * (1 << 20) + 1), Some(11 * (1 << 20))),
+        (Some(4096), Some(0)),
+        (None, None),
+    ] {
+        let observation = executor.observe(JOB, &cancel).await.unwrap();
+        assert_eq!(observation.usage.scanned_bytes, raw);
+        assert_eq!(observation.usage.billed_bytes, billed);
+    }
+    assert_eq!(server.finish().unwrap().len(), 5);
+    assert_eq!(protocol::billable_bytes(u64::MAX), None);
 }

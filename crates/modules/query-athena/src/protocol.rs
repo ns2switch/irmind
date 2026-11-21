@@ -9,6 +9,16 @@ use irmind_app::{
 };
 use serde_json::{Value, json};
 
+const MEBIBYTE: u64 = 1 << 20;
+pub(super) const MINIMUM_BILLED_BYTES: u64 = 10 * MEBIBYTE;
+
+pub(super) fn billable_bytes(scanned: u64) -> Option<u64> {
+    scanned
+        .div_ceil(MEBIBYTE)
+        .checked_mul(MEBIBYTE)
+        .map(|rounded| rounded.max(MINIMUM_BILLED_BYTES))
+}
+
 pub(super) const METADATA_LIMIT: usize = 256 * 1024;
 const PAGE_LIMIT: usize = 8 * 1024 * 1024;
 
@@ -156,13 +166,21 @@ impl Athena {
             Some("CANCELLED") => QueryExecutionStatus::Cancelled,
             _ => QueryExecutionStatus::Unknown,
         };
+        let scanned_bytes = statistics["DataScannedInBytes"].as_u64();
+        let billed_bytes = match status {
+            QueryExecutionStatus::Succeeded | QueryExecutionStatus::Cancelled => {
+                scanned_bytes.and_then(billable_bytes)
+            }
+            QueryExecutionStatus::Failed => Some(0),
+            _ => None,
+        };
         Ok(ExecutionObservationV1 {
             status,
             request_id: None,
             usage: SourceQueryUsage {
-                scanned_bytes: statistics["DataScannedInBytes"].as_u64(),
+                scanned_bytes,
                 processed_bytes: None,
-                billed_bytes: None,
+                billed_bytes,
                 returned_wire_bytes: 0,
                 returned_decoded_bytes: 0,
                 query_price_basis: QueryAccounting::ScanPriced,

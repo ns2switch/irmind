@@ -52,7 +52,9 @@ impl Athena {
             || region.len() > 32
             || credentials.access_key_id().is_empty()
             || credentials.secret_access_key().is_empty()
-            || limits.scan_bytes.is_none()
+            || limits
+                .scan_bytes
+                .is_none_or(|cap| cap < protocol::MINIMUM_BILLED_BYTES)
         {
             return Err(SourceQueryError::Invalid.into());
         }
@@ -102,11 +104,14 @@ impl Athena {
         let configuration = &workgroup["Configuration"];
         let cutoff = configuration["BytesScannedCutoffPerQuery"]
             .as_u64()
-            .filter(|bytes| *bytes > 0 && Some(*bytes) <= self.limits.scan_bytes)
+            .filter(|bytes| *bytes >= 10_000_000)
+            .and_then(protocol::billable_bytes)
+            .filter(|bytes| Some(*bytes) <= self.limits.scan_bytes)
             .ok_or(SourceQueryError::Unavailable)?;
         if workgroup["Name"] != self.workgroup
             || workgroup["State"] != "ENABLED"
             || configuration["EnforceWorkGroupConfiguration"] != true
+            || configuration["EngineVersion"]["EffectiveEngineVersion"] != "Athena engine version 3"
         {
             return Err(SourceQueryError::Unavailable.into());
         }
@@ -154,13 +159,13 @@ impl SourceQueryExecutor for Athena {
             observed_at: QueryTime::parse(&irmind_calendar::Utc::now().to_rfc3339())?,
             accounting: QueryAccounting::ScanPriced,
             estimate: QueryEstimate {
-                unit: "scanned_bytes".into(),
+                unit: "billed_bytes".into(),
                 value: None,
                 basis: "workgroup_cutoff".into(),
                 reliable: false,
             },
             provider_ceiling: Some(cutoff),
-            source_metadata: json!({"workgroup": self.workgroup, "cutoff_semantics": "cancel_after_threshold"}),
+            source_metadata: json!({"workgroup": self.workgroup, "cutoff_semantics": "cancel_after_threshold", "billed_ceiling_bytes": cutoff}),
             uncertainty: vec!["no_reliable_dry_run".into()],
         })
     }
