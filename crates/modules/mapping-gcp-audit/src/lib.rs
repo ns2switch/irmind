@@ -13,6 +13,16 @@ const CLOUD: &str = include_str!("cloud.toml");
 const CLOUD_DIGEST: &str = "9bbdd74600a9b03315e3743dc6c173cadc379f663914dbc1adcbf36ec7ad69d2";
 pub struct CloudAuditMapping(TableMapping);
 impl CloudAuditMapping {
+    pub fn for_capture() -> Result<Self, MappingError> {
+        let decoder =
+            irmind_domain::SourceDecoderIdentityV1::try_new("query-bigquery-cloud-audit", "1")
+                .map_err(|_| MappingError::UnsupportedDecoder)?;
+        Self::new()?
+            .0
+            .capture_alias("mapping-gcp-audit-query", &decoder)
+            .map(Self)
+    }
+
     pub fn new() -> Result<Self, MappingError> {
         TableMapping::bundled(
             CLOUD,

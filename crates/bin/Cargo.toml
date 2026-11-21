@@ -7,6 +7,7 @@ license.workspace = true
 
 [features]
 default = [
+    "query-bigquery",
     "query-athena",
     "parser-s3-access", "mapping-s3-access",
     "parser-elb", "mapping-elb",
@@ -118,7 +119,10 @@ mapping-cloud-flow = ["dep:irmind-mod-mapping-cloud-flow"]
 
 query-athena = ["dep:irmind-mod-query-athena", "mapping-cloudtrail"]
 
+query-bigquery = ["dep:irmind-mod-query-bigquery", "mapping-gcp-audit"]
+
 [dependencies]
+irmind-mod-query-bigquery = { path = "../modules/query-bigquery", version = "0.1.0", optional = true }
 irmind-mod-query-athena = { path = "../modules/query-athena", version = "0.1.0", optional = true }
 irmind-mod-parser-s3-access = { path = "../modules/parser-s3-access", version = "0.1.0", optional = true }
 irmind-mod-parser-elb = { path = "../modules/parser-elb", version = "0.1.0", optional = true }
