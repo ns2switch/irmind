@@ -20,9 +20,7 @@ build() (
     TIMEFORMAT='RELEASE_BINARY_BUILD elapsed_seconds=%R'
     time cargo build --release --locked -p irmind
     TIMEFORMAT='RELEASE_HELPER_BUILD elapsed_seconds=%R'
-    time cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked --bin irmind-evtx --example large_collection
-    cargo test --locked --release -p irmind --test identity_ingest --test format_goldens --no-run
-    cargo test --locked --release -p irmind-infra --lib --no-run
+    time cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked --bin irmind-evtx
     wc -c < "$CARGO_TARGET_DIR/release/irmind" | awk '{printf "RELEASE_BINARY bytes=%s\n", $1}'
     wc -c < "$CARGO_TARGET_DIR/release/irmind-evtx" | awk '{printf "RELEASE_HELPER bytes=%s\n", $1}'
     (
@@ -33,6 +31,13 @@ build() (
             sort -u
     ) > "$root/release-profile-$profile-mapping-identities.txt"
     test -s "$root/release-profile-$profile-mapping-identities.txt"
+    sha256sum "$CARGO_TARGET_DIR/release/irmind" "$CARGO_TARGET_DIR/release/irmind-evtx" |
+        sed -E 's@  .*/@  @' > "$root/release-profile-$profile-shipping-sha256.txt"
+    cp "$CARGO_TARGET_DIR/release/irmind-evtx" "$CARGO_TARGET_DIR/shipping-irmind-evtx"
+    cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked --example large_collection
+    cargo test --locked --release -p irmind --test identity_ingest --test format_goldens --no-run
+    cargo test --locked --release -p irmind-infra --lib --no-run
+    mv "$CARGO_TARGET_DIR/shipping-irmind-evtx" "$CARGO_TARGET_DIR/release/irmind-evtx"
 )
 
 exercise() (
