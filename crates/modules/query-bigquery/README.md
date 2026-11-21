@@ -46,3 +46,20 @@ byte dry-run estimate can inform approval while the billed total is uncertain.
 Settlement uses the final `totalBytesBilled` value, separately from processed
 bytes. [On-demand pricing](https://cloud.google.com/bigquery/pricing) ·
 [Job statistics](https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/Job#JobStatistics2).
+
+## Service-account authentication design
+
+The application obtains short-lived Google access tokens from the configured
+service account. The token exchange uses the pinned Google OAuth endpoint and
+the BigQuery read-only scope. The private key remains in the IRMind keystore.
+Tokens are used only in HTTP authorization and are excluded from signed plans,
+captures, diagnostics and exports.
+
+The shared implementation can move the existing RS256 signing and bounded
+OAuth token exchange from the Chronicle adapter into `irmind-http`. An optional
+feature would use the same `ring 0.17.14` already pinned in the workspace.
+Chronicle keeps its existing identity, credential names and scope. BigQuery
+uses its own keystore source binding. No production package needs a new
+third-party crate. Both services keep separate tokens and test the exchange
+against local fake endpoints. Issuing and refreshing a token occurs only after
+an authorized operation, with bounded requests and cancellation.
