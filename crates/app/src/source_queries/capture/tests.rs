@@ -200,3 +200,34 @@ fn streams_large_pages_in_bounded_chunks_and_observes_cancellation() {
         Err(CaptureError::Cancelled)
     );
 }
+
+#[test]
+fn capture_decoder_sees_each_exact_page_at_its_real_container_offset() {
+    let bytes = golden();
+    let cancel = CancellationToken::new();
+    let mut visited = 0;
+    let result = read_query_capture_pages(bytes.as_slice(), &cancel, |page, reader| {
+        let mut body = Vec::new();
+        reader.read_to_end(&mut body).unwrap();
+        let start = usize::try_from(page.body_offset).unwrap();
+        assert_eq!(page.ordinal, visited);
+        assert_eq!(page.rows, 1);
+        assert_eq!(body.len() as u64, page.body_bytes);
+        assert_eq!(body, bytes[start..start + body.len()]);
+        visited += 1;
+        Ok(())
+    })
+    .unwrap();
+    assert_eq!(verify(&bytes).unwrap(), result);
+    assert_eq!(visited, 2);
+    assert!(read_query_capture_pages(bytes.as_slice(), &cancel, |_, _| Ok(())).is_err());
+    let mut tampered = bytes;
+    *tampered.last_mut().unwrap() ^= 1;
+    assert!(
+        read_query_capture_pages(tampered.as_slice(), &cancel, |_, reader| {
+            io::copy(reader, &mut io::sink()).unwrap();
+            Ok(())
+        })
+        .is_err()
+    );
+}

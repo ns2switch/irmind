@@ -112,6 +112,10 @@ fn verify_open_export_with_catalog(
         provided_count + captures.len(),
     );
     result.format_version = version;
+    result.source_query_limits = captures
+        .iter()
+        .filter_map(|receipt| receipt.limit_notice())
+        .collect();
     Ok(result)
 }
 

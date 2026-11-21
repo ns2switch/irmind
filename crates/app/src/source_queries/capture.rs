@@ -102,6 +102,40 @@ pub fn verify_query_capture(
     input: impl Read,
     cancel: &CancellationToken,
 ) -> Result<QueryCaptureSummary, CaptureError> {
+    let mut buffer = vec![0; MAX_CHUNK];
+    walk_query_capture(input, cancel, |_, reader| {
+        while reader.read(&mut buffer).map_err(capture_body_error)? != 0 {}
+        Ok(())
+    })
+}
+
+/// Authenticated framing for one provider-native page. Body bytes are still
+/// untrusted and must be consumed completely.
+#[derive(Clone, Copy)]
+pub struct QueryCapturePage<'a> {
+    pub ordinal: u64,
+    pub rows: u64,
+    pub body_offset: u64,
+    pub body_bytes: u64,
+    pub columns: &'a [CaptureColumn],
+}
+
+/// Walk the same framing used by offline verification. A decoder may stage
+/// rows while reading, but can publish them only after the entire capture and
+/// its page hashes have verified. The reader never crosses a page boundary.
+pub fn read_query_capture_pages(
+    input: impl Read,
+    cancel: &CancellationToken,
+    visit: impl FnMut(QueryCapturePage<'_>, &mut dyn Read) -> Result<(), crate::AppError>,
+) -> Result<QueryCaptureSummary, crate::AppError> {
+    walk_query_capture(input, cancel, visit)
+}
+
+fn walk_query_capture<E: From<CaptureError>>(
+    input: impl Read,
+    cancel: &CancellationToken,
+    mut visit: impl FnMut(QueryCapturePage<'_>, &mut dyn Read) -> Result<(), E>,
+) -> Result<QueryCaptureSummary, E> {
     let mut input = CaptureReader {
         input,
         cancel,
@@ -111,7 +145,7 @@ pub fn verify_query_capture(
     let mut magic = [0u8; QUERY_CAPTURE_MAGIC.len()];
     input.read_exact(&mut magic)?;
     if magic != QUERY_CAPTURE_MAGIC {
-        return Err(CaptureError::InvalidFormat);
+        return Err(CaptureError::InvalidFormat.into());
     }
     let descriptor: Descriptor = input.metadata()?;
     let plan = EvidenceHash::parse(&descriptor.plan).map_err(|_| CaptureError::InvalidFormat)?;
@@ -120,10 +154,10 @@ pub fn verify_query_capture(
             .map_err(|_| CaptureError::InvalidFormat)?;
     let page_count = input.count()?;
     if descriptor.version != 1 || descriptor.pages != page_count {
-        return Err(CaptureError::InvalidFormat);
+        return Err(CaptureError::InvalidFormat.into());
     }
     if page_count > QUERY_MAX_PAGES {
-        return Err(CaptureError::Limit);
+        return Err(CaptureError::Limit.into());
     }
 
     let mut pages = Sha256::new();
@@ -131,11 +165,10 @@ pub fn verify_query_capture(
     pages.update(page_count.to_be_bytes());
     let mut rows = 0;
     let mut completeness_mask = 0;
-    let mut buffer = vec![0; MAX_CHUNK];
     for ordinal in 0..page_count {
         let page: Page = input.metadata()?;
-        if page.ordinal != ordinal || page.completeness > 4 {
-            return Err(CaptureError::InvalidFormat);
+        if page.ordinal != ordinal || page.completeness > 4 || page.encoding != "identity" {
+            return Err(CaptureError::InvalidFormat.into());
         }
         EvidenceHash::parse(&page.sha256).map_err(|_| CaptureError::InvalidFormat)?;
         let mut expected_hash = [0; 32];
@@ -143,9 +176,9 @@ pub fn verify_query_capture(
             .map_err(|_| CaptureError::InvalidFormat)?;
         rows = checked_total(rows, page.rows, QUERY_MAX_ROWS)?;
         let body_bytes = input.count()?;
-        let body_hash = input.hash_body(body_bytes, &mut buffer)?;
+        let body_hash = input.visit_body(&page, body_bytes, &mut visit)?;
         if body_hash != expected_hash {
-            return Err(CaptureError::Integrity);
+            return Err(CaptureError::Integrity.into());
         }
         pages.update(ordinal.to_be_bytes());
         pages.update(body_hash);
@@ -155,7 +188,7 @@ pub fn verify_query_capture(
         completeness_mask |= 1 << page.completeness;
     }
     if input.read(&mut [0])? != 0 {
-        return Err(CaptureError::InvalidFormat);
+        return Err(CaptureError::InvalidFormat.into());
     }
     Ok(QueryCaptureSummary {
         capture_sha256: EvidenceHash::from_bytes(input.digest.finalize().into()),
@@ -211,6 +244,36 @@ impl<R: Read> CaptureReader<'_, R> {
         Ok(u64::from_be_bytes(bytes))
     }
 
+    fn visit_body<E: From<CaptureError>>(
+        &mut self,
+        page: &Page,
+        body_bytes: u64,
+        visit: &mut impl FnMut(QueryCapturePage<'_>, &mut dyn Read) -> Result<(), E>,
+    ) -> Result<[u8; 32], E> {
+        checked_total(self.bytes, body_bytes, QUERY_MAX_BYTES)?;
+        let metadata = QueryCapturePage {
+            ordinal: page.ordinal,
+            rows: page.rows,
+            body_offset: self.bytes,
+            body_bytes,
+            columns: &page.columns,
+        };
+        let mut body = PageBody {
+            reader: self,
+            remaining: body_bytes,
+            hash: Sha256::new(),
+        };
+        let page_result = visit(metadata, &mut body);
+        if body.reader.cancel.is_cancelled() {
+            return Err(CaptureError::Cancelled.into());
+        }
+        page_result?;
+        if body.remaining != 0 {
+            return Err(CaptureError::InvalidFormat.into());
+        }
+        Ok(body.hash.finalize().into())
+    }
+
     fn metadata<T: DeserializeOwned + Serialize>(&mut self) -> Result<T, CaptureError> {
         let size = usize::try_from(self.count()?).map_err(|_| CaptureError::Limit)?;
         if size > QUERY_MAX_RECORD_BYTES {
@@ -227,19 +290,36 @@ impl<R: Read> CaptureReader<'_, R> {
         }
         Ok(value)
     }
+}
 
-    fn hash_body(&mut self, size: u64, buffer: &mut [u8]) -> Result<[u8; 32], CaptureError> {
-        checked_total(self.bytes, size, QUERY_MAX_BYTES)?;
-        let mut remaining = usize::try_from(size).map_err(|_| CaptureError::Limit)?;
-        let mut hash = Sha256::new();
-        while remaining != 0 {
-            let count = remaining.min(buffer.len());
-            self.read_exact(&mut buffer[..count])?;
-            hash.update(&buffer[..count]);
-            remaining -= count;
+struct PageBody<'a, 'cancel, R> {
+    reader: &'a mut CaptureReader<'cancel, R>,
+    remaining: u64,
+    hash: Sha256,
+}
+
+impl<R: Read> Read for PageBody<'_, '_, R> {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let count = usize::try_from(self.remaining)
+            .unwrap_or(usize::MAX)
+            .min(buffer.len())
+            .min(MAX_CHUNK);
+        if count == 0 {
+            return Ok(0);
         }
-        Ok(hash.finalize().into())
+        let slice = &mut buffer[..count];
+        self.reader.read_exact(slice).map_err(io::Error::other)?;
+        self.hash.update(slice);
+        self.remaining -= count as u64;
+        Ok(count)
     }
+}
+
+fn capture_body_error(error: io::Error) -> CaptureError {
+    error
+        .into_inner()
+        .and_then(|inner| inner.downcast::<CaptureError>().ok())
+        .map_or(CaptureError::Read, |error| *error)
 }
 
 fn checked_total(current: u64, amount: u64, max: u64) -> Result<u64, CaptureError> {

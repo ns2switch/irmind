@@ -47,7 +47,14 @@ fn engine_query_capture_survives_reopen_reconstruction_seal_and_v9_export() {
             .decoder_selection(decoder.name, decoder.version)
             .unwrap(),
     );
-    let engine = engine(root.path(), store.clone(), decoder.clone(), analyst, agent);
+    let engine = engine(
+        root.path(),
+        store.clone(),
+        decoder.clone(),
+        analyst,
+        agent,
+        None,
+    );
     let cancel = CancellationToken::new();
     let mut spool = reserve_and_stage(&engine, &case, &chain, &cancel);
     spool.write_all(&capture).unwrap();
@@ -83,8 +90,38 @@ fn engine_query_capture_survives_reopen_reconstruction_seal_and_v9_export() {
         .unwrap(),
         1
     );
+    let notices = check_citation_notices(&engine, &case, &hash, &cancel);
     engine.seal(&case).unwrap();
-    check_v9_export(root.path(), store.as_ref(), &case, &cancel);
+    check_v9_export(root.path(), store.as_ref(), &case, &notices, &cancel);
+}
+
+fn check_citation_notices(
+    engine: &Engine<'_>,
+    case: &CaseId,
+    hash: &EvidenceHash,
+    cancel: &CancellationToken,
+) -> Vec<irmind_app::source_queries::SourceQueryLimitNotice> {
+    let (_, notices) = engine.verify_with_query_limits(case, cancel).unwrap();
+    assert_eq!(notices.len(), 1);
+    assert_eq!(notices[0].capture_sha256(), hash.as_str());
+    assert!(notices[0].message().contains("after 2 captured rows"));
+    let finding = engine
+        .add_finding(
+            case,
+            irmind_app::FindingKind::Hypothesis,
+            "Synthetic bounded acquisition",
+            hash.as_str(),
+        )
+        .unwrap();
+    engine.confirm_finding(case, &finding).unwrap();
+    assert!(engine.findings(case).unwrap()[0].source_query_limited);
+    assert!(
+        engine
+            .report(case)
+            .unwrap()
+            .contains("More results may exist.")
+    );
+    notices
 }
 
 fn check_append_rollback(
@@ -135,19 +172,26 @@ fn engine(
     decoder: Arc<dyn irmind_app::StreamingEventParser>,
     analyst: Arc<LocalSigner>,
     agent: Arc<LocalSigner>,
+    queries: Option<irmind_app::source_queries::SourceQueryPorts>,
 ) -> Engine<'static> {
     let verifier = LocalVerifier::from_signer(analyst.as_ref())
         .with_trusted_key(&agent.actor(), &agent.public_key())
         .unwrap();
+    let ports = EnginePorts::new(
+        store.clone(),
+        store.clone(),
+        store.clone(),
+        store.clone(),
+        CryptoPorts::new(analyst, Arc::new(verifier)),
+        Arc::new(MandatoryGuard::new().unwrap()),
+    );
+    let ports = if let Some(queries) = queries {
+        ports.with_source_queries(queries)
+    } else {
+        ports
+    };
     Engine::new(
-        EnginePorts::new(
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            store.clone(),
-            CryptoPorts::new(analyst, Arc::new(verifier)),
-            Arc::new(MandatoryGuard::new().unwrap()),
-        ),
+        ports,
         ExecutionMode::Attended,
         Arc::new(irmind_testkit::FixedClock::new(1_794_960_000)),
     )
@@ -210,14 +254,26 @@ fn reserve_and_stage(
     output
 }
 
-fn check_v9_export(root: &Path, store: &LocalStore, case: &CaseId, cancel: &CancellationToken) {
+fn check_v9_export(
+    root: &Path,
+    store: &LocalStore,
+    case: &CaseId,
+    notices: &[irmind_app::source_queries::SourceQueryLimitNotice],
+    cancel: &CancellationToken,
+) {
     for include_originals in [false, true] {
         let export = root.join(format!("query-{include_originals}.irmind"));
         let fingerprint =
             LargeCaseExporter::export_case(store, case, &export, None, include_originals, cancel)
                 .unwrap();
-        let (verified, _) = crate::verify_export_expected(&export, Some(&fingerprint)).unwrap();
-        assert_eq!(verified, fingerprint);
+        let verified = irmind_app::verify_export_details(
+            &crate::LocalExportVerifier,
+            &export,
+            Some(&fingerprint),
+        )
+        .unwrap();
+        assert_eq!(verified.analyst_key_fingerprint, fingerprint);
+        assert_eq!(verified.source_query_limits, notices);
         let mut changed = fs::read(&export).unwrap();
         *changed.last_mut().unwrap() ^= 1;
         fs::write(&export, changed).unwrap();
@@ -273,7 +329,29 @@ fn remap_vector(
         for (before, after) in &replacements {
             entry.payload = entry.payload.replace(before, after);
         }
-        let value: serde_json::Value = serde_json::from_str(&entry.payload).unwrap();
+        let mut value: serde_json::Value = serde_json::from_str(&entry.payload).unwrap();
+        if name == "plan" {
+            value["query"]["limit"] = serde_json::json!(2);
+            value["compiled"]["text"] = serde_json::json!(
+                value["compiled"]["text"]
+                    .as_str()
+                    .unwrap()
+                    .replace("LIMIT 100000", "LIMIT 2")
+            );
+            let preflight = serde_json::json!({
+                "compiled": value["compiled"], "source": value["source"],
+                "scope": value["scope"], "limits": value["limits"]
+            });
+            value["preflight"]["plan_digest"] =
+                serde_json::json!(irmind_app::hex(&irmind_app::sha256(
+                    &irmind_app::source_queries::canonical_query_json(&preflight).unwrap()
+                )));
+        } else if name == "result" {
+            value["completeness"] = serde_json::json!(["local_limit"]);
+        }
+        entry.payload =
+            String::from_utf8(irmind_app::source_queries::canonical_query_json(&value).unwrap())
+                .unwrap();
         let kind = if name == "intent" { "execution" } else { name };
         let identity = query_content_id(&format!("irmind-source-query-{kind}-v1"), &value).unwrap();
         replacements.push((ids[name].as_str(), identity.clone()));
@@ -300,4 +378,224 @@ fn remap_vector(
         prior = entry.hash;
     }
     (chain, captured)
+}
+
+mod signed_dispatch {
+    use super::*;
+    use irmind_app::{AppError, async_trait, source_queries::*};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    struct SimulatedExecutor {
+        store: Arc<LocalStore>,
+        compiled: CompiledSourceQueryV1,
+        submissions: AtomicUsize,
+    }
+
+    #[async_trait]
+    impl SourceQueryExecutor for SimulatedExecutor {
+        fn descriptor(&self) -> SourceQueryModuleV1 {
+            SourceQueryModuleV1 {
+                id: "query-athena".into(),
+                version: "1".into(),
+                datasets: vec!["cloudtrail-management".into()],
+                fields: vec!["@timestamp".into()],
+                operators: vec![QueryOperator::Eq],
+                result_kinds: vec![QueryResultKind::Events],
+                accounting: QueryAccounting::ScanPriced,
+                recoverable_submit: true,
+                cancellation: true,
+                api_version: "2017-05-18".into(),
+            }
+        }
+
+        fn compile(
+            &self,
+            _: &ResolvedQuerySourceV1,
+            _: &SourceQueryV1,
+        ) -> Result<CompiledSourceQueryV1, AppError> {
+            Ok(self.compiled.clone())
+        }
+
+        async fn preflight(
+            &self,
+            _: &irmind_domain::AuthorizedCall,
+            _: &CompiledSourceQueryV1,
+            _: &CancellationToken,
+        ) -> Result<QueryPreflightV1, AppError> {
+            Err(SourceQueryError::Unavailable.into())
+        }
+
+        async fn submit(
+            &self,
+            lease: &AdmittedSourceQuery,
+            _: &CancellationToken,
+        ) -> Result<SubmitObservationV1, AppError> {
+            lease.check(
+                "query-athena",
+                "aws-lab",
+                SourceQueryLeasePhase::Submit,
+                None,
+            )?;
+            let _lock = irmind_app::Repository::lock_case(self.store.as_ref(), lease.case_id())?;
+            let entries = self.store.entries(lease.case_id())?;
+            assert!(
+                matches!(&entries[entries.len() - 2..], [reservation, intent]
+                if reservation.kind == AuditEventKind::SourceQueryReservationV1
+                    && intent.kind == AuditEventKind::SourceQueryExecutionV1
+                    && intent.prev == reservation.hash)
+            );
+            self.submissions.fetch_add(1, Ordering::SeqCst);
+            Ok(SubmitObservationV1::Unknown)
+        }
+
+        async fn reconcile(
+            &self,
+            _: &AdmittedSourceQuery,
+            _: &QueryExecutionRef,
+            _: &CancellationToken,
+        ) -> Result<ExecutionObservationV1, AppError> {
+            Err(SourceQueryError::Unavailable.into())
+        }
+
+        async fn fetch(
+            &self,
+            _: &AdmittedSourceQuery,
+            _: &QueryExecutionRef,
+            _: &QueryResultCursor,
+            _: &CancellationToken,
+        ) -> Result<QueryResponsePage, AppError> {
+            Err(SourceQueryError::Unavailable.into())
+        }
+
+        async fn cancel(
+            &self,
+            _: &AdmittedSourceQuery,
+            _: &QueryExecutionRef,
+            _: &CancellationToken,
+        ) -> Result<CancelObservationV1, AppError> {
+            Err(SourceQueryError::Unavailable.into())
+        }
+    }
+
+    fn authorize(
+        engine: &Engine<'_>,
+        case: &CaseId,
+        plan: &serde_json::Value,
+    ) -> Option<irmind_domain::AuthorizedCall> {
+        let args = plan["query"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .map(|(key, value)| {
+                (
+                    key.clone(),
+                    value
+                        .as_str()
+                        .map_or_else(|| value.to_string(), str::to_owned),
+                )
+            })
+            .collect();
+        let decision = irmind_domain::evaluate_with_rules(
+            &engine.repo.get_case(case).unwrap(),
+            irmind_domain::ProposedCall {
+                tool: irmind_domain::Tool::SourceQuery,
+                args,
+            },
+            3,
+            ExecutionMode::Attended,
+            1_794_960_000,
+            &PolicyRules::default(),
+        );
+        match decision {
+            irmind_domain::Decision::Allow(call) => Some(call),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn ambiguous_submission_is_only_called_once_after_durable_intent() {
+        let root = tempfile::tempdir().unwrap();
+        let identity = TestDecoder.identity();
+        let (catalog, template) = synthetic_catalog_and_result(identity);
+        let analyst = Arc::new(LocalSigner {
+            key: SigningKey::from_bytes(&[77; 32]),
+            actor: Actor::Analyst,
+        });
+        let agent = Arc::new(LocalSigner {
+            key: SigningKey::from_bytes(&[88; 32]),
+            actor: Actor::Agent(AgentId::parse("main").unwrap()),
+        });
+        let (chain, _) = remap_vector(&template, agent.as_ref(), analyst.as_ref());
+        let case = case();
+        let store = Arc::new(LocalStore::open_mapped(root.path(), catalog.clone()).unwrap());
+        record_query_prefix(store.as_ref(), &case, &chain);
+        let plan: serde_json::Value = serde_json::from_str(&chain[2].payload).unwrap();
+        let executor = Arc::new(SimulatedExecutor {
+            store: store.clone(),
+            compiled: serde_json::from_value(plan["compiled"].clone()).unwrap(),
+            submissions: AtomicUsize::new(0),
+        });
+        let mut queries = SourceQueryPorts::new();
+        queries.add(executor.clone()).unwrap();
+        let decoder = Arc::new(
+            catalog
+                .decoder_selection(identity.name, identity.version)
+                .unwrap(),
+        );
+        let engine = engine(
+            root.path(),
+            store.clone(),
+            decoder,
+            analyst,
+            agent,
+            Some(queries),
+        );
+        let authorized = authorize(&engine, &case, &plan).unwrap();
+        let configuration: SignedOperation = serde_json::from_slice(CONFIGURATION).unwrap();
+        let admission = SignedSourceQueryAdmission {
+            plan: &chain[2],
+            approval: Some(&chain[3]),
+            reservation: &chain[4],
+            intent: &chain[5],
+            configuration: &configuration,
+        };
+        let cancel = CancellationToken::new();
+        let mut tampered = chain[3].clone();
+        tampered.sig[0] ^= 1;
+        assert!(
+            engine
+                .submit_signed_source_query(
+                    &authorized,
+                    SignedSourceQueryAdmission {
+                        approval: Some(&tampered),
+                        ..admission
+                    },
+                    &cancel
+                )
+                .is_err()
+        );
+        assert_eq!(executor.submissions.load(Ordering::SeqCst), 0);
+        assert!(matches!(
+            engine
+                .submit_signed_source_query(&authorized, admission, &cancel)
+                .unwrap(),
+            SubmitObservationV1::Unknown
+        ));
+        assert!(
+            engine
+                .submit_signed_source_query(&authorized, admission, &cancel)
+                .is_err()
+        );
+        assert_eq!(executor.submissions.load(Ordering::SeqCst), 1);
+        verify_unknown_observation(&engine, &store, &case);
+    }
+
+    fn verify_unknown_observation(engine: &Engine<'_>, store: &LocalStore, case: &CaseId) {
+        let last = store.last_entry(case).unwrap().unwrap();
+        assert_eq!(last.kind, AuditEventKind::SourceQueryExecutionV1);
+        let observation: serde_json::Value = serde_json::from_str(&last.payload).unwrap();
+        assert_eq!(observation["status"], "unknown");
+        assert!(observation["usage"]["billed_bytes"].is_null());
+        assert!(engine.verify(case).is_ok());
+    }
 }

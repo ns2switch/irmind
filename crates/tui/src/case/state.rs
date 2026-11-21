@@ -453,6 +453,7 @@ mod tests {
             evidence_hash: "a".repeat(64),
             confirmed: false,
             dismissed: false,
+            source_query_limited: false,
             details: None,
         }];
         assert!(matches!(

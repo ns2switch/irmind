@@ -1,8 +1,8 @@
 use super::{
     BudgetReplay, QUERY_CASE_MAX_BYTES, QUERY_CASE_MAX_ROWS, SignedSourceQueryAdmission,
     SourceQueryAllocationV1, SourceQueryApprovalV1, SourceQueryAuthority, SourceQueryBroker,
-    SourceQueryExecutionV1, SourceQueryPlanV1, SourceQueryReservationV1, SourceQueryResources,
-    SourceQueryResultV1, SourceQuerySettlementV1,
+    SourceQueryExecutionV1, SourceQueryPlanV1, SourceQueryRecoveryV1, SourceQueryReservationV1,
+    SourceQueryResources, SourceQueryResultV1, SourceQuerySettlementV1,
     admission::{adopted_threshold, verify_entry},
     completion::verify_observations,
 };
@@ -273,6 +273,7 @@ impl<'a> Replay<'a, '_> {
                 }
             }
             AuditEventKind::SourceQuerySettlementV1 => self.settle(entry)?,
+            AuditEventKind::SourceQueryRecoveryV1 => self.recover(entry)?,
             _ => {}
         }
         Ok(())
@@ -402,5 +403,39 @@ impl<'a> Replay<'a, '_> {
             )?;
         }
         Ok(self.journal)
+    }
+
+    fn recover(&mut self, entry: &SignedEntry) -> Result<(), AppError> {
+        let invalid = || AppError::InvalidChain(entry.seq);
+        let broker = &mut self.journal.broker;
+        verify_entry(
+            entry,
+            broker.case(),
+            AuditEventKind::SourceQueryRecoveryV1,
+            &Actor::Analyst,
+            self.verifier,
+        )?;
+        let recovery = SourceQueryRecoveryV1::decode(entry.payload.as_bytes())?;
+        let reservation = recovery.reservation();
+        let pending = self.pending.get(reservation).ok_or_else(invalid)?;
+        if pending.result.is_some() {
+            return Err(invalid());
+        }
+        let hold = broker.pending(reservation)?;
+        let (execution, seq) = verify_observations(
+            &pending.observations,
+            broker.case(),
+            hold,
+            &Actor::Agent(pending.principal.clone()),
+            self.verifier,
+        )?;
+        if seq >= entry.seq {
+            return Err(invalid());
+        }
+        let observed = pending.observations.last().ok_or_else(invalid)?;
+        recovery.validate_observation(broker.case(), hold, &execution, observed.at, entry.at)?;
+        broker.release_expired_analytics_slot(reservation)?;
+        self.pending.remove(reservation);
+        Ok(())
     }
 }
