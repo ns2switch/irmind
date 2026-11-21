@@ -13,6 +13,8 @@ def platform_path(path: str) -> bool:
         path.startswith("crates/fs/")
         or path.startswith("crates/process-containment/")
         or path.startswith("crates/modules/parser-evtx/")
+        or path.startswith("crates/modules/query-")
+        or path.startswith("crates/app/src/source_queries/")
         or path.startswith("helpers/evtx/")
         or path.startswith("crates/modules/storage-object/")
         or (len(parts) >= 4 and parts[:2] == ["crates", "modules"]
