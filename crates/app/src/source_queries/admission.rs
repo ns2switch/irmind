@@ -235,6 +235,43 @@ pub(super) fn require_active_adoption(
     plan: &SourceQueryPlanV1,
     authenticated: &[SignedOperation],
 ) -> Result<(), AppError> {
+    let active = active_source_adoption(plan.source(), authenticated)?;
+    if plan.adoption() != crate::hex(&active.operation.hash) {
+        return Err(SourceQueryError::Approval.into());
+    }
+    Ok(())
+}
+
+pub(super) struct ActiveSourceAdoption<'a> {
+    pub operation: &'a SignedOperation,
+    pub policy: Value,
+}
+
+impl ActiveSourceAdoption<'_> {
+    pub(super) fn check_limits(
+        &self,
+        binding: &super::ports::QuerySourceBinding,
+    ) -> Result<(), AppError> {
+        let rules: PolicyRules =
+            serde_json::from_value(self.policy.clone()).map_err(|_| SourceQueryError::Invalid)?;
+        let limits = &binding.limits;
+        if limits.interval_seconds > rules.interval_seconds
+            || limits.rows > rules.query_rows
+            || limits.retained_bytes > rules.query_retained_bytes
+            || limits
+                .scan_bytes
+                .is_some_and(|limit| rules.query_scan_bytes.is_none_or(|max| limit > max))
+        {
+            return Err(SourceQueryError::Scope.into());
+        }
+        Ok(())
+    }
+}
+
+pub(super) fn active_source_adoption<'a>(
+    source: &ResolvedQuerySourceV1,
+    authenticated: &'a [SignedOperation],
+) -> Result<ActiveSourceAdoption<'a>, AppError> {
     for operation in authenticated.iter().rev() {
         let Some(encoded) = operation.operation.strip_prefix(CONFIGURATION_PREFIX) else {
             continue;
@@ -243,13 +280,16 @@ pub(super) fn require_active_adoption(
             return Err(SourceQueryError::Approval.into());
         }
         let bytes = hex::decode(encoded).map_err(|_| SourceQueryError::Approval)?;
-        let (adoption, _) = decode_adoption(&bytes)?;
-        if adoption.source.id() == plan.source().id() {
-            return if plan.adoption() == crate::hex(&operation.hash) {
-                Ok(())
-            } else {
-                Err(SourceQueryError::Approval.into())
-            };
+        let (adoption, rules) = decode_adoption(&bytes)?;
+        if adoption.source.id() == source.id() {
+            if adoption.source != *source {
+                return Err(SourceQueryError::Approval.into());
+            }
+            rules.check_source(source)?;
+            return Ok(ActiveSourceAdoption {
+                operation,
+                policy: adoption.policy,
+            });
         }
     }
     Err(SourceQueryError::Approval.into())

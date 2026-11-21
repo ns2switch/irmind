@@ -9,6 +9,7 @@ mod export;
 mod parsers;
 mod recovery;
 mod skills;
+mod source_queries;
 
 impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
     pub(super) fn submit(&mut self, prompt: String) -> Result<bool> {
@@ -541,6 +542,9 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
     }
 
     fn case_command(&mut self, prompt: &str) -> Result<bool> {
+        if self.source_query_command(prompt) {
+            return Ok(true);
+        }
         match prompt {
             "/help" => {
                 self.state.overlay_scroll = 0;

@@ -484,10 +484,10 @@ impl Engine<'_> {
                     source_query_limit: previous.source_query_limit.clone(),
                 }
             } else {
-                let result = match self
-                    .execute_proposal(case, call.proposal().clone(), cancel)
-                    .await
-                {
+                let dispatched = self
+                    .execute_turn_proposal(case, turn, call.proposal().clone(), cancel)
+                    .await;
+                let result = match dispatched {
                     Ok(result) => result,
                     Err(error @ AppError::CloudTransferLimit { .. }) => {
                         turn.cloud_limit_reached = true;
@@ -505,6 +505,42 @@ impl Engine<'_> {
             ));
         }
         self.refresh_skill_tools(turn)
+    }
+
+    async fn execute_turn_proposal(
+        &self,
+        case: &Case,
+        turn: &TurnContext,
+        proposal: crate::ProposedCall,
+        cancel: &CancellationToken,
+    ) -> Result<crate::dispatch::ToolFeedback, AppError> {
+        if proposal.tool != crate::Tool::SourceQuery {
+            return self.execute_proposal(case, proposal, cancel).await;
+        }
+
+        let invalid = || AppError::InvalidChain(0);
+        let held = turn
+            .case_lock
+            .lock()
+            .map_err(|_| invalid())?
+            .take()
+            .ok_or_else(invalid)?;
+        drop(held);
+        let result = self.execute_proposal(case, proposal, cancel).await;
+        let id = case.id.clone();
+        let cancel = cancel.clone();
+        let held = self
+            .blocking_local(move |local| {
+                let held = local.repo.lock_case(&id)?;
+                local.verify_unlocked_cancelable(&id, &cancel)?;
+                if local.repo.get_case(&id)?.sealed {
+                    return Err(AppError::Sealed);
+                }
+                Ok(held)
+            })
+            .await?;
+        *turn.case_lock.lock().map_err(|_| invalid())? = Some(held);
+        result
     }
 
     pub(in crate::engine) async fn finish_answer(

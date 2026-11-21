@@ -54,6 +54,46 @@ pub struct SourceQueryExecutionV1 {
 }
 
 impl SourceQueryExecutionV1 {
+    pub(super) fn intent_for_plan(
+        case: &crate::CaseId,
+        plan: &super::SourceQueryPlanV1,
+        reservation: &super::SourceQueryReservationV1,
+        at: QueryTime,
+    ) -> Result<Self, SourceQueryError> {
+        let plan_id = plan.content_id()?;
+        let reservation = reservation.content_id()?;
+        let execution_key = query_content_id(
+            "irmind-source-query-job-key-v1",
+            &(case.as_str(), &plan_id, plan.attempt),
+        )?;
+        Ok(Self {
+            version: 1,
+            case_id: case.as_str().into(),
+            plan: plan_id,
+            reservation,
+            previous: None,
+            attempt: plan.attempt,
+            phase: Phase::Intent,
+            execution_key,
+            provider_id: None,
+            provider_request_id: None,
+            started_at: at.clone(),
+            observed_at: at,
+            provider_at: None,
+            status: Status::Pending,
+            usage: SourceQueryUsage {
+                scanned_bytes: None,
+                processed_bytes: None,
+                billed_bytes: None,
+                returned_wire_bytes: 0,
+                returned_decoded_bytes: 0,
+                query_price_basis: plan.accounting(),
+            },
+            source_observation: None,
+            reason: None,
+        })
+    }
+
     pub(super) fn execution_key(&self) -> &str {
         &self.execution_key
     }

@@ -3,6 +3,10 @@
 use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 
+#[cfg(feature = "google-service-account")]
+pub mod google_auth;
+#[cfg(feature = "google-service-account")]
+mod rs256;
 mod trust;
 pub use trust::{CaBundle, CaError, load_ca_file, load_optional_ca};
 
