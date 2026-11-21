@@ -325,7 +325,10 @@ concat(u64(ordinal) || hash32(body) || u64(bytes) || u64(rows) || u8(completenes
 Ordinales contiguos desde cero. Cambiar orden/fila/longitud/cuerpo o quitar/duplicar
 página falla. Códigos: 0 completo, 1 parcial del proveedor, 2 límite local,
 3 cancelado, 4 rechazado. Resultado global conserva causas ordenadas únicas.
-N filas exactas bajo LIMIT no prueba que se adquirieran todas las coincidencias.
+Una respuesta que alcanza el límite de filas solicitado registra `local_limit`
+en el resultado firmado. El límite cuenta las filas retenidas y las rechazadas.
+El verificador rechaza un recibo con el número exacto de filas sin ese indicador
+o con más filas que las solicitadas. Pueden existir más coincidencias.
 
 SourceManifestV2 fija hash/tamaño y `queries/<capture_sha256>.sqc`, copied=true;
 la referencia no autoriza rutas arbitrarias. SourceRecordSetV1 usa ToolResult y
@@ -373,6 +376,12 @@ retención atómicamente en la cadena principal tras hash y tamaño final. Recib
 de ejecución/escaneo se conservan aunque falle la admisión. Ficheros de append
 fallido se limpian como huérfanos, sin fuente admitida a medias. Ningún dato entra
 al rol system. Mantener Provenance, ContentGuard y UNTRUSTED con nonce.
+Si el resultado firmado contiene `local_limit`, la verificación del caso y del
+export V9 y los hallazgos que citen la captura avisan de que puede haber más
+coincidencias. El modelo recibe ese aviso como metadato de la herramienta fuera
+del bloque UNTRUSTED. El texto del proveedor queda dentro del bloque, incluidas
+las imitaciones del aviso. Antes de otra adquisición, acotar el intervalo o
+añadir filtros. Alcanzar el límite no demuestra que no haya más actividad.
 
 El modelo recibe ID/hash de fuente, ventana, filas/bytes, completitud/cobertura
 y vista previa acotada. Timeline, búsqueda, entidades y lectura consultan después
