@@ -119,6 +119,22 @@ impl Athena {
         }
         Ok(cutoff)
     }
+
+    fn workgroup_facts(&self, cutoff: u64) -> serde_json::Value {
+        json!({"workgroup": self.workgroup, "cutoff_semantics": "cancel_after_threshold", "billed_ceiling_bytes": cutoff})
+    }
+
+    async fn check_workgroup_facts(
+        &self,
+        lease: &AdmittedSourceQuery,
+        cancel: &CancellationToken,
+    ) -> Result<(), AppError> {
+        let cutoff = self.scan_cutoff(cancel).await?;
+        if &self.workgroup_facts(cutoff) != lease.source_metadata() {
+            return Err(SourceQueryError::Scope.into());
+        }
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -167,7 +183,7 @@ impl SourceQueryExecutor for Athena {
                 reliable: false,
             },
             provider_ceiling: Some(cutoff),
-            source_metadata: json!({"workgroup": self.workgroup, "cutoff_semantics": "cancel_after_threshold", "billed_ceiling_bytes": cutoff}),
+            source_metadata: self.workgroup_facts(cutoff),
             uncertainty: vec!["no_reliable_dry_run".into()],
         })
     }
@@ -181,7 +197,7 @@ impl SourceQueryExecutor for Athena {
         if cancel.is_cancelled() {
             return Err(AppError::Cancelled);
         }
-        self.scan_cutoff(cancel).await?;
+        self.check_workgroup_facts(lease, cancel).await?;
         match self
             .start(lease.compiled(), lease.execution_key(), cancel)
             .await
@@ -203,7 +219,7 @@ impl SourceQueryExecutor for Athena {
     ) -> Result<ExecutionObservationV1, AppError> {
         self.check(lease, SourceQueryLeasePhase::Reconcile, Some(execution))?;
         let id = if execution.provider_id() == lease.execution_key() {
-            self.scan_cutoff(cancel).await?;
+            self.check_workgroup_facts(lease, cancel).await?;
             self.start(lease.compiled(), lease.execution_key(), cancel)
                 .await?
         } else {
