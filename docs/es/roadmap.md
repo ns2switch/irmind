@@ -101,6 +101,9 @@ quedan para después. Consulta el [diseño](source-queries-design.md) y el
 
 ## v0.7: detección, informes, extensibilidad y API del motor
 
+- Priorizar las identidades de mapeo nativo acotadas a sus dependencias para
+  conservar la reconstrucción cuando cambien dependencias ajenas al mapeo.
+  [Diseño](../development/native-mapping-build-identity.md).
 - Ejecutar reglas Sigma sobre Parquet local sin LLM.
 - Exportar informes Markdown y PDF que citan solo evidencia confirmada.
 - Evaluar IRMind como deployment completo con el protocolo HuntEval.

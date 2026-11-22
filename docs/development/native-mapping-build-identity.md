@@ -1,6 +1,6 @@
 # Native mapping build identity
 
-**Status.** Proposal for v0.7.
+**Status.** High-priority proposal for v0.7. [Implementation tracking](https://github.com/ns2switch/irmind/issues/381).
 
 Native mapping identities currently commit to each mapping crate, shared
 implementation sources, the application and domain crates, the build-manifest
@@ -9,6 +9,17 @@ production feature names and hashes file contents. A change to workspace
 membership or an unrelated dev-dependency can therefore change every native
 mapping identity. Identities also change when shared validation code changes,
 which is expected. [Current manifest generator](../../crates/build-manifest/src/lib.rs).
+
+The dependency update after v0.6.0 moved `url` to 2.5.9 for
+RUSTSEC-2026-0592 and `form_urlencoded` to 1.2.3 to satisfy `url`'s
+requirement. All 20 mapping identities changed on every release target.
+The update changed the workspace lockfile while leaving the mapping
+implementations and their inputs untouched. A newly built executable
+authenticated a signed v0.6.0 V9 export and its included original.
+Rebuilding the artifacts requires the original v0.6.0 executable in this
+case. Use this lockfile change as a regression input for the new format.
+[Dependency update](https://github.com/ns2switch/irmind/pull/380) ·
+[Cross-platform builds](https://github.com/ns2switch/irmind/actions/runs/45023768127).
 
 ## Proposed manifest
 
@@ -30,6 +41,13 @@ visible. Ignore standalone dev graphs and unrelated workspace members. Preserve
 the rules against absolute paths, secrets and machine environment values.
 Treat out-of-tree patches or untracked build inputs as unsupported until their
 identity can be committed.
+
+Mappings currently depend on `irmind-app` for their ports. Its crate-level
+dependency closure also contains URL handling for configuration. Before
+excluding a dependency, demonstrate a build boundary that keeps it outside
+the mapping path, for example by separating mapping contracts from
+configuration. A crate-level closure that still reaches `url` must commit
+to it. The dependency-update regression should exercise that boundary.
 
 Record the production resolution for supported targets in a fixed order. First
 establish that those targets produce the same normalized mapping output. Where

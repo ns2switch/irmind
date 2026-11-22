@@ -4,9 +4,10 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
-- Update `url` to 2.5.9 and `form_urlencoded` to 1.2.3. The dependency
-  update changes native mapping identities. Use the original v0.6.0
-  binary to fully reconstruct artifacts from cases created with it.
+- Update `url` to 2.5.9 for [RUSTSEC-2026-0592](https://rustsec.org/advisories/RUSTSEC-2026-0592.html)
+  and `form_urlencoded` to 1.2.3 to meet its dependency requirement. The
+  root lockfile update changes all 20 native mapping identities. Use the
+  v0.6.0 binary to fully reconstruct artifacts from v0.6.0 cases.
 - Build the Linux arm64 release executable with ThinLTO and one codegen
   unit, matching the Linux x86_64 profile.
 

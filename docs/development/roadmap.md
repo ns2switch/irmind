@@ -105,6 +105,8 @@ See the [source query design](source-queries-design.md) and
 
 Add local detections, evidence-linked reports, controlled extensions, and a headless engine API.
 
+- Prioritize dependency-scoped native mapping identities so unrelated lockfile
+  updates leave reconstruction identities stable. [Design](native-mapping-build-identity.md).
 - Execute Sigma rules over local Parquet without an LLM.
 - Export Markdown and PDF reports that cite only confirmed evidence.
 - Evaluate IRMind as a complete deployment through the HuntEval protocol.
