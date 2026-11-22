@@ -41,7 +41,7 @@ env:
   CARGO_PROFILE_RELEASE_STRIP: symbols
 jobs:
   dco:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     outputs:
       run_ci: ${{ steps.scope.outputs.run_ci }}
@@ -109,7 +109,9 @@ jobs:
       - name: Test documented command ownership
         run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_check_docs.py
       - name: Test native release coverage
-        run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_release_platforms.py
+        run: |
+          python3 -B .github/scripts/test_release_platforms.py
+          python3 -B .github/scripts/test_release_build_environment.py
       - name: Test release-note policy links and retry behavior
         run: |
           python3 -B .github/scripts/test_release_notes.py
@@ -180,7 +182,7 @@ jobs:
   json_formats:
     needs: [linux, dco]
     if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.run_ci == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -241,7 +243,7 @@ jobs:
   windows:
     if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.platforms == 'true' && inputs.profile_linux != true }}
     needs: [linux, dco]
-    runs-on: windows-latest
+    runs-on: windows-2025-vs2026
     timeout-minutes: 120
     env:
       CARGO_BUILD_TARGET: x86_64-pc-windows-msvc
@@ -322,7 +324,7 @@ jobs:
   linux_verify_windows:
     if: ${{ !cancelled() && needs.windows.result == 'success' && needs.dco.outputs.cross_verify == 'true' }}
     needs: [windows, dco]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -340,7 +342,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {runner: macos-latest, target: aarch64-apple-darwin, arch: arm64}
+          - {runner: macos-26, target: aarch64-apple-darwin, arch: arm64}
           - {runner: macos-15-intel, target: x86_64-apple-darwin, arch: x86_64}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
@@ -402,7 +404,7 @@ jobs:
   macos_verify_windows:
     if: ${{ !cancelled() && needs.macos.result == 'success' && needs.windows.result == 'success' && needs.dco.outputs.cross_verify == 'true' }}
     needs: [macos, windows, dco]
-    runs-on: macos-latest
+    runs-on: macos-26
     timeout-minutes: 15
     defaults:
       run:
@@ -432,7 +434,7 @@ jobs:
         include:
           - {artifact: arm64, architecture: aarch64}
           - {artifact: x86_64, architecture: x86_64}
-    runs-on: macos-latest
+    runs-on: macos-26
     timeout-minutes: 40
     environment: release
     permissions:
@@ -463,7 +465,7 @@ jobs:
   release:
     needs: [dco, linux, json_formats, release_binaries, windows, macos, native_macos, evtx_linux_compatibility, linux_verify_windows, macos_verify_windows]
     if: ${{ !cancelled() && (needs.native_macos.result == 'success' || needs.native_macos.result == 'skipped') && needs.linux.result == 'success' && needs.json_formats.result == 'success' && needs.release_binaries.result == 'success' && needs.windows.result == 'success' && needs.macos.result == 'success' && needs.linux_verify_windows.result == 'success' && needs.macos_verify_windows.result == 'success' && needs.evtx_linux_compatibility.result == 'success' && (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_dry_run == true)) }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 30
     permissions:
       actions: read
@@ -508,6 +510,8 @@ jobs:
               cp "artifacts/macos-$architecture/IRMind-macos-$architecture.dmg" release/
             fi
           done
+      - name: Assemble the build environment inventory from all five targets
+        run: python3 .github/scripts/release_build_environment.py assemble artifacts release/BUILD-ENVIRONMENT.json
       # WINDOWS NATIVE SIGNING (inactive, comment only): Authenticode is pending.
       # SignPath Foundation may be reevaluated after the public launch; a paid
       # signing subscription is another future option. No signing service or
@@ -558,7 +562,7 @@ jobs:
           rm "$RUNNER_TEMP/evtx-geiger.json" "$RUNNER_TEMP/evtx-geiger.log"
       - name: Create and check the release checksum list
         run: |
-          (cd release && sha256sum irmind-linux-x86_64 irmind-linux-aarch64 irmind-macos-aarch64 irmind-macos-x86_64 irmind-windows-x86_64.exe irmind-evtx-linux-x86_64 irmind-evtx-linux-aarch64 irmind-evtx-macos-aarch64 irmind-evtx-macos-x86_64 irmind-evtx-windows-x86_64.exe install.sh install.ps1 IRMind-SBOM.spdx.json IRMind-EVTX-SBOM.spdx.json EVTX-UNSAFE-REPORT.json EVTX-GEIGER-REPORT.json LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md > SHA256SUMS)
+          (cd release && sha256sum irmind-linux-x86_64 irmind-linux-aarch64 irmind-macos-aarch64 irmind-macos-x86_64 irmind-windows-x86_64.exe irmind-evtx-linux-x86_64 irmind-evtx-linux-aarch64 irmind-evtx-macos-aarch64 irmind-evtx-macos-x86_64 irmind-evtx-windows-x86_64.exe install.sh install.ps1 IRMind-SBOM.spdx.json IRMind-EVTX-SBOM.spdx.json EVTX-UNSAFE-REPORT.json EVTX-GEIGER-REPORT.json BUILD-ENVIRONMENT.json LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md > SHA256SUMS)
           for architecture in aarch64 x86_64; do
             if test -f "release/IRMind-macos-$architecture.dmg"; then
               (cd release && sha256sum "IRMind-macos-$architecture.dmg" >> SHA256SUMS)
@@ -568,15 +572,18 @@ jobs:
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with: {subject-path: 'release/irmind-*'}
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with: {subject-path: 'release/*SBOM.spdx.json'}
+        with:
+          subject-path: |
+            release/*SBOM.spdx.json
+            release/BUILD-ENVIRONMENT.json
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         if: needs.native_macos.result == 'success'
         with: {subject-path: 'release/IRMind-macos-*.dmg'}
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         with: {cosign-release: 'v3.1.4'} # fixes GHSA-fx35-mq7g-6g98 in the bundled default
-      - name: Sign every binary and the checksum list with GitHub OIDC
+      - name: Sign the binaries, build environment inventory and checksums with GitHub OIDC
         run: |
-          for file in release/irmind-linux-x86_64 release/irmind-linux-aarch64 release/irmind-macos-aarch64 release/irmind-macos-x86_64 release/irmind-windows-x86_64.exe release/irmind-evtx-linux-x86_64 release/irmind-evtx-linux-aarch64 release/irmind-evtx-macos-aarch64 release/irmind-evtx-macos-x86_64 release/irmind-evtx-windows-x86_64.exe release/SHA256SUMS; do
+          for file in release/irmind-linux-x86_64 release/irmind-linux-aarch64 release/irmind-macos-aarch64 release/irmind-macos-x86_64 release/irmind-windows-x86_64.exe release/irmind-evtx-linux-x86_64 release/irmind-evtx-linux-aarch64 release/irmind-evtx-macos-aarch64 release/irmind-evtx-macos-x86_64 release/irmind-evtx-windows-x86_64.exe release/BUILD-ENVIRONMENT.json release/SHA256SUMS; do
             cosign sign-blob --yes --bundle "$file.sigstore.json" "$file"
           done
           for dmg in release/IRMind-macos-*.dmg; do
@@ -588,7 +595,7 @@ jobs:
         env:
           EXPECTED_IDENTITY: https://github.com/${{ github.repository }}/.github/workflows/ci.yml@${{ github.ref }}
         run: |
-          for file in release/irmind-linux-x86_64 release/irmind-linux-aarch64 release/irmind-macos-aarch64 release/irmind-macos-x86_64 release/irmind-windows-x86_64.exe release/irmind-evtx-linux-x86_64 release/irmind-evtx-linux-aarch64 release/irmind-evtx-macos-aarch64 release/irmind-evtx-macos-x86_64 release/irmind-evtx-windows-x86_64.exe release/SHA256SUMS; do
+          for file in release/irmind-linux-x86_64 release/irmind-linux-aarch64 release/irmind-macos-aarch64 release/irmind-macos-x86_64 release/irmind-windows-x86_64.exe release/irmind-evtx-linux-x86_64 release/irmind-evtx-linux-aarch64 release/irmind-evtx-macos-aarch64 release/irmind-evtx-macos-x86_64 release/irmind-evtx-windows-x86_64.exe release/BUILD-ENVIRONMENT.json release/SHA256SUMS; do
             cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "$EXPECTED_IDENTITY" --certificate-oidc-issuer https://token.actions.githubusercontent.com
           done
           for dmg in release/IRMind-macos-*.dmg; do
@@ -640,7 +647,7 @@ jobs:
   update_homebrew:
     needs: post_release
     if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push' && needs.post_release.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     environment: release
     permissions:

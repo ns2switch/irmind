@@ -20,8 +20,23 @@ class MacOSReleaseTests(unittest.TestCase):
         binaries = BINARIES.read_text()
         self.assertIn('dist --verify', binaries)
         self.assertCountEqual(re.findall(r'destination: (\S+), runner:', binaries), PLATFORMS)
-        self.assertIn('runner: macos-latest, artifact: irmind-macos-arm64', binaries)
+        self.assertIn('runner: macos-26, artifact: irmind-macos-arm64', binaries)
         self.assertIn('runner: macos-15-intel, artifact: irmind-macos-x86_64', binaries)
+
+    def test_release_workflows_pin_their_runner_images(self):
+        for workflow in (WORKFLOW, RELEASE, BINARIES):
+            self.assertNotRegex(workflow.read_text(), r"(?:ubuntu|macos|windows)-latest")
+
+    def test_build_environment_is_checksummed_signed_verified_and_attested(self):
+        release = WORKFLOW.read_text().split('  release:\n', 1)[1].split('  post_release:', 1)[0]
+        self.assertIn('assemble artifacts release/BUILD-ENVIRONMENT.json', release)
+        checksum = next(line for line in release.splitlines() if '> SHA256SUMS)' in line)
+        self.assertIn('BUILD-ENVIRONMENT.json', checksum.split())
+        signing_loops = [line for line in release.splitlines() if 'for file in ' in line]
+        self.assertEqual(len(signing_loops), 2)
+        self.assertTrue(all('release/BUILD-ENVIRONMENT.json' in line.split() for line in signing_loops))
+        self.assertIn('subject-path: |\n            release/*SBOM.spdx.json\n            release/BUILD-ENVIRONMENT.json', release)
+        self.assertIn('release/* --clobber', release)
 
     def test_linker_flags_match_the_release_platform(self):
         self.assertEqual(build_env('linux-x86_64')['RUSTFLAGS'], '-C link-arg=-fuse-ld=mold')
@@ -43,7 +58,7 @@ class MacOSReleaseTests(unittest.TestCase):
 
     def test_both_architectures_are_tested_natively(self):
         job = WORKFLOW.read_text().split('  macos:\n', 1)[1].split('  macos_verify_windows:', 1)[0]
-        self.assertIn('runner: macos-latest, target: aarch64-apple-darwin, arch: arm64', job)
+        self.assertIn('runner: macos-26, target: aarch64-apple-darwin, arch: arm64', job)
         self.assertIn('runner: macos-15-intel, target: x86_64-apple-darwin, arch: x86_64', job)
         self.assertIn('cargo nextest run --workspace --all-features', job)
         self.assertIn('python3 helpers/evtx/test.py', job)
@@ -78,7 +93,7 @@ class MacOSReleaseTests(unittest.TestCase):
 
     def test_clean_installation_runs_on_both_native_architectures(self):
         job = RELEASE.read_text().split('  verify_install_macos:\n', 1)[1].split('  verify_install_windows:', 1)[0]
-        self.assertIn('runner: [macos-latest, macos-15-intel]', job)
+        self.assertIn('runner: [macos-26, macos-15-intel]', job)
         self.assertIn('attestations: read', job)
         self.assertIn('sh install.sh "$GITHUB_REF_NAME"', job)
         self.assertNotIn('contents: write', job)

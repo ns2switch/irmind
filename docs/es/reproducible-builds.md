@@ -9,22 +9,42 @@ la publicación si hay diferencias. La comprobación se aplica a los tags cuyo
 workflow usa esta matriz. Cubre los ejecutables antes de la firma nativa de la
 plataforma. Los bundles de Sigstore y las attestations se verifican por separado.
 
+## Primeras releases reproducibles
+
+| Ejecutable | Plataformas | Reproducible desde |
+| --- | --- | --- |
+| `irmind` | Linux x86_64 y Arm64, Windows x64 | v0.6.1 |
+| `irmind-evtx` | Los cinco destinos de release | v0.6.1 |
+| `irmind` | macOS Intel y Apple Silicon | v0.6.2 |
+
+En v0.6.1, el ejecutable principal de macOS usó el workspace, el directorio de
+Cargo y el directorio de compilación del runner. El principal de macOS usa
+las rutas fijas desde v0.6.2. Para v0.6.1, consulta el
+[workflow de la release](https://github.com/ns2switch/irmind/blob/v0.6.1/.github/workflows/ci.yml)
+y su [registro de compilación](https://github.com/ns2switch/irmind/actions/runs/45056933393).
+El inventario firmado y el comando de compilación por pares se incorporan en
+v0.6.2.
+
 ## Entradas de la compilación
 
 Usa la toolchain de Rust fijada en [`rust-toolchain.toml`](../../rust-toolchain.toml)
 en el tag, actualmente 1.95.0, además de Git y Python 3.10 o posterior. Usa la
-misma imagen de runner y las mismas versiones del compilador y del enlazador
-que constan en el workflow del tag. En macOS, usa las versiones de Xcode y del
-SDK de macOS indicadas. En Windows, usa las herramientas de C++ de Visual Studio
-y el SDK de Windows indicados, y ejecuta los comandos en Git Bash.
+revisión de imagen y las versiones indicadas en `BUILD-ENVIRONMENT.json`, entre
+los [ficheros del tag de la release](https://github.com/ns2switch/irmind/releases).
+El inventario recoge Rust y Cargo, el compilador y el enlazador nativos, Xcode
+y la versión y número de compilación del SDK de macOS, además de la instalación
+de Visual Studio, las herramientas MSVC y el SDK de Windows. Las etiquetas
+versionadas fijan la familia de imagen. GitHub puede actualizarla dentro de
+esa familia, así que consulta también la revisión registrada. En Windows, usa
+el entorno de desarrollo x64 de Visual Studio correspondiente con Git Bash.
 
 | Argumento de destino y sufijo de release | Runner nativo | Ejecutable principal |
 | --- | --- | --- |
 | `linux-x86_64` | Ubuntu 22.04 | ThinLTO, una unidad de generación de código, mold 2.42.1 |
 | `linux-aarch64` | Ubuntu 24.04 Arm64 | ThinLTO, una unidad de generación de código, enlazador del sistema |
-| `macos-aarch64` | `macos-latest` en Apple Silicon | Enlazador nativo de Apple |
+| `macos-aarch64` | `macos-26` en Apple Silicon | Enlazador nativo de Apple |
 | `macos-x86_64` | `macos-15-intel` en Intel | Enlazador nativo de Apple |
-| `windows-x86_64` | `windows-latest` en x64 | ThinLTO, una unidad de generación de código, MSVC con `/Brepro` |
+| `windows-x86_64` | `windows-2025-vs2026` en x64 | ThinLTO, una unidad de generación de código, MSVC con `/Brepro` |
 
 El [script de compilación](../../.github/scripts/build_release_binaries.py)
 usa `--release --locked`, fija `CARGO_INCREMENTAL=0` y
@@ -51,26 +71,32 @@ los directorios temporales que crea.
 
 ## Compilar y comparar con una release
 
-Desde un clon del repositorio público, asigna a `tag` el tag de la release y
-a `destination` el destino de tu sistema. Elige un directorio de salida que
-aún no exista. El comando siguiente ejecuta la misma comprobación por pares que la CI.
+Asigna a `tag` el tag exacto. Descarga el inventario y la lista de sumas y
+verifica sus firmas con cosign 3.1.3 o posterior antes de elegir las herramientas.
 
 ```bash
 tag='<TAG>'
+gh release download "$tag" -R ns2switch/irmind \
+  -p 'BUILD-ENVIRONMENT.json*' -p 'SHA256SUMS*' -D release-checksums
+for file in BUILD-ENVIRONMENT.json SHA256SUMS; do
+  cosign verify-blob "release-checksums/$file" \
+    --bundle "release-checksums/$file.sigstore.json" \
+    --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" \
+    --certificate-oidc-issuer https://token.actions.githubusercontent.com || exit 1
+done
+```
+
+Usa las versiones del inventario verificado. Desde un clon del repositorio
+público, selecciona un destino de la tabla y un directorio de salida que aún
+no exista. El comando ejecuta la misma compilación por pares que la CI.
+
+```bash
 destination=macos-aarch64
 git fetch --tags origin
 git checkout --detach "$tag"
 python .github/scripts/build_release_binaries.py "$destination" reproduced --verify
-
-gh release download "$tag" -R ns2switch/irmind \
-  -p SHA256SUMS -p SHA256SUMS.sigstore.json -D release-checksums
-cosign verify-blob release-checksums/SHA256SUMS \
-  --bundle release-checksums/SHA256SUMS.sigstore.json \
-  --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
-Usa cosign 3.1.3 o posterior y continúa cuando la verificación sea correcta.
 Compara los dos ejecutables locales con los nombres publicados en la release:
 
 ```bash

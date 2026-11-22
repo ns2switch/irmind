@@ -17,9 +17,9 @@ jobs:
         include:
           - {destination: linux-x86_64, runner: ubuntu-22.04, artifact: irmind-linux}
           - {destination: linux-aarch64, runner: ubuntu-24.04-arm, artifact: irmind-linux-arm64}
-          - {destination: macos-aarch64, runner: macos-latest, artifact: irmind-macos-arm64}
+          - {destination: macos-aarch64, runner: macos-26, artifact: irmind-macos-arm64}
           - {destination: macos-x86_64, runner: macos-15-intel, artifact: irmind-macos-x86_64}
-          - {destination: windows-x86_64, runner: windows-latest, artifact: irmind-windows}
+          - {destination: windows-x86_64, runner: windows-2025-vs2026, artifact: irmind-windows}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     defaults:
@@ -32,35 +32,22 @@ jobs:
       - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2, reviewed mold manifest
         if: matrix.destination == 'linux-x86_64'
         with: {tool: 'mold@2.42.1', checksum: true, fallback: none}
-      - name: Record the runner image and native build toolchain
-        run: |
-          printf 'Runner image: %s %s\n' "${ImageOS:-unknown}" "${ImageVersion:-unknown}"
-          rustc -vV
-          cargo --version
-          python --version
-          case "$RUNNER_OS" in
-            macOS)
-              sw_vers
-              xcodebuild -version
-              xcrun --sdk macosx --show-sdk-version
-              ;;
-            Linux)
-              cc --version
-              if command -v mold >/dev/null; then mold --version; fi
-              ;;
-            Windows)
-              vswhere='C:/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe'
-              "$vswhere" -latest -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationVersion
-              ;;
-          esac
-      - name: Require identical SHA-256 for irmind and irmind-evtx in two clean builds
+      - name: Build and verify the two release executables and record their toolchain
+        if: runner.os != 'Windows'
         env:
           DESTINATION: ${{ matrix.destination }}
-          COMPARE_WINDOWS_MAPPINGS: ${{ inputs.compare_windows_mappings && runner.os == 'Windows' }}
+          RUNNER_LABEL: ${{ matrix.runner }}
         run: |
-          args=()
-          if [[ "$COMPARE_WINDOWS_MAPPINGS" == true ]]; then args+=(--compare-windows-mappings); fi
-          python .github/scripts/build_release_binaries.py "$DESTINATION" dist --verify "${args[@]}"
+          python .github/scripts/build_release_binaries.py "$DESTINATION" dist --verify
+          python .github/scripts/release_build_environment.py record "$DESTINATION" "$RUNNER_LABEL" dist/BUILD-ENVIRONMENT.json
+      - name: Build and verify the two Windows release executables and record their toolchain
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          DESTINATION: ${{ matrix.destination }}
+          RUNNER_LABEL: ${{ matrix.runner }}
+          COMPARE_WINDOWS_MAPPINGS: ${{ inputs.compare_windows_mappings }}
+        run: ./.github/scripts/build_release_windows.ps1
       - name: Verify native ARM64 containment and inherited-file decoding
         if: matrix.destination == 'linux-aarch64'
         run: python .github/scripts/check_evtx_linux.py dist/irmind-evtx native-only
@@ -72,7 +59,7 @@ jobs:
           if [[ "$RUNNER_OS" == Windows ]]; then names=(irmind.exe irmind-evtx.exe); fi
           hash=(sha256sum)
           if [[ "$RUNNER_OS" == macOS ]]; then hash=(shasum -a 256); fi
-          "${hash[@]}" "${names[@]}" LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 > SHA256SUMS
+          "${hash[@]}" "${names[@]}" LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 BUILD-ENVIRONMENT.json > SHA256SUMS
           "${hash[@]}" -c SHA256SUMS
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with: {name: "${{ matrix.artifact }}", path: dist/, if-no-files-found: error}
