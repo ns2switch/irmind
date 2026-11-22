@@ -3,7 +3,7 @@
 import argparse
 import hashlib
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
 import tarfile
@@ -24,7 +24,22 @@ def build(checkout, commit):
         source = stage / "source"
         source.mkdir()
         with tarfile.open(archive) as tar:
-            tar.extractall(source, filter="data")
+            for entry in tar:
+                relative = PurePosixPath(entry.name)
+                if (relative.is_absolute() or ".." in relative.parts
+                        or "\\" in entry.name or ":" in entry.name):
+                    raise ValueError("Invalid path in the committed release tree")
+                destination = source.joinpath(*relative.parts)
+                if entry.isdir():
+                    destination.mkdir(parents=True, exist_ok=True)
+                elif entry.isfile():
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    with tar.extractfile(entry) as input_file, destination.open("xb") as output:
+                        shutil.copyfileobj(input_file, output)
+                    if os.name != "nt":
+                        destination.chmod(entry.mode & 0o777)
+                else:
+                    raise ValueError("The release tree must contain only files and directories")
         archive.unlink()
 
         target = stage / "target"
