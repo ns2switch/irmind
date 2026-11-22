@@ -165,10 +165,11 @@ def run_probe(platform, target, mode):
                 if mode == "remap":
                     for prefix in sorted({str(checkout), checkout.as_posix()}):
                         flags.append(f"--remap-path-prefix={prefix}=/irmind-source")
-                if mode == "brepro":
+                if mode in ("brepro", "thin-brepro"):
                     flags = ["-C", "link-arg=/Brepro"]
                 os.environ["CARGO_ENCODED_RUSTFLAGS"] = "\x1f".join(flags)
-                release = build_once(checkout, "default", target)
+                profile = "thin" if mode == "thin-brepro" else "default"
+                release = build_once(checkout, profile, target)
                 file = checkout / "out" / target / "release" / ("irmind.exe" if os.name == "nt" else "irmind")
                 builds[test] = inspect(file) | {"release": release}
             finally:
@@ -184,6 +185,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--platform", required=True)
     parser.add_argument("--target", required=True)
-    parser.add_argument("--mode", required=True, choices=("default", "remap", "brepro"))
+    parser.add_argument("--mode", required=True, choices=("default", "remap", "brepro", "thin-brepro"))
     args = parser.parse_args()
     run_probe(args.platform, args.target, args.mode)
