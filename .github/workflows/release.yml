@@ -121,10 +121,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {runner: macos-latest, target: aarch64-apple-darwin, mode: workspace}
-          - {runner: macos-15-intel, target: x86_64-apple-darwin, mode: workspace}
-          - {runner: macos-latest, target: aarch64-apple-darwin, mode: all}
-          - {runner: macos-15-intel, target: x86_64-apple-darwin, mode: all}
+          - {runner: macos-latest, target: aarch64-apple-darwin, mode: fixed}
+          - {runner: macos-15-intel, target: x86_64-apple-darwin, mode: fixed}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 100
     permissions:

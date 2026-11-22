@@ -39,10 +39,13 @@ def probe(target, mode):
             root = Path(base).resolve() / name
             root.mkdir()
             paths = {key: root / key for key in ("workspace", "cargo_home", "target")}
+            if mode == "fixed":
+                paths["cargo_home"] = Path(base).resolve() / "shared-cargo-home"
+                paths["target"] = Path(base).resolve() / "shared-target"
             subprocess.run(["git", "worktree", "add", "--detach", paths["workspace"], commit], check=True, cwd=repo)
             try:
                 flags = []
-                for key in (paths if mode == "all" else ("workspace",)):
+                for key in (paths if mode != "workspace" else ("workspace",)):
                     for prefix in sorted({paths[key], paths[key].resolve()}):
                         flags.append(f"--remap-path-prefix={prefix}=/canonical/{key}")
                 env = os.environ | {
@@ -66,6 +69,8 @@ def probe(target, mode):
                                "mappings": mapping_identities(release / "build")})
             finally:
                 subprocess.run(["git", "worktree", "remove", "--force", paths["workspace"]], check=True, cwd=repo)
+                if mode == "fixed":
+                    shutil.rmtree(paths["target"], ignore_errors=True)
                 shutil.rmtree(root)
     left, right = builds
     summary = {
@@ -84,6 +89,6 @@ def probe(target, mode):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("target")
-    parser.add_argument("mode", choices=("workspace", "all"))
+    parser.add_argument("mode", choices=("workspace", "all", "fixed"))
     args = parser.parse_args()
     probe(args.target, args.mode)
