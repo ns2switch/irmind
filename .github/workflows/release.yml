@@ -8,6 +8,9 @@ on:
       profile_reproducibility:
         type: boolean
         default: false
+      signing_rehearsal:
+        type: boolean
+        default: false
 permissions:
   contents: read
   attestations: read
@@ -89,6 +92,25 @@ jobs:
           } finally {
             Remove-Item -LiteralPath $binary,$helper -Force -ErrorAction SilentlyContinue
           }
+
+  rehearse_install_windows:
+    if: ${{ inputs.signing_rehearsal && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      attestations: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: {name: signed-release-dry-run, path: signed-assets}
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with: {cosign-release: 'v3.1.4'}
+      - name: Verify provenance and rehearse installation of the exact signed Windows binaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .github/scripts/rehearse_windows_install.py signed-assets
 
   benchmark_profiles:
     if: ${{ inputs.profile_benchmark && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}

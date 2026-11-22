@@ -4,12 +4,18 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+## 0.6.1 — Reproducible release builds and URL dependency update
+
 - Update `url` to 2.5.9 for [RUSTSEC-2026-0592](https://rustsec.org/advisories/RUSTSEC-2026-0592.html)
   and `form_urlencoded` to 1.2.3 to meet its dependency requirement. The
   root lockfile update changes all 20 native mapping identities. Use the
   v0.6.0 binary to fully reconstruct artifacts from v0.6.0 cases.
 - Build the Linux arm64 release executable with ThinLTO and one codegen
   unit, matching the Linux x86_64 profile.
+- Build the Windows x86_64 executable with ThinLTO, one codegen unit and
+  deterministic PE linking.
+- Build the EVTX helper at a fixed source and target path. Check its full
+  SHA-256 across clean checkouts before packaging.
 
 ## 0.6.0 — Budgeted cloud source queries
 

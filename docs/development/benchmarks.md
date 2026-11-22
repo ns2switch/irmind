@@ -51,9 +51,9 @@ reproducibility result applies to the tested runner and toolchain image.
 | macOS Intel | 48,071,064 | 42,023,596 | No / No | 20/20 |
 | Windows x86_64 | 53,032,960 | 48,714,752 | No / No | 20/20 |
 
-Linux arm64 now uses ThinLTO with one codegen unit, matching Linux x86_64.
-Both macOS targets and Windows keep their current profiles because SHA-256
-differed between clean builds under both profiles. The checkout directory
+Linux arm64 uses ThinLTO with one codegen unit, matching Linux x86_64.
+The initial comparison retained the macOS and Windows profiles because
+SHA-256 differed between clean builds under both profiles. The checkout directory
 prefix was absent from the literal strings checked in each executable. The
 cause of the byte differences on those targets remains unconfirmed.
 
@@ -67,6 +67,14 @@ same 20 identities. Changing checkout line endings would change them.
 The helper keeps its existing release profile. Its separate
 [reproducibility investigation](https://github.com/ns2switch/irmind/issues/378)
 tracks directory-independent builds and vendored dependency checks.
+
+For v0.6.1, Windows uses ThinLTO, one codegen unit and the MSVC linker's
+`/Brepro` mode. Two clean builds with those settings produced the same
+SHA-256 and preserved all 20 mapping identities relative to the default
+profile. The release helper builds at fixed source and target paths,
+including its separately resolved containment crate. The workflow compares
+its bytes from two checkouts before packaging.
+[Windows deterministic linking experiment](https://github.com/ns2switch/irmind/actions/runs/45035987926).
 
 ## Kubernetes methods and verified-original reads (release)
 

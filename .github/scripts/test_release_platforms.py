@@ -12,12 +12,13 @@ class MacOSReleaseTests(unittest.TestCase):
         workflow = WORKFLOW.read_text()
         standard = 'cargo build --release -p irmind --locked'
         optimized = 'CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 ' + standard
+        windows = 'RUSTFLAGS="-C link-arg=/Brepro" ' + optimized
         for name, command in (('linux', optimized), ('linux_arm64', optimized),
-                              ('windows', standard), ('macos', standard)):
+                              ('windows', windows), ('macos', standard)):
             with self.subTest(job=name):
                 job = re.split(r'\n  \w+:\n', workflow.split(f'  {name}:\n', 1)[1], 1)[0]
                 self.assertIn('\n          ' + command + '\n'
-                              '          cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked', job)
+                              '          python3 .github/scripts/build_release_evtx.py ', job)
         for variable in ('CARGO_PROFILE_RELEASE_LTO', 'CARGO_PROFILE_RELEASE_CODEGEN_UNITS'):
             self.assertEqual(workflow.count(variable), workflow.count(optimized))
 
