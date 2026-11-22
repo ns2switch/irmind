@@ -271,7 +271,7 @@ jobs:
       - name: Check shipped JSON feature isolation
         run: python .github/scripts/check_release_json_features.py
       - run: |
-          cargo build --release -p irmind --locked
+          CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 cargo build --release -p irmind --locked
           cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked
       - name: Verify native ARM64 containment and inherited-file decoding
         run: python3 .github/scripts/check_evtx_linux.py target/release/irmind-evtx native-only
@@ -350,7 +350,7 @@ jobs:
       - name: Build unsigned release binary for tag, nightly code change, or manual dry run
         if: needs.dco.outputs.release_build == 'true'
         run: |
-          cargo build --release -p irmind --locked
+          CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 cargo build --release -p irmind --locked
           cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked
       - name: Measure the release witness and 300 small distinct EVTX sources
         if: github.event_name == 'workflow_dispatch' && inputs.release_dry_run == true
@@ -466,7 +466,7 @@ jobs:
       - name: Build unsigned release binary for tag, nightly code change, or manual dry run
         if: needs.dco.outputs.release_build == 'true'
         run: |
-          cargo build --release -p irmind --locked
+          CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 cargo build --release -p irmind --locked
           cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked
       - name: Package unsigned binary and checksum
         if: needs.dco.outputs.release_build == 'true'

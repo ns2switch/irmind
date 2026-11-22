@@ -30,10 +30,24 @@ different hashes across clean directories with both profiles. A separate
 local smoke run of a ThinLTO host with the default helper completed the
 1 GiB EVTX benchmark within the existing limits.
 
-Use ThinLTO and one codegen unit for the Linux x86_64 main binary. Its size
-fell 12.9% and its build time fell 10.1% in this pair. The EVTX helper and
-other platforms retain their current profiles. See also the [four- and
-sixteen-CPU worker measurements](worker-memory-budget.md).
+v0.6.0 used ThinLTO and one codegen unit for the Linux x86_64 main binary.
+Its size fell 12.9% and its build time fell 10.1% in this pair. See also the
+[four- and sixteen-CPU worker measurements](worker-memory-budget.md).
+
+## Native release profile reproducibility
+
+The release workflow now applies the same profile to the main binary on
+Linux x86_64 and arm64, macOS Intel and Apple Silicon, and Windows x86_64.
+The EVTX helper keeps its own profile.
+
+For each native runner, the release experiment built the default profile
+and ThinLTO with one codegen unit twice, from differently named checkouts
+with a fresh target directory each time. It compares SHA-256 of the
+unsigned executable and every generated native mapping manifest, using the
+same locked dependencies, Rust 1.95.0 and linker flags as the release.
+The check covers path independence within each runner and toolchain image.
+The published binaries are signed after this build stage.
+[Native comparison and per-target receipts](https://github.com/ns2switch/irmind/actions/runs/45019797350).
 
 ## Kubernetes methods and verified-original reads (release)
 

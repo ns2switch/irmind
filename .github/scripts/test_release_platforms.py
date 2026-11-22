@@ -8,6 +8,18 @@ RELEASE = WORKFLOW.with_name('release.yml')
 
 
 class MacOSReleaseTests(unittest.TestCase):
+    def test_thin_lto_is_scoped_to_the_main_release_binary(self):
+        workflow = WORKFLOW.read_text()
+        optimized = ('CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 '
+                     'cargo build --release -p irmind --locked')
+        for name in ('linux', 'linux_arm64', 'windows', 'macos'):
+            with self.subTest(job=name):
+                job = re.split(r'\n  \w+:\n', workflow.split(f'  {name}:\n', 1)[1], 1)[0]
+                self.assertIn('\n          ' + optimized + '\n'
+                              '          cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked', job)
+        for variable in ('CARGO_PROFILE_RELEASE_LTO', 'CARGO_PROFILE_RELEASE_CODEGEN_UNITS'):
+            self.assertEqual(workflow.count(variable), workflow.count(optimized))
+
     def test_both_architectures_are_built_and_tested_natively(self):
         job = WORKFLOW.read_text().split('  macos:\n', 1)[1].split('  macos_verify_windows:', 1)[0]
         for entry in ('runner: macos-latest, target: aarch64-apple-darwin, arch: arm64',
