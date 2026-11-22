@@ -4,6 +4,10 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+- Update `url` to 2.5.9 and `form_urlencoded` to 1.2.3. The dependency
+  update changes native mapping identities. Use the original v0.6.0
+  binary to fully reconstruct artifacts from cases created with it.
+
 ## 0.6.0 — Budgeted cloud source queries
 
 **Format impact:** Case marker 5 and export V9 require the creating minor
