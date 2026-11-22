@@ -113,6 +113,7 @@ jobs:
           path: |
             release-profile-*.txt
             release-profile-*.json
+          if-no-files-found: error
 
   reproduce_profiles:
     if: ${{ inputs.profile_reproducibility && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
@@ -163,4 +164,3 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: {pattern: 'release-repro-*', path: repro, merge-multiple: true}
       - run: python3 .github/scripts/reproduce_release_profile.py --compare repro
-          if-no-files-found: error
