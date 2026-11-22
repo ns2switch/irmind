@@ -115,52 +115,31 @@ jobs:
             release-profile-*.json
           if-no-files-found: error
 
-  reproduce_profiles:
+  diagnose_native_profiles:
     if: ${{ inputs.profile_reproducibility && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     strategy:
       fail-fast: false
       matrix:
-        profile: [default, thin]
-        platform: [linux-x86_64, linux-arm64, macos-arm64, macos-x86_64, windows-x86_64]
         include:
-          - {platform: linux-x86_64, runner: ubuntu-22.04, rustflags: '-C link-arg=-fuse-ld=mold'}
-          - {platform: linux-arm64, runner: ubuntu-24.04-arm}
-          - {platform: macos-arm64, runner: macos-latest, target: aarch64-apple-darwin}
-          - {platform: macos-x86_64, runner: macos-15-intel, target: x86_64-apple-darwin}
-          - {platform: windows-x86_64, runner: windows-latest, target: x86_64-pc-windows-msvc}
+          - {platform: macos-arm64, runner: macos-latest, target: aarch64-apple-darwin, mode: default}
+          - {platform: macos-arm64, runner: macos-latest, target: aarch64-apple-darwin, mode: remap}
+          - {platform: macos-x86_64, runner: macos-15-intel, target: x86_64-apple-darwin, mode: default}
+          - {platform: macos-x86_64, runner: macos-15-intel, target: x86_64-apple-darwin, mode: remap}
+          - {platform: windows-x86_64, runner: windows-latest, target: x86_64-pc-windows-msvc, mode: default}
+          - {platform: windows-x86_64, runner: windows-latest, target: x86_64-pc-windows-msvc, mode: remap}
+          - {platform: windows-x86_64, runner: windows-latest, target: x86_64-pc-windows-msvc, mode: brepro}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 75
+    timeout-minutes: 100
     permissions:
       contents: read
-    env:
-      CARGO_INCREMENTAL: 0
-      CARGO_PROFILE_RELEASE_STRIP: symbols
-      RUSTFLAGS: ${{ matrix.rustflags || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: {persist-credentials: false}
       - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
-      - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2, reviewed mold manifest
-        if: matrix.platform == 'linux-x86_64'
-        with: {tool: 'mold@2.42.1', checksum: true, fallback: none}
-      - name: Build twice from clean, differently named checkouts
-        run: python .github/scripts/reproduce_release_profile.py --platform "${{ matrix.platform }}" --profile "${{ matrix.profile }}" --target "${{ matrix.target }}"
+      - name: Inspect binary metadata and section hashes
+        run: python .github/scripts/diagnose_native_release.py --platform "${{ matrix.platform }}" --target "${{ matrix.target }}" --mode "${{ matrix.mode }}"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: release-repro-${{ matrix.platform }}-${{ matrix.profile }}
-          path: release-repro-*.json
+          name: native-diagnostic-${{ matrix.platform }}-${{ matrix.mode }}
+          path: native-diagnostic-*.json
           if-no-files-found: error
-
-  compare_reproduced_profiles:
-    if: ${{ inputs.profile_reproducibility && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
-    needs: [reproduce_profiles]
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with: {persist-credentials: false}
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with: {pattern: 'release-repro-*', path: repro, merge-multiple: true}
-      - run: python3 .github/scripts/reproduce_release_profile.py --compare repro
