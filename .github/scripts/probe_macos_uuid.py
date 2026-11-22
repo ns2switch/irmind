@@ -69,8 +69,8 @@ def probe(target, mode):
                                "mappings": mapping_identities(release / "build")})
             finally:
                 subprocess.run(["git", "worktree", "remove", "--force", paths["workspace"]], check=True, cwd=repo)
-                if mode == "fixed":
-                    shutil.rmtree(paths["target"], ignore_errors=True)
+                if mode == "fixed" and paths["target"].exists():
+                    shutil.rmtree(paths["target"])
                 shutil.rmtree(root)
     left, right = builds
     summary = {
