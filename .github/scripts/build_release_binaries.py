@@ -134,8 +134,11 @@ def build_binaries(checkout, commit, destination, output, check_features, compar
 def checksums(directory):
     with_digests = {}
     for path in sorted(directory.iterdir()):
+        digest = hashlib.sha256()
         with path.open("rb") as binary:
-            with_digests[path.name] = hashlib.file_digest(binary, "sha256").hexdigest()
+            while block := binary.read(1024 * 1024):
+                digest.update(block)
+        with_digests[path.name] = digest.hexdigest()
     return with_digests
 
 

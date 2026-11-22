@@ -37,6 +37,7 @@ jobs:
           printf 'Runner image: %s %s\n' "${ImageOS:-unknown}" "${ImageVersion:-unknown}"
           rustc -vV
           cargo --version
+          python --version
           case "$RUNNER_OS" in
             macOS)
               sw_vers

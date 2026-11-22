@@ -12,7 +12,7 @@ plataforma. Los bundles de Sigstore y las attestations se verifican por separado
 ## Entradas de la compilación
 
 Usa la toolchain de Rust fijada en [`rust-toolchain.toml`](../../rust-toolchain.toml)
-en el tag, actualmente 1.95.0, además de Git y Python 3.11 o posterior. Usa la
+en el tag, actualmente 1.95.0, además de Git y Python 3.10 o posterior. Usa la
 misma imagen de runner y las mismas versiones del compilador y del enlazador
 que constan en el workflow del tag. En macOS, usa las versiones de Xcode y del
 SDK de macOS indicadas. En Windows, usa las herramientas de C++ de Visual Studio
@@ -86,8 +86,7 @@ for name in ("irmind", "irmind-evtx"):
     asset = f"{name}-{destination}{extension}"
     expected = [fields[0] for line in lines
                 if len(fields := line.split()) == 2 and fields[1] == asset]
-    with (Path("reproduced") / (name + extension)).open("rb") as binary:
-        digest = hashlib.file_digest(binary, "sha256").hexdigest()
+    digest = hashlib.sha256((Path("reproduced") / (name + extension)).read_bytes()).hexdigest()
     if expected != [digest]:
         sys.exit(f"{asset}: SHA-256 distinto o entrada ausente o duplicada")
     print(f"{asset}: {digest}")

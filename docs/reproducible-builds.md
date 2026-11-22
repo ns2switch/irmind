@@ -12,7 +12,7 @@ Sigstore bundles and attestations are verified separately.
 ## Build inputs
 
 Use the Rust toolchain pinned in [`rust-toolchain.toml`](../rust-toolchain.toml)
-at the tag, currently 1.95.0, plus Git and Python 3.11 or newer. Match the
+at the tag, currently 1.95.0, plus Git and Python 3.10 or newer. Match the
 native runner image and compiler/linker versions recorded by that tag's workflow.
 On macOS, use the recorded Xcode and macOS SDK. On Windows, use the recorded
 Visual Studio C++ tools and Windows SDK, and run the commands in Git Bash.
@@ -85,8 +85,7 @@ for name in ("irmind", "irmind-evtx"):
     asset = f"{name}-{destination}{extension}"
     expected = [fields[0] for line in lines
                 if len(fields := line.split()) == 2 and fields[1] == asset]
-    with (Path("reproduced") / (name + extension)).open("rb") as binary:
-        digest = hashlib.file_digest(binary, "sha256").hexdigest()
+    digest = hashlib.sha256((Path("reproduced") / (name + extension)).read_bytes()).hexdigest()
     if expected != [digest]:
         sys.exit(f"{asset}: SHA-256 mismatch or checksum entry missing or duplicated")
     print(f"{asset}: {digest}")
