@@ -21,6 +21,8 @@ Linux x86-64 builds use Ubuntu 22.04 as their userspace ABI baseline. Native Ubu
 
 Install a C/C++ compiler before building: GCC or Clang and `pkg-config` on Linux, Xcode Command Line Tools on macOS, or Visual Studio Build Tools with MSVC C++ on Windows. A cold release build still compiles many Rust crates and bundled SQLite. Allow extra time and disk; the exact cost depends on CPU, compiler, and cache. See [benchmarks](development/benchmarks.md) for measured builds.
 
+To rebuild a release and compare the SHA-256 of both executables, see [Reproducible builds](reproducible-builds.md).
+
 ## Verify a release before installing
 
 Download the binary for your system and `SHA256SUMS` from the [GitHub release](https://github.com/ns2switch/irmind/releases). Check the exact binary name in the checksum file before executing it. The first pre-release, v0.1.0, has only checksums. Releases from v0.1.1 include Sigstore bundles and GitHub provenance. A checksum alone checks bytes against that file, not the publisher's identity.

@@ -2,35 +2,51 @@
 from pathlib import Path
 import unittest
 import re
+from tempfile import TemporaryDirectory
+
+from build_release_binaries import PLATFORMS, build_env, verify_rebuild
 
 WORKFLOW = Path(__file__).parents[1] / 'workflows/ci.yml'
 RELEASE = WORKFLOW.with_name('release.yml')
+BINARIES = WORKFLOW.with_name('release-binaries.yml')
 
 
 class MacOSReleaseTests(unittest.TestCase):
-    def test_thin_lto_is_scoped_to_the_main_release_binary(self):
+    def test_all_destinations_build_the_pair_before_signing(self):
         workflow = WORKFLOW.read_text()
-        standard = 'cargo build --release -p irmind --locked'
-        optimized = 'CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 ' + standard
-        windows = 'RUSTFLAGS="-C link-arg=/Brepro" ' + optimized
-        for name, command in (('linux', optimized), ('linux_arm64', optimized),
-                              ('windows', windows), ('macos', standard)):
-            with self.subTest(job=name):
-                job = re.split(r'\n  \w+:\n', workflow.split(f'  {name}:\n', 1)[1], 1)[0]
-                self.assertIn('\n          ' + command + '\n'
-                              '          python3 .github/scripts/build_release_evtx.py ', job)
-        for variable in ('CARGO_PROFILE_RELEASE_LTO', 'CARGO_PROFILE_RELEASE_CODEGEN_UNITS'):
-            self.assertEqual(workflow.count(variable), workflow.count(optimized))
+        job = workflow.split('  release:\n', 1)[1].split('  post_release:', 1)[0]
+        self.assertIn("needs.release_binaries.result == 'success'", job)
+        self.assertIn("uses: ./.github/workflows/release-binaries.yml", workflow)
+        binaries = BINARIES.read_text()
+        self.assertIn('dist --verify', binaries)
+        self.assertCountEqual(re.findall(r'destination: (\S+), runner:', binaries), PLATFORMS)
+        self.assertIn('runner: macos-latest, artifact: irmind-macos-arm64', binaries)
+        self.assertIn('runner: macos-15-intel, artifact: irmind-macos-x86_64', binaries)
 
-    def test_both_architectures_are_built_and_tested_natively(self):
+    def test_linker_flags_match_the_release_platform(self):
+        self.assertEqual(build_env('linux-x86_64')['RUSTFLAGS'], '-C link-arg=-fuse-ld=mold')
+        self.assertEqual(build_env('windows-x86_64')['RUSTFLAGS'], '-C link-arg=/Brepro')
+        for destination in ('macos-x86_64', 'macos-aarch64', 'linux-aarch64'):
+            self.assertNotIn('RUSTFLAGS', build_env(destination))
+
+    def test_altered_helper_fails_reproducibility(self):
+        with TemporaryDirectory() as temp:
+            first, second = Path(temp) / 'first', Path(temp) / 'second'
+            for pair in (first, second):
+                pair.mkdir()
+                (pair / 'irmind').write_bytes(b'main')
+                (pair / 'irmind-evtx').write_bytes(b'helper')
+            verify_rebuild('linux-x86_64', first, second)
+            (second / 'irmind-evtx').write_bytes(b'other helper')
+            with self.assertRaisesRegex(SystemExit, 'linux-x86_64 irmind-evtx differs'):
+                verify_rebuild('linux-x86_64', first, second)
+
+    def test_both_architectures_are_tested_natively(self):
         job = WORKFLOW.read_text().split('  macos:\n', 1)[1].split('  macos_verify_windows:', 1)[0]
-        for entry in ('runner: macos-latest, target: aarch64-apple-darwin, arch: arm64',
-                      'runner: macos-15-intel, target: x86_64-apple-darwin, arch: x86_64'):
-            self.assertIn(entry, job)
+        self.assertIn('runner: macos-latest, target: aarch64-apple-darwin, arch: arm64', job)
+        self.assertIn('runner: macos-15-intel, target: x86_64-apple-darwin, arch: x86_64', job)
         self.assertIn('cargo nextest run --workspace --all-features', job)
         self.assertIn('python3 helpers/evtx/test.py', job)
-        self.assertIn('target/${{ matrix.target }}/release/irmind-evtx', job)
-        self.assertIn('name: "irmind-macos-${{ matrix.arch }}"', job)
 
     def test_every_intel_binary_is_checksummed_signed_verified_and_attested(self):
         release = WORKFLOW.read_text().split('  release:\n', 1)[1].split('  post_release:', 1)[0]

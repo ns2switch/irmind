@@ -25,6 +25,10 @@ on:
         description: Compare mapping identities and reproducibility on all release targets
         type: boolean
         default: false
+      release_binary_reproducibility:
+        description: Run only the five native reproducibility jobs used by the release
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -58,7 +62,7 @@ jobs:
         run: python3 .github/scripts/check_dco.py
   linux:
     needs: dco
-    if: ${{ !cancelled() && needs.dco.result == 'success' && needs.dco.outputs.run_ci == 'true' && (github.event_name != 'workflow_dispatch' || (!inputs.release_profile_benchmark && !inputs.release_profile_reproducibility)) }}
+    if: ${{ !cancelled() && needs.dco.result == 'success' && needs.dco.outputs.run_ci == 'true' && (github.event_name != 'workflow_dispatch' || (!inputs.release_profile_benchmark && !inputs.release_profile_reproducibility && !inputs.release_binary_reproducibility)) }}
     runs-on: ubuntu-22.04
     timeout-minutes: 120
     env:
@@ -163,27 +167,8 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: needs.dco.outputs.cross_verify == 'true'
         with: {name: verify-test-linux, path: verify-bin/, if-no-files-found: error}
-      - name: Check shipped JSON feature isolation
-        if: needs.dco.outputs.release_build == 'true'
-        run: python .github/scripts/check_release_json_features.py
-      - name: Build unsigned release binary for tag, nightly code change, or manual dry run
-        if: needs.dco.outputs.release_build == 'true'
-        run: |
-          CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 cargo build --release -p irmind --locked
-          python3 .github/scripts/build_release_evtx.py target/release/irmind-evtx
       - name: Check links and documented CLI commands against the built test binary
         run: python3 .github/scripts/check_docs.py --binary target/ci/irmind
-      - name: Package unsigned binary and checksum
-        if: needs.dco.outputs.release_build == 'true'
-        run: |
-          mkdir -p dist
-          cp target/release/irmind target/release/irmind-evtx dist/
-          cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 dist/
-          (cd dist && sha256sum irmind irmind-evtx LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 > SHA256SUMS)
-          (cd dist && sha256sum --check SHA256SUMS)
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: needs.dco.outputs.release_build == 'true'
-        with: {name: irmind-linux, path: dist/, if-no-files-found: error}
       - if: needs.dco.outputs.cross_verify == 'true'
         run: IRMIND_PORTABLE_EXPORT_DIR="$GITHUB_WORKSPACE/portable-export" cargo nextest run -p irmind --test verify_export_no_keyring --all-features --cargo-profile ci --locked -E 'test(portable_export_fixture)'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -191,7 +176,7 @@ jobs:
         with: {name: portable-export-linux, path: portable-export/, if-no-files-found: error}
       - name: Clean staging
         if: always()
-        run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('dist', 'portable-export', 'verify-bin')) if p.is_dir()]"
+        run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('portable-export', 'verify-bin')) if p.is_dir()]"
   json_formats:
     needs: [linux, dco]
     if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.run_ci == 'true' }}
@@ -230,8 +215,8 @@ jobs:
             -p irmind-mod-parser-syslog -p irmind-mod-parser-declarative \
             -p irmind-mod-parser-kubernetes -p irmind-mod-parser-falco
   evtx_linux_compatibility:
-    needs: [dco, linux]
-    if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.platforms == 'true' && inputs.profile_linux != true }}
+    needs: [dco, linux, release_binaries]
+    if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.platforms == 'true' && inputs.profile_linux != true && (needs.dco.outputs.release_build != 'true' || needs.release_binaries.result == 'success') }}
     strategy:
       matrix:
         os: [ubuntu-22.04, ubuntu-24.04]
@@ -253,40 +238,6 @@ jobs:
       - name: Remove downloaded compatibility binaries
         if: always()
         run: python3 -c "from pathlib import Path; from shutil import rmtree; p=Path('compatibility-bin'); p.is_dir() and rmtree(p)"
-  linux_arm64:
-    needs: [linux, dco]
-    if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.release_build == 'true' && inputs.profile_linux != true }}
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with: {persist-credentials: false}
-      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
-        with: {targets: aarch64-unknown-linux-gnu}
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
-        with:
-          key: linux-arm64-${{ hashFiles('Cargo.lock', 'helpers/evtx/Cargo.lock') }}
-          cache-targets: true
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: Check shipped JSON feature isolation
-        run: python .github/scripts/check_release_json_features.py
-      - run: |
-          CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 cargo build --release -p irmind --locked
-          python3 .github/scripts/build_release_evtx.py target/release/irmind-evtx
-      - name: Verify native ARM64 containment and inherited-file decoding
-        run: python3 .github/scripts/check_evtx_linux.py target/release/irmind-evtx native-only
-      - name: Package ARM64 binary and checksum
-        run: |
-          mkdir -p dist
-          cp target/release/irmind target/release/irmind-evtx dist/
-          cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 dist/
-          (cd dist && sha256sum irmind irmind-evtx LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 > SHA256SUMS)
-          (cd dist && sha256sum --check SHA256SUMS)
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with: {name: irmind-linux-arm64, path: dist/, if-no-files-found: error}
-      - name: Clean staging
-        if: always()
-        run: python -c "from pathlib import Path; from shutil import rmtree; p=Path('dist'); rmtree(p) if p.is_dir() else None"
   windows:
     if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.platforms == 'true' && inputs.profile_linux != true }}
     needs: [linux, dco]
@@ -344,17 +295,6 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: needs.dco.outputs.cross_verify == 'true'
         with: {name: verify-test-windows, path: verify-bin/, if-no-files-found: error}
-      - name: Check shipped JSON feature isolation
-        if: needs.dco.outputs.release_build == 'true'
-        run: python .github/scripts/check_release_json_features.py
-      - name: Build unsigned release binary for tag, nightly code change, or manual dry run
-        if: needs.dco.outputs.release_build == 'true'
-        run: |
-          RUSTFLAGS="-C link-arg=/Brepro" CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 cargo build --release -p irmind --locked
-          python3 .github/scripts/build_release_evtx.py target/x86_64-pc-windows-msvc/release/irmind-evtx.exe
-      - name: Compare Windows release mapping identities with the default profile
-        if: github.event_name == 'workflow_dispatch' && inputs.release_dry_run == true
-        run: python3 .github/scripts/check_windows_release_mappings.py target/x86_64-pc-windows-msvc/release/build
       - name: Measure the release witness and 300 small distinct EVTX sources
         if: github.event_name == 'workflow_dispatch' && inputs.release_dry_run == true
         run: |
@@ -364,18 +304,6 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: github.event_name == 'workflow_dispatch' && inputs.release_dry_run == true
         with: {name: evtx-windows-collection, path: evtx-collection.json, if-no-files-found: error}
-      - name: Package unsigned binary and checksum
-        if: needs.dco.outputs.release_build == 'true'
-        run: |
-          mkdir -p dist
-          cp target/x86_64-pc-windows-msvc/release/irmind.exe target/x86_64-pc-windows-msvc/release/irmind-evtx.exe dist/
-          cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 dist/
-          python -c "from pathlib import Path; import hashlib; root=Path('dist'); names=('irmind.exe','irmind-evtx.exe','LICENSE-MIT','LICENSE-APACHE','THIRD_PARTY_NOTICES.md','install.sh','install.ps1'); (root/'SHA256SUMS').write_bytes(''.join(hashlib.sha256((root/name).read_bytes()).hexdigest()+'  '+name+'\n' for name in names).encode('ascii'))"
-          python -c "from pathlib import Path; assert b'\r' not in Path('dist/SHA256SUMS').read_bytes()"
-          (cd dist && sha256sum --check SHA256SUMS)
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: needs.dco.outputs.release_build == 'true'
-        with: {name: irmind-windows, path: dist/, if-no-files-found: error}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         if: needs.dco.outputs.cross_verify == 'true'
         with: {name: portable-export-linux, path: foreign-export}
@@ -390,7 +318,7 @@ jobs:
         with: {name: portable-export-windows, path: portable-export/, if-no-files-found: error}
       - name: Clean staging
         if: always()
-        run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('dist', 'foreign-export', 'portable-export', 'verify-bin')) if p.is_dir()]; Path('evtx-collection.json').unlink(missing_ok=True)"
+        run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('foreign-export', 'portable-export', 'verify-bin')) if p.is_dir()]; Path('evtx-collection.json').unlink(missing_ok=True)"
   linux_verify_windows:
     if: ${{ !cancelled() && needs.windows.result == 'success' && needs.dco.outputs.cross_verify == 'true' }}
     needs: [windows, dco]
@@ -462,25 +390,6 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: needs.dco.outputs.cross_verify == 'true' && matrix.arch == 'arm64'
         with: {name: verify-test-macos, path: verify-bin/, if-no-files-found: error}
-      - name: Check shipped JSON feature isolation
-        if: needs.dco.outputs.release_build == 'true'
-        run: python .github/scripts/check_release_json_features.py
-      - name: Build unsigned release binary for tag, nightly code change, or manual dry run
-        if: needs.dco.outputs.release_build == 'true'
-        run: |
-          cargo build --release -p irmind --locked
-          python3 .github/scripts/build_release_evtx.py "target/${{ matrix.target }}/release/irmind-evtx"
-      - name: Package unsigned binary and checksum
-        if: needs.dco.outputs.release_build == 'true'
-        run: |
-          mkdir -p dist
-          cp target/${{ matrix.target }}/release/irmind target/${{ matrix.target }}/release/irmind-evtx dist/
-          cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 dist/
-          (cd dist && shasum -a 256 irmind irmind-evtx LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 > SHA256SUMS)
-          (cd dist && shasum -a 256 -c SHA256SUMS)
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: needs.dco.outputs.release_build == 'true'
-        with: {name: "irmind-macos-${{ matrix.arch }}", path: dist/, if-no-files-found: error}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         if: needs.dco.outputs.cross_verify == 'true' && matrix.arch == 'arm64'
         with: {name: portable-export-linux, path: foreign-export}
@@ -489,7 +398,7 @@ jobs:
         run: verify-bin/irmind verify-export foreign-export/synthetic.irmind.json --expected-key "$(tr -d '\r\n' < foreign-export/expected-key.txt)"
       - name: Clean staging
         if: always()
-        run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('dist', 'foreign-export', 'verify-bin')) if p.is_dir()]"
+        run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('foreign-export', 'verify-bin')) if p.is_dir()]"
   macos_verify_windows:
     if: ${{ !cancelled() && needs.macos.result == 'success' && needs.windows.result == 'success' && needs.dco.outputs.cross_verify == 'true' }}
     needs: [macos, windows, dco]
@@ -507,9 +416,16 @@ jobs:
       - name: Clean staging
         if: always()
         run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('bin', 'foreign-export')) if p.is_dir()]"
+  release_binaries:
+    needs: dco
+    if: ${{ needs.dco.outputs.release_build == 'true' || (github.event_name == 'workflow_dispatch' && inputs.release_binary_reproducibility && startsWith(github.ref, 'refs/heads/')) }}
+    uses: ./.github/workflows/release-binaries.yml
+    with:
+      compare_windows_mappings: ${{ github.event_name == 'workflow_dispatch' && inputs.release_dry_run == true }}
+
   native_macos:
-    needs: [dco, macos]
-    if: ${{ false && !cancelled() && needs.macos.result == 'success' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && vars.MACOS_NATIVE_SIGNING_ENABLED == 'true' }}
+    needs: [dco, macos, release_binaries]
+    if: ${{ false && !cancelled() && needs.release_binaries.result == 'success' && needs.macos.result == 'success' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && vars.MACOS_NATIVE_SIGNING_ENABLED == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -545,8 +461,8 @@ jobs:
   # Fulcio binds the certificate to this job's workflow path. Keep this job
   # here so installed verifiers retain the exact ci.yml signing identity.
   release:
-    needs: [dco, linux, json_formats, linux_arm64, windows, macos, native_macos, evtx_linux_compatibility, linux_verify_windows, macos_verify_windows]
-    if: ${{ !cancelled() && (needs.native_macos.result == 'success' || needs.native_macos.result == 'skipped') && needs.linux.result == 'success' && needs.json_formats.result == 'success' && needs.linux_arm64.result == 'success' && needs.windows.result == 'success' && needs.macos.result == 'success' && needs.linux_verify_windows.result == 'success' && needs.macos_verify_windows.result == 'success' && needs.evtx_linux_compatibility.result == 'success' && (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_dry_run == true)) }}
+    needs: [dco, linux, json_formats, release_binaries, windows, macos, native_macos, evtx_linux_compatibility, linux_verify_windows, macos_verify_windows]
+    if: ${{ !cancelled() && (needs.native_macos.result == 'success' || needs.native_macos.result == 'skipped') && needs.linux.result == 'success' && needs.json_formats.result == 'success' && needs.release_binaries.result == 'success' && needs.windows.result == 'success' && needs.macos.result == 'success' && needs.linux_verify_windows.result == 'success' && needs.macos_verify_windows.result == 'success' && needs.evtx_linux_compatibility.result == 'success' && (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_dry_run == true)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

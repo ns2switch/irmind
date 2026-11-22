@@ -24,6 +24,8 @@ Las compilaciones Linux x86-64 usan Ubuntu 22.04 como base ABI. Los jobs nativos
 
 Instala un compilador de C/C++ antes de compilar: GCC o Clang y `pkg-config` en Linux, Xcode Command Line Tools en macOS, o Visual Studio Build Tools con MSVC C++ en Windows. Una compilación release sin caché sigue compilando muchos crates de Rust y SQLite incluido. Reserva tiempo y disco adicionales; depende de la CPU, el compilador y la caché. Consulta las [mediciones](../development/benchmarks.md).
 
+Para recompilar una release y comparar el SHA-256 de ambos ejecutables, consulta [Compilaciones reproducibles](reproducible-builds.md).
+
 ## Verificar una versión antes de instalar
 
 Descarga el binario de tu sistema y `SHA256SUMS` desde la [versión en GitHub](https://github.com/ns2switch/irmind/releases). Comprueba el nombre exacto del binario en el archivo de hashes antes de ejecutarlo. La primera versión preliminar, v0.1.0, solo incluye hashes. Desde v0.1.1 hay bundles Sigstore y procedencia de GitHub. Un hash comprueba los bytes frente a un archivo, pero no la identidad del editor.
