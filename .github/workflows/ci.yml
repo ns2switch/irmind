@@ -21,6 +21,10 @@ on:
         description: Compare the default release profile with ThinLTO on synthetic evidence
         type: boolean
         default: false
+      release_profile_reproducibility:
+        description: Compare mapping identities and reproducibility on all release targets
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -54,7 +58,7 @@ jobs:
         run: python3 .github/scripts/check_dco.py
   linux:
     needs: dco
-    if: ${{ !cancelled() && needs.dco.result == 'success' && needs.dco.outputs.run_ci == 'true' && (github.event_name != 'workflow_dispatch' || !inputs.release_profile_benchmark) }}
+    if: ${{ !cancelled() && needs.dco.result == 'success' && needs.dco.outputs.run_ci == 'true' && (github.event_name != 'workflow_dispatch' || (!inputs.release_profile_benchmark && !inputs.release_profile_reproducibility)) }}
     runs-on: ubuntu-22.04
     timeout-minutes: 120
     env:
@@ -728,10 +732,11 @@ jobs:
         run: gh workflow run update.yml --repo ns2switch/homebrew-irmind --ref main -f tag="$GITHUB_REF_NAME"
 
   release_profile:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_profile_benchmark && !inputs.release_dry_run && !inputs.profile_linux && startsWith(github.ref, 'refs/heads/') }}
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.release_profile_benchmark || inputs.release_profile_reproducibility) && !inputs.release_dry_run && !inputs.profile_linux && startsWith(github.ref, 'refs/heads/') }}
     permissions:
       contents: read
       attestations: read
     uses: ./.github/workflows/release.yml
     with:
-      profile_benchmark: true
+      profile_benchmark: ${{ inputs.release_profile_benchmark }}
+      profile_reproducibility: ${{ inputs.release_profile_reproducibility }}
