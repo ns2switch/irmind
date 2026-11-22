@@ -36,18 +36,37 @@ Its size fell 12.9% and its build time fell 10.1% in this pair. See also the
 
 ## Native release profile reproducibility
 
-The release workflow now applies the same profile to the main binary on
-Linux x86_64 and arm64, macOS Intel and Apple Silicon, and Windows x86_64.
-The EVTX helper keeps its own profile.
-
-For each native runner, the release experiment built the default profile
-and ThinLTO with one codegen unit twice, from differently named checkouts
-with a fresh target directory each time. It compares SHA-256 of the
-unsigned executable and every generated native mapping manifest, using the
-same locked dependencies, Rust 1.95.0 and linker flags as the release.
-The check covers path independence within each runner and toolchain image.
-The published binaries are signed after this build stage.
+The release experiment built each profile twice from differently named
+checkouts with fresh target directories on the native release runners.
+The toolchain, locked dependencies and linker flags match the release.
+Each pair compares the executable before release signing. The
+reproducibility result applies to the tested runner and toolchain image.
 [Native comparison and per-target receipts](https://github.com/ns2switch/irmind/actions/runs/45019797350).
+
+| Main executable | Default bytes | ThinLTO bytes | Equal SHA-256, default / ThinLTO | Identities retained by ThinLTO |
+| --- | ---: | ---: | --- | ---: |
+| Linux x86_64 | 52,625,624 | 45,825,992 | Yes / Yes | 20/20 |
+| Linux arm64 | 45,715,424 | 38,637,424 | Yes / Yes | 20/20 |
+| macOS Apple Silicon | 43,741,808 | 37,045,568 | No / No | 20/20 |
+| macOS Intel | 48,071,064 | 42,023,596 | No / No | 20/20 |
+| Windows x86_64 | 53,032,960 | 48,714,752 | No / No | 20/20 |
+
+Linux arm64 now uses ThinLTO with one codegen unit, matching Linux x86_64.
+Both macOS targets and Windows keep their current profiles because SHA-256
+differed between clean builds under both profiles. The checkout directory
+prefix was absent from the literal strings checked in each executable. The
+cause of the byte differences on those targets remains unconfirmed.
+
+The 20 native mapping manifests are stable within each target across both
+profiles. Windows has a pre-existing difference from Linux and macOS. The
+Windows checkout uses CRLF for `Cargo.lock`, which the manifest commits as
+raw bytes. Recomputing the manifests with CRLF in that file alone reproduced
+all 20 Windows hashes. The published v0.6.0 Windows executable contains the
+same 20 identities. Changing checkout line endings would change them.
+
+The helper keeps its existing release profile. Its separate
+[reproducibility investigation](https://github.com/ns2switch/irmind/issues/378)
+tracks directory-independent builds and vendored dependency checks.
 
 ## Kubernetes methods and verified-original reads (release)
 
