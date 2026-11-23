@@ -1,10 +1,16 @@
 //! Canonical receipt bodies introduced by case marker 6.
 use irmind_domain::{CaseId, DomainError};
 
+mod bindings;
+pub use bindings::*;
+mod checkpoint;
+pub use checkpoint::*;
 mod proofs;
 pub use proofs::*;
 mod report_objects;
 pub use report_objects::*;
+mod section;
+pub use section::V10ObjectSection;
 mod sigma_objects;
 pub use sigma_objects::*;
 
