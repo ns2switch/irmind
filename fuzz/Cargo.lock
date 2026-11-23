@@ -38,6 +38,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3bc62ac97cc33321f50863d514c3bc38a453947a8f9e781137e47c7401020aed"
 
 [[package]]
+name = "arraydeque"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d902e3d592a523def97af8f317b08ce16b7ab854c1985a0c671e6f15cebc236"
+
+[[package]]
 name = "arrow-array"
 version = "59.3.2"
 dependencies = [
@@ -1217,6 +1223,7 @@ dependencies = [
  "irmind-mod-query-athena",
  "irmind-mod-query-azure-log-analytics",
  "irmind-mod-query-bigquery",
+ "irmind-mod-sigma",
  "irmind-security",
  "libfuzzer-sys",
  "serde_json",
@@ -1744,6 +1751,13 @@ dependencies = [
  "secrecy",
  "serde_json",
  "tokio",
+]
+
+[[package]]
+name = "irmind-mod-sigma"
+version = "0.1.0"
+dependencies = [
+ "saphyr-parser",
 ]
 
 [[package]]
@@ -2362,6 +2376,16 @@ name = "ryu"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
+
+[[package]]
+name = "saphyr-parser"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c98d2738e44a25e6ba2e6d83d91805648df204768abc96f4f1278cb3d5c90bbe"
+dependencies = [
+ "arraydeque",
+ "thiserror",
+]
 
 [[package]]
 name = "schannel"
