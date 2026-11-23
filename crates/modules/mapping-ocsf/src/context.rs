@@ -1,6 +1,6 @@
 use super::view::View;
-use irmind_app::source_mapping::{MappingError, SourceValue};
 use irmind_domain::{CommonField as F, EventContextV1};
+use irmind_mapping_contracts::source_mapping::{MappingError, SourceValue};
 const FIELDS: &[(F, &str)] = &[
     (F::HostName, "device.hostname"),
     (F::HostId, "device.uid"),

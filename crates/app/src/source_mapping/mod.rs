@@ -5,41 +5,28 @@ mod catalog;
 mod compact;
 pub use compact::{CompactRecordLocator, CompactSourceOrdering, CompactSourceReplay};
 mod decoder_selection;
-mod error;
 pub mod framed;
 mod installation;
 pub mod json;
-mod manifest;
 pub use installation::{ApprovedMappingDefinition, verify_mapping_installation};
 mod normalization_budget;
 pub mod ordered_decode;
-mod output;
 mod ports;
 pub use normalization_budget::{NormalizedExpansionProfile, NormalizedSourceBudget};
 mod proofs;
+pub(crate) use proofs::native_mapping_build_counts;
 pub use proofs::{mapping_installation_proofs, required_mapping_installations};
 mod prepared;
-mod selector;
-mod snapshot;
 mod stream;
 mod time;
 
 pub use catalog::MappingCatalog;
 pub use decoder_selection::SourceDecoderSelection;
-pub use error::MappingError;
-pub use irmind_domain::{
-    DecodeAnnotationsV1, MappingIdentityV1, SourceDiscriminator, SourceFormatV1, SourceNumber,
-    SourcePath, SourcePathSegment, SourceRecordError, SourceRecordV1, SourceReferenceV1,
-    SourceValue,
-};
-pub use manifest::{MappingManifest, MappingProvenance};
-pub use output::{MappingDiagnostic, MappingOutput, MappingPartition};
+pub use irmind_mapping_contracts::source_mapping::*;
 pub use ports::{
-    DecodeBudget, DecodeInput, SourceDecoder, SourceFileInput, SourceInput, SourceMapper,
-    SourceMetadata,
+    DecodeBudget, DecodeInput, SourceDecoder, SourceFileInput, SourceInput, SourceMetadata,
 };
 pub use prepared::{BoundMappingSource, MappedArtifactProjection, PreparedMappingSource};
-pub use selector::{SelectorCondition, SelectorPredicate, SelectorScalar, SourceSelector};
 
 pub use stream::{
     DecodedSourceCommitmentV1, MappedSourceRecord, PreparedSourceRecord, ReorderedRecords,
@@ -47,3 +34,9 @@ pub use stream::{
 };
 
 pub use time::{decode_source_time_context, parser_time_context, source_time_snapshot};
+
+impl From<MappingError> for crate::AppError {
+    fn from(error: MappingError) -> Self {
+        Self::Policy(error.to_string())
+    }
+}

@@ -1,6 +1,6 @@
 //! Classification tables are release-bound by the native build manifest.
-use irmind_app::source_mapping::{MappingError, SourceRecordV1};
 use irmind_domain::{EventHeaderV1, EventOutcome};
+use irmind_mapping_contracts::source_mapping::{MappingError, SourceRecordV1};
 use irmind_mapping_tables::TableMapping;
 struct Header {
     key: &'static str,
@@ -52,7 +52,7 @@ impl Headers {
                 .fields()
                 .field("columns")
                 .and_then(|v| v.field(field))
-                .and_then(irmind_app::source_mapping::SourceValue::as_text)
+                .and_then(irmind_mapping_contracts::source_mapping::SourceValue::as_text)
                 .and_then(|v| v.parse::<u16>().ok());
             let outcome = match (key.ends_with("http"), code) {
                 (true, Some(200..=399)) | (false, Some(0)) => EventOutcome::Success,

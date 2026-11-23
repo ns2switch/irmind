@@ -1,9 +1,9 @@
 use super::view::View;
-use irmind_app::source_mapping::{MappingDiagnostic, MappingError};
 use irmind_domain::{
     CategorySet, EventCategory as C, EventHeaderV1, EventKind, EventOutcome as O, EventType as T,
     EventTypeSet,
 };
+use irmind_mapping_contracts::source_mapping::{MappingDiagnostic, MappingError};
 pub(super) fn project(
     view: &View<'_>,
 ) -> Result<(EventHeaderV1, Vec<MappingDiagnostic>), MappingError> {
@@ -42,7 +42,7 @@ pub(super) fn project(
         && class == 2004
         && matches!(
             view.get("is_alert"),
-            Some(irmind_app::source_mapping::SourceValue::Boolean(true))
+            Some(irmind_mapping_contracts::source_mapping::SourceValue::Boolean(true))
         ) {
         EventKind::Alert
     } else {

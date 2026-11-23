@@ -34,6 +34,9 @@ impl ApprovedMappingDefinition {
         self.active
     }
     pub fn installed_manifest(&self) -> Result<MappingManifest, MappingError> {
+        if !self.active {
+            return Err(MappingError::InvalidDefinition);
+        }
         let MappingProvenance::BundledDefinition {
             canonical,
             interpreter,
@@ -109,7 +112,7 @@ pub fn verify_mapping_installation(
     let MappingProvenance::InstalledDefinition { operation, .. } = manifest.provenance() else {
         return Ok(());
     };
-    let bad = || MappingError::InvalidDefinition.into_app();
+    let bad = || AppError::from(MappingError::InvalidDefinition);
     if proof.case_id != GLOBAL_OPERATION_SCOPE
         || proof.actor != Actor::Analyst
         || proof.seq == 0
@@ -123,14 +126,9 @@ pub fn verify_mapping_installation(
         .verify(&proof.public_key, &proof.hash, &proof.sig)
         .map_err(|_| bad())?;
     let approved = operation_definition(proof)
-        .map_err(MappingError::into_app)?
+        .map_err(AppError::from)?
         .ok_or_else(bad)?;
-    if !approved.active
-        || approved
-            .installed_manifest()
-            .map_err(MappingError::into_app)?
-            != *manifest
-    {
+    if !approved.active || approved.installed_manifest().map_err(AppError::from)? != *manifest {
         return Err(bad());
     }
     Ok(())
@@ -143,39 +141,38 @@ impl Engine<'_> {
         let mut latest = BTreeMap::<String, ApprovedMappingDefinition>::new();
         let mut versions = BTreeMap::new();
         for operation in entries {
-            let Some(approved) =
-                operation_definition(&operation).map_err(MappingError::into_app)?
-            else {
+            let Some(approved) = operation_definition(&operation).map_err(AppError::from)? else {
                 continue;
             };
             let payload = operation
                 .operation
                 .strip_prefix(PREFIX)
-                .ok_or_else(|| MappingError::InvalidDefinition.into_app())?;
+                .ok_or_else(|| AppError::from(MappingError::InvalidDefinition))?;
             let change: Change = serde_json::from_slice(
-                &hex::decode(payload).map_err(|_| MappingError::InvalidDefinition.into_app())?,
+                &hex::decode(payload)
+                    .map_err(|_| AppError::from(MappingError::InvalidDefinition))?,
             )
-            .map_err(|_| MappingError::InvalidDefinition.into_app())?;
+            .map_err(|_| AppError::from(MappingError::InvalidDefinition))?;
             let identity = approved.manifest.identity();
             let previous = latest
                 .get(identity.id())
                 .map(|p| crate::hex(&p.operation.hash));
             if change.previous != previous {
-                return Err(MappingError::InvalidDefinition.into_app());
+                return Err(AppError::from(MappingError::InvalidDefinition));
             }
             let key = (identity.id().to_owned(), identity.version().to_owned());
             if versions
                 .insert(key, identity.implementation().clone())
                 .is_some_and(|old| old != *identity.implementation())
             {
-                return Err(MappingError::InvalidDefinition.into_app());
+                return Err(AppError::from(MappingError::InvalidDefinition));
             }
             latest.insert(identity.id().into(), approved);
             if latest.len() > 256
                 || versions.len() > 4096
                 || latest.values().filter(|m| m.active).count() > 64
             {
-                return Err(MappingError::InvalidDefinition.into_app());
+                return Err(AppError::from(MappingError::InvalidDefinition));
             }
         }
         Ok(latest.into_values().collect())
@@ -190,7 +187,7 @@ impl Engine<'_> {
             .filter_map(|operation| match operation_definition(operation) {
                 Ok(Some(approved)) if approved.active => Some(Ok(approved)),
                 Ok(_) => None,
-                Err(error) => Some(Err(error.into_app())),
+                Err(error) => Some(Err(AppError::from(error))),
             })
             .collect()
     }
@@ -206,13 +203,12 @@ impl Engine<'_> {
             manifest.provenance(),
             MappingProvenance::BundledDefinition { .. }
         ) {
-            return Err(MappingError::InvalidDefinition.into_app());
+            return Err(AppError::from(MappingError::InvalidDefinition));
         }
         let _lock = self.audit_log.lock_global_operations()?;
         let current = self.approved_mapping_definitions()?;
-        validate_history(&self.audit_log.global_operations()?, manifest)
-            .map_err(MappingError::into_app)?;
-        preflight(base, &current, manifest, active).map_err(MappingError::into_app)?;
+        validate_history(&self.audit_log.global_operations()?, manifest).map_err(AppError::from)?;
+        preflight(base, &current, manifest, active).map_err(AppError::from)?;
         let change = Change {
             version: 1,
             active,
@@ -222,21 +218,22 @@ impl Engine<'_> {
                 .map(|m| crate::hex(&m.operation.hash)),
             manifest: manifest
                 .snapshot()
-                .map_err(MappingError::into_app)?
+                .map_err(AppError::from)?
                 .encode()
-                .map_err(|_| MappingError::InvalidDefinition.into_app())?,
+                .map_err(|_| AppError::from(MappingError::InvalidDefinition))?,
         };
         let payload = hex::encode(
-            serde_json::to_vec(&change).map_err(|_| MappingError::InvalidDefinition.into_app())?,
+            serde_json::to_vec(&change)
+                .map_err(|_| AppError::from(MappingError::InvalidDefinition))?,
         );
         if payload.len() > MAX_OPERATION {
-            return Err(MappingError::InvalidDefinition.into_app());
+            return Err(AppError::from(MappingError::InvalidDefinition));
         }
         self.append_global_operation_unlocked(format!("{PREFIX}{payload}"))?;
         self.approved_mapping_definitions()?
             .into_iter()
             .find(|m| m.manifest.identity() == manifest.identity())
-            .ok_or_else(|| MappingError::InvalidDefinition.into_app())
+            .ok_or_else(|| AppError::from(MappingError::InvalidDefinition))
     }
 }
 

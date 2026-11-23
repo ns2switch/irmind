@@ -19,7 +19,11 @@ class MacOSReleaseTests(unittest.TestCase):
         self.assertIn("uses: ./.github/workflows/release-binaries.yml", workflow)
         binaries = BINARIES.read_text()
         self.assertIn('dist --verify', binaries)
-        self.assertCountEqual(re.findall(r'destination: (\S+), runner:', binaries), PLATFORMS)
+        discovery, builds = binaries.split('  verify_release_reproducibility:', 1)
+        self.assertCountEqual(re.findall(r'destination: (\S+), runner:', discovery), PLATFORMS)
+        self.assertCountEqual(re.findall(r'destination: (\S+), runner:', builds), PLATFORMS)
+        self.assertIn('needs: prepare_native_mapping_inputs', builds)
+        self.assertIn('--mapping-inputs mapping-inputs/NATIVE-MAPPING-INPUTS.json', builds)
         self.assertIn('runner: macos-26, artifact: irmind-macos-arm64', binaries)
         self.assertIn('runner: macos-15-intel, artifact: irmind-macos-x86_64', binaries)
 
@@ -32,8 +36,10 @@ class MacOSReleaseTests(unittest.TestCase):
         self.assertIn('assemble artifacts release/BUILD-ENVIRONMENT.json', release)
         checksum = next(line for line in release.splitlines() if '> SHA256SUMS)' in line)
         self.assertIn('BUILD-ENVIRONMENT.json', checksum.split())
+        self.assertIn('NATIVE-MAPPING-INPUTS.json', checksum.split())
         signing_loops = [line for line in release.splitlines() if 'for file in ' in line]
         self.assertEqual(len(signing_loops), 2)
+        self.assertTrue(all('release/NATIVE-MAPPING-INPUTS.json' in line.split() for line in signing_loops))
         self.assertTrue(all('release/BUILD-ENVIRONMENT.json' in line.split() for line in signing_loops))
         self.assertIn('subject-path: |\n            release/*SBOM.spdx.json\n            release/BUILD-ENVIRONMENT.json', release)
         self.assertIn('release/* --clobber', release)

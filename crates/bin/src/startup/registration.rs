@@ -178,7 +178,7 @@ pub(super) fn configured_registry(
                     decoder.file_format(),
                     &identity,
                 )
-                .map_err(irmind_app::source_mapping::MappingError::into_app)?,
+                .map_err(irmind_app::AppError::from)?,
             ))?;
             registry.add_source_decoder(std::sync::Arc::new(decoder))?;
         }
@@ -190,7 +190,7 @@ pub(super) fn configured_registry(
         ))?;
         registry.add_source_mapper(std::sync::Arc::new(
             irmind_mod_mapping_gcp_audit::CloudAuditMapping::for_capture()
-                .map_err(irmind_app::source_mapping::MappingError::into_app)?,
+                .map_err(irmind_app::AppError::from)?,
         ))?;
     }
     #[cfg(feature = "query-athena")]
@@ -200,7 +200,7 @@ pub(super) fn configured_registry(
         ))?;
         registry.add_source_mapper(std::sync::Arc::new(
             irmind_mod_mapping_cloudtrail::CloudTrailMapping::for_capture()
-                .map_err(irmind_app::source_mapping::MappingError::into_app)?,
+                .map_err(irmind_app::AppError::from)?,
         ))?;
     }
     Ok((registry, config_issues))
@@ -769,7 +769,7 @@ fn register_elastic(
     registry.register(
         Box::new(
             irmind_mod_mapping_ecs::EcsMapping::for_elastic()
-                .map_err(irmind_app::source_mapping::MappingError::into_app)?,
+                .map_err(irmind_app::AppError::from)?,
         ),
         &irmind_app::modules::ModuleConfig::new(),
     )?;
@@ -819,10 +819,7 @@ fn register_chronicle(
     }
     #[cfg(feature = "siem-chronicle")]
     registry.register(
-        Box::new(
-            irmind_mod_mapping_udm::UdmMapping::new()
-                .map_err(irmind_app::source_mapping::MappingError::into_app)?,
-        ),
+        Box::new(irmind_mod_mapping_udm::UdmMapping::new().map_err(irmind_app::AppError::from)?),
         &irmind_app::modules::ModuleConfig::new(),
     )?;
     Ok(())

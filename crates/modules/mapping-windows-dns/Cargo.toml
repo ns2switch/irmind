@@ -6,10 +6,11 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
-irmind-app = { path = "../../app", version = "0.1.0" }
+irmind-mapping-contracts = { path = "../../mapping-contracts", version = "0.1.0" }
 irmind-mapping-tables = { path = "../../mapping-tables", version = "0.1.0" }
 
 [dev-dependencies]
+irmind-app = { path = "../../app", version = "0.1.0" }
 irmind-domain = { path = "../../domain", version = "0.1.0" }
 irmind-mod-parser-windows-dns = { path = "../parser-windows-dns", version = "0.1.0" }
 

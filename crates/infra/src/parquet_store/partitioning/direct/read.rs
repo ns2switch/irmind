@@ -35,7 +35,7 @@ pub(super) fn plan(
             .as_ref()
             .ok_or_else(invalid_source)?
             .decoder(id.name, id.version)
-            .map_err(irmind_app::source_mapping::MappingError::into_app)?;
+            .map_err(AppError::from)?;
         Ok::<_, AppError>(
             old || decoder.source_parallelism() == irmind_app::SourceParallelism::Serial,
         )

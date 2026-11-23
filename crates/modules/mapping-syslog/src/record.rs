@@ -1,8 +1,8 @@
-use irmind_app::{
+use irmind_domain::SourceNumber;
+use irmind_mapping_contracts::{
     GraphRecord,
     source_mapping::{MappingError, SourceRecordV1, SourceValue, json::render_source_fields},
 };
-use irmind_domain::SourceNumber;
 pub(super) fn project(source: &SourceRecordV1) -> Result<GraphRecord, MappingError> {
     let fields = source.fields();
     let text = |key| fields.field(key).and_then(SourceValue::as_text);
@@ -21,7 +21,7 @@ pub(super) fn project(source: &SourceRecordV1) -> Result<GraphRecord, MappingErr
     };
     let at = source
         .timestamp()
-        .map(irmind_app::IndexedTime::to_rfc3339)
+        .map(irmind_mapping_contracts::IndexedTime::to_rfc3339)
         .unwrap_or_default();
     projection.insert("timestamp".into(), SourceValue::Text(at.clone()));
     projection.insert(
@@ -29,7 +29,7 @@ pub(super) fn project(source: &SourceRecordV1) -> Result<GraphRecord, MappingErr
         SourceValue::Boolean(
             source
                 .timestamp()
-                .is_some_and(irmind_app::IndexedTime::inferred),
+                .is_some_and(irmind_mapping_contracts::IndexedTime::inferred),
         ),
     );
     for (target, key) in [

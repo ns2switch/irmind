@@ -1,4 +1,4 @@
-use irmind_app::{
+use irmind_mapping_contracts::{
     GraphRecord, GraphRelation,
     source_mapping::{MappingError, SourceRecordV1, SourceValue, json::render_source_fields},
 };
@@ -182,7 +182,7 @@ fn source_tool(source: &SourceRecordV1) -> Option<&str> {
     let tool = source
         .format()
         .discriminators()
-        .get(&irmind_app::source_mapping::SourceDiscriminator::Dataset)?
+        .get(&irmind_mapping_contracts::source_mapping::SourceDiscriminator::Dataset)?
         .as_str();
     [
         "PECmd",

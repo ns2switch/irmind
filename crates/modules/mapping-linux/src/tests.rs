@@ -1,9 +1,11 @@
 use super::*;
+use irmind_app::modules::ModuleConfig;
 use irmind_app::{
     CancellationToken, SourceDecoder,
     source_mapping::{SourceInput, SourceMetadata},
 };
 use irmind_domain::{CommonField as F, EntityRole, EventCategory, EventOutcome, SourceReferenceV1};
+use std::sync::Arc;
 fn decode(raw: &str) -> Vec<SourceRecordV1> {
     let cancel = CancellationToken::new();
     let mut rows = vec![];

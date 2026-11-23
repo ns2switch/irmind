@@ -1,5 +1,5 @@
 use super::view::LegacyView;
-use irmind_app::{
+use irmind_mapping_contracts::{
     PartitionProfile,
     source_mapping::{MappingError, MappingPartition, SourceValue as Value},
 };

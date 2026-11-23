@@ -5,6 +5,7 @@ use irmind_app::{
 };
 use irmind_domain::{CommonField, CommonValue, EntityRole, EventOutcome};
 use irmind_mod_parser_s3_access::S3AccessSourceDecoder;
+use std::sync::Arc;
 
 const LOG: &[u8] = include_bytes!("../../../testkit/fixtures/parser-s3-access/source/access.log");
 

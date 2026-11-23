@@ -43,8 +43,7 @@ impl PreparedMappedGroup {
             .collect::<Result<Vec<_>, _>>()
             .map_err(|_| bad())?;
         for snapshot in &self.snapshots {
-            MappingManifest::from_snapshot(snapshot)
-                .map_err(crate::source_mapping::MappingError::into_app)?;
+            MappingManifest::from_snapshot(snapshot).map_err(AppError::from)?;
         }
         let snapshots = self
             .snapshots

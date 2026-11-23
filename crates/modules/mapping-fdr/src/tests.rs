@@ -1,6 +1,7 @@
 use super::*;
 use irmind_app::CancellationToken;
 use irmind_domain::{CommonField, EntityIdentityScope, EntityRole, EventOutcome};
+use std::sync::Arc;
 const FIXTURE: &[u8] = include_bytes!("../../../testkit/fixtures/parser-fdr/source/events.ndjson");
 fn mapped(bytes: &[u8]) -> Vec<MappingOutput> {
     let mapper = FdrMapping::new().unwrap();

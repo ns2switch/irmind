@@ -5,17 +5,17 @@ mod definition;
 mod fields;
 mod map;
 mod provider_process;
-use irmind_app::source_mapping::{
+use irmind_domain::EventHeaderV1;
+use irmind_mapping_contracts::source_mapping::{
     MappingError, MappingManifest, MappingOutput, SourceMapper, SourceRecordV1, SourceSelector,
 };
-use irmind_domain::EventHeaderV1;
 
 pub struct TableMapping {
     manifest: MappingManifest,
     rules: Vec<CompiledRule>,
     fields: Vec<fields::CompiledField>,
     partition: fields::CompiledPartition,
-    action: Option<irmind_app::source_mapping::SourcePath>,
+    action: Option<irmind_mapping_contracts::source_mapping::SourcePath>,
 }
 struct CompiledRule {
     selector: SourceSelector,

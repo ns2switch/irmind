@@ -6,6 +6,7 @@ use irmind_app::{
 use irmind_domain::{
     CommonField as F, EntityIdentityScope, EntityRole, EventCategory, EventOutcome,
 };
+use std::sync::Arc;
 const SAMPLE: &[u8] = br#"{"time_dt":"2026-11-01T00:00:00.123456789Z","class_uid":3002,"category_uid":3,"activity_id":1,"activity_name":"Logon","status_id":2,"metadata":{"version":"1.4.0"},"device":{"hostname":"synthetic-host"},"actor":{"user":{"name":"alice","domain":"CORP-A"}},"user":{"name":"bob","domain":"CORP-B"},"src_endpoint":{"ip":"203.0.113.77"},"dst_endpoint":{"ip":"203.0.113.77"},"process":{"pid":42,"parent_process":{"pid":7}},"unmapped":"synthetic only"}"#;
 fn records(bytes: &[u8]) -> Vec<SourceRecordV1> {
     let mut rows = Vec::new();

@@ -40,7 +40,10 @@ impl MappingManifest {
             return Err(MappingError::InvalidManifest);
         }
         let content = match &provenance {
-            MappingProvenance::NativeBuild { manifest } => manifest,
+            MappingProvenance::NativeBuild { manifest } => {
+                super::native_manifest::validate(manifest)?;
+                manifest
+            }
             MappingProvenance::BundledDefinition {
                 canonical,
                 interpreter,
@@ -81,6 +84,22 @@ impl MappingManifest {
     pub const fn provenance(&self) -> &MappingProvenance {
         &self.provenance
     }
+    /// Classifies the build recipe, independently of the analyst's signature.
+    pub fn native_build_is_provisional(&self) -> Option<bool> {
+        const RELEASE: &[u8] = b"irmind-native-mapping-build-v2\0";
+        const BOOTSTRAP: &[u8] = b"irmind-native-mapping-build-v1\0";
+        let MappingProvenance::NativeBuild { manifest } = &self.provenance else {
+            return None;
+        };
+        if manifest.starts_with(RELEASE) {
+            Some(false)
+        } else if manifest.starts_with(BOOTSTRAP) {
+            Some(true)
+        } else {
+            None
+        }
+    }
+
     pub const fn compatibility_projection(&self) -> bool {
         self.compatibility_projection
     }

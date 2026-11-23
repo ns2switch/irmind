@@ -24,7 +24,7 @@ impl ModuleRegistry {
                     .iter()
                     .any(|old| old.manifest().identity().id() == mapper.manifest().identity().id())
         }) {
-            return Err(MappingError::DuplicateIdentity.into_app());
+            return Err(AppError::from(MappingError::DuplicateIdentity));
         }
         Ok(())
     }
@@ -35,7 +35,7 @@ impl ModuleRegistry {
             .iter()
             .any(|d| d.identity() == identity)
         {
-            return Err(MappingError::DuplicateIdentity.into_app());
+            return Err(AppError::from(MappingError::DuplicateIdentity));
         }
         self.source_decoders.push(decoder);
         Ok(())
@@ -47,7 +47,7 @@ impl ModuleRegistry {
             .iter()
             .any(|m| m.manifest().identity().id() == mapper.manifest().identity().id())
         {
-            return Err(MappingError::DuplicateIdentity.into_app());
+            return Err(AppError::from(MappingError::DuplicateIdentity));
         }
         self.source_mappers.push(mapper);
         Ok(())
@@ -69,7 +69,7 @@ impl ModuleRegistry {
     pub fn mapping_catalog(&self) -> Result<MappingCatalog, AppError> {
         let mut catalog =
             MappingCatalog::freeze(self.source_decoders.clone(), self.source_mappers.clone())
-                .map_err(MappingError::into_app)?;
+                .map_err(AppError::from)?;
         catalog
             .definition_history
             .clone_from(&self.definition_history);

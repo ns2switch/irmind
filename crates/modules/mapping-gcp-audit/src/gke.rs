@@ -2,11 +2,11 @@ use super::{
     EvidenceHash, MappingError, MappingManifest, MappingOutput, SourceMapper, SourceRecordV1,
     TableMapping,
 };
-use irmind_app::source_mapping::{MappingIdentityV1, MappingProvenance};
 use irmind_domain::{
     BoundedObservations, CommonEventV1, CommonField as F, CommonValue, EntityIdentityScope,
     EntityObservation, EntityRole, EventContextV1, EventText, ObservedEntity, ObservedEntityKind,
 };
+use irmind_mapping_contracts::source_mapping::{MappingIdentityV1, MappingProvenance};
 const BUILD: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/native-mapping-manifest.bin"));
 const BASE: &str = include_str!("gke.toml");
 const BASE_DIGEST: &str = "0114a289c7b4a50c8c37dd2f3f721f38166506874add399cbb415fb03defcbcf";
@@ -20,7 +20,7 @@ impl GkeMapping {
             BASE,
             &EvidenceHash::parse(BASE_DIGEST).map_err(|_| MappingError::InvalidDefinition)?,
         )?;
-        let digest = EvidenceHash::from_bytes(irmind_app::sha256(BUILD));
+        let digest = EvidenceHash::from_bytes(irmind_mapping_contracts::sha256(BUILD));
         let identity = MappingIdentityV1::try_new(
             "mapping-gke-audit",
             &format!("gke-paths-v1-{}", digest.as_str()),
@@ -60,7 +60,7 @@ impl SourceMapper for GkeMapping {
         )
         .map_err(bad)?;
         record.indexed.record.text =
-            irmind_app::encode_common_event(&record.common).map_err(bad)?;
+            irmind_mapping_contracts::encode_common_event(&record.common).map_err(bad)?;
         MappingOutput::try_new(source, record.indexed, record.common, partition, vec![])
     }
 }
@@ -73,7 +73,7 @@ fn resource(
         .fields()
         .field("protoPayload")
         .and_then(|p| p.field("resourceName"))
-        .and_then(irmind_app::source_mapping::SourceValue::as_text)
+        .and_then(irmind_mapping_contracts::source_mapping::SourceValue::as_text)
     else {
         return Ok(());
     };
@@ -167,7 +167,7 @@ fn regional_location(
         .field("resource")
         .and_then(|v| v.field("labels"))
         .and_then(|v| v.field("location"))
-        .and_then(irmind_app::source_mapping::SourceValue::as_text)
+        .and_then(irmind_mapping_contracts::source_mapping::SourceValue::as_text)
     else {
         return Ok(());
     };

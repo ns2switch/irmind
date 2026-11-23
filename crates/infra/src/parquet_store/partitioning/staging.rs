@@ -104,7 +104,7 @@ impl ParquetStore {
             .as_ref()
             .ok_or_else(invalid_source)?
             .decoder(id.name, id.version)
-            .map_err(irmind_app::source_mapping::MappingError::into_app)?;
+            .map_err(AppError::from)?;
         file.rewind().map_err(storage)?;
         let result = decoder.normalized_source_budget(file, cancel);
         let rewind = file.rewind().map_err(storage);

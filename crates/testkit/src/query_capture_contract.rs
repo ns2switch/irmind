@@ -86,17 +86,13 @@ fn common_events(
                         Some(row.origin().record())
                     );
                 }
-                result = mapper
-                    .map(row)
-                    .map_err(irmind_app::source_mapping::MappingError::into_app)
-                    .and_then(|mapped| {
-                        let encoded = irmind_app::encode_common_event(&mapped.record().common)?;
-                        let event = serde_json::from_str(&encoded).map_err(|_| {
-                            AppError::Policy("synthetic event encoding failed".into())
-                        })?;
-                        events.push(event);
-                        Ok(())
-                    });
+                result = mapper.map(row).map_err(AppError::from).and_then(|mapped| {
+                    let encoded = irmind_app::encode_common_event(&mapped.record().common)?;
+                    let event = serde_json::from_str(&encoded)
+                        .map_err(|_| AppError::Policy("synthetic event encoding failed".into()))?;
+                    events.push(event);
+                    Ok(())
+                });
             });
             result
         },

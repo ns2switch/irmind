@@ -1,5 +1,5 @@
 use super::view::LegacyView;
-use irmind_app::{GraphRelation, source_mapping::SourceValue as Value};
+use irmind_mapping_contracts::{GraphRelation, source_mapping::SourceValue as Value};
 
 pub(super) fn cloudtrail_relations(
     value: &Value,

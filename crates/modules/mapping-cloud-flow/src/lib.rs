@@ -1,17 +1,16 @@
 #![forbid(unsafe_code)]
 //! Cloud network classification and explicit outcomes come from included finite tables.
 //! Native glue validates provider-specific partition placeholders, never inferring a host.
-use irmind_app::{
-    modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
+use irmind_domain::{COMMON_EVENT_V1, CommonEventV1, EventHeaderV1, EvidenceHash};
+use irmind_mapping_contracts::{
+    modules::{MappingModule, ModuleManifest, ModulePort},
     source_mapping::{
         MappingDiagnostic, MappingError, MappingIdentityV1, MappingManifest, MappingOutput,
         MappingPartition, MappingProvenance, SourceMapper, SourceRecordV1, SourceValue,
     },
 };
-use irmind_domain::{COMMON_EVENT_V1, CommonEventV1, EventHeaderV1, EvidenceHash};
 mod projection;
 use irmind_mapping_tables::TableMapping;
-use std::sync::Arc;
 const BUILD: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/native-mapping-manifest.bin"));
 #[derive(Clone, Copy)]
 enum SourceKind {
@@ -91,7 +90,7 @@ impl CloudFlowMapping {
     fn new(kind: SourceKind, base: &str, status: &str) -> Result<Self, MappingError> {
         let base = table(base)?;
         let status = table(status)?;
-        let hash = EvidenceHash::from_bytes(irmind_app::sha256(BUILD));
+        let hash = EvidenceHash::from_bytes(irmind_mapping_contracts::sha256(BUILD));
         let identity = MappingIdentityV1::try_new(
             kind.module().id,
             &format!("cloud-flow-v1-{}", hash.as_str()),
@@ -121,16 +120,9 @@ impl CloudFlowMapping {
         })
     }
 }
-impl Module for CloudFlowMapping {
-    fn manifest(&self) -> &'static ModuleManifest {
+impl MappingModule for CloudFlowMapping {
+    fn module_manifest(&self) -> &'static ModuleManifest {
         self.kind.module()
-    }
-    fn register(
-        self: Box<Self>,
-        registry: &mut ModuleRegistry,
-        _: &ModuleConfig,
-    ) -> Result<(), irmind_app::AppError> {
-        registry.add_source_mapper(Arc::new(*self))
     }
 }
 impl SourceMapper for CloudFlowMapping {

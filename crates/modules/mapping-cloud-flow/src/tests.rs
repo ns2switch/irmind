@@ -3,6 +3,7 @@ use irmind_app::{
     CancellationToken, SourceDecoder,
     source_mapping::{SourceInput, SourceMetadata, SourceReferenceV1},
 };
+use std::sync::Arc;
 #[test]
 fn network_roles_and_unknown_action_are_preserved() {
     let bytes = include_bytes!("../../../testkit/fixtures/parser-vpc-flow/source/custom.log");

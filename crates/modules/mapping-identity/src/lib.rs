@@ -1,19 +1,18 @@
 #![forbid(unsafe_code)]
 //! Classification and outcome are finite TOML tables. Native glue only walks variable target/parameter arrays and validates IP representations.
-use irmind_app::{
-    modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
-    source_mapping::{
-        MappingDiagnostic, MappingError, MappingIdentityV1, MappingManifest, MappingOutput,
-        MappingProvenance, SourceMapper, SourceRecordV1, SourceValue,
-    },
-};
 use irmind_domain::{
     BoundedObservations, COMMON_EVENT_V1, CategorySet, CommonEventV1, CommonField as F,
     CommonValue, EntityIdentityScope, EntityObservation, EntityRole as R, EventCategory,
     EventHeaderV1, EventText, EvidenceHash, ObservedEntity, ObservedEntityKind as K,
 };
+use irmind_mapping_contracts::{
+    modules::{MappingModule, ModuleManifest, ModulePort},
+    source_mapping::{
+        MappingDiagnostic, MappingError, MappingIdentityV1, MappingManifest, MappingOutput,
+        MappingProvenance, SourceMapper, SourceRecordV1, SourceValue,
+    },
+};
 use irmind_mapping_tables::TableMapping;
-use std::sync::Arc;
 const BUILD: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/native-mapping-manifest.bin"));
 pub struct IdentityMapping {
     manifest: MappingManifest,
@@ -71,7 +70,7 @@ impl IdentityMapping {
         status: &str,
     ) -> Result<Self, MappingError> {
         let base = table(base)?;
-        let hash = EvidenceHash::from_bytes(irmind_app::sha256(BUILD));
+        let hash = EvidenceHash::from_bytes(irmind_mapping_contracts::sha256(BUILD));
         let identity = MappingIdentityV1::try_new(
             module.id,
             &format!("identity-v1-{}", hash.as_str()),
@@ -97,16 +96,9 @@ impl IdentityMapping {
         })
     }
 }
-impl Module for IdentityMapping {
-    fn manifest(&self) -> &'static ModuleManifest {
+impl MappingModule for IdentityMapping {
+    fn module_manifest(&self) -> &'static ModuleManifest {
         self.module
-    }
-    fn register(
-        self: Box<Self>,
-        registry: &mut ModuleRegistry,
-        _: &ModuleConfig,
-    ) -> Result<(), irmind_app::AppError> {
-        registry.add_source_mapper(Arc::new(*self))
     }
 }
 impl SourceMapper for IdentityMapping {
@@ -117,7 +109,7 @@ impl SourceMapper for IdentityMapping {
         let base = self.base.map(source)?;
         let partition = base.partition();
         let partition = if self.source == "m365" && partition.account() == "-" {
-            irmind_app::source_mapping::MappingPartition::try_new(
+            irmind_mapping_contracts::source_mapping::MappingPartition::try_new(
                 partition.profile(),
                 "",
                 partition.region(),

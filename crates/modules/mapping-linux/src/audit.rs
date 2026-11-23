@@ -1,20 +1,20 @@
 //! Cross-member auditd decoding requires bounded joins, beyond finite table rules.
 use super::{
-    Arc, EvidenceHash, MappingError, MappingManifest, MappingOutput, Module, ModuleConfig,
-    ModuleManifest, ModulePort, ModuleRegistry, SourceMapper, SourceRecordV1,
-};
-use irmind_app::{
-    IndexedGraphRecord, PartitionProfile,
-    source_mapping::{
-        MappingDiagnostic, MappingPartition, MappingProvenance, SourceDiscriminator,
-        SourceSelector, SourceValue,
-    },
+    EvidenceHash, MappingError, MappingManifest, MappingModule, MappingOutput, ModuleManifest,
+    ModulePort, SourceMapper, SourceRecordV1,
 };
 use irmind_domain::{
     BoundedObservations, CategorySet, CommonEventV1, CommonField as F, CommonValue,
     EntityIdentityScope, EntityObservation, EntityRole as R, EventCategory, EventContextV1,
     EventHeaderV1, EventKind, EventOutcome, EventText, EventType, EventTypeSet, ObservedEntity,
     ObservedEntityKind,
+};
+use irmind_mapping_contracts::{
+    IndexedGraphRecord, PartitionProfile,
+    source_mapping::{
+        MappingDiagnostic, MappingPartition, MappingProvenance, SourceDiscriminator,
+        SourceSelector, SourceValue,
+    },
 };
 use std::collections::{BTreeMap, BTreeSet};
 const BUILD: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/native-mapping-manifest.bin"));
@@ -23,7 +23,7 @@ pub struct AuditMapping {
 }
 impl AuditMapping {
     pub fn new() -> Result<Self, MappingError> {
-        let digest = EvidenceHash::from_bytes(irmind_app::sha256(BUILD));
+        let digest = EvidenceHash::from_bytes(irmind_mapping_contracts::sha256(BUILD));
         let identity = irmind_domain::MappingIdentityV1::try_new(
             "mapping-linux-auditd",
             &format!("linux-auditd-v1-{}", digest.as_str()),
@@ -231,8 +231,8 @@ fn text<'a>(row: &'a SourceValue, key: &str) -> Option<&'a str> {
 fn invalid() -> MappingError {
     MappingError::UnsupportedSourceValue
 }
-impl Module for AuditMapping {
-    fn manifest(&self) -> &'static ModuleManifest {
+impl MappingModule for AuditMapping {
+    fn module_manifest(&self) -> &'static ModuleManifest {
         const MODULE: ModuleManifest = ModuleManifest {
             id: "mapping-linux-auditd",
             version: "0.1.0",
@@ -241,12 +241,5 @@ impl Module for AuditMapping {
             config: &[],
         };
         &MODULE
-    }
-    fn register(
-        self: Box<Self>,
-        registry: &mut ModuleRegistry,
-        _: &ModuleConfig,
-    ) -> Result<(), irmind_app::AppError> {
-        registry.add_source_mapper(Arc::new(*self))
     }
 }

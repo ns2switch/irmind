@@ -30,6 +30,7 @@ NON_IRMIND_FLAGS = {
     "--ignore",
     "--locked",
     "--manifest-path",
+    "--mapping-inputs",
     "--no-default-features",
     "--release",
     "--sanitizer",

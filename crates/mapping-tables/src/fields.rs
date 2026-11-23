@@ -5,11 +5,11 @@ use super::{
     definition::{Conversion, Field, Partition},
     invalid,
 };
-use irmind_app::{
+use irmind_domain::{CommonField, CommonFieldType};
+use irmind_mapping_contracts::{
     PartitionProfile,
     source_mapping::{MappingError, MappingPartition, SourcePath, SourceRecordV1},
 };
-use irmind_domain::{CommonField, CommonFieldType};
 use observation::CompiledObservation;
 use std::collections::BTreeSet;
 
@@ -20,7 +20,7 @@ pub(super) struct CompiledField {
     pub observation: Option<CompiledObservation>,
     pub observations: Vec<CompiledObservation>,
     pub requires_provider_identity: bool,
-    conditions: Vec<irmind_app::source_mapping::SelectorCondition>,
+    conditions: Vec<irmind_mapping_contracts::source_mapping::SelectorCondition>,
     omit_text: BTreeSet<String>,
 }
 pub(super) fn compile_fields(fields: Vec<Field>) -> Result<Vec<CompiledField>, MappingError> {
@@ -74,8 +74,11 @@ impl CompiledField {
             .iter()
             .all(|c| c.predicate.matches(c.path.resolve(source.fields())))
     }
-    pub(super) fn omits(&self, value: &irmind_app::source_mapping::SourceValue) -> bool {
-        matches!(value, irmind_app::source_mapping::SourceValue::Text(text) if self.omit_text.contains(text) || (matches!(self.conversion, Conversion::KubernetesServiceAccountName) && !text.starts_with("system:serviceaccount:")))
+    pub(super) fn omits(
+        &self,
+        value: &irmind_mapping_contracts::source_mapping::SourceValue,
+    ) -> bool {
+        matches!(value, irmind_mapping_contracts::source_mapping::SourceValue::Text(text) if self.omit_text.contains(text) || (matches!(self.conversion, Conversion::KubernetesServiceAccountName) && !text.starts_with("system:serviceaccount:")))
     }
 }
 fn compile_omit_text(values: Vec<String>) -> Result<BTreeSet<String>, MappingError> {
@@ -117,7 +120,7 @@ fn indexed_path(keys: &[String], index: Option<u16>) -> Result<SourcePath, Mappi
         if index >= 4096 {
             return Err(MappingError::InvalidDefinition);
         }
-        parts.push(irmind_app::source_mapping::SourcePathSegment::Index(index));
+        parts.push(irmind_mapping_contracts::source_mapping::SourcePathSegment::Index(index));
     }
     SourcePath::try_new(parts).map_err(invalid)
 }
