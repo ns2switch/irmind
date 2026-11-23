@@ -1,6 +1,9 @@
 #![forbid(unsafe_code)]
 //! Build-time mapping identity. No environment values or absolute paths enter the output.
 use sha2::{Digest, Sha256};
+
+const INPUT_DIRECTORY: &str = "IRMIND_NATIVE_MAPPING_MANIFEST_DIR";
+const REQUIRE_V2: &str = "IRMIND_NATIVE_MAPPING_REQUIRE_V2";
 use std::{
     fs,
     io::{self, Read},
@@ -18,6 +21,19 @@ pub fn emit_native_mapping_manifest_with_sources(
 ) -> io::Result<()> {
     let module = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").ok_or_else(invalid)?);
     let root = module.ancestors().nth(3).ok_or_else(invalid)?;
+    let name = std::env::var("CARGO_PKG_NAME").map_err(|_| invalid())?;
+    if name.starts_with("irmind-mod-mapping-") {
+        println!("cargo:rerun-if-env-changed={INPUT_DIRECTORY}");
+        println!("cargo:rerun-if-env-changed={REQUIRE_V2}");
+        if let Some(directory) = std::env::var_os(INPUT_DIRECTORY) {
+            return install_prepared(&name, Path::new(&directory));
+        }
+        if std::env::var_os(REQUIRE_V2).is_some() {
+            return Err(io::Error::other(
+                "release build requires prepared V2 native mapping inputs",
+            ));
+        }
+    }
     let features = production_features
         .iter()
         .map(|feature| (*feature).to_owned())
@@ -25,6 +41,25 @@ pub fn emit_native_mapping_manifest_with_sources(
     let output = manifest_with_sources(root, &module, features, shared_sources)?;
     let target = PathBuf::from(std::env::var_os("OUT_DIR").ok_or_else(invalid)?);
     fs::write(target.join("native-mapping-manifest.bin"), output)
+}
+
+fn install_prepared(name: &str, directory: &Path) -> io::Result<()> {
+    if !name
+        .bytes()
+        .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
+    {
+        return Err(invalid());
+    }
+    let path = directory.join(format!("{name}.bin"));
+    println!("cargo:rerun-if-changed={}", path.display());
+    let mut input = fs::File::open(&path)?.take(64 * 1024 + 1);
+    let mut bytes = Vec::new();
+    input.read_to_end(&mut bytes)?;
+    if bytes.len() > 64 * 1024 || !bytes.starts_with(b"irmind-native-mapping-build-v2\0") {
+        return Err(invalid());
+    }
+    let target = PathBuf::from(std::env::var_os("OUT_DIR").ok_or_else(invalid)?);
+    fs::write(target.join("native-mapping-manifest.bin"), bytes)
 }
 
 #[cfg(test)]

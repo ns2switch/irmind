@@ -21,7 +21,12 @@ $env:IRMIND_VISUAL_STUDIO_VERSION = $installation.installationVersion
 $env:IRMIND_CL_VERSION = Get-MsvcToolVersion 'cl.exe'
 $env:IRMIND_LINK_VERSION = Get-MsvcToolVersion 'link.exe'
 
-$buildOptions = @()
+if ($env:OBSERVE_NATIVE_MAPPING_INPUTS -eq 'true') {
+    python .github/scripts/build_release_binaries.py $env:DESTINATION mapping-input --observe-only
+    exit $LASTEXITCODE
+}
+
+$buildOptions = @('--mapping-inputs', 'mapping-inputs/NATIVE-MAPPING-INPUTS.json')
 if ($env:COMPARE_WINDOWS_MAPPINGS -eq 'true') { $buildOptions += '--compare-windows-mappings' }
 python .github/scripts/build_release_binaries.py $env:DESTINATION dist --verify @buildOptions
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

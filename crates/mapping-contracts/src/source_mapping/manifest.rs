@@ -40,7 +40,10 @@ impl MappingManifest {
             return Err(MappingError::InvalidManifest);
         }
         let content = match &provenance {
-            MappingProvenance::NativeBuild { manifest } => manifest,
+            MappingProvenance::NativeBuild { manifest } => {
+                super::native_manifest::validate(manifest)?;
+                manifest
+            }
             MappingProvenance::BundledDefinition {
                 canonical,
                 interpreter,
