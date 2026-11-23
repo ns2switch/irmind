@@ -26,17 +26,18 @@ The signed tool inventory and paired-build command below start with v0.6.2.
 
 ## Build inputs
 
-Use the Rust toolchain pinned in [`rust-toolchain.toml`](../rust-toolchain.toml)
-at the tag, currently 1.95.0, plus Git and Python 3.10 or newer. Match the
-runner image revision and tool versions in `BUILD-ENVIRONMENT.json` in the
-[assets of the release tag](https://github.com/ns2switch/irmind/releases). It
-lists Rust and Cargo, the native compiler and linker, Xcode and the macOS SDK
-version and build, and the Visual Studio installation, MSVC toolset and Windows
-SDK. The versioned runner labels fix the image family. GitHub can update the
-image within that family, so use the recorded image revision as well. On
-Windows, use the matching x64 Visual Studio developer environment with Git Bash.
+Start with a native host or VM for the target architecture, Git, and Python
+3.10 or newer. Use the versions in the verified `BUILD-ENVIRONMENT.json` from
+the [release assets](https://github.com/ns2switch/irmind/releases). Each entry
+under `targets` records the tools used for that target.
 
-| Target argument and release suffix | Native runner | Main executable |
+GitHub regularly updates its hosted runner images, including versioned
+labels, and retired revisions are unavailable as runnable images. The
+`image_os` and `image_version` fields help locate the historical software
+list. To reproduce an older binary, install the recorded tool versions on
+your own host or VM. [GitHub runner image maintenance](https://github.com/actions/runner-images#software-and-image-support)
+
+| Target argument and release suffix | Release runner | Main executable |
 | --- | --- | --- |
 | `linux-x86_64` | Ubuntu 22.04 | ThinLTO, one codegen unit, mold 2.42.1 |
 | `linux-aarch64` | Ubuntu 24.04 Arm64 | ThinLTO, one codegen unit, system linker |
@@ -47,8 +48,8 @@ Windows, use the matching x64 Visual Studio developer environment with Git Bash.
 The [build script](../.github/scripts/build_release_binaries.py) passes
 `--release --locked`, sets `CARGO_INCREMENTAL=0` and
 `CARGO_PROFILE_RELEASE_STRIP=symbols`, and selects the target and linker flags.
-Run it with the runner's standard Cargo and compiler environment, free of local
-build overrides. The Windows worktree uses CRLF checkout rules for files such as
+Run it from the shell where you selected the matching tools, with the
+build settings from the tag. The Windows worktree uses CRLF checkout rules for files such as
 `Cargo.lock` that are governed by Git's automatic text conversion. These bytes
 are part of the current native mapping identity.
 
@@ -63,17 +64,20 @@ build UUID stable.
 EVTX uses its own lockfile and Cargo profile. Its committed tree and target are
 staged in the `source` and `target` subdirectories of
 `/tmp/irmind-evtx-release-v1` on Linux, `/private/tmp/irmind-evtx-release-v1`
-on macOS and `C:\irmind-evtx-release-v1` on Windows. It uses the native
-runner's Cargo home. The fixed staging directories must be free when the script
+on macOS and `C:\irmind-evtx-release-v1` on Windows. It uses the build
+shell's Cargo home. The fixed staging directories must be free when the script
 starts. The script removes the staging directories it creates.
 
 ## Build and compare with a release
 
-Set `tag` to the exact release tag. Download and verify the signed inventory
-and checksum list with cosign 3.1.3 or newer before choosing the build tools.
+From a clone of the public repository, set `tag` to the exact release tag.
+Verify the inventory and checksum list with cosign 3.1.3 or newer before
+choosing the build tools.
 
 ```bash
 tag='<TAG>'
+git fetch --tags origin
+git checkout --detach "$tag"
 gh release download "$tag" -R ns2switch/irmind \
   -p 'BUILD-ENVIRONMENT.json*' -p 'SHA256SUMS*' -D release-checksums
 for file in BUILD-ENVIRONMENT.json SHA256SUMS; do
@@ -84,14 +88,96 @@ for file in BUILD-ENVIRONMENT.json SHA256SUMS; do
 done
 ```
 
-Use the tool versions in the verified inventory. From a clone of the public
-repository, select a destination from the table and an output directory that
-does not already exist. The command runs the same paired build as CI.
+### Install the native tools
+
+Choose the entry under `targets` for the binary being reproduced. Compare
+versions in the build shell before compiling.
+
+**Linux.** Use the Ubuntu release and architecture in the table. Install the
+compiler and development libraries from the matching Ubuntu archive snapshot,
+using the recorded compiler version and the software list linked in the
+release workflow's job log. For Arm64, install the matching GNU Binutils and
+check the linker resolved by the compiler driver. For x86_64, install the
+recorded mold release and put its `bin` directory on `PATH`. Compare
+`cc --version` and either the version of the linker returned by
+`cc -print-prog-name=ld` on Arm64 or `mold --version` on x86_64 with the
+inventory. [Ubuntu Snapshot Service](https://snapshot.ubuntu.com/) ·
+[mold releases](https://github.com/rui314/mold/releases)
+
+**macOS.** Download the Xcode version and build shown in `native.xcode` from
+Apple Developer Downloads. Use a macOS version that supports that Xcode on
+the target architecture. Install the app and use its bundled macOS SDK.
+Set `DEVELOPER_DIR` to the installed app's developer directory in the build
+shell. Compare the Xcode build, the SDK version and build, and the compiler
+and linker with the corresponding `native` fields. [Apple downloads](https://developer.apple.com/download/all/?q=Xcode) ·
+[Selecting Xcode tools](https://developer.apple.com/documentation/xcode/configuring-command-line-tools-settings)
+
+```bash
+export DEVELOPER_DIR='/Applications/<Xcode app>/Contents/Developer'
+unset SDKROOT
+xcodebuild -version
+xcodebuild -version -sdk macosx
+xcrun clang --version
+xcrun ld -v
+```
+
+**Windows.** Use the fixed-version Build Tools installer for the recorded
+`native.visual_studio` build. In Visual Studio Installer, install **Desktop
+development with C++**, including the recorded **MSVC C++ x64/x86 build tools**
+and **Windows SDK**. Use **Individual components** to select the toolset and
+SDK corresponding to `native.msvc_toolset` and `native.windows_sdk`. Open a
+fresh Command Prompt and replace the placeholders with that installation's
+path and recorded versions. [Visual Studio release history](https://learn.microsoft.com/en-us/visualstudio/releases/2026/release-history) ·
+[Build Tools components](https://learn.microsoft.com/en-us/visualstudio/install/workload-component-id-vs-build-tools?view=vs-2026) ·
+[Selecting a toolset and SDK](https://learn.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=msvc-140)
+
+```bat
+call "<Visual Studio path>\VC\Auxiliary\Build\vcvarsall.bat" x64 <windows_sdk> -vcvars_ver=<msvc_toolset>
+echo %VCToolsVersion%
+echo %WindowsSDKVersion%
+where.exe cl.exe
+where.exe link.exe
+```
+
+Compare the selected `cl.exe` and `link.exe` file versions in Properties
+under **Details** with `native.compiler` and `native.linker`. Launch Git
+Bash by running `"<Git for Windows path>\bin\bash.exe"` from that prompt
+so it inherits the selected toolchain.
+
+In Git Bash, put the selected MSVC tools first on `PATH` and check where
+both executables resolve.
+
+```bash
+msvc_bin="$(cygpath -u "$VCToolsInstallDir")/bin/Hostx64/x64"
+export PATH="$msvc_bin:$PATH"
+command -v cl.exe
+command -v link.exe
+```
+
+### Install the exact Rust toolchain and rebuild
+
+In the build shell, use the `release` and `host` lines in the target's
+`rustc` field to form the rustup toolchain name. For example,
+`1.95.0-aarch64-apple-darwin` pairs release `1.95.0` with host
+`aarch64-apple-darwin`. Confirm the release agrees with
+[`rust-toolchain.toml`](../rust-toolchain.toml) at the tag. Compare the output
+of `rustc -vV` and `cargo -vV` with the inventory, including their commit
+hashes. [rustup installation](https://rust-lang.github.io/rustup/installation/) ·
+[Selecting a toolchain for the shell](https://rust-lang.github.io/rustup/overrides.html)
+
+```bash
+toolchain='<release>-<host>'
+rustup toolchain install "$toolchain"
+export RUSTUP_TOOLCHAIN="$toolchain"
+rustc -vV
+cargo -vV
+```
+
+Select the destination from the table and a new output directory. The
+command runs the same paired build as CI.
 
 ```bash
 destination=macos-aarch64
-git fetch --tags origin
-git checkout --detach "$tag"
 python .github/scripts/build_release_binaries.py "$destination" reproduced --verify
 ```
 

@@ -27,18 +27,19 @@ v0.6.2.
 
 ## Entradas de la compilación
 
-Usa la toolchain de Rust fijada en [`rust-toolchain.toml`](../../rust-toolchain.toml)
-en el tag, actualmente 1.95.0, además de Git y Python 3.10 o posterior. Usa la
-revisión de imagen y las versiones indicadas en `BUILD-ENVIRONMENT.json`, entre
-los [ficheros del tag de la release](https://github.com/ns2switch/irmind/releases).
-El inventario recoge Rust y Cargo, el compilador y el enlazador nativos, Xcode
-y la versión y número de compilación del SDK de macOS, además de la instalación
-de Visual Studio, las herramientas MSVC y el SDK de Windows. Las etiquetas
-versionadas fijan la familia de imagen. GitHub puede actualizarla dentro de
-esa familia, así que consulta también la revisión registrada. En Windows, usa
-el entorno de desarrollo x64 de Visual Studio correspondiente con Git Bash.
+Usa un equipo o una máquina virtual con la arquitectura del destino, Git y
+Python 3.10 o posterior. Consulta las versiones en el fichero verificado
+`BUILD-ENVIRONMENT.json` de los [ficheros de la release](https://github.com/ns2switch/irmind/releases).
+Cada entrada de `targets` registra las herramientas usadas para ese destino.
 
-| Argumento de destino y sufijo de release | Runner nativo | Ejecutable principal |
+GitHub actualiza periódicamente las imágenes de sus runners, incluidas las
+etiquetas versionadas, y deja de ofrecer las revisiones retiradas para
+ejecutar jobs. Los campos `image_os` e `image_version` ayudan a localizar
+el inventario histórico de software. Para reproducir un binario antiguo,
+instala las versiones registradas en tu equipo o máquina virtual.
+[Mantenimiento de las imágenes de GitHub](https://github.com/actions/runner-images#software-and-image-support)
+
+| Argumento de destino y sufijo de release | Runner de release | Ejecutable principal |
 | --- | --- | --- |
 | `linux-x86_64` | Ubuntu 22.04 | ThinLTO, una unidad de generación de código, mold 2.42.1 |
 | `linux-aarch64` | Ubuntu 24.04 Arm64 | ThinLTO, una unidad de generación de código, enlazador del sistema |
@@ -49,8 +50,8 @@ el entorno de desarrollo x64 de Visual Studio correspondiente con Git Bash.
 El [script de compilación](../../.github/scripts/build_release_binaries.py)
 usa `--release --locked`, fija `CARGO_INCREMENTAL=0` y
 `CARGO_PROFILE_RELEASE_STRIP=symbols` y selecciona el destino y las opciones
-del enlazador. Ejecútalo con el entorno normal de Cargo y del compilador del
-runner, sin ajustes locales de compilación. El worktree de Windows usa CRLF
+del enlazador. Ejecútalo desde la sesión donde seleccionaste las herramientas
+correspondientes, con los ajustes de compilación del tag. El worktree de Windows usa CRLF
 en archivos como `Cargo.lock` que se rigen por la conversión automática de
 texto de Git. Sus bytes son parte de la identidad de los mapeos nativos actuales.
 
@@ -66,16 +67,19 @@ EVTX usa su propio lockfile y perfil de Cargo. El árbol del commit y la salida
 se preparan en los subdirectorios `source` y `target` de
 `/tmp/irmind-evtx-release-v1` en Linux, `/private/tmp/irmind-evtx-release-v1`
 en macOS y `C:\irmind-evtx-release-v1` en Windows. Usa el directorio de Cargo
-del runner. Las rutas fijas deben estar libres al empezar. El script elimina
+de la sesión de compilación. Las rutas fijas deben estar libres al empezar. El script elimina
 los directorios temporales que crea.
 
 ## Compilar y comparar con una release
 
-Asigna a `tag` el tag exacto. Descarga el inventario y la lista de sumas y
-verifica sus firmas con cosign 3.1.3 o posterior antes de elegir las herramientas.
+Desde un clon del repositorio público, asigna a `tag` el tag exacto. Verifica
+el inventario y la lista de sumas con cosign 3.1.3 o posterior antes de
+elegir las herramientas.
 
 ```bash
 tag='<TAG>'
+git fetch --tags origin
+git checkout --detach "$tag"
 gh release download "$tag" -R ns2switch/irmind \
   -p 'BUILD-ENVIRONMENT.json*' -p 'SHA256SUMS*' -D release-checksums
 for file in BUILD-ENVIRONMENT.json SHA256SUMS; do
@@ -86,14 +90,100 @@ for file in BUILD-ENVIRONMENT.json SHA256SUMS; do
 done
 ```
 
-Usa las versiones del inventario verificado. Desde un clon del repositorio
-público, selecciona un destino de la tabla y un directorio de salida que aún
-no exista. El comando ejecuta la misma compilación por pares que la CI.
+### Instalar las herramientas nativas
+
+Elige en `targets` la entrada del binario que quieres reproducir. Comprueba
+las versiones en la sesión donde vas a compilar.
+
+**Linux.** Usa la versión de Ubuntu y la arquitectura de la tabla. Instala el
+compilador y las bibliotecas de desarrollo desde la instantánea
+correspondiente del archivo de Ubuntu. Usa la versión registrada del
+compilador y la lista de software enlazada desde el log del workflow de
+release. En Arm64, instala la versión correspondiente de GNU Binutils y
+comprueba qué enlazador selecciona el compilador. En x86_64, instala la
+versión registrada de mold y pon su directorio `bin` en `PATH`. Compara
+`cc --version` y, según el destino, la versión del enlazador indicado por
+`cc -print-prog-name=ld` en Arm64 o `mold --version` en x86_64 con el
+inventario. [Instantáneas de Ubuntu](https://snapshot.ubuntu.com/) ·
+[Releases de mold](https://github.com/rui314/mold/releases)
+
+**macOS.** Descarga desde Apple Developer Downloads la versión y el número de
+compilación de Xcode indicados en `native.xcode`. Usa una versión de macOS
+compatible con ese Xcode en la arquitectura del destino. Instala la
+aplicación y usa el SDK de macOS que incluye. Fija `DEVELOPER_DIR` en la
+sesión de compilación y compara el build de Xcode, la versión y el build
+del SDK, el compilador y el enlazador con los campos de `native`.
+[Descargas de Apple](https://developer.apple.com/download/all/?q=Xcode) ·
+[Selección de herramientas de Xcode](https://developer.apple.com/documentation/xcode/configuring-command-line-tools-settings)
+
+```bash
+export DEVELOPER_DIR='/Applications/<aplicación Xcode>/Contents/Developer'
+unset SDKROOT
+xcodebuild -version
+xcodebuild -version -sdk macosx
+xcrun clang --version
+xcrun ld -v
+```
+
+**Windows.** Usa el instalador de versión fija de Build Tools para el build
+de `native.visual_studio`. En Visual Studio Installer, instala **Desarrollo
+para el escritorio con C++**, con las **herramientas de compilación de
+C++ MSVC para x64/x86** y el **SDK de Windows** registrados. Usa
+**Componentes individuales** para elegir las versiones indicadas por
+`native.msvc_toolset` y `native.windows_sdk`. Abre una sesión nueva del
+Símbolo del sistema y sustituye los marcadores por la ruta de esa
+instalación y las versiones registradas.
+[Historial de Visual Studio](https://learn.microsoft.com/en-us/visualstudio/releases/2026/release-history) ·
+[Componentes de Build Tools](https://learn.microsoft.com/en-us/visualstudio/install/workload-component-id-vs-build-tools?view=vs-2026) ·
+[Selección de herramientas y SDK](https://learn.microsoft.com/en-us/cpp/build/building-on-the-command-line?view=msvc-140)
+
+```bat
+call "<ruta de Visual Studio>\VC\Auxiliary\Build\vcvarsall.bat" x64 <windows_sdk> -vcvars_ver=<msvc_toolset>
+echo %VCToolsVersion%
+echo %WindowsSDKVersion%
+where.exe cl.exe
+where.exe link.exe
+```
+
+Compara las versiones de los ficheros `cl.exe` y `link.exe` seleccionados
+en **Propiedades > Detalles** con `native.compiler` y `native.linker`. Abre
+Git Bash con `"<ruta de Git for Windows>\bin\bash.exe"` desde ese Símbolo
+del sistema para que herede el entorno seleccionado.
+
+En Git Bash, pon primero en `PATH` las herramientas de MSVC seleccionadas y
+comprueba las rutas de ambos ejecutables.
+
+```bash
+msvc_bin="$(cygpath -u "$VCToolsInstallDir")/bin/Hostx64/x64"
+export PATH="$msvc_bin:$PATH"
+command -v cl.exe
+command -v link.exe
+```
+
+### Instalar la toolchain exacta de Rust y recompilar
+
+En la sesión de compilación, combina las líneas `release` y `host` del
+campo `rustc` del destino para formar el nombre de la toolchain de rustup.
+Por ejemplo, `1.95.0-aarch64-apple-darwin` combina la versión `1.95.0` con
+el host `aarch64-apple-darwin`. Comprueba que la versión coincide con
+[`rust-toolchain.toml`](../../rust-toolchain.toml) en el tag. Compara la salida
+de `rustc -vV` y `cargo -vV` con el inventario, incluidos los hashes de commit.
+[Instalación de rustup](https://rust-lang.github.io/rustup/installation/) ·
+[Selección de la toolchain por sesión](https://rust-lang.github.io/rustup/overrides.html)
+
+```bash
+toolchain='<release>-<host>'
+rustup toolchain install "$toolchain"
+export RUSTUP_TOOLCHAIN="$toolchain"
+rustc -vV
+cargo -vV
+```
+
+Selecciona el destino de la tabla y un directorio de salida nuevo. El comando
+ejecuta la compilación por pares de la CI.
 
 ```bash
 destination=macos-aarch64
-git fetch --tags origin
-git checkout --detach "$tag"
 python .github/scripts/build_release_binaries.py "$destination" reproduced --verify
 ```
 
