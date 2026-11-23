@@ -18,10 +18,10 @@ pub struct SourceRecordPreparer<'a> {
 /// Private construction binds the original tainted input, mapping and tuple.
 pub struct PreparedSourceRecord<'a> {
     catalog: &'a MappingCatalog,
-    source: Tainted<SourceRecordV1>,
-    mapped: MappedSourceRecord,
-    tuple: Vec<u8>,
-    format: SourceFormatIdentityV1,
+    pub(super) source: Tainted<SourceRecordV1>,
+    pub(super) mapped: MappedSourceRecord,
+    pub(super) tuple: Vec<u8>,
+    pub(super) format: SourceFormatIdentityV1,
 }
 impl PreparedSourceRecord<'_> {
     pub const fn mapped(&self) -> &MappedSourceRecord {

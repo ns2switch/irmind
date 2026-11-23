@@ -23,6 +23,15 @@ pub(super) fn finish<S: Read + Seek>(
     written: Sha256,
 ) -> Result<EvidenceHash, AppError> {
     spool.seek(SeekFrom::Start(0)).map_err(|_| invalid())?;
+    fold(spool, count, metadata, Some(written))
+}
+
+pub(super) fn fold(
+    spool: &mut dyn Read,
+    count: u64,
+    metadata: SourceMetadata<'_>,
+    written: Option<Sha256>,
+) -> Result<EvidenceHash, AppError> {
     let source = EvidenceHash::from_bytes(metadata.evidence_hash);
     let mut digest = Sha256::new();
     digest.update(b"irmind-source-records-commitment-v1\0");
@@ -58,7 +67,7 @@ pub(super) fn finish<S: Read + Seek>(
     }
     let mut extra = [0u8; 1];
     if spool.read(&mut extra).map_err(|_| invalid())? != 0
-        || observed.finalize() != written.finalize()
+        || written.is_some_and(|written| observed.finalize() != written.finalize())
     {
         return Err(invalid());
     }

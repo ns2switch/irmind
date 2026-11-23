@@ -2,6 +2,8 @@
 mod bounded_reader;
 pub use bounded_reader::BoundedSourceReader;
 mod catalog;
+mod compact;
+pub use compact::{CompactRecordLocator, CompactSourceOrdering, CompactSourceReplay};
 mod decoder_selection;
 mod error;
 pub mod framed;
@@ -40,8 +42,8 @@ pub use prepared::{BoundMappingSource, MappedArtifactProjection, PreparedMapping
 pub use selector::{SelectorCondition, SelectorPredicate, SelectorScalar, SourceSelector};
 
 pub use stream::{
-    DecodedSourceCommitmentV1, MappedSourceRecord, PreparedSourceRecord, SourceRecordAccumulator,
-    SourceRecordPreparer, SourceRecordReplay,
+    DecodedSourceCommitmentV1, MappedSourceRecord, PreparedSourceRecord, ReorderedRecords,
+    SourceRecordAccumulator, SourceRecordPreparer, SourceRecordReplay,
 };
 
 pub use time::{decode_source_time_context, parser_time_context, source_time_snapshot};

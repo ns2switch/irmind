@@ -97,6 +97,9 @@ pub trait SourceDecoder: Send + Sync {
     ) -> Result<Option<super::NormalizedSourceBudget>, AppError> {
         Ok(None)
     }
+    fn compact_ordering(&self) -> Option<&dyn super::CompactSourceOrdering> {
+        None
+    }
     fn source_parallelism(&self) -> crate::SourceParallelism {
         crate::SourceParallelism::Concurrent
     }

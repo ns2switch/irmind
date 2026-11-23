@@ -114,6 +114,16 @@ fn decode_json_inner(
     Ok(state.finish())
 }
 
+/// Identify seekable document framing exactly as the ordinary decoder does.
+pub fn has_json_document_framing(
+    reader: &mut impl BufRead,
+    source: &str,
+    record_wrappers: &'static [&'static str],
+    cancel: &crate::CancellationToken,
+) -> Result<bool, AppError> {
+    is_document(reader, source, record_wrappers, cancel)
+}
+
 fn is_document(
     reader: &mut impl BufRead,
     source: &str,

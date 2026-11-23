@@ -13,7 +13,7 @@ use std::cmp::Ordering;
 use std::io::{Seek as _, SeekFrom};
 
 // Bound the number of open run files and heap heads per merge.
-const MAX_SORT_FAN_IN: usize = 64;
+pub(super) const MAX_SORT_FAN_IN: usize = 64;
 const SORT_GROUP_READERS: usize = 128;
 // Input runs and their in-progress replacement each occupy at most the
 // normalized spool size. The spool itself is reserved separately.

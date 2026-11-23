@@ -147,12 +147,16 @@ fn profile_ingest(
 }
 
 fn azure_catalog() -> Arc<MappingCatalog> {
+    azure_catalog_with(Arc::new(AzureFlowSourceDecoder))
+}
+
+fn azure_catalog_with(decoder: Arc<dyn SourceDecoder>) -> Arc<MappingCatalog> {
     let mappings = CloudFlowMapping::azure()
         .unwrap()
         .into_iter()
         .map(|mapping| Arc::new(mapping) as Arc<dyn SourceMapper>)
         .collect();
-    Arc::new(MappingCatalog::freeze(vec![Arc::new(AzureFlowSourceDecoder)], mappings).unwrap())
+    Arc::new(MappingCatalog::freeze(vec![decoder], mappings).unwrap())
 }
 
 #[test]
@@ -160,10 +164,7 @@ fn disordered_azure_wide_merge_preserves_artifacts_and_chain_at_each_worker_cap(
     let root = tempfile::tempdir().unwrap();
     let input = root.path().join("input");
     fs::create_dir(&input).unwrap();
-    let paths = ["vnet.ndjson".into(), "nsg.ndjson".into()];
-    for (path, format) in paths.iter().zip(["vnet", "nsg"]) {
-        write_flows(&input.join(path), format, 2 << 20, false);
-    }
+    let paths = build_compact_test_sources(&input);
     let seed = root.path().join("seed");
     let seed_fixture = profiled_fixture_with_catalog(&seed, azure_catalog());
     let case = seed_fixture
@@ -174,8 +175,8 @@ fn disordered_azure_wide_merge_preserves_artifacts_and_chain_at_each_worker_cap(
     let mut expected = None;
     let clock = Arc::new(FixedClock::new(1_793_491_200));
     let cancel = CancellationToken::new();
-    for cap in [1, 4] {
-        let run = root.path().join(format!("workers-{cap}"));
+    for (cap, legacy) in [(1, true), (1, false), (4, false)] {
+        let run = root.path().join(format!("workers-{cap}-{legacy}"));
         fs::create_dir(&run).unwrap();
         fs::copy(seed.join("irmind.db"), run.join("irmind.db")).unwrap();
         let ProfiledFixture {
@@ -184,7 +185,14 @@ fn disordered_azure_wide_merge_preserves_artifacts_and_chain_at_each_worker_cap(
             catalog,
             profile,
             ..
-        } = profiled_fixture_with_catalog(&run, azure_catalog());
+        } = profiled_fixture_with_catalog(
+            &run,
+            if legacy {
+                azure_catalog_with(Arc::new(LegacyAzure))
+            } else {
+                azure_catalog()
+            },
+        );
         engine.clock = clock.clone();
         store.set_parallel_worker_limit(NonZeroU16::new(cap));
         let identity = AzureFlowSourceDecoder.identity();
@@ -203,18 +211,93 @@ fn disordered_azure_wide_merge_preserves_artifacts_and_chain_at_each_worker_cap(
                 .len(),
             paths.len()
         );
-        let [_, _, _, _, fan_in, _, _, _] = profile.sort_snapshot();
-        assert!(fan_in > 2);
+        let [runs, _, _, _, fan_in, _, final_copy, _] = profile.sort_snapshot();
+        assert!(runs != 0);
+        if legacy {
+            assert!(fan_in > 2 && final_copy != 0);
+        } else {
+            assert_eq!(
+                final_copy, 0,
+                "compact runs must avoid normalized row spools"
+            );
+        }
         assert!(ingest.verify_parquet(&case.id, &cancel).unwrap() > 0);
         let entries = store.entries(&case.id).unwrap();
         let actual = (
             entries.iter().map(|entry| entry.hash).collect::<Vec<_>>(),
             irmind_app::artifact_catalog(&entries).unwrap().active,
         );
+        if cap == 4 {
+            verify_compact_custody(&ingest, store.as_ref(), &case.id, &input, &run, &cancel);
+        }
         if let Some(expected) = &expected {
             assert_eq!(&actual, expected);
         } else {
             expected = Some(actual);
         }
+    }
+}
+
+fn build_compact_test_sources(dir: &Path) -> [String; 2] {
+    write_flows(&dir.join("vnet.ndjson"), "vnet", 2 << 20, false);
+    let scratch = dir.join("nsg-lines");
+    write_flows(&scratch, "nsg", 2 << 20, false);
+    let contents = fs::read_to_string(&scratch).unwrap();
+    let records = contents.lines().collect::<Vec<_>>().join(",\n");
+    fs::write(
+        dir.join("nsg.json"),
+        format!("{{\n\"records\":[\n{records}\n]\n}}"),
+    )
+    .unwrap();
+    fs::remove_file(scratch).unwrap();
+    ["vnet.ndjson".into(), "nsg.json".into()]
+}
+
+fn verify_compact_custody(
+    ingest: &LargeCaseUseCases<'_, '_>,
+    store: &crate::LocalStore,
+    case: &irmind_domain::CaseId,
+    input: &Path,
+    case_root: &Path,
+    cancel: &CancellationToken,
+) {
+    assert_eq!(
+        ingest.verify_parquet_rebuild(case, input, cancel).unwrap(),
+        2
+    );
+    ingest.engine.seal(case).unwrap();
+    let export = case_root.join("azure.irmind");
+    let key = irmind_app::export_case(ingest.engine, store, case, &export, cancel).unwrap();
+    let details =
+        irmind_app::verify_export_details(&crate::LocalExportVerifier, &export, Some(&key))
+            .unwrap();
+    assert_eq!(details.format_version, 9);
+}
+
+struct LegacyAzure;
+impl SourceDecoder for LegacyAzure {
+    fn identity(&self) -> irmind_app::ParserIdentity<'_> {
+        AzureFlowSourceDecoder.identity()
+    }
+
+    fn decode_reader(
+        &self,
+        input: irmind_app::source_mapping::SourceInput<'_>,
+        emit: &mut dyn FnMut(
+            irmind_domain::Tainted<irmind_domain::SourceRecordV1>,
+        ) -> Result<(), AppError>,
+    ) -> Result<irmind_app::ParseReport, AppError> {
+        AzureFlowSourceDecoder.decode_reader(input, emit)
+    }
+
+    fn decode_with_budget(
+        &self,
+        input: irmind_app::source_mapping::DecodeInput<'_>,
+        budget: irmind_app::source_mapping::DecodeBudget,
+        emit: &mut dyn FnMut(
+            irmind_domain::Tainted<irmind_domain::SourceRecordV1>,
+        ) -> Result<(), AppError>,
+    ) -> Result<irmind_app::ParseReport, AppError> {
+        AzureFlowSourceDecoder.decode_with_budget(input, budget, emit)
     }
 }

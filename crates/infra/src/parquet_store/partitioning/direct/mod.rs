@@ -1,4 +1,5 @@
 //! Preparation holds unsigned final files until the application commits a group.
+mod compact;
 mod fallback;
 mod prepared;
 mod read;

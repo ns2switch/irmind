@@ -71,6 +71,17 @@ impl Replay<'_, '_> {
                     }
                     sources.extend(self.stream(group, writing, allocator)?);
                 }
+                Plan::Compact(source) => {
+                    let result = super::compact::replay(
+                        self.store,
+                        self.request,
+                        *source,
+                        writing,
+                        allocator,
+                        self.cancel,
+                    )?;
+                    sources.push(result);
+                }
                 Plan::Sorted(source) => {
                     let mut group = vec![*source];
                     while matches!(pending.peek(), Some(Plan::Sorted(_))) {

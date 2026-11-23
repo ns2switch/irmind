@@ -37,7 +37,7 @@ const NSG: &[&str] = &[
     "packetsReceived",
     "bytesReceived",
 ];
-fn array(value: Option<&SourceValue>) -> &[SourceValue] {
+pub(super) fn array(value: Option<&SourceValue>) -> &[SourceValue] {
     match value {
         Some(SourceValue::Array(values)) => values,
         _ => &[],
@@ -54,29 +54,14 @@ pub(super) fn expand(
     output: &mut SourceFrameEmitter<'_>,
     emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
 ) -> Result<(), AppError> {
-    let fields = source.fields();
-    let vnet = fields.field("category").and_then(SourceValue::as_text) == Some("FlowLogFlowEvent");
-    let properties = fields.field("properties");
-    let version = if vnet {
-        version(fields.field("flowLogVersion"))
-    } else {
-        version(properties.and_then(|v| v.field("Version")))
-    };
-    if !matches!(
-        (vnet, version),
-        (true, Some(2 | 4 | 5)) | (false, Some(1 | 2))
-    ) {
+    let (vnet, version, flows) = layout(source.fields());
+    let Some(version) = version else {
         return output.frame(
             b"unknown Azure flow version",
             source.origin().offset(),
             unknown(source, vnet),
             emit,
         );
-    }
-    let flows = if vnet {
-        fields.field("flowRecords").and_then(|v| v.field("flows"))
-    } else {
-        properties.and_then(|v| v.field("flows"))
     };
     let mut found = false;
     for flow in array(flows) {
@@ -85,16 +70,9 @@ pub(super) fn expand(
                 found = true;
                 let raw = raw.as_text();
                 let bytes = raw.map_or(b"non-text flow tuple".as_slice(), str::as_bytes);
-                let prepared = raw.ok_or_else(invalid).and_then(|tuple| {
-                    prepare(
-                        source,
-                        vnet,
-                        version.unwrap_or_default(),
-                        flow,
-                        group,
-                        tuple,
-                    )
-                });
+                let prepared = raw
+                    .ok_or_else(invalid)
+                    .and_then(|tuple| prepare(source, vnet, version, flow, group, tuple));
                 // Nested tuple byte positions are not claimed: the JSON container can escape strings.
                 output.frame(bytes, None, prepared, emit)?;
             }
@@ -110,6 +88,24 @@ pub(super) fn expand(
     }
     Ok(())
 }
+pub(super) fn layout(fields: &SourceValue) -> (bool, Option<u16>, Option<&SourceValue>) {
+    let vnet = fields.field("category").and_then(SourceValue::as_text) == Some("FlowLogFlowEvent");
+    let properties = fields.field("properties");
+    if vnet {
+        (
+            vnet,
+            version(fields.field("flowLogVersion")).filter(|v| matches!(v, 2 | 4 | 5)),
+            fields.field("flowRecords").and_then(|v| v.field("flows")),
+        )
+    } else {
+        (
+            vnet,
+            version(properties.and_then(|v| v.field("Version"))).filter(|v| matches!(v, 1 | 2)),
+            properties.and_then(|v| v.field("flows")),
+        )
+    }
+}
+
 fn unknown(source: &SourceRecordV1, vnet: bool) -> Result<DecodedSourceFrame, AppError> {
     Ok(DecodedSourceFrame {
         fields: source.fields().clone(),
@@ -137,7 +133,7 @@ fn format(vnet: bool) -> Result<SourceFormatV1, AppError> {
     )
     .map_err(|_| invalid())
 }
-fn prepare(
+pub(super) fn prepare(
     source: &SourceRecordV1,
     vnet: bool,
     version: u16,
@@ -146,13 +142,7 @@ fn prepare(
     tuple: &str,
 ) -> Result<DecodedSourceFrame, AppError> {
     let names = if vnet { VNET } else { NSG };
-    let count = if vnet {
-        if version == 5 { 16 } else { 13 }
-    } else if version == 1 {
-        8
-    } else {
-        13
-    };
+    let count = column_count(vnet, version);
     let values: Vec<_> = tuple.split(',').take(count + 1).collect();
     if values.len() != count {
         return Err(invalid());
@@ -166,18 +156,7 @@ fn prepare(
             .collect(),
     )
     .map_err(|_| invalid())?;
-    let timestamp = if vnet {
-        let millis = values[0].parse::<i64>().map_err(|_| invalid())?;
-        IndexedTime::new(
-            IndexedInstant::new(millis.checked_mul(1000).ok_or_else(invalid)?, 0)
-                .map_err(|_| invalid())?,
-            TimePrecision::Millisecond,
-            false,
-        )
-        .map_err(|_| invalid())?
-    } else {
-        IndexedTime::from_epoch_decimal(values[0], false).map_err(|_| invalid())?
-    };
+    let timestamp = timestamp(vnet, values[0])?;
     let fields = original_fields(source, vnet, version, flow, group, tuple, columns)?;
     let mut format = format(vnet)?;
     let mut discriminators = format.discriminators().clone();
@@ -189,6 +168,31 @@ fn prepare(
         timestamp: Some(timestamp),
         format,
     })
+}
+
+pub(super) const fn column_count(vnet: bool, version: u16) -> usize {
+    if vnet {
+        if version == 5 { 16 } else { 13 }
+    } else if version == 1 {
+        8
+    } else {
+        13
+    }
+}
+
+pub(super) fn timestamp(vnet: bool, value: &str) -> Result<IndexedTime, AppError> {
+    if vnet {
+        let millis = value.parse::<i64>().map_err(|_| invalid())?;
+        IndexedTime::new(
+            IndexedInstant::new(millis.checked_mul(1000).ok_or_else(invalid)?, 0)
+                .map_err(|_| invalid())?,
+            TimePrecision::Millisecond,
+            false,
+        )
+        .map_err(|_| invalid())
+    } else {
+        IndexedTime::from_epoch_decimal(value, false).map_err(|_| invalid())
+    }
 }
 
 fn without(value: &SourceValue, excluded: &[&str]) -> Result<SourceValue, AppError> {
