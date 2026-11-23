@@ -6,10 +6,21 @@ use irmind_app::{
 use irmind_domain::{
     BoundedObservations, EventContextV1, EventHeaderV1, EventOrigin, EvidenceHash,
 };
-use parquet::{arrow::ArrowWriter, basic::Compression, file::properties::WriterProperties};
+use parquet::{
+    arrow::ArrowWriter,
+    basic::Compression,
+    file::{
+        properties::WriterProperties,
+        reader::{ChunkReader, Length},
+    },
+};
 use std::{
     fs::{File, OpenOptions},
-    sync::Arc,
+    io::{self, Read},
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
     time::{Duration, Instant},
 };
 
@@ -152,6 +163,45 @@ fn rules(original: bool, count: u64) -> Vec<(SigmaRuleKeyV1, Vec<u8>)> {
     }).collect()
 }
 
+struct CountedParquet {
+    file: File,
+    read_bytes: Arc<AtomicU64>,
+}
+
+impl Length for CountedParquet {
+    fn len(&self) -> u64 {
+        self.file.len()
+    }
+}
+
+impl ChunkReader for CountedParquet {
+    type T = CountedRead<<File as ChunkReader>::T>;
+
+    fn get_read(&self, start: u64) -> parquet::errors::Result<Self::T> {
+        Ok(CountedRead(
+            self.file.get_read(start)?,
+            self.read_bytes.clone(),
+        ))
+    }
+
+    fn get_bytes(&self, start: u64, length: usize) -> parquet::errors::Result<bytes::Bytes> {
+        let bytes = self.file.get_bytes(start, length)?;
+        self.read_bytes
+            .fetch_add(bytes.len() as u64, Ordering::Relaxed);
+        Ok(bytes)
+    }
+}
+
+struct CountedRead<R>(R, Arc<AtomicU64>);
+
+impl<R: Read> Read for CountedRead<R> {
+    fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
+        let count = self.0.read(bytes)?;
+        self.1.fetch_add(count as u64, Ordering::Relaxed);
+        Ok(count)
+    }
+}
+
 fn lane(file: &std::path::Path, original: bool, count: u64) {
     let rules = rules(original, count);
     let table = table(original);
@@ -166,8 +216,12 @@ fn lane(file: &std::path::Path, original: bool, count: u64) {
     let cancel = CancellationToken::new();
     let mut run = programs.start(8_000_000_000);
     let mut actual = std::collections::BTreeSet::new();
+    let read_bytes = Arc::new(AtomicU64::new(0));
     run.scan_authenticated(
-        File::open(file).unwrap(),
+        CountedParquet {
+            file: File::open(file).unwrap(),
+            read_bytes: read_bytes.clone(),
+        },
         0..i64::MAX,
         start + Duration::from_mins(5),
         &cancel,
@@ -198,10 +252,12 @@ fn lane(file: &std::path::Path, original: bool, count: u64) {
         usize::try_from(count.saturating_sub(950)).unwrap()
     );
     println!(
-        "fields={name} compiled={count} evaluated={} skipped={} compile_s={:.3} scan_s={seconds:.3} tp={true_positives} fp={false_positives} fn={false_negatives} units={}",
+        "fields={name} rules={count} compiled={} evaluated={} skipped={} compile_s={:.3} scan_s={seconds:.3} read_bytes={} tp={true_positives} fp={false_positives} fn={false_negatives} units={}",
+        programs.eligible(),
         run.rules_evaluated(),
         programs.skipped().len(),
         compile.as_secs_f64(),
+        read_bytes.load(Ordering::Relaxed),
         run.used_units(),
     );
 }
