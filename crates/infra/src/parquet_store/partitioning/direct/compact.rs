@@ -25,7 +25,7 @@ type Initial = (std::fs::Metadata, [u8; 32], u64);
 const RUN_RECORDS: usize = 65_536;
 
 pub(super) enum Choice {
-    Fallback(Input, Initial),
+    Fallback(Input, Box<Initial>),
     Stream(Input),
     Compact(Box<Planned>),
 }
@@ -55,7 +55,7 @@ pub(super) fn plan(
         || request.parser.cluster_context().is_some()
         || store.capture_origin.is_some()
     {
-        return Ok(Choice::Fallback(input, initial));
+        return Ok(Choice::Fallback(input, Box::new(initial)));
     }
     let decoder = store
         .mapping_catalog
@@ -64,7 +64,7 @@ pub(super) fn plan(
         .decoder(id.name, id.version)
         .map_err(irmind_app::source_mapping::MappingError::into_app)?;
     let Some(ordering) = decoder.compact_ordering() else {
-        return Ok(Choice::Fallback(input, initial));
+        return Ok(Choice::Fallback(input, Box::new(initial)));
     };
     let _stage = store
         .profile
@@ -82,56 +82,21 @@ pub(super) fn plan(
     let sample_hash = irmind_app::sha256(&source_sample(&mut input.file)?);
     input.file.rewind().map_err(storage)?;
     let mut reader = HashingReader::new(&mut input.file);
-    let mut batch = Vec::new();
-    let mut pending = Vec::new();
-    let mut count = 0_u64;
-    let mut previous = None;
-    let mut disordered = false;
-    let mut too_large = false;
+    let mut locator_runs = LocatorRuns::default();
     let result = ordering.scan(
         SourceInput {
             metadata,
             reader: &mut reader,
         },
-        &mut |locator| {
-            if cancel.is_cancelled() {
-                return Err(AppError::Cancelled);
-            }
-            if locator.index != count
-                || locator.frame_len == 0
-                || locator
-                    .frame_start
-                    .checked_add(u64::from(locator.frame_len))
-                    .is_none_or(|end| end > initial.2)
-            {
-                return Err(invalid_source());
-            }
-            count += 1;
-            if count * (2 * runs::BYTES + ReorderedRecords::SLOT_BYTES) > input.budget {
-                too_large = true;
-                return Err(AppError::Cancelled);
-            }
-            let key = runs::key(locator);
-            if let Some(old) = previous {
-                disordered |= irmind_domain::compare_record_keys(old, key, false)
-                    .map_err(|_| invalid_source())?
-                    .is_gt();
-            }
-            previous = Some(key);
-            batch.push(locator);
-            if batch.len() == RUN_RECORDS {
-                pending.push(write_run(store, request.case_id, &mut batch, cancel)?);
-            }
-            Ok(())
-        },
+        &mut |locator| locator_runs.push(store, request, locator, initial.2, input.budget, cancel),
     );
     if reader.io_failed {
         return Err(storage("compact Azure read"));
     }
     match result {
-        Ok(false) => return Ok(Choice::Fallback(input, initial)),
-        Err(AppError::Cancelled) if too_large && !cancel.is_cancelled() => {
-            return Ok(Choice::Fallback(input, initial));
+        Ok(false) => return Ok(Choice::Fallback(input, Box::new(initial))),
+        Err(AppError::Cancelled) if locator_runs.too_large && !cancel.is_cancelled() => {
+            return Ok(Choice::Fallback(input, Box::new(initial)));
         }
         other => {
             other?;
@@ -141,19 +106,83 @@ pub(super) fn plan(
     if reader.bytes != initial.2 || reader.finish() != initial.1 {
         return Err(AppError::EvidenceMismatch(irmind_app::hex(&initial.1)));
     }
-    if !disordered {
+    if !locator_runs.disordered {
         return Ok(Choice::Stream(input));
     }
-    if !batch.is_empty() {
-        pending.push(write_run(store, request.case_id, &mut batch, cancel)?);
-    }
+    let count = locator_runs.count;
     Ok(Choice::Compact(Box::new(Planned {
         input,
         initial,
-        runs: pending,
+        runs: locator_runs.finish(store, request.case_id, cancel)?,
         count,
         sample_hash,
     })))
+}
+
+#[derive(Default)]
+struct LocatorRuns {
+    batch: Vec<CompactRecordLocator>,
+    pending: Vec<runs::Run>,
+    count: u64,
+    previous: Option<irmind_domain::StableRecordKey<'static>>,
+    disordered: bool,
+    too_large: bool,
+}
+
+impl LocatorRuns {
+    fn push(
+        &mut self,
+        store: &ParquetStore,
+        request: &MappedIngestRequest<'_>,
+        locator: CompactRecordLocator,
+        source_bytes: u64,
+        budget: u64,
+        cancel: &CancellationToken,
+    ) -> Result<(), AppError> {
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
+        if locator.index != self.count
+            || locator.frame_len == 0
+            || locator
+                .frame_start
+                .checked_add(u64::from(locator.frame_len))
+                .is_none_or(|end| end > source_bytes)
+        {
+            return Err(invalid_source());
+        }
+        self.count += 1;
+        if self.count * (2 * runs::BYTES + ReorderedRecords::SLOT_BYTES) > budget {
+            self.too_large = true;
+            return Err(AppError::Cancelled);
+        }
+        let key = runs::key(locator);
+        if let Some(old) = self.previous {
+            self.disordered |= irmind_domain::compare_record_keys(old, key, false)
+                .map_err(|_| invalid_source())?
+                .is_gt();
+        }
+        self.previous = Some(key);
+        self.batch.push(locator);
+        if self.batch.len() == RUN_RECORDS {
+            self.pending
+                .push(write_run(store, request.case_id, &mut self.batch, cancel)?);
+        }
+        Ok(())
+    }
+
+    fn finish(
+        mut self,
+        store: &ParquetStore,
+        case: &irmind_domain::CaseId,
+        cancel: &CancellationToken,
+    ) -> Result<Vec<runs::Run>, AppError> {
+        if !self.batch.is_empty() {
+            self.pending
+                .push(write_run(store, case, &mut self.batch, cancel)?);
+        }
+        Ok(self.pending)
+    }
 }
 
 fn write_run(
@@ -209,37 +238,26 @@ pub(super) fn replay(
         .map_err(irmind_app::source_mapping::MappingError::into_app)?;
     let ordering = decoder.compact_ordering().ok_or_else(invalid_source)?;
     let routes = mapped::projection_routes_for_direct(&catalog)?;
-    let run = {
-        let _sort = store
-            .profile
-            .as_ref()
-            .map(|p| p.measure(PartitionPhase::Sort));
-        runs::merge(store, request.case_id, runs, cancel)?
-    };
-    let receipts =
-        store.create_private_object_spool(request.case_id, count * ReorderedRecords::SLOT_BYTES)?;
-    let mut disk = super::super::temporary::DiskLease::new(store.profile.clone());
-    disk.add(count * ReorderedRecords::SLOT_BYTES)?;
-    let mut receipts = receipts;
+    let (run, mut receipts, _disk) = prepare_replay(store, request.case_id, runs, count, cancel)?;
     let mut account = ReorderedRecords::new(
         SourceRecordAccumulator::new(metadata, id, size, &catalog)?,
         count,
     )?;
     writing.register_source(&hash, logical)?;
     let root = store.case_dir(request.case_id)?;
-    let mut normalized = CountBytes::default();
-    let _replay = store
-        .profile
-        .as_ref()
-        .map(|p| p.measure(PartitionPhase::Replay));
     {
-        let mut decoder = ordering.replay(SourceFileInput {
+        let _replay = store
+            .profile
+            .as_ref()
+            .map(|p| p.measure(PartitionPhase::Replay));
+        let mut replay = ordering.replay(SourceFileInput {
             metadata,
             file: &mut input.file,
         });
         let mut reader = run.reader()?;
+        let mut normalized = CountBytes::default();
         while let Some(locator) = reader.next(cancel)? {
-            let record = decoder.read(locator).map_err(|error| match error {
+            let record = replay.read(locator).map_err(|error| match error {
                 AppError::EvidenceMismatch(_) => {
                     super::read::source_changed(input.path.clone()).unwrap_or_else(|error| error)
                 }
@@ -247,28 +265,18 @@ pub(super) fn replay(
             })?;
             let mapped = account.accept(record, receipts.as_file_mut())?;
             let row = mapped::project_row(&mapped, id, &hash, &routes)?;
-            let key = row.sort_key();
-            if key.record_index != locator.index
-                || key.instant != Some(locator.time.instant())
-                || key.source_offset.is_some()
-            {
-                return Err(invalid_source());
-            }
+            ensure_row_matches_locator(&row, locator)?;
             normalized.charge(&row, input.budget)?;
             writing.push(row, allocator, &root, cancel)?;
         }
     }
-    let (current, live_size) = ParquetStore::hash_reader(&mut input.file, cancel)?;
-    if current != digest || live_size != size {
-        return Err(super::read::source_changed(input.path)?);
-    }
-    verify_source_unchanged(&input.file, &snapshot, &hash)?;
+    verify_replayed_source(&mut input, &snapshot, &hash, size, cancel)?;
     let report = ParseReport {
         accepted: usize::try_from(count).map_err(storage)?,
         rejected: 0,
         samples: vec![],
     };
-    let decoded = account.finish(receipts.as_file_mut(), &report)?;
+    let record_set = account.finish(receipts.as_file_mut(), &report)?;
     Ok(MappedSourceAcquisition {
         manifest: ParquetStore::source_manifest(
             &input.path,
@@ -279,8 +287,63 @@ pub(super) fn replay(
         )?,
         report,
         format_sample_sha256: sample_hash,
-        decoded,
+        decoded: record_set,
     })
+}
+
+fn verify_replayed_source(
+    input: &mut Input,
+    snapshot: &std::fs::Metadata,
+    hash: &EvidenceHash,
+    size: u64,
+    cancel: &CancellationToken,
+) -> Result<(), AppError> {
+    let (current, live_size) = ParquetStore::hash_reader(&mut input.file, cancel)?;
+    if &EvidenceHash::from_bytes(current) != hash || live_size != size {
+        return Err(super::read::source_changed(input.path.clone())?);
+    }
+    verify_source_unchanged(&input.file, snapshot, hash)
+}
+
+type ReplayScratch = (
+    runs::Run,
+    tempfile::NamedTempFile,
+    super::super::temporary::DiskLease,
+);
+
+fn prepare_replay(
+    store: &ParquetStore,
+    case: &irmind_domain::CaseId,
+    runs: Vec<runs::Run>,
+    count: u64,
+    cancel: &CancellationToken,
+) -> Result<ReplayScratch, AppError> {
+    let run = {
+        let _sort = store
+            .profile
+            .as_ref()
+            .map(|p| p.measure(PartitionPhase::Sort));
+        runs::merge(store, case, runs, cancel)?
+    };
+    let bytes = count * ReorderedRecords::SLOT_BYTES;
+    let receipts = store.create_private_object_spool(case, bytes)?;
+    let mut lease = super::super::temporary::DiskLease::new(store.profile.clone());
+    lease.add(bytes)?;
+    Ok((run, receipts, lease))
+}
+
+fn ensure_row_matches_locator(
+    row: &crate::parquet_store::RecordRow,
+    locator: CompactRecordLocator,
+) -> Result<(), AppError> {
+    let key = row.sort_key();
+    if key.record_index != locator.index
+        || key.instant != Some(locator.time.instant())
+        || key.source_offset.is_some()
+    {
+        return Err(invalid_source());
+    }
+    Ok(())
 }
 
 #[derive(Default)]

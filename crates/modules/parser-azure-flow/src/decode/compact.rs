@@ -14,6 +14,7 @@ use irmind_domain::Tainted;
 use std::io::{BufRead, BufReader, Read as _, Seek as _, SeekFrom};
 
 const FRAME_LIMIT: usize = 64 * 1024;
+const SOURCE_LIMIT: u64 = 50 * 1024 * 1024 * 1024;
 const RECORD_LIMIT: u64 = 10_000_000;
 
 impl CompactSourceOrdering for AzureFlowSourceDecoder {
@@ -44,7 +45,7 @@ impl CompactSourceOrdering for AzureFlowSourceDecoder {
             if len == 0 {
                 return Ok(index != 0);
             }
-            if len > FRAME_LIMIT {
+            if len > FRAME_LIMIT || offset + len as u64 > SOURCE_LIMIT {
                 return Ok(false);
             }
             let Some(fields) = eligible_fields(&bytes) else {
@@ -139,10 +140,10 @@ impl CompactSourceReplay for Replay<'_> {
         }
         let frame = (locator.frame_start, locator.frame_len, locator.frame_hash);
         let emitter = SourceFrameEmitter::new(self.metadata, AzureFlowSourceDecoder.identity());
-        if !self
+        if self
             .cached
             .as_ref()
-            .is_some_and(|(start, len, hash, _)| (*start, *len, *hash) == frame)
+            .is_none_or(|(start, len, hash, _)| (*start, *len, *hash) != frame)
         {
             let length = locator.frame_len as usize;
             if length == 0 || length > FRAME_LIMIT {
@@ -150,9 +151,11 @@ impl CompactSourceReplay for Replay<'_> {
             }
             self.file
                 .seek(SeekFrom::Start(locator.frame_start))
-                .map_err(read_error)?;
+                .map_err(|error| AppError::Storage(error.to_string()))?;
             let mut bytes = vec![0; length];
-            self.file.read_exact(&mut bytes).map_err(read_error)?;
+            self.file
+                .read_exact(&mut bytes)
+                .map_err(|error| AppError::Storage(error.to_string()))?;
             if irmind_app::sha256(&bytes) != locator.frame_hash {
                 return Err(AppError::EvidenceMismatch(irmind_app::hex(
                     &self.metadata.evidence_hash,
@@ -197,8 +200,4 @@ fn replay_tuple(
         }
     }
     Err(invalid())
-}
-
-fn read_error(error: std::io::Error) -> AppError {
-    AppError::Storage(error.to_string())
 }

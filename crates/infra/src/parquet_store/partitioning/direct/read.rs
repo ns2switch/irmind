@@ -192,7 +192,7 @@ fn plan_hashed(
     )? {
         super::compact::Choice::Stream(input) => return Ok(Plan::Stream(input, hash)),
         super::compact::Choice::Compact(source) => return Ok(Plan::Compact(source)),
-        super::compact::Choice::Fallback(input, initial) => (input, initial),
+        super::compact::Choice::Fallback(input, initial) => (input, *initial),
     };
     if path != first_path {
         return hash_failure(
