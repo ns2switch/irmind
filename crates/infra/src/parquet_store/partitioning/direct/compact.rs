@@ -61,8 +61,7 @@ pub(super) fn plan(
         .mapping_catalog
         .as_ref()
         .ok_or_else(invalid_source)?
-        .decoder(id.name, id.version)
-        .map_err(irmind_app::source_mapping::MappingError::into_app)?;
+        .decoder(id.name, id.version)?;
     let Some(ordering) = decoder.compact_ordering() else {
         return Ok(Choice::Fallback(input, Box::new(initial)));
     };
@@ -233,9 +232,7 @@ pub(super) fn replay(
         .as_ref()
         .ok_or_else(invalid_source)?
         .for_decoder(id);
-    let decoder = catalog
-        .decoder(id.name, id.version)
-        .map_err(irmind_app::source_mapping::MappingError::into_app)?;
+    let decoder = catalog.decoder(id.name, id.version)?;
     let ordering = decoder.compact_ordering().ok_or_else(invalid_source)?;
     let routes = mapped::projection_routes_for_direct(&catalog)?;
     let (run, mut receipts, _disk) = prepare_replay(store, request.case_id, runs, count, cancel)?;
