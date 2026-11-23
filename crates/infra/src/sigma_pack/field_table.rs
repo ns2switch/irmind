@@ -175,7 +175,7 @@ impl SigmaSourceVariant {
 }
 
 impl SigmaEventFilter {
-    fn values(&self) -> &[SigmaLiteral] {
+    pub(super) fn values(&self) -> &[SigmaLiteral] {
         self.equals.as_ref().map_or_else(
             || self.one_of.as_deref().unwrap_or(&[]),
             std::slice::from_ref,
@@ -218,9 +218,10 @@ fn location(
     path: Option<&[String]>,
 ) -> Result<Option<SigmaBindingType>, AppError> {
     match (column, path) {
-        (Some("event.code" | "event.action" | "event.id" | "event.dataset"), None) => {
-            Ok(Some(SigmaBindingType::Text))
-        }
+        (
+            Some("event.code" | "event.action" | "event.id" | "event.dataset" | "event.outcome"),
+            None,
+        ) => Ok(Some(SigmaBindingType::Text)),
         (Some(name), None) => match CommonField::parse(name)
             .map_err(|_| invalid())?
             .value_type()

@@ -2,6 +2,7 @@ use crate::{
     Actor, AppError, AuditEventKind, BTreeMap, CaseId, Deserialize, Engine, Serialize, SignedEntry,
 };
 use irmind_domain::SourceManifestV1;
+mod cited;
 mod document;
 pub use document::*;
 mod entity_details;

@@ -2478,6 +2478,7 @@ dependencies = [
  "irmind-mod-parser-json",
  "irmind-mod-parser-linux",
  "irmind-mod-parser-vpc-flow",
+ "irmind-mod-sigma",
  "irmind-security",
  "irmind-testkit",
  "memchr",

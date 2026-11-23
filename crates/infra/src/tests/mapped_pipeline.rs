@@ -226,3 +226,6 @@ mod partition_order;
 mod cluster;
 
 mod expanded_catalog;
+
+#[cfg(feature = "sigma")]
+mod sigma_report;

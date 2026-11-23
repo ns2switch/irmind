@@ -5,7 +5,11 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
+[features]
+sigma = ["dep:irmind-mod-sigma"]
+
 [dependencies]
+irmind-mod-sigma = { path = "../modules/sigma", version = "0.1.0", optional = true }
 arrow-select = { version = "=59.3.2", default-features = false }
 arrow-ord = { version = "=59.3.2", default-features = false }
 irmind-calendar = { path = "../calendar", version = "0.1.0" }
