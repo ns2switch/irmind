@@ -2,7 +2,7 @@
 """Refresh synthetic export vectors or derive V9 and V10 from frozen synthetic seeds.
 
 Development only; requires Python cryptography. Only the published synthetic
-[43; 32] signing key is accepted. Original signatures and seed digests are checked
+signing keys are accepted. Original signatures and seed digests are checked
 before updating profiles, artifact bindings, receipts, inventory and signatures.
 No evidence, mapping installation or Parquet bytes are changed.
 """
@@ -211,6 +211,39 @@ def derive_v10(path):
 
 
 
+def derive_v6_query_chain(name):
+    directory = ROOT / 'docs/development/source-query-format-vectors'
+    original = (directory / f'{name}.json').read_bytes()
+    sums = (directory / 'SHA256SUMS').read_text()
+    expected = next(
+        line.split()[0] for line in sums.splitlines() if line.split()[-1] == f'{name}.json'
+    )
+    assert sha(original).hex() == expected
+    edge = bytes(32)
+    entries = json.loads(original)
+    assert entries[0]['kind'] == 'CaseCreated'
+    keys = {actor: Ed25519PrivateKey.from_private_bytes(bytes([seed]) * 32)
+            for actor, seed in [('analyst', 77), ('agent:main', 88)]}
+    for entry in entries:
+        public = keys[entry['actor']].public_key()
+        assert bytes(entry['public_key']) == public.public_bytes(Encoding.Raw, PublicFormat.Raw)
+        assert bytes(entry['prev']) == edge
+        edge = sha(canonical(entry))
+        assert edge == bytes(entry['hash'])
+        public.verify(bytes(entry['sig']), edge)
+    created = json.loads(entries[0]['payload'])
+    assert created['version'] == 5
+    created['version'] = 6
+    entries[0]['payload'] = json.dumps(created, ensure_ascii=False, separators=(',', ':'))
+    edge = bytes(32)
+    for entry in entries:
+        entry['prev'] = list(edge)
+        edge = sha(canonical(entry))
+        entry['hash'] = list(edge)
+        entry['sig'] = list(keys[entry['actor']].sign(edge))
+    return (json.dumps(entries, separators=(',', ':'), sort_keys=True) + '\n').encode()
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--write', action='store_true')
@@ -223,6 +256,12 @@ def main():
             directory = ROOT / 'fuzz/seeds/export'
             data = derive_v10(directory / f'valid-v9-{suffix}.irmind')
             path = directory / f'valid-v10-{suffix}.irmind'
+            print(path.name, sha(data).hex())
+            if args.write:
+                path.write_bytes(data)
+        for name in ('signed-record-chain', 'signed-recovery-chain'):
+            data = derive_v6_query_chain(name)
+            path = ROOT / 'crates/testkit/fixtures/contracts' / f'{name}-case-v6.json'
             print(path.name, sha(data).hex())
             if args.write:
                 path.write_bytes(data)

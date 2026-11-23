@@ -19,14 +19,14 @@ const CONFIGURATION: &[u8] = include_bytes!(
     "../../../../../../docs/development/source-query-format-vectors/signed-configuration.json"
 );
 const CHAIN: &[u8] = include_bytes!(
-    "../../../../../../docs/development/source-query-format-vectors/signed-record-chain.json"
+    "../../../../../../crates/testkit/fixtures/contracts/signed-record-chain-case-v6.json"
 );
 const IDS: &[u8] = include_bytes!(
     "../../../../../../docs/development/source-query-format-vectors/identities.json"
 );
 
 #[test]
-fn engine_query_capture_survives_reopen_reconstruction_seal_and_v9_export() {
+fn engine_query_capture_survives_reopen_reconstruction_seal_and_v10_export() {
     assert_eq!(query_capture_roundtrip(1), query_capture_roundtrip(4));
 }
 
@@ -99,7 +99,7 @@ fn query_capture_roundtrip(workers: u16) -> (EvidenceHash, Vec<[u8; 32]>) {
     let acquisition = store.entries(&case).unwrap();
     let notices = check_citation_notices(&engine, &case, &hash, &cancel);
     engine.seal(&case).unwrap();
-    check_v9_export(root.path(), store.as_ref(), &case, &notices, &cancel);
+    check_v10_export(root.path(), store.as_ref(), &case, &notices, &cancel);
     (
         hash,
         acquisition.into_iter().map(|entry| entry.hash).collect(),
@@ -296,7 +296,7 @@ fn reserve_and_stage(
     output
 }
 
-fn check_v9_export(
+fn check_v10_export(
     root: &Path,
     store: &LocalStore,
     case: &CaseId,

@@ -225,7 +225,7 @@ fn installed_mapping_round_trips_v10_without_keyring_and_rebuilds_exact_version(
             .verify_export_details(&path, Some(&key))
             .unwrap()
             .format_version,
-        9
+        10
     );
     assert_tampered_proof_rejected(&path, approved.operation(), &key);
 }

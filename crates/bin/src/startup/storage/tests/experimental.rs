@@ -134,7 +134,7 @@ fn default_source_ingestion_is_mapped_and_exports_v10() {
         irmind_app::verify_export_details(&LocalExportVerifier, &path, Some(&key))
             .unwrap()
             .format_version,
-        9
+        10
     );
 }
 
