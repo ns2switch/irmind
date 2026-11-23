@@ -70,12 +70,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: {persist-credentials: false, fetch-depth: 0}
-      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
+      - uses: dtolnay/rust-toolchain@766a42937d994bd78bb4591385445c188ccb3f09 # 1.97.1
         with: {components: 'rustfmt, clippy'}
       - name: Keep only the pinned Rust toolchain for a stable cache key
         run: |
           rustup toolchain list | awk '{print $1}' | while read -r toolchain; do
-            case "$toolchain" in 1.95.0-*) ;; *) rustup toolchain uninstall "$toolchain" ;; esac
+            case "$toolchain" in 1.97.1-*) ;; *) rustup toolchain uninstall "$toolchain" ;; esac
           done
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         id: rust_cache
@@ -187,7 +187,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: {persist-credentials: false}
-      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
+      - uses: dtolnay/rust-toolchain@766a42937d994bd78bb4591385445c188ccb3f09 # 1.97.1
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           key: json-formats-${{ hashFiles('Cargo.lock', 'helpers/evtx/Cargo.lock') }}
@@ -254,12 +254,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: {persist-credentials: false}
-      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
+      - uses: dtolnay/rust-toolchain@766a42937d994bd78bb4591385445c188ccb3f09 # 1.97.1
         with: {targets: x86_64-pc-windows-msvc, components: clippy}
       - name: Keep only the pinned Rust toolchain for a stable cache key
         run: |
           rustup toolchain list | awk '{print $1}' | while read -r toolchain; do
-            case "$toolchain" in 1.95.0-*) ;; *) rustup toolchain uninstall "$toolchain" ;; esac
+            case "$toolchain" in 1.97.1-*) ;; *) rustup toolchain uninstall "$toolchain" ;; esac
           done
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
@@ -345,12 +345,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: {persist-credentials: false}
-      - uses: dtolnay/rust-toolchain@035fceb3c12fb0c6a9461b52775e16473133e591 # 1.95.0
+      - uses: dtolnay/rust-toolchain@766a42937d994bd78bb4591385445c188ccb3f09 # 1.97.1
         with: {targets: "${{ matrix.target }}"}
       - name: Keep only the pinned Rust toolchain for a stable cache key
         run: |
           rustup toolchain list | awk '{print $1}' | while read -r toolchain; do
-            case "$toolchain" in 1.95.0-*) ;; *) rustup toolchain uninstall "$toolchain" ;; esac
+            case "$toolchain" in 1.97.1-*) ;; *) rustup toolchain uninstall "$toolchain" ;; esac
           done
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:

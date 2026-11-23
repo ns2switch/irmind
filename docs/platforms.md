@@ -10,7 +10,7 @@ privacy and the status of native platform signing.
 A source build is the recommended path for internal evaluation:
 
 ```sh
-rustup toolchain install 1.95.0
+rustup toolchain install 1.97.1
 cargo build --release --locked -p irmind
 CARGO_TARGET_DIR=target cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked
 ```
