@@ -4,7 +4,7 @@ use crate::{AppError, CancellationToken};
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    io::{Read, Seek, SeekFrom},
+    io::{Read, Seek, SeekFrom, Write},
 };
 
 const MAX_SECTION: u64 = 128 * 1024 * 1024;
@@ -111,6 +111,55 @@ impl V10ObjectSection {
     }
 }
 
+/// Write one bounded V10 section to a transactional export sink.
+pub fn write_v10_object_section<R: Read>(
+    output: &mut impl Write,
+    family: V10ProofFamily,
+    objects: &[V10ProofDescriptor],
+    mut open: impl FnMut(V10ProofDescriptor) -> Result<R, AppError>,
+    cancel: &CancellationToken,
+) -> Result<(), AppError> {
+    let count = u64::try_from(objects.len()).map_err(|_| invalid())?;
+    if count > MAX_OBJECTS {
+        return Err(invalid());
+    }
+    v10_proof_commitment(family, objects).map_err(|_| invalid())?;
+    check_cancel(cancel)?;
+    output
+        .write_all(&count.to_be_bytes())
+        .map_err(|_| invalid())?;
+    if objects.is_empty() {
+        return Ok(());
+    }
+    let mut scratch = vec![0; BUFFER];
+    for descriptor in objects {
+        check_cancel(cancel)?;
+        let mut input = open(*descriptor)?;
+        output
+            .write_all(&descriptor.encode())
+            .map_err(|_| invalid())?;
+        let mut remaining = descriptor.size();
+        let mut digest = Sha256::new();
+        while remaining > 0 {
+            check_cancel(cancel)?;
+            let length = usize::try_from(remaining.min(BUFFER as u64)).map_err(|_| invalid())?;
+            input
+                .read_exact(&mut scratch[..length])
+                .map_err(|_| invalid())?;
+            digest.update(&scratch[..length]);
+            output
+                .write_all(&scratch[..length])
+                .map_err(|_| invalid())?;
+            remaining -= length as u64;
+        }
+        let actual: [u8; 32] = digest.finalize().into();
+        if actual != descriptor.hash() || input.read(&mut [0]).map_err(|_| invalid())? != 0 {
+            return Err(invalid());
+        }
+    }
+    Ok(())
+}
+
 fn check_body(
     input: &mut impl Read,
     descriptor: V10ProofDescriptor,
@@ -162,6 +211,28 @@ mod tests {
         bytes.extend_from_slice(&descriptor.encode());
         bytes.extend_from_slice(&body);
         let cancel = CancellationToken::new();
+        let mut encoded = Vec::new();
+        write_v10_object_section(
+            &mut encoded,
+            family,
+            &[descriptor],
+            |_| Ok(Box::new(Cursor::new(body.as_slice()))),
+            &cancel,
+        )
+        .unwrap();
+        assert_eq!(encoded, bytes);
+        let mut wrong_body = body.clone();
+        wrong_body.push(0);
+        assert!(
+            write_v10_object_section(
+                &mut Vec::new(),
+                family,
+                &[descriptor],
+                |_| Ok(Box::new(Cursor::new(wrong_body.as_slice()))),
+                &cancel,
+            )
+            .is_err()
+        );
         let mut cursor = Cursor::new(&bytes);
         let index = V10ObjectSection::scan(&mut cursor, family, &cancel).unwrap();
         assert_eq!(cursor.position(), bytes.len() as u64);

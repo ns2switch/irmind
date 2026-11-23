@@ -10,7 +10,7 @@ pub use proofs::*;
 mod report_objects;
 pub use report_objects::*;
 mod section;
-pub use section::V10ObjectSection;
+pub use section::{V10ObjectSection, write_v10_object_section};
 mod sigma_objects;
 pub use sigma_objects::*;
 

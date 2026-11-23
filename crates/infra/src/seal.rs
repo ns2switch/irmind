@@ -14,6 +14,8 @@ mod frames;
 mod local;
 mod mapping_proofs;
 mod parquet_frame;
+mod proof_files;
+pub use proof_files::V10PreparedObjects;
 mod read;
 mod skill_proofs;
 mod subagent_branches;

@@ -40,7 +40,12 @@ pub fn verify_v10_artifact_rows(
         return Err(invalid());
     }
     file.seek(SeekFrom::Start(offset)).map_err(storage)?;
-    super::super::frames::verify_raw(file, core.size, core.sha256.as_str())?;
+    super::super::frames::verify_raw_with_cancel(
+        file,
+        core.size,
+        core.sha256.as_str(),
+        Some(cancel),
+    )?;
     let reader = FrameReader {
         file: file.try_clone().map_err(storage)?,
         start: offset,
