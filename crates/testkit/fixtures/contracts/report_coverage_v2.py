@@ -3,7 +3,6 @@
 import json
 
 from sigma_report_objects import descriptor, entries, generate, ref, sha, tag, text, u64, vector
-from sigma_report_v10 import commitment, optional_hash
 
 
 def vectors():
@@ -28,11 +27,12 @@ def vectors():
     analyst = approved["report_analyst_sections"]
     objects = [(0, citations), (1, analyst), (2, coverage), (3, report)]
     checkpoint = text("00000000-0000-4000-8000-000000000010") + ref(30, b"report-input-checkpoint")
+    proof_set = sha(tag("irmind-report-proof-set-v1") + entries(*(descriptor(kind, body) for kind, body in objects)))
     publication = (
         tag("irmind-report-published-v1")
-        + checkpoint + sha(citations) + optional_hash(None) + optional_hash(sha(analyst))
+        + checkpoint + sha(citations) + bytes([0, 1]) + sha(analyst)
         + sha(coverage) + bytes([0]) + text("irmind-report-renderer-v1") + bytes([0])
-        + u64(len(report)) + sha(report) + commitment("irmind-report-proof-set-v1", objects)
+        + u64(len(report)) + sha(report) + proof_set
     )
     section = entries(*(descriptor(kind, body) + body for kind, body in objects))
     return {
