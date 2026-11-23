@@ -2,6 +2,7 @@
 mod error;
 pub mod json;
 mod manifest;
+mod native_manifest;
 mod output;
 mod selector;
 mod snapshot;

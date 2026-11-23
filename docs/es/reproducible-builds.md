@@ -90,6 +90,15 @@ for file in BUILD-ENVIRONMENT.json SHA256SUMS; do
 done
 ```
 
+Si la release publica `NATIVE-MAPPING-INPUTS.json`, descárgalo junto con
+su bundle de Sigstore y los dos ficheros anteriores. Verifícalo con la misma
+identidad del certificado de la release y comprueba su entrada en
+`SHA256SUMS` firmado. Usa Python 3.11 o posterior y añade
+`--mapping-inputs release-checksums/NATIVE-MAPPING-INPUTS.json` al comando
+de compilación de abajo. El workflow reúne las observaciones de los cinco
+destinos de release. El script vuelve a comprobar la observación del destino
+elegido antes de aceptar el binario reconstruido.
+
 ### Instalar las herramientas nativas
 
 Elige en `targets` la entrada del binario que quieres reproducir. Comprueba
