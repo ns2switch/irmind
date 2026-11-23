@@ -91,6 +91,7 @@ pub use skills::{
 };
 pub mod source_mapping;
 pub mod source_queries;
+pub mod v10_proofs;
 pub use source_mapping::{SourceDecoder, SourceMapper};
 mod source_evidence;
 pub use source_evidence::SourceEvidenceReader;
