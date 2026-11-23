@@ -35,9 +35,16 @@ fn sigma_match_stays_out_of_cited_reports_until_analyst_confirms_the_exact_row()
         store: store.as_ref(),
         parser: &parser,
     };
-    let source_file = "aws.json";
+    let source_file = "aws.jsonl";
     let raw = include_bytes!("../../../../testkit/fixtures/common/cloudtrail-console-login.jsonl");
-    fs::write(root.path().join(source_file), raw).unwrap();
+    let mut success: serde_json::Value = serde_json::from_slice(raw).unwrap();
+    success["responseElements"]["ConsoleLogin"] = "Success".into();
+    success["eventTime"] = "2026-11-01T00:00:01.123456Z".into();
+    success["eventID"] = "synthetic-console-success".into();
+    let mut source = raw.to_vec();
+    serde_json::to_writer(&mut source, &success).unwrap();
+    source.push(b'\n');
+    fs::write(root.path().join(source_file), source).unwrap();
     let cancel = CancellationToken::new();
     large
         .ingest_local(&case.id, root.path(), source_file, false, &cancel)
@@ -156,6 +163,8 @@ fn scan(store: &LocalStore, case: &CaseId, cancel: &CancellationToken) -> V10Row
         artifact_sha256: digest(artifact.sha256().as_str()),
     };
     let artifact = view.artifact(source, artifact_ref).unwrap();
+    let ParquetArtifact::V3(envelope) = &artifact;
+    assert_eq!(envelope.pipeline().rows(), 2);
     let root = store.parquet.owned_case_path(case);
     let mut file = irmind_fs::open_regular_no_follow(&root, Path::new(artifact.path())).unwrap();
     crate::verify_v10_artifact_rows(&mut file, 0, &artifact, &[], cancel).unwrap();
