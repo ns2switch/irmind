@@ -85,7 +85,7 @@ not compatibility promises for the current executable.
 
 ## Public launch
 
-Publish an article, a synthetic-data demo video, community posts, a public HuntEval model benchmark, and an initial community skills catalog.
+Publish an article, a synthetic-data demo video, community posts, and an initial community skills catalog.
 
 The public launch is the next milestone after v0.5.x stabilization. Publish only
 measured validation claims; native signing, analyst validations and the catalog
@@ -97,24 +97,32 @@ Run structured, budgeted CloudTrail queries in Athena, Cloud Audit Logs in
 BigQuery and queries on supported Azure Log Analytics tables in the Analytics
 plan. Sign the result and retain it as derived evidence for local analysis.
 Source-side queries in subagents and remote re-verification of cloud originals
-remain follow-up work, along with additional datasets and providers.
+are planned for v0.8. Additional datasets and providers are follow-up work.
 See the [source query design](source-queries-design.md) and
 [implementation contract](source-queries-format-contract.md).
 
-## v0.7: Detection, reports, extensibility, and engine API
+## v0.7: Mapping identities, detection, and reports
 
-Add local detections, evidence-linked reports, controlled extensions, and a headless engine API.
-
-- Prioritize dependency-scoped native mapping identities so unrelated lockfile
-  updates leave reconstruction identities stable. [Design](native-mapping-build-identity.md).
+- Scope native mapping identities to their production dependencies so unrelated
+  lockfile updates leave reconstruction identities stable.
+  [Design](native-mapping-build-identity.md).
 - Execute Sigma rules over local Parquet without an LLM.
-- Export Markdown and PDF reports that cite only confirmed evidence.
-- Evaluate IRMind as a complete deployment through the HuntEval protocol.
-- Add signed local hooks before or after tool calls, including an explicitly
-  admitted status-bar script. The current status bar remains declarative and
-  executes no external command.
-- Offer an optional MCP client, disabled by default. Each MCP tool declares risk, passes through policy, and returns untrusted content; its design includes a threat model.
-- Approve an engine API design before implementing the planned headless `serve` subcommand for `irmind`. The versioned protocol streams events over stdio, a Unix socket, or a Windows named pipe, with no open TCP listener by default. Keys stay inside IRMind: a client requests approval, the analyst confirms, and IRMind signs.
+- Produce signed Markdown and PDF reports from confirmed findings with citations.
+- Design signed local hooks, the MCP client, and the engine API for v0.8.
+
+## v0.8: Extensibility, engine API, and validation
+
+- Add signed local hooks around tool calls, including a status-bar script the
+  analyst has explicitly admitted.
+- Offer an optional MCP client, disabled by default. Each MCP tool declares
+  risk, passes through policy, and returns untrusted content.
+- Provide a versioned engine protocol for `serve` over stdio, a Unix
+  socket, or a Windows named pipe. A client requests approval, the analyst
+  confirms, and IRMind signs. TCP stays disabled by default.
+- Add source-side queries for subagents and remote re-verification of original
+  cloud objects.
+- Evaluate IRMind as a complete deployment through HuntEval and publish the
+  measured model benchmark.
 
 ## 1.0 criteria
 
