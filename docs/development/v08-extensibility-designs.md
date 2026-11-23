@@ -1,8 +1,8 @@
 # v0.8 extensibility designs
 
-**Status.** Three proposals for review. The v0.7 work does not enable these
-features. Each component needs a concrete contract, tests, and explicit
-approval of new signed bytes, production dependencies or credentials.
+**Status.** Design accepted for v0.8. Each implementation contract requires
+explicit approval, including any new signed bytes, production dependencies
+or credentials.
 
 ## Signed local hooks
 
@@ -51,17 +51,36 @@ binding, phase and outcome with bounded diagnostics. Review the signed
 admission and case receipt formats separately. Use native negative tests for
 permissions, data access, child cleanup and substituted artifacts.
 
+### WebAssembly alternative
+
+Compare a guest runtime such as Wasmtime with the native-interpreter
+helper. A WebAssembly guest would receive only reviewed, bounded host
+imports for request and response bytes. Omit WASI, filesystem, network,
+clock, environment and process imports. Set linear-memory and table limits,
+fuel and a wall-clock deadline. Keep the runtime in a killable helper so
+host defects and stalled imports have an independent containment boundary.
+Require the same immutable artifact hash, audit semantics and negative tests.
+Native interpreters retain existing script compatibility and can reuse a
+smaller launcher, with three OS-specific confinement and validation paths.
+WebAssembly would require guest-language tooling and a new runtime and may add
+substantially to the release size if a compiler backend ships. Compare
+stripped helper size, locked production dependencies, cold launch latency
+and peak RSS on all release targets, including a reduced runtime build.
+This is an option to evaluate in v0.8. [Wasmtime security model](https://docs.wasmtime.dev/security.html) ·
+[Wasmtime execution limits](https://docs.wasmtime.dev/examples-interrupting-wasm.html)
+
 ## Optional MCP client
 
 The proposed first surface is explicitly admitted local stdio servers and a
-bounded tool-call subset of one reviewed MCP revision. IRMind starts the
+bounded tool-call subset of MCP revision `2025-11-25`. IRMind starts the
 server under the same verified isolation class as local hooks. No servers
 or tools are discovered or enabled by default. Design Streamable HTTP
 separately, with approved endpoint allowlists, TLS validation, explicit
 tenant/account bounds, and a dedicated credential and audience contract.
 No automatic discovery, redirection, or credential forwarding is part of
-the initial surface. [MCP protocol lifecycle](https://modelcontextprotocol.io/specification/2026-07-28) ·
-[MCP authorization design](https://blog.modelcontextprotocol.io/posts/2026-07-28/)
+the initial surface. Require that exact version in the initialization
+reply and close the session on a different revision. [Published MCP lifecycle](https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle) ·
+[Published MCP transports](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
 
 Admit the server executable digest and each exact namespaced tool schema,
 argument limits, capabilities, declared risk and pinned description. A
@@ -121,15 +140,25 @@ inventing a view. A disconnected client cannot leave an unbounded operation
 or orphan reservation. The engine remains the only owner of case locks,
 budget settlement, custody state and privileged local paths.
 
-An external client can show the pending operation and request an approval.
-A trusted local analyst interaction obtains confirmation and a signature
-through IRMind. Confirm the exact case, tool, argument hash, scope and
-expiry through that trusted path. The server compares the one-use approval
-with the current action and signs through the keystore. Private keys and
-passphrases remain inside IRMind. Generic messages, client identities, model
-text, and stream subscriptions cannot approve, sign, install or grant
-capabilities. Stdio protocols reserve stdout for framed messages and
-expose only guarded diagnostics on stderr.
+An external client can show a pending operation and ask IRMind to open a
+trusted approval prompt. IRMind presents the exact case, tool, arguments,
+scope, expiry and a request code in an IRMind-owned terminal or native
+prompt. The analyst checks the request code displayed by the separate GUI
+and confirms inside IRMind. Approval unlocks the keystore with the
+passphrase entered directly into IRMind or uses OS authentication through
+IRMind, such as Touch ID on macOS or Windows Hello on Windows. OS
+authentication proves local presence and authorizes the exact one-use
+challenge inside IRMind. It does not give the GUI a key or an approval
+token. The server checks the outstanding action again and signs the exact
+challenge through the keystore. With no trusted prompt the action remains
+pending or expires.
+
+The GUI displays waiting, approved, denied or expired status from the engine.
+A click in the GUI may request a prompt. IPC has no approval or signature
+operation. Private keys, passphrases and OS authentication assertions remain
+inside IRMind. A versioned approval contract must include substituted-action
+and replay tests. Stdio reserves stdout for frames and uses only guarded
+diagnostics on stderr.
 
 Test cross-user denial, counterfeit approvals, replay and races on a case
 lock, mismatched IDs and protocol versions, oversized or truncated frames,
