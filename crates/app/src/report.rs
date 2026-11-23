@@ -2,9 +2,15 @@ use crate::{
     Actor, AppError, AuditEventKind, BTreeMap, CaseId, Deserialize, Engine, Serialize, SignedEntry,
 };
 use irmind_domain::SourceManifestV1;
+mod document;
+pub use document::*;
 mod entity_details;
+mod literal;
+mod pdf;
 mod render;
 pub use entity_details::EntityDetails;
+use literal::render_report_literal;
+use pdf::render_text_pdf;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

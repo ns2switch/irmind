@@ -72,6 +72,11 @@ jobs:
           for target in guard parsers parser_syslog parser_linux parser_ecs parser_ocsf parser_velociraptor parser_hayabusa parser_chainsaw parser_plaso parser_eztools parser_declarative parser_zeek parser_suricata parser_kubernetes parser_falco parser_gcp_audit parser_entra canonical subagents spl; do
             cargo +nightly fuzz run "$target" --target x86_64-unknown-linux-gnu -- -max_total_time=600 -rss_limit_mb=2048 -verbosity=0
           done
+      - name: Fuzz Sigma rule admission with AddressSanitizer
+        run: |
+          mkdir -p fuzz/corpus/sigma_admission
+          cp fuzz/seeds/sigma_admission/* fuzz/corpus/sigma_admission/
+          cargo +nightly fuzz run sigma_admission --target x86_64-unknown-linux-gnu --sanitizer address -- -max_total_time=600 -rss_limit_mb=2048 -max_len=65537 -verbosity=0
       - name: Fuzz exported packages within memory budget
         env:
           CARGO_PROFILE_RELEASE_OPT_LEVEL: 0

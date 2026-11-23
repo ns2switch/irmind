@@ -1,0 +1,45 @@
+name: Report documents
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/report-documents.yml'
+      - '.github/scripts/check_report_pdf.py'
+      - 'crates/app/**'
+      - 'crates/domain/**'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/report-documents.yml'
+      - '.github/scripts/check_report_pdf.py'
+      - 'crates/app/**'
+      - 'crates/domain/**'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  document-bytes:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15-intel, macos-26, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      CARGO_INCREMENTAL: 0
+      IRMIND_REPORT_FIXTURE_DIR: ${{ github.workspace }}/report-fixtures
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: dtolnay/rust-toolchain@766a42937d994bd78bb4591385445c188ccb3f09 # 1.97.1
+      - name: Match the four shared Markdown and PDF digests
+        run: cargo test --locked -p irmind-app --test report_bytes --profile ci
+      - name: Inspect PDF structures and extract text with independent tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y qpdf poppler-utils
+          python3 .github/scripts/check_report_pdf.py report-fixtures

@@ -145,6 +145,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "arraydeque"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d902e3d592a523def97af8f317b08ce16b7ab854c1985a0c671e6f15cebc236"
+
+[[package]]
 name = "arrow-array"
 version = "59.3.2"
 dependencies = [
@@ -3532,6 +3538,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mod-sigma"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "saphyr-parser",
+]
+
+[[package]]
 name = "irmind-mod-storage-object"
 version = "0.1.0"
 dependencies = [
@@ -4815,6 +4829,16 @@ name = "ryu"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
+
+[[package]]
+name = "saphyr-parser"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c98d2738e44a25e6ba2e6d83d91805648df204768abc96f4f1278cb3d5c90bbe"
+dependencies = [
+ "arraydeque",
+ "thiserror 2.0.21",
+]
 
 [[package]]
 name = "schannel"
