@@ -3,8 +3,12 @@ use crate::{
 };
 use irmind_domain::SourceManifestV1;
 mod entity_details;
+mod literal;
+mod pdf;
 mod render;
 pub use entity_details::EntityDetails;
+pub(crate) use literal::safe_markdown;
+pub use pdf::render_text_pdf;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]

@@ -270,23 +270,6 @@ fn put(out: &mut Vec<u8>, value: &[u8]) {
     out.extend_from_slice(value);
 }
 
-pub(crate) fn safe_markdown(value: &str) -> String {
-    let mut safe = String::with_capacity(value.len());
-    for ch in value.chars() {
-        if ch.is_control()
-            || matches!(ch, '\u{200b}'..='\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}' | '\u{feff}')
-        {
-            safe.push(' ');
-        } else if matches!(ch, '\\' | '<' | '>' | '[' | ']' | '*' | '_' | '#' | '`') {
-            safe.push('\\');
-            safe.push(ch);
-        } else {
-            safe.push(ch);
-        }
-    }
-    safe
-}
-
 pub(crate) fn isolate_untrusted(value: &str, nonce: &uuid::Uuid) -> String {
     value
         .replace(&format!("</UNTRUSTED_{nonce}>"), "[ESCAPED_DELIMITER]")
