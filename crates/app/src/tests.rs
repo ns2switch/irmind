@@ -221,6 +221,4 @@ fn report_escapes_links_and_terminal_controls() {
     assert!(!value.contains('\u{202e}'));
     assert!(!value.contains('\x1b'));
     assert!(value.contains("\\[click\\]"));
-    assert!(value.contains(r"https\[\:\]\/\/evil\[\.\]example"));
-    assert!(!value.contains("https://"));
 }

@@ -84,8 +84,7 @@ pub use parser_time_json::{ParserTimeFields, json_time_requirement};
 mod ports;
 pub use fixed_errors::FixedAppError;
 mod report;
-pub use report::render_text_pdf;
-use report::safe_markdown;
+pub use report::{render_report_literal, render_text_pdf};
 mod skills;
 pub use skills::{
     ApprovedSkills, CompiledSkill, SkillCompiler, SkillOrigin, SkillPackageStore,
@@ -120,7 +119,7 @@ pub use large_case::{LargeCaseUseCases, ParserSelection, SourceCheckMode, Source
 mod partition_preparation;
 pub use partition_preparation::PartitionLimits;
 pub use ports::*;
-use ports::{isolate_untrusted, remote_tool_error, run_async};
+use ports::{isolate_untrusted, remote_tool_error, run_async, safe_markdown};
 pub use report::{EntityDetails, Finding, FindingKind};
 
 #[cfg(test)]

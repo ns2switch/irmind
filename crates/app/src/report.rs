@@ -7,7 +7,7 @@ mod literal;
 mod pdf;
 mod render;
 pub use entity_details::EntityDetails;
-pub(crate) use literal::safe_markdown;
+pub use literal::render_report_literal;
 pub use pdf::render_text_pdf;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

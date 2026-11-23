@@ -18,7 +18,7 @@ pub(super) fn needs_visible_escape(ch: char) -> bool {
         )
 }
 
-pub(crate) fn safe_markdown(value: &str) -> String {
+pub fn render_report_literal(value: &str) -> String {
     let mut safe = String::with_capacity(value.len());
     for ch in value.chars() {
         if needs_visible_escape(ch) {
@@ -43,4 +43,16 @@ fn append_char(target: &mut String, ch: char) {
         target.push('\\');
     }
     target.push(ch);
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn markup_and_autolinks_stay_literal() {
+        let literal = super::render_report_literal("[click](https://example.invalid) <b>\u{202e}");
+        assert!(literal.contains(r"\[click\]"));
+        assert!(literal.contains(r"https\[\:\]\/\/example\[\.\]invalid"));
+        assert!(!literal.contains("<b>"));
+        assert!(!literal.contains('\u{202e}'));
+    }
 }

@@ -8,7 +8,7 @@ pub use audit::{
     AppError, CancelledOperation, CaseSeal, GLOBAL_OPERATION_SCOPE, SignedEntry, SignedOperation,
     hex, seal_challenge, sha256, sha256_stream,
 };
-pub(crate) use audit::{isolate_untrusted, remote_tool_error, run_async};
+pub(crate) use audit::{isolate_untrusted, remote_tool_error, run_async, safe_markdown};
 pub use local::{
     AuditLog, CaseExporter, CaseLock, CaseMutation, Clock, ContentGuard, EvidenceGraph,
     EvidenceStore, ExportVerification, ExportVerifier, LargeCaseExporter, LargeCaseStore,
