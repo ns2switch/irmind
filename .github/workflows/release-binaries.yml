@@ -2,7 +2,7 @@ name: Reproducible release binaries
 on:
   workflow_call:
     inputs:
-      compare_windows_mappings:
+      signing_rehearsal:
         type: boolean
         default: false
 
@@ -46,11 +46,26 @@ jobs:
         env:
           DESTINATION: ${{ matrix.destination }}
           RUNNER_LABEL: ${{ matrix.runner }}
-          COMPARE_WINDOWS_MAPPINGS: ${{ inputs.compare_windows_mappings }}
+          COMPARE_WINDOWS_MAPPINGS: ${{ inputs.signing_rehearsal }}
         run: ./.github/scripts/build_release_windows.ps1
       - name: Verify native ARM64 containment and inherited-file decoding
         if: matrix.destination == 'linux-aarch64'
         run: python .github/scripts/check_evtx_linux.py dist/irmind-evtx native-only
+      - name: Measure the released Windows helper with 300 small distinct EVTX sources
+        if: runner.os == 'Windows' && inputs.signing_rehearsal
+        env:
+          CARGO_BUILD_TARGET: x86_64-pc-windows-msvc
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
+          CARGO_INCREMENTAL: 0
+          CARGO_PROFILE_RELEASE_STRIP: symbols
+        run: |
+          cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked --example collection
+          cp dist/irmind-evtx.exe target/x86_64-pc-windows-msvc/release/
+          target/x86_64-pc-windows-msvc/release/examples/collection.exe > evtx-collection.json
+          cat evtx-collection.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: runner.os == 'Windows' && inputs.signing_rehearsal
+        with: {name: evtx-windows-collection, path: evtx-collection.json, if-no-files-found: error}
       - name: Complete the unsigned distribution package
         run: |
           cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 dist/

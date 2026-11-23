@@ -38,6 +38,14 @@ class MacOSReleaseTests(unittest.TestCase):
         self.assertIn('subject-path: |\n            release/*SBOM.spdx.json\n            release/BUILD-ENVIRONMENT.json', release)
         self.assertIn('release/* --clobber', release)
 
+    def test_windows_rehearsal_runs_with_the_verified_release_helper(self):
+        build = BINARIES.read_text()
+        witness = build.split('      - name: Measure the released Windows helper', 1)[1]
+        witness = witness.split('      - uses:', 1)[0]
+        self.assertIn("if: runner.os == 'Windows' && inputs.signing_rehearsal", witness)
+        self.assertIn('cp dist/irmind-evtx.exe target/x86_64-pc-windows-msvc/release/', witness)
+        self.assertIn('target/x86_64-pc-windows-msvc/release/examples/collection.exe', witness)
+
     def test_linker_flags_match_the_release_platform(self):
         self.assertEqual(build_env('linux-x86_64')['RUSTFLAGS'], '-C link-arg=-fuse-ld=mold')
         self.assertEqual(build_env('windows-x86_64')['RUSTFLAGS'], '-C link-arg=/Brepro')
