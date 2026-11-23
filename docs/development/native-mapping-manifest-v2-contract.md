@@ -1,6 +1,7 @@
 # Native mapping build manifest V2
 
-**Status.** Approved encoding and independent synthetic vectors for v0.7.
+**Status.** The maintainer explicitly approved the encoding and independent
+synthetic vectors for v0.7, with release-matrix and verification requirements.
 See the [dependency-closure design](native-mapping-build-identity.md).
 
 The manifest commits to the production inputs that reach one native mapping
@@ -71,6 +72,21 @@ bytes. Target-specific reachable code or features require an explanation
 and a cross-platform output comparison. If the five builds do not produce
 the same normalized mapping output, stop before shipping a universal
 identity.
+
+## Verification and mapping count
+
+`/verify` distinguishes provisional bootstrap identities recorded by
+development builds from V2 release-profile identities. It obtains the
+classification from the authenticated mapping snapshots. This identifies
+the recipe used to reproduce the mapping. It does not certify where the
+binary came from. A matching creating build remains necessary to reconstruct
+data that used a provisional identity.
+
+The five-target release build has 19 native mapping packages. The previous
+build output also counted the declarative parser's extraction support as a
+twentieth manifest. The extractor keeps its own signed definition recipe
+and existing proof handling. The count change removes no mapping or
+declarative extractor.
 
 ## Canonical encoding
 

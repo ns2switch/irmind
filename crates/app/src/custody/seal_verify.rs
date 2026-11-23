@@ -4,6 +4,13 @@ use crate::{
     hex, seal_challenge, sha256, summarize_usage, verify_case_metadata,
 };
 
+pub struct VerifiedCaseNotices {
+    pub count: usize,
+    pub query_limits: Vec<crate::source_queries::SourceQueryLimitNotice>,
+    pub provisional_mappings: usize,
+    pub release_mappings: usize,
+}
+
 impl Engine<'_> {
     pub fn seal(&self, id: &CaseId) -> Result<(), AppError> {
         let preview = self.prepare_seal(id)?;
@@ -134,6 +141,26 @@ impl Engine<'_> {
         let count = self.verify_unlocked_cancelable(id, cancel)?;
         let notices = crate::source_queries::result_limit_notices(&self.audit_log.entries(id)?)?;
         Ok((count, notices))
+    }
+
+    /// Include identity profiles from the verified chain used for the count.
+    pub fn verify_with_mapping_and_query_notices(
+        &self,
+        id: &CaseId,
+        cancel: &CancellationToken,
+    ) -> Result<VerifiedCaseNotices, AppError> {
+        let _case_lock = self.repo.lock_case(id)?;
+        let count = self.verify_unlocked_cancelable(id, cancel)?;
+        let entries = self.audit_log.entries(id)?;
+        let query_limits = crate::source_queries::result_limit_notices(&entries)?;
+        let (provisional_mappings, release_mappings) =
+            crate::source_mapping::native_mapping_build_counts(&entries)?;
+        Ok(VerifiedCaseNotices {
+            count,
+            query_limits,
+            provisional_mappings,
+            release_mappings,
+        })
     }
 
     /// Inspect signed history when an original is missing. This does not mark

@@ -96,8 +96,14 @@ impl CaseWorkflow<'_, '_> {
                 )
                 .and_then(|message| Err(AppError::Policy(message)));
         }
-        let (count, notices) = self.engine.verify_with_query_limits(id, cancel)?;
-        Ok(self.with_query_limit_lines(id, format!("Verified {count} audit entries"), &notices))
+        let notices = self
+            .engine
+            .verify_with_mapping_and_query_notices(id, cancel)?;
+        Ok(self.with_verification_notices(
+            id,
+            format!("Verified {} audit entries", notices.count),
+            notices,
+        ))
     }
 
     fn verify_with_query_notices(
@@ -106,18 +112,34 @@ impl CaseWorkflow<'_, '_> {
         cancel: &CancellationToken,
         message: &str,
     ) -> Result<String, AppError> {
-        let (_, notices) = self.engine.verify_with_query_limits(id, cancel)?;
-        Ok(self.with_query_limit_lines(id, message.into(), &notices))
+        let notices = self
+            .engine
+            .verify_with_mapping_and_query_notices(id, cancel)?;
+        Ok(self.with_verification_notices(id, message.into(), notices))
     }
 
-    fn with_query_limit_lines(
+    fn with_verification_notices(
         &self,
         id: &CaseId,
         mut message: String,
-        notices: &[irmind_app::source_queries::SourceQueryLimitNotice],
+        notices: irmind_app::VerifiedCaseNotices,
     ) -> String {
         use std::fmt::Write as _;
-        for notice in notices {
+        if notices.provisional_mappings != 0 {
+            let _ = write!(
+                message,
+                "\nNative mappings: {} provisional bootstrap identities from development builds. Rebuild with the creating build.",
+                notices.provisional_mappings
+            );
+        }
+        if notices.release_mappings != 0 {
+            let _ = write!(
+                message,
+                "\nNative mappings: {} release-profile identities",
+                notices.release_mappings
+            );
+        }
+        for notice in &notices.query_limits {
             let _ = write!(
                 message,
                 "\n{} — {}",
