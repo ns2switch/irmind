@@ -1,4 +1,4 @@
-use irmind_app::source_mapping::{MappingError, SourceValue};
+use irmind_mapping_contracts::source_mapping::{MappingError, SourceValue};
 pub(super) struct View<'a>(pub(super) &'a SourceValue);
 impl<'a> View<'a> {
     pub(super) fn get(&self, path: &str) -> Option<&'a SourceValue> {

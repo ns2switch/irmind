@@ -3,6 +3,7 @@ use irmind_app::{
     CancellationToken, SourceDecoder,
     source_mapping::{SourceInput, SourceMetadata, SourceReferenceV1},
 };
+use std::sync::Arc;
 fn mapped(bytes: &[u8]) -> Vec<MappingOutput> {
     let source = SourceReferenceV1::file("synthetic.data").unwrap();
     let cancel = CancellationToken::new();

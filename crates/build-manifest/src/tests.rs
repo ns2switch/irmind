@@ -5,6 +5,7 @@ fn fixture(root: &Path, reverse: bool) -> PathBuf {
     fs::write(root.join("Cargo.lock"), "synthetic resolved dependencies").unwrap();
     let mut paths = vec![
         "crates/app",
+        "crates/mapping-contracts",
         "crates/domain",
         "crates/build-manifest",
         "crates/modules/mapping-test",

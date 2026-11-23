@@ -5,6 +5,7 @@ use irmind_app::{
 };
 use irmind_domain::{CommonField, CommonValue, EntityRole, EventOutcome, EventText};
 use irmind_mod_parser_iis_w3c::IisW3cSourceDecoder;
+use std::sync::Arc;
 
 const LOG: &[u8] = include_bytes!("../../../testkit/fixtures/parser-iis-w3c/source/access.log");
 

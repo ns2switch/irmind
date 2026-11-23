@@ -22,7 +22,7 @@ impl MappingCatalog {
                     .get(operation)
                     .is_some_and(|prior| *prior != mapper.manifest())
                 {
-                    return Err(MappingError::InvalidDefinition.into_app());
+                    return Err(AppError::from(MappingError::InvalidDefinition));
                 }
                 required.insert(operation.clone(), mapper.manifest());
             }
@@ -32,16 +32,16 @@ impl MappingCatalog {
             let hash = EvidenceHash::from_bytes(proof.hash);
             let manifest = required
                 .get(&hash)
-                .ok_or_else(|| MappingError::InvalidDefinition.into_app())?;
+                .ok_or_else(|| AppError::from(MappingError::InvalidDefinition))?;
             verify_mapping_installation(manifest, proof, verifier, analyst_key)?;
             if authenticated.insert(hash, proof.clone()).is_some() {
-                return Err(MappingError::InvalidDefinition.into_app());
+                return Err(AppError::from(MappingError::InvalidDefinition));
             }
         }
         if authenticated.len() != required.len() {
-            return Err(MappingError::InvalidDefinition.into_app());
+            return Err(AppError::from(MappingError::InvalidDefinition));
         }
-        Self::freeze_verified(decoders, mappings, authenticated).map_err(MappingError::into_app)
+        Self::freeze_verified(decoders, mappings, authenticated).map_err(AppError::from)
     }
 
     /// Only signatures already authenticated when this immutable catalog was built.

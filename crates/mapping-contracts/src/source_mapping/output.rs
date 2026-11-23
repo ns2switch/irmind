@@ -75,7 +75,10 @@ impl MappingPartition {
     }
 }
 
-pub(super) fn unmapped(source: &SourceRecordV1) -> Result<MappingOutput, MappingError> {
+fn unmapped(
+    source: &SourceRecordV1,
+    diagnostic: MappingDiagnostic,
+) -> Result<MappingOutput, MappingError> {
     let indexed = IndexedGraphRecord {
         record: crate::GraphRecord {
             index: usize::try_from(source.origin().record())
@@ -106,7 +109,7 @@ pub(super) fn unmapped(source: &SourceRecordV1) -> Result<MappingOutput, Mapping
         } else {
             MappingPartition::default()
         },
-        vec![MappingDiagnostic::Unclassified],
+        vec![diagnostic],
     )
 }
 
@@ -121,9 +124,7 @@ impl MappingOutput {
         source: &SourceRecordV1,
         diagnostic: MappingDiagnostic,
     ) -> Result<Self, MappingError> {
-        let mut output = unmapped(source)?;
-        output.diagnostics = vec![diagnostic];
-        Ok(output)
+        unmapped(source, diagnostic)
     }
     pub fn try_new(
         source: &SourceRecordV1,

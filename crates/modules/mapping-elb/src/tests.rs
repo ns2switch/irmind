@@ -1,5 +1,6 @@
 use super::*;
 use irmind_mod_parser_elb::ElbSourceDecoder;
+use std::sync::Arc;
 
 #[test]
 fn source_mapping_contract_for_both_load_balancer_layouts() {

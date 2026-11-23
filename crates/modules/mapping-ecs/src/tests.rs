@@ -6,6 +6,7 @@ use irmind_app::{
 use irmind_domain::{
     CommonField as F, EntityIdentityScope, EntityRole, EventCategory, EventOutcome,
 };
+use std::sync::Arc;
 fn records(bytes: &[u8]) -> Vec<SourceRecordV1> {
     let mut rows = Vec::new();
     let cancel = CancellationToken::new();

@@ -30,11 +30,11 @@ pub(super) struct Definition {
 impl Definition {
     pub(super) fn interpreter(
         &self,
-    ) -> Result<&'static str, irmind_app::source_mapping::MappingError> {
+    ) -> Result<&'static str, irmind_mapping_contracts::source_mapping::MappingError> {
         if self.interpreter == "irmind-mapping-tables-v2" {
             Ok("irmind-mapping-tables-v2")
         } else {
-            Err(irmind_app::source_mapping::MappingError::InvalidDefinition)
+            Err(irmind_mapping_contracts::source_mapping::MappingError::InvalidDefinition)
         }
     }
 }

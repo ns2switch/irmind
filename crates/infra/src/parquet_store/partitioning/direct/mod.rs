@@ -86,9 +86,7 @@ impl ParquetStore {
         let projections = prepared::projections(&catalog, &staged)?;
         let metadata = PreparedMappedGroup {
             sources,
-            snapshots: catalog
-                .snapshots()
-                .map_err(irmind_app::source_mapping::MappingError::into_app)?,
+            snapshots: catalog.snapshots().map_err(AppError::from)?,
             projections,
         };
         Ok(Some(Box::new(prepared::Prepared::new(

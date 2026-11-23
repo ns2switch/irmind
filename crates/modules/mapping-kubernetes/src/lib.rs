@@ -1,12 +1,11 @@
 #![forbid(unsafe_code)]
 //! Finite Kubernetes audit interpretation; source context never grants permissions.
-use irmind_app::{
-    modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
+use irmind_domain::EvidenceHash;
+use irmind_mapping_contracts::{
+    modules::{MappingModule, ModuleManifest, ModulePort},
     source_mapping::{MappingError, MappingManifest, MappingOutput, SourceMapper, SourceRecordV1},
 };
-use irmind_domain::EvidenceHash;
 use irmind_mapping_tables::TableMapping;
-use std::sync::Arc;
 const DEFINITION: &str = include_str!("kubernetes.toml");
 const DIGEST: &str = "832d119ca0d776a13a10ff56c814e98eecd575a5eee5eb25d3d492079d7bd63f";
 pub struct KubernetesMapping {
@@ -59,16 +58,9 @@ static MODULE: ModuleManifest = ModuleManifest {
     tools: &[],
     config: &[],
 };
-impl Module for KubernetesMapping {
-    fn manifest(&self) -> &'static ModuleManifest {
+impl MappingModule for KubernetesMapping {
+    fn module_manifest(&self) -> &'static ModuleManifest {
         self.module
-    }
-    fn register(
-        self: Box<Self>,
-        registry: &mut ModuleRegistry,
-        _: &ModuleConfig,
-    ) -> Result<(), irmind_app::AppError> {
-        registry.add_source_mapper(Arc::new(*self))
     }
 }
 static EKS_MODULE: ModuleManifest = ModuleManifest {

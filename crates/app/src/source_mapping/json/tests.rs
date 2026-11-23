@@ -1,4 +1,5 @@
 use super::*;
+use irmind_domain::SourceValue;
 
 #[test]
 fn original_numbers_strings_and_dotted_keys_survive_without_map_order_features() {

@@ -3,6 +3,7 @@ use irmind_app::{
     CancellationToken, SourceDecoder,
     source_mapping::{SourceInput, SourceMetadata, SourceReferenceV1},
 };
+use std::sync::Arc;
 #[test]
 fn findings_are_unconfirmed_and_unknown_types_survive() {
     let bytes = include_bytes!("../../../testkit/fixtures/parser-guardduty/source/events.ndjson");

@@ -2,11 +2,11 @@
 //! Hidden answers are never accepted as input to this parser.
 
 use super::view::LegacyView;
-use irmind_app::{
+use irmind_domain::UtcTimestamp;
+use irmind_mapping_contracts::{
     GraphRelation,
     source_mapping::{MappingError, SourceValue as Value},
 };
-use irmind_domain::UtcTimestamp;
 use std::net::IpAddr;
 
 pub(super) struct Extracted {

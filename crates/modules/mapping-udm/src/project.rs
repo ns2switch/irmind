@@ -1,15 +1,15 @@
-use irmind_app::{
-    PartitionProfile,
-    source_mapping::{
-        MappingDiagnostic, MappingError, MappingOutput, MappingPartition, SourceRecordV1,
-        SourceValue,
-    },
-};
 use irmind_domain::{
     BoundedObservations, CategorySet, CommonEventV1, CommonField as F, CommonValue,
     EntityIdentityScope, EntityObservation, EntityRole as R, EventCategory as C, EventContextV1,
     EventHeaderV1, EventKind, EventOutcome, EventType as T, EventTypeSet, ObservedEntity,
     ObservedEntityKind as K,
+};
+use irmind_mapping_contracts::{
+    PartitionProfile,
+    source_mapping::{
+        MappingDiagnostic, MappingError, MappingOutput, MappingPartition, SourceRecordV1,
+        SourceValue,
+    },
 };
 struct Binding {
     path: &'static [&'static str],
@@ -213,7 +213,8 @@ fn project(
         }
         let decimal = text.parse::<u64>().map_err(|_| invalid())?.to_string();
         number = SourceValue::Number(
-            irmind_app::source_mapping::SourceNumber::try_new(&decimal).map_err(|_| invalid())?,
+            irmind_mapping_contracts::source_mapping::SourceNumber::try_new(&decimal)
+                .map_err(|_| invalid())?,
         );
         &number
     } else {
@@ -252,7 +253,7 @@ fn project(
 fn projection(
     source: &SourceRecordV1,
     common: &CommonEventV1,
-) -> Result<irmind_app::IndexedGraphRecord, MappingError> {
+) -> Result<irmind_mapping_contracts::IndexedGraphRecord, MappingError> {
     let mut indexed = MappingOutput::unclassified(source, MappingDiagnostic::Unclassified)?
         .into_record()
         .indexed;

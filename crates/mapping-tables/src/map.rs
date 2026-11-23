@@ -1,6 +1,8 @@
 use super::TableMapping;
-use irmind_app::source_mapping::{MappingDiagnostic, MappingError, MappingOutput, SourceRecordV1};
 use irmind_domain::{BoundedObservations, CommonEventV1, EventContextV1};
+use irmind_mapping_contracts::source_mapping::{
+    MappingDiagnostic, MappingError, MappingOutput, SourceRecordV1,
+};
 impl TableMapping {
     pub(super) fn project(&self, source: &SourceRecordV1) -> Result<MappingOutput, MappingError> {
         let rule = self.selected_rule(source)?;
@@ -18,7 +20,7 @@ impl TableMapping {
         let mut indexed = unmapped.into_record().indexed;
         indexed.record.event = common.event().action().unwrap_or_default().into();
         if source.cluster_identity().is_some() {
-            indexed.record.text = irmind_app::encode_common_event(&common)
+            indexed.record.text = irmind_mapping_contracts::encode_common_event(&common)
                 .map_err(|_| MappingError::InvalidOutput)?;
         }
         MappingOutput::try_new(
@@ -96,8 +98,10 @@ impl TableMapping {
                 }
                 continue;
             };
-            if matches!(original, irmind_app::source_mapping::SourceValue::Null)
-                || field.omits(original)
+            if matches!(
+                original,
+                irmind_mapping_contracts::source_mapping::SourceValue::Null
+            ) || field.omits(original)
             {
                 if field.requires_provider_identity {
                     return Err(MappingError::UnsupportedSourceValue);

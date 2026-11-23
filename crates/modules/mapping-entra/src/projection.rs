@@ -1,10 +1,12 @@
 mod fields;
 mod status;
-use irmind_app::source_mapping::{MappingDiagnostic, MappingError, SourceRecordV1, SourceValue};
 use irmind_domain::{
     BoundedObservations, CommonEventV1, CommonField as F, CommonValue, EntityIdentityScope,
     EntityObservation, EntityRole, EventContextV1, EventHeaderV1, EventText, ObservedEntity,
     ObservedEntityKind,
+};
+use irmind_mapping_contracts::source_mapping::{
+    MappingDiagnostic, MappingError, SourceRecordV1, SourceValue,
 };
 use irmind_mapping_tables::TableMapping;
 use std::borrow::Cow;
@@ -119,9 +121,9 @@ fn dynamic(value: &SourceValue) -> Result<Cow<'_, SourceValue>, MappingError> {
         if text.len() > 65536 {
             return Err(bad(()));
         }
-        irmind_app::source_mapping::json::decode_json_value(
+        irmind_mapping_contracts::source_mapping::json::decode_json_value(
             text.as_bytes(),
-            irmind_app::source_mapping::json::SourceJsonLimits {
+            irmind_mapping_contracts::source_mapping::json::SourceJsonLimits {
                 bytes: 65536,
                 nodes: 4096,
                 fields: 1024,

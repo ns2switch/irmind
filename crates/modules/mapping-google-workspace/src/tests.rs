@@ -5,6 +5,7 @@ use irmind_app::{
 };
 use irmind_domain::{EntityRole, EventCategory, EventOutcome, EventType};
 use irmind_mod_parser_google_workspace::GoogleWorkspaceSourceDecoder;
+use std::sync::Arc;
 
 const FIXTURE: &[u8] =
     include_bytes!("../../../testkit/fixtures/parser-google-workspace/source/events.ndjson");

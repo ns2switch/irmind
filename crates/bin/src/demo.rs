@@ -31,7 +31,7 @@ fn demo_storage(root: &Path) -> Result<(Arc<LocalStore>, ParserCatalog), AppErro
     registry.register(
         Box::new(
             irmind_mod_mapping_json_compat::JsonCompatibilityMapping::new()
-                .map_err(irmind_app::source_mapping::MappingError::into_app)?,
+                .map_err(AppError::from)?,
         ),
         &ModuleConfig::new(),
     )?;

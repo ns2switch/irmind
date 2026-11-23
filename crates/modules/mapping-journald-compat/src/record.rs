@@ -1,8 +1,8 @@
-use irmind_app::{
+use irmind_domain::{IndexedInstant, IndexedTime, TimePrecision};
+use irmind_mapping_contracts::{
     GraphRecord,
     source_mapping::{MappingError, SourceRecordV1, SourceValue},
 };
-use irmind_domain::{IndexedInstant, IndexedTime, TimePrecision};
 use serde::Serialize;
 
 /// Historical field order is explicit, independent of `serde_json`'s map features.

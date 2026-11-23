@@ -1,9 +1,9 @@
 use super::{View, bad};
-use irmind_app::source_mapping::{MappingDiagnostic, MappingError, SourceRecordV1};
 use irmind_domain::{
     CommonField as F, CommonFieldType, CommonValue, EntityIdentityScope, EntityObservation,
     EntityRole as R, EventContextV1, EventText, ObservedEntity, ObservedEntityKind as K,
 };
+use irmind_mapping_contracts::source_mapping::{MappingDiagnostic, MappingError, SourceRecordV1};
 type Field = (&'static str, F, Option<(K, R)>);
 const ZEEK: &[Field] = &[
     ("id.orig_h", F::SourceIp, Some((K::Ip, R::Source))),
@@ -183,7 +183,8 @@ fn dns_questions(
     if context.get(F::DnsQuestionName).is_some() {
         return Ok(());
     }
-    let Some(irmind_app::source_mapping::SourceValue::Array(questions)) = view.raw("dns.queries")
+    let Some(irmind_mapping_contracts::source_mapping::SourceValue::Array(questions)) =
+        view.raw("dns.queries")
     else {
         return Ok(());
     };
@@ -197,7 +198,7 @@ fn dns_questions(
     };
     if let Some(name) = question
         .field("rrname")
-        .and_then(irmind_app::source_mapping::SourceValue::as_text)
+        .and_then(irmind_mapping_contracts::source_mapping::SourceValue::as_text)
     {
         insert(
             source,
@@ -210,7 +211,7 @@ fn dns_questions(
     }
     if let Some(kind) = question
         .field("rrtype")
-        .and_then(irmind_app::source_mapping::SourceValue::as_text)
+        .and_then(irmind_mapping_contracts::source_mapping::SourceValue::as_text)
     {
         insert(
             source,

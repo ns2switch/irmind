@@ -1,5 +1,5 @@
 //! Pure URI interpretation of bounded decoded source-byte spans; never follows links.
-use irmind_app::source_mapping::{MappingError, SourceValue};
+use irmind_mapping_contracts::source_mapping::{MappingError, SourceValue};
 fn bad() -> MappingError {
     MappingError::UnsupportedSourceValue
 }

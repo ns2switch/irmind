@@ -7,6 +7,7 @@ use irmind_domain::{
     CommonField as F, EntityRole as R, EventCategory, EventOutcome, ObservedEntityKind as K,
 };
 use serde_json::{Value, json};
+use std::sync::Arc;
 const SIGNIN: &str =
     include_str!("../../../testkit/fixtures/parser-entra/source/signin-resource.ndjson");
 const SIGNIN_TABLE: &str =

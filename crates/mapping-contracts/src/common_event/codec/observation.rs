@@ -1,4 +1,4 @@
-use super::{AppError, invalid};
+use super::{InvalidCommonEvent, invalid};
 use irmind_domain::{
     CommonField, EntityIdentityScope, EntityObservation, EntityRole, EventText, EvidenceHash,
     ObservedEntity, ObservedEntityKind,
@@ -70,7 +70,7 @@ impl From<&EntityIdentityScope> for WireScope {
     }
 }
 impl WireScope {
-    fn checked(self) -> Result<EntityIdentityScope, AppError> {
+    fn checked(self) -> Result<EntityIdentityScope, InvalidCommonEvent> {
         Ok(match self {
             Self::Cluster {
                 provider,
@@ -109,7 +109,7 @@ impl WireScope {
         })
     }
 }
-fn identifier(value: &str) -> Result<EventText, AppError> {
+fn identifier(value: &str) -> Result<EventText, InvalidCommonEvent> {
     EventText::identifier(value).map_err(|_| invalid())
 }
 #[derive(Serialize, Deserialize)]
@@ -141,7 +141,7 @@ impl From<&EntityObservation> for WireObservation {
     }
 }
 impl WireObservation {
-    pub(super) fn checked(self) -> Result<EntityObservation, AppError> {
+    pub(super) fn checked(self) -> Result<EntityObservation, InvalidCommonEvent> {
         EntityObservation::try_new(
             ObservedEntity::try_new(
                 ObservedEntityKind::parse(&self.kind).map_err(|_| invalid())?,
@@ -158,11 +158,13 @@ impl WireObservation {
 
 pub(in crate::common_event) fn encode_scope(
     scope: &EntityIdentityScope,
-) -> Result<String, AppError> {
+) -> Result<String, InvalidCommonEvent> {
     let value = serde_json::to_value(WireScope::from(scope)).map_err(|_| invalid())?;
     serde_json::to_string(&super::ordered(value)).map_err(|_| invalid())
 }
-pub(in crate::common_event) fn decode_scope(input: &str) -> Result<EntityIdentityScope, AppError> {
+pub(in crate::common_event) fn decode_scope(
+    input: &str,
+) -> Result<EntityIdentityScope, InvalidCommonEvent> {
     if input.len() > 4096 {
         return Err(invalid());
     }

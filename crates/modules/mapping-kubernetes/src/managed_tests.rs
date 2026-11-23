@@ -1,4 +1,5 @@
 use super::*;
+use irmind_app::modules::Module;
 use irmind_app::{
     CancellationToken, SourceDecoder,
     source_mapping::{SourceInput, SourceMetadata, SourceReferenceV1},
@@ -7,6 +8,7 @@ use irmind_domain::{
     ClusterContextBasis, ClusterIdentity, ClusterProvider, CommonField, CommonValue, EventOutcome,
     SourceClusterBinding, SourceClusterContext,
 };
+use std::sync::Arc;
 const EKS: &[u8] = include_bytes!("../../../testkit/fixtures/parser-kubernetes/source/eks.json");
 const AKS: &[u8] = include_bytes!("../../../testkit/fixtures/parser-kubernetes/source/aks.json");
 fn context(provider: ClusterProvider) -> SourceClusterContext {

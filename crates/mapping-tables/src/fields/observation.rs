@@ -5,17 +5,17 @@ use super::{
     },
     path,
 };
-use irmind_app::source_mapping::{MappingError, SourcePath, SourceRecordV1};
 use irmind_domain::{
     CommonField, CommonValue, EntityIdentityScope, EntityObservation, EntityRole, EventText,
     EvidenceHash, ObservedEntity, ObservedEntityKind,
 };
+use irmind_mapping_contracts::source_mapping::{MappingError, SourcePath, SourceRecordV1};
 
 pub(crate) struct CompiledObservation {
     kind: ObservedEntityKind,
     role: EntityRole,
     scope: CompiledScope,
-    conditions: Vec<irmind_app::source_mapping::SelectorCondition>,
+    conditions: Vec<irmind_mapping_contracts::source_mapping::SelectorCondition>,
 }
 enum CompiledScope {
     Global,
@@ -132,7 +132,7 @@ impl CompiledObservation {
         let named = |p: &SourcePath| {
             EventText::identifier(
                 p.resolve(source.fields())
-                    .and_then(irmind_app::source_mapping::SourceValue::as_text)
+                    .and_then(irmind_mapping_contracts::source_mapping::SourceValue::as_text)
                     .ok_or_else(bad)?,
             )
             .map_err(|_| bad())

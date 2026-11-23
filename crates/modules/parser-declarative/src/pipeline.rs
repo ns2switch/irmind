@@ -37,7 +37,7 @@ pub(super) fn compile(contents: &str) -> Result<CompiledDefinition, AppError> {
         BTreeMap::new(),
         Vec::new(),
     )
-    .map_err(irmind_app::source_mapping::MappingError::into_app)?;
+    .map_err(AppError::from)?;
     let manifest = MappingManifest::try_new(
         identity,
         vec![selector],
@@ -46,7 +46,7 @@ pub(super) fn compile(contents: &str) -> Result<CompiledDefinition, AppError> {
         },
         true,
     )
-    .map_err(irmind_app::source_mapping::MappingError::into_app)?;
+    .map_err(AppError::from)?;
     let decoder: Arc<dyn SourceDecoder> = Arc::new(Decoder(Arc::clone(&parser)));
     let mapper: Arc<dyn SourceMapper> = Arc::new(Extraction {
         parser: Arc::clone(&parser),

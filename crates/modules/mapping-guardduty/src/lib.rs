@@ -1,20 +1,19 @@
 #![forbid(unsafe_code)]
 //! Included tables classify every `GuardDuty` record as an unconfirmed source alert.
 //! Native glue converts the exact numeric severity lexeme and validates IP variants.
-use irmind_app::{
-    modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
-    source_mapping::{
-        MappingDiagnostic, MappingError, MappingIdentityV1, MappingManifest, MappingOutput,
-        MappingProvenance, SourceMapper, SourceRecordV1, SourceValue,
-    },
-};
 use irmind_domain::{
     BoundedObservations, COMMON_EVENT_V1, CommonEventV1, CommonField as F, CommonValue,
     EntityIdentityScope, EntityObservation, EntityRole, EventText, EvidenceHash, ObservedEntity,
     ObservedEntityKind,
 };
+use irmind_mapping_contracts::{
+    modules::{MappingModule, ModuleManifest, ModulePort},
+    source_mapping::{
+        MappingDiagnostic, MappingError, MappingIdentityV1, MappingManifest, MappingOutput,
+        MappingProvenance, SourceMapper, SourceRecordV1, SourceValue,
+    },
+};
 use irmind_mapping_tables::TableMapping;
-use std::sync::Arc;
 const BUILD: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/native-mapping-manifest.bin"));
 static MODULE: ModuleManifest = ModuleManifest {
     id: "mapping-guardduty",
@@ -42,7 +41,7 @@ impl GuardDutyMapping {
         });
         let [wire, sdk] = tables;
         let tables = [wire?, sdk?];
-        let hash = EvidenceHash::from_bytes(irmind_app::sha256(BUILD));
+        let hash = EvidenceHash::from_bytes(irmind_mapping_contracts::sha256(BUILD));
         let identity = MappingIdentityV1::try_new(
             MODULE.id,
             &format!("guardduty-v1-{}", hash.as_str()),
@@ -65,16 +64,9 @@ impl GuardDutyMapping {
         Ok(Self { manifest, tables })
     }
 }
-impl Module for GuardDutyMapping {
-    fn manifest(&self) -> &'static ModuleManifest {
+impl MappingModule for GuardDutyMapping {
+    fn module_manifest(&self) -> &'static ModuleManifest {
         &MODULE
-    }
-    fn register(
-        self: Box<Self>,
-        registry: &mut ModuleRegistry,
-        _: &ModuleConfig,
-    ) -> Result<(), irmind_app::AppError> {
-        registry.add_source_mapper(Arc::new(*self))
     }
 }
 impl SourceMapper for GuardDutyMapping {

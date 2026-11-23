@@ -1,5 +1,5 @@
 use super::definition::{Conversion, Definition, Scope};
-use irmind_app::source_mapping::MappingError;
+use irmind_mapping_contracts::source_mapping::MappingError;
 
 pub(super) fn validate_definition(definition: &Definition) -> Result<(), MappingError> {
     for field in definition

@@ -5,6 +5,7 @@ use irmind_app::{
 };
 use irmind_domain::{CommonField, EntityRole, EventCategory, EventOutcome, SourceReferenceV1};
 use serde_json::{Value, json};
+use std::sync::Arc;
 const FIXTURE: &[u8] =
     include_bytes!("../../../testkit/fixtures/common/cloudtrail-console-login.jsonl");
 fn decode(value: &Value) -> SourceRecordV1 {

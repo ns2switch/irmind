@@ -188,7 +188,10 @@ impl MappingCatalog {
         source: &SourceRecordV1,
     ) -> Result<(Option<MappingIdentityV1>, MappingOutput), MappingError> {
         let Some(mapper) = self.select(source)? else {
-            return Ok((None, super::output::unmapped(source)?));
+            return Ok((
+                None,
+                MappingOutput::unclassified(source, super::MappingDiagnostic::Unclassified)?,
+            ));
         };
         let output = match mapper.map(source) {
             Ok(output) => output,
