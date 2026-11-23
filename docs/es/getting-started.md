@@ -10,7 +10,7 @@ Esta guía es para analistas que evalúan IRMind con datos sintéticos. Explica 
 
 Empieza por la [guía de plataformas](platforms.md): descarga el instalador, verifica su lista de checksums firmada y la identidad del editor y ejecuta el script guardado. Hay binarios para Linux x86_64/aarch64, macOS Apple Silicon y Windows x86_64. La firma y notarización nativas de Apple y Authenticode en Windows siguen pendientes; sí hay firmas Sigstore y attestations.
 
-Después ejecuta `irmind demo` antes de configurar un modelo. Compilar es opcional para contribuir: `cargo build --release --locked -p irmind` con Rust 1.95.0. Conserva el ejecutable que creó cada caso.
+Después ejecuta `irmind demo` antes de configurar un modelo. Compilar es opcional para contribuir: `cargo build --release --locked -p irmind` con Rust 1.97.1. Conserva el ejecutable que creó cada caso.
 
 ## Pruébalo en cinco minutos
 

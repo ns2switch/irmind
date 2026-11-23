@@ -8,7 +8,7 @@ This guide is for analysts evaluating IRMind with synthetic data. It takes you f
 
 Start with the [platform guide](platforms.md#verify-a-release-before-installing): download the installer, verify its signed checksum list and publisher identity, then run the saved script. Linux x86_64/aarch64, macOS Apple Silicon and Windows x86_64 binaries are available. Native Apple signing/notarization and Windows Authenticode remain pending; Sigstore signatures and provenance are available.
 
-After installation, run `irmind demo` before configuring a model. Building from source is optional for contributors: `cargo build --release --locked -p irmind` with Rust 1.95.0. Keep the executable that created each case.
+After installation, run `irmind demo` before configuring a model. Building from source is optional for contributors: `cargo build --release --locked -p irmind` with Rust 1.97.1. Keep the executable that created each case.
 
 ## Try it in five minutes
 
