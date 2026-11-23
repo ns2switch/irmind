@@ -11,12 +11,13 @@ use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{Read, Write};
 
-pub(super) const MAGIC_V9: &[u8] = b"IRMIND-EXPORT-V9\0";
+pub(super) const EXPORT_VERSION: u32 = 10;
+pub(super) const MAGIC_V10: &[u8] = b"IRMIND-EXPORT-V10\0";
 pub(super) const MAX_FRAME_BYTES: u64 = 1024 * 1024;
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct HeaderV9 {
+pub(super) struct HeaderV10 {
     pub version: u32,
     pub case_id: String,
     pub title: String,
@@ -31,7 +32,7 @@ struct ExportRequest<'a> {
     source_root: Option<&'a Path>,
     include_originals: bool,
     cancel: &'a CancellationToken,
-    header: HeaderV9,
+    header: HeaderV10,
     entry_count: u64,
     evidence: Vec<String>,
     source_count: u64,
@@ -70,8 +71,8 @@ impl LocalStore {
             return Err(AppError::Sealed);
         }
         let seal = self.case_seal(id)?.ok_or(AppError::InvalidChain(0))?;
-        let header = HeaderV9 {
-            version: 9,
+        let header = HeaderV10 {
+            version: EXPORT_VERSION,
             case_id: id.as_str().into(),
             title: case.title,
             severity: case.severity.as_str().into(),
@@ -153,8 +154,7 @@ impl LocalStore {
         let mut out = options.open(path).map_err(storage)?;
         *created = true;
         private_file(path).map_err(storage)?;
-        out.write_all(MAGIC_V9).map_err(storage)?;
-        write_frame(&mut out, &serde_json::to_vec(&header).map_err(storage)?)?;
+        write_header(&mut out, header)?;
         out.write_all(&entry_count.to_be_bytes()).map_err(storage)?;
         let written = self.for_each_audit_entry(id, |entry| {
             if cancel.is_cancelled() {
@@ -206,6 +206,7 @@ impl LocalStore {
             cancel,
         )?;
         write_stored_query_capture_section(&mut out, queries.captures(), self, id, cancel)?;
+        super::extensions::write_empty(&mut out)?;
         out.sync_all().map_err(storage)?;
         Ok(header.seal.analyst_key_fingerprint.clone())
     }
@@ -283,6 +284,11 @@ pub(super) fn copy_verified(
     Ok(())
 }
 
+pub(super) fn write_header(out: &mut File, header: &HeaderV10) -> Result<(), AppError> {
+    out.write_all(MAGIC_V10).map_err(storage)?;
+    write_frame(out, &serde_json::to_vec(header).map_err(storage)?)
+}
+
 pub(super) fn write_frame(out: &mut File, bytes: &[u8]) -> Result<(), AppError> {
     if bytes.len() as u64 > MAX_FRAME_BYTES {
         return Err(storage_reason("export metadata frame exceeds limit"));
@@ -292,7 +298,7 @@ pub(super) fn write_frame(out: &mut File, bytes: &[u8]) -> Result<(), AppError> 
     out.write_all(bytes).map_err(storage)
 }
 
-pub(super) fn v9_result(
+pub(super) fn v10_result(
     fingerprint: String,
     entries: usize,
     source_manifests: usize,
@@ -301,7 +307,7 @@ pub(super) fn v9_result(
     ExportVerification {
         analyst_key_fingerprint: fingerprint,
         entries,
-        format_version: 9,
+        format_version: EXPORT_VERSION,
         source_manifests,
         source_bytes_verified,
         source_bytes_unavailable: source_manifests.saturating_sub(source_bytes_verified),

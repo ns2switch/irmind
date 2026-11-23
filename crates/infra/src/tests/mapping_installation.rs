@@ -154,7 +154,7 @@ fn installation_proofs_bind_analyst_content_scope_and_active_authorization() {
     assert!(!format!("{approved:?}{manifest:?}").contains("failed"));
 }
 #[test]
-fn installed_mapping_round_trips_v9_without_keyring_and_rebuilds_exact_version() {
+fn installed_mapping_round_trips_v10_without_keyring_and_rebuilds_exact_version() {
     let h = Harness::new();
     let engine = h.engine(h.store.clone());
     let definition = TableMapping::review(DEFINITION).unwrap();

@@ -143,7 +143,7 @@ pub(super) fn acquire_and_export<D: SourceQueryPageDecoder + 'static>(
     let verified =
         irmind_app::verify_export_details(&LocalExportVerifier, &export, Some(&expected_key))
             .unwrap();
-    assert_eq!(verified.format_version, 9);
+    assert_eq!(verified.format_version, 10);
     assert_eq!(verified.source_bytes_verified, 1);
     let bytes = fs::read(export).unwrap();
     assert_exported_citation(
@@ -267,7 +267,7 @@ fn assert_exported_citation(
     citation_field: &'static str,
     cancel: &CancellationToken,
 ) {
-    let mut export = Cursor::new(bytes.strip_prefix(b"IRMIND-EXPORT-V9\0").unwrap());
+    let mut export = Cursor::new(bytes.strip_prefix(b"IRMIND-EXPORT-V10\0").unwrap());
     frame(&mut export);
     let count = length(&mut export);
     let mut entries =
@@ -300,12 +300,14 @@ fn assert_exported_citation(
     assert_eq!(finding.evidence_hash, hash);
     assert_eq!(source, receipt.capture_path());
     assert_eq!(index, 1);
-    // This fixture exports one capture smaller than one V9 chunk. The package
-    // verifier already authenticated section framing; select its final chunk.
+    // This fixture exports one capture smaller than one export chunk. The package
+    // verifier already authenticated section framing; select the capture chunk before the empty extension sections.
     assert!((1..=512 * 1024).contains(&size));
-    let start = bytes.len() - usize::try_from(size).unwrap();
+    let (package, extension_counts) = bytes.split_at(bytes.len() - 16);
+    assert_eq!(extension_counts, [0; 16]);
+    let start = package.len() - usize::try_from(size).unwrap();
     assert_eq!(bytes[start - 8..start], size.to_be_bytes());
-    let capture = &bytes[start..];
+    let capture = &package[start..];
     let digest = irmind_app::sha256(capture);
     assert_eq!(irmind_app::hex(&digest), hash);
     let mut rows = Vec::new();

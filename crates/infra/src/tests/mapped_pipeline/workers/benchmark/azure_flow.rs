@@ -271,7 +271,7 @@ fn verify_compact_custody(
     let details =
         irmind_app::verify_export_details(&crate::LocalExportVerifier, &export, Some(&key))
             .unwrap();
-    assert_eq!(details.format_version, 9);
+    assert_eq!(details.format_version, 10);
 }
 
 struct LegacyAzure;

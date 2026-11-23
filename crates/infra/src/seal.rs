@@ -9,6 +9,7 @@ mod artifact_frames;
 mod catalog_proofs;
 mod export;
 mod export_current;
+mod extensions;
 mod frames;
 mod local;
 mod mapping_proofs;

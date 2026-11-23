@@ -1,4 +1,4 @@
-//! The mandatory V9 tail. Capture trust comes from the caller's authenticated
+//! The mandatory query-capture section of the export. Capture trust comes from the caller's authenticated
 //! principal-chain result inventory.
 use super::{QUERY_CASE_MAX_BYTES, SourceQueryError, SourceQueryResultV1, verify_query_capture};
 use crate::{AppError, CancellationToken};
@@ -106,6 +106,23 @@ pub fn verify_query_capture_section(
     expected: &[&SourceQueryResultV1],
     cancel: &CancellationToken,
 ) -> Result<(), AppError> {
+    read_query_capture_section(&mut input, expected, cancel)?;
+    if input
+        .read(&mut [0])
+        .map_err(|_| AppError::InvalidChain(0))?
+        != 0
+    {
+        return Err(AppError::Storage("export has trailing bytes".into()));
+    }
+    Ok(())
+}
+
+/// Verify the capture section and leave subsequent export sections unread.
+pub fn read_query_capture_section(
+    mut input: impl Read,
+    expected: &[&SourceQueryResultV1],
+    cancel: &CancellationToken,
+) -> Result<(), AppError> {
     let invalid = || AppError::InvalidChain(0);
     let count = read_length(&mut input).map_err(|_| invalid())?;
     if count != expected.len() as u64 {
@@ -146,9 +163,6 @@ pub fn verify_query_capture_section(
         )
         .map_err(|error| capture_error(&error))?;
         receipt.verify_capture(&capture)?;
-    }
-    if input.read(&mut [0]).map_err(|_| invalid())? != 0 {
-        return Err(AppError::Storage("export has trailing bytes".into()));
     }
     Ok(())
 }

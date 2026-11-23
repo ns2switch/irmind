@@ -193,7 +193,7 @@ impl LlmPort for MixedEpisode {
 }
 
 #[test]
-fn subagents_mixed_windows_aws_kubernetes_episode_reads_real_sources_confirms_and_verifies_v9() {
+fn subagents_mixed_windows_aws_kubernetes_episode_reads_real_sources_confirms_and_verifies_v10() {
     let root = tempfile::tempdir().unwrap();
     let store = Arc::new(crate::current_sources::open(&root.path().join("data")));
     let (_, engine) =
@@ -269,7 +269,7 @@ fn subagents_mixed_windows_aws_kubernetes_episode_reads_real_sources_confirms_an
     let verified =
         irmind_app::verify_export_details(&irmind_infra::LocalExportVerifier, &output, Some(&key))
             .unwrap();
-    assert_eq!(verified.format_version, 9);
+    assert_eq!(verified.format_version, 10);
 }
 
 fn ingest_sources(

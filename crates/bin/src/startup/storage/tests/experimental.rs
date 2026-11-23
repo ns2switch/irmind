@@ -72,7 +72,7 @@ fn registry() -> ModuleRegistry {
 }
 
 #[test]
-fn default_source_ingestion_is_mapped_and_exports_v9() {
+fn default_source_ingestion_is_mapped_and_exports_v10() {
     let root = tempfile::tempdir().unwrap();
     let (_, engine) = setup(root.path(), false);
     let registry = registry();

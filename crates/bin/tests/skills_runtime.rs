@@ -210,7 +210,7 @@ fn seal_export(
     let details = irmind_infra::LocalExportVerifier
         .verify_export_details(&export, Some(&key))
         .unwrap();
-    assert_eq!(details.format_version, 9);
+    assert_eq!(details.format_version, 10);
     let result = std::process::Command::new(env!("CARGO_BIN_EXE_irmind"))
         .arg("--home")
         .arg(root.join("independent-verifier"))
@@ -230,12 +230,12 @@ fn seal_export(
     assert!(
         std::fs::read(&export)
             .unwrap()
-            .starts_with(b"IRMIND-EXPORT-V9\0")
+            .starts_with(b"IRMIND-EXPORT-V10\0")
     );
     if std::env::var_os("IRMIND_REFRESH_SKILL_EXPORT_SEEDS").is_some() {
         let seed = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../fuzz/seeds/export")
-            .join(format!("valid-v9-skill-{name}.irmind"));
+            .join(format!("valid-v10-skill-{name}.irmind"));
         std::fs::copy(&export, seed).unwrap();
     }
 }

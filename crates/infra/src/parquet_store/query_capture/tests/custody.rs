@@ -317,7 +317,8 @@ fn check_v9_export(
         assert_eq!(verified.analyst_key_fingerprint, fingerprint);
         assert_eq!(verified.source_query_limits, notices);
         let mut changed = fs::read(&export).unwrap();
-        *changed.last_mut().unwrap() ^= 1;
+        let capture_body_end = changed.len() - 16;
+        changed[capture_body_end - 1] ^= 1;
         fs::write(&export, changed).unwrap();
         assert!(crate::verify_export_expected(&export, Some(&fingerprint)).is_err());
     }
