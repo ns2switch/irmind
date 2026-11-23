@@ -7,20 +7,19 @@ mod hunteval;
 mod partition;
 mod relations;
 mod view;
-use irmind_app::{
+use irmind_domain::{COMMON_EVENT_V1, EvidenceHash};
+use irmind_mapping_contracts::{
     GraphRecord, IndexedGraphRecord, SourceMapper,
-    modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
+    modules::{MappingModule, ModuleManifest, ModulePort},
     source_mapping::{
         MappingDiagnostic, MappingError, MappingIdentityV1, MappingManifest, MappingOutput,
         MappingProvenance, SourceRecordV1, SourceSelector, SourceValue,
         json::{SourceJsonLimits, decode_json_fields, render_source_fields},
     },
 };
-use irmind_domain::{COMMON_EVENT_V1, EvidenceHash};
 use std::{
     borrow::Cow,
     collections::{BTreeMap, BTreeSet},
-    sync::Arc,
 };
 use view::LegacyView;
 
@@ -32,9 +31,11 @@ impl JsonCompatibilityMapping {
     /// Disjoint release catalog route when the explicit `CloudTrail` module is compiled.
     /// The broad constructor remains available for pinned compatibility benchmarks.
     pub fn generic_only() -> Result<Self, MappingError> {
-        use irmind_app::source_mapping::{SelectorCondition, SelectorPredicate, SourcePath};
+        use irmind_mapping_contracts::source_mapping::{
+            SelectorCondition, SelectorPredicate, SourcePath,
+        };
         let mut mapper = Self::new()?;
-        let digest = EvidenceHash::from_bytes(irmind_app::sha256(BUILD));
+        let digest = EvidenceHash::from_bytes(irmind_mapping_contracts::sha256(BUILD));
         let selector = SourceSelector::try_new(
             "parser-json",
             BTreeSet::from(["json-source-v1".into()]),
@@ -63,7 +64,7 @@ impl JsonCompatibilityMapping {
         Ok(mapper)
     }
     pub fn new() -> Result<Self, MappingError> {
-        let digest = EvidenceHash::from_bytes(irmind_app::sha256(BUILD));
+        let digest = EvidenceHash::from_bytes(irmind_mapping_contracts::sha256(BUILD));
         let version = format!("json-compat-v1-{}", digest.as_str());
         let identity =
             MappingIdentityV1::try_new("mapping-json-compat", &version, COMMON_EVENT_V1, digest)
@@ -155,16 +156,9 @@ static MODULE: ModuleManifest = ModuleManifest {
     tools: &[],
     config: &[],
 };
-impl Module for JsonCompatibilityMapping {
-    fn manifest(&self) -> &'static ModuleManifest {
+impl MappingModule for JsonCompatibilityMapping {
+    fn module_manifest(&self) -> &'static ModuleManifest {
         &MODULE
-    }
-    fn register(
-        self: Box<Self>,
-        registry: &mut ModuleRegistry,
-        _: &ModuleConfig,
-    ) -> Result<(), irmind_app::AppError> {
-        registry.add_source_mapper(Arc::new(*self))
     }
 }
 

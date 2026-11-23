@@ -3,6 +3,7 @@ use irmind_app::{
     CancellationToken, SourceDecoder,
     source_mapping::{SourceInput, SourceMetadata, SourceReferenceV1},
 };
+use std::sync::Arc;
 fn records(decoder: &dyn SourceDecoder, mut bytes: &[u8]) -> Vec<SourceRecordV1> {
     let source = SourceReferenceV1::file("events.ndjson").unwrap();
     let cancel = CancellationToken::new();

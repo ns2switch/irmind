@@ -1,4 +1,10 @@
-use crate::*;
+use crate::{
+    Actor, AppError, Arc, AuditEventKind, AuditLog, AuditOrigin, BTreeMap, CaseId, CaseScope,
+    Clock, CloudAuditPort, ContentGuard, Deserialize, EdrPort, EvidenceGraph, EvidenceStore,
+    ExecutionMode, InternalIntelPort, LargeCaseStore, ModelPricing, ObjectSource, PolicyRules,
+    Repository, Screened, Serialize, Severity, SiemPort, SignedEntry, Signer, StreamingEventParser,
+    ThreatIntelPort, Tool, Verifier, tool_catalog,
+};
 
 mod audit;
 mod budgets;
@@ -501,7 +507,7 @@ mod format_tests {
             first.payload = retired.into();
             assert!(matches!(
                 verify_case_metadata("Synthetic", Severity::Medium, "local", &[first.clone()]),
-                Err(AppError::Fixed(FixedAppError::RetiredCaseFormat))
+                Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat))
             ));
         }
     }

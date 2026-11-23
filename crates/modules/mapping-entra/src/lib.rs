@@ -1,16 +1,15 @@
 #![forbid(unsafe_code)]
 //! Included Entra tables plus bounded dynamic-field and status representation glue.
 mod projection;
-use irmind_app::{
-    modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
+use irmind_domain::{COMMON_EVENT_V1, EvidenceHash};
+use irmind_mapping_contracts::{
+    modules::{MappingModule, ModuleManifest, ModulePort},
     source_mapping::{
         MappingError, MappingIdentityV1, MappingManifest, MappingOutput, MappingProvenance,
         SourceMapper, SourceRecordV1,
     },
 };
-use irmind_domain::{COMMON_EVENT_V1, EvidenceHash};
 use irmind_mapping_tables::TableMapping;
-use std::sync::Arc;
 const BUILD: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/native-mapping-manifest.bin"));
 pub struct EntraMapping {
     manifest: MappingManifest,
@@ -57,7 +56,7 @@ impl EntraMapping {
         build.extend_from_slice(decoder.id().as_bytes());
         build.push(0);
         build.extend_from_slice(decoder.version().as_bytes());
-        let digest = EvidenceHash::from_bytes(irmind_app::sha256(&build));
+        let digest = EvidenceHash::from_bytes(irmind_mapping_contracts::sha256(&build));
         mapper.manifest = MappingManifest::try_new(
             MappingIdentityV1::try_new(
                 &id,
@@ -75,7 +74,7 @@ impl EntraMapping {
 
     fn new(definition: &'static Definition) -> Result<Self, MappingError> {
         let base = compile(definition.base)?;
-        let digest = EvidenceHash::from_bytes(irmind_app::sha256(BUILD));
+        let digest = EvidenceHash::from_bytes(irmind_mapping_contracts::sha256(BUILD));
         let identity = MappingIdentityV1::try_new(
             definition.module.id,
             &format!("entra-v1-{}", digest.as_str()),
@@ -122,16 +121,9 @@ impl SourceMapper for EntraMapping {
         )
     }
 }
-impl Module for EntraMapping {
-    fn manifest(&self) -> &'static ModuleManifest {
+impl MappingModule for EntraMapping {
+    fn module_manifest(&self) -> &'static ModuleManifest {
         self.module
-    }
-    fn register(
-        self: Box<Self>,
-        registry: &mut ModuleRegistry,
-        _: &ModuleConfig,
-    ) -> Result<(), irmind_app::AppError> {
-        registry.add_source_mapper(Arc::new(*self))
     }
 }
 fn compile(contents: &str) -> Result<TableMapping, MappingError> {

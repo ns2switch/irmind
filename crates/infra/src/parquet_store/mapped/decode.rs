@@ -34,7 +34,7 @@ impl ParquetStore {
         let catalog = catalog.for_decoder(id);
         let decoder = catalog
             .decoder(id.name, id.version)
-            .map_err(irmind_app::source_mapping::MappingError::into_app)?;
+            .map_err(AppError::from)?;
         let mut tuple_disk =
             crate::parquet_store::partitioning::temporary::DiskLease::new(self.profile.clone());
         let mut tuples = self.create_private_object_spool(
@@ -208,9 +208,7 @@ pub(in crate::parquet_store) fn projection_routes(
     catalog: &MappingCatalog,
 ) -> Result<std::collections::BTreeMap<Option<irmind_domain::MappingIdentityV1>, String>, AppError>
 {
-    let snapshots = catalog
-        .snapshots()
-        .map_err(irmind_app::source_mapping::MappingError::into_app)?;
+    let snapshots = catalog.snapshots().map_err(AppError::from)?;
     let references = snapshots
         .iter()
         .map(irmind_domain::MappingSnapshotV1::reference)

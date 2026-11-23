@@ -22,7 +22,7 @@ impl ParquetStore {
         let catalog = self.mapping_catalog.as_ref().ok_or_else(invalid_source)?;
         Ok(catalog
             .decoder(id.name, id.version)
-            .map_err(irmind_app::source_mapping::MappingError::into_app)?
+            .map_err(AppError::from)?
             .source_parallelism())
     }
 }

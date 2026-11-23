@@ -34,12 +34,10 @@ impl ParquetStore {
                 decoder.version()
             )));
         }
-        let catalog = active
-            .frozen_for_profile(profile)
-            .map_err(irmind_app::source_mapping::MappingError::into_app)?;
+        let catalog = active.frozen_for_profile(profile).map_err(AppError::from)?;
         let selection = catalog
             .decoder_selection(first.0.decoder().id(), first.0.decoder().version())
-            .map_err(irmind_app::source_mapping::MappingError::into_app)?;
+            .map_err(AppError::from)?;
         let mut selection: Arc<dyn LogParser> = Arc::new(selection);
         if let Some(context) = first.0.time_context() {
             selection = selection

@@ -1,8 +1,8 @@
-use irmind_app::source_mapping::{MappingError, SourceRecordV1};
 use irmind_domain::{
     BoundedObservations, CommonField as F, CommonValue, EntityIdentityScope as S,
     EntityObservation, EntityRole as R, EventContextV1, ObservedEntity, ObservedEntityKind as K,
 };
+use irmind_mapping_contracts::source_mapping::{MappingError, SourceRecordV1};
 // At most 32 occurrence descriptors. Unlisted supported context remains available.
 const OBSERVATIONS: &[(F, K, R)] = &[
     (F::SourceIp, K::Ip, R::Source),
@@ -131,7 +131,7 @@ fn user_scope(
     }
     let name = format!(
         "ocsf-user-v1:sha256={}",
-        irmind_app::hex(&irmind_app::sha256(&material))
+        irmind_mapping_contracts::hex(&irmind_mapping_contracts::sha256(&material))
     );
     Ok(S::Account(
         irmind_domain::EventText::identifier(&name).map_err(|_| invalid())?,

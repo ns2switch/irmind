@@ -1,7 +1,7 @@
 mod observation;
 pub(super) mod time;
 use super::{invalid, values};
-use crate::AppError;
+use crate::InvalidCommonEvent;
 use irmind_domain::{
     BoundedObservations, COMMON_EVENT_MAX_BYTES, COMMON_EVENT_V1, CategorySet, CommonEventV1,
     CommonField, EventCategory, EventContextV1, EventHeaderV1, EventKind, EventOrigin,
@@ -67,7 +67,7 @@ fn ordered(value: Value) -> Value {
     }
 }
 
-pub fn encode_common_event(event: &CommonEventV1) -> Result<String, AppError> {
+pub fn encode_common_event(event: &CommonEventV1) -> Result<String, InvalidCommonEvent> {
     let origin = event.origin();
     let header = event.event();
     let wire = WireCommon {
@@ -116,7 +116,7 @@ pub fn encode_common_event(event: &CommonEventV1) -> Result<String, AppError> {
 }
 
 /// Reject duplicate/unknown fields, unsupported codes, invalid values and noncanonical input.
-pub fn decode_common_event(input: &str) -> Result<CommonEventV1, AppError> {
+pub fn decode_common_event(input: &str) -> Result<CommonEventV1, InvalidCommonEvent> {
     if input.len() > COMMON_EVENT_MAX_BYTES {
         return Err(invalid());
     }
@@ -163,7 +163,7 @@ pub fn decode_common_event(input: &str) -> Result<CommonEventV1, AppError> {
     Ok(event)
 }
 
-fn checked_header(wire: WireHeader) -> Result<EventHeaderV1, AppError> {
+fn checked_header(wire: WireHeader) -> Result<EventHeaderV1, InvalidCommonEvent> {
     if wire.category.len() > EventCategory::ALL.len()
         || wire.event_type.len() > EventType::ALL.len()
     {

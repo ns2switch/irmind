@@ -2377,6 +2377,7 @@ dependencies = [
  "futures-util",
  "hex",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "secrecy",
  "serde",
  "serde_json",
@@ -2513,11 +2514,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mapping-contracts"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "irmind-domain",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "irmind-mapping-tables"
 version = "0.1.0"
 dependencies = [
  "irmind-app",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mod-parser-json",
  "irmind-testkit",
  "serde",
@@ -2668,6 +2681,7 @@ dependencies = [
  "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-azure-flow",
  "irmind-mod-parser-gcp-flow",
@@ -2681,6 +2695,7 @@ version = "0.1.0"
 dependencies = [
  "irmind-app",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-mapping-json-compat",
  "irmind-mod-parser-json",
@@ -2695,6 +2710,7 @@ dependencies = [
  "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-defender",
  "irmind-testkit",
@@ -2707,6 +2723,7 @@ dependencies = [
  "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mod-parser-chainsaw",
  "irmind-mod-parser-eztools",
  "irmind-mod-parser-hayabusa",
@@ -2722,6 +2739,7 @@ dependencies = [
  "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-ecs",
  "irmind-testkit",
@@ -2731,7 +2749,7 @@ dependencies = [
 name = "irmind-mod-mapping-elb"
 version = "0.1.0"
 dependencies = [
- "irmind-app",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-elb",
  "irmind-testkit",
@@ -2744,6 +2762,7 @@ dependencies = [
  "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-email",
  "irmind-testkit",
@@ -2756,6 +2775,7 @@ dependencies = [
  "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-entra",
  "irmind-testkit",
@@ -2768,6 +2788,7 @@ version = "0.1.0"
 dependencies = [
  "irmind-app",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-evtx",
  "irmind-testkit",
@@ -2781,6 +2802,7 @@ version = "0.1.0"
 dependencies = [
  "irmind-app",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-falco",
  "irmind-testkit",
@@ -2794,6 +2816,7 @@ dependencies = [
  "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-fdr",
  "irmind-testkit",
@@ -2806,6 +2829,7 @@ dependencies = [
  "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-gcp-audit",
  "irmind-testkit",
@@ -2818,6 +2842,7 @@ version = "0.1.0"
 dependencies = [
  "irmind-app",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-github-audit",
  "irmind-testkit",
@@ -2830,6 +2855,7 @@ dependencies = [
  "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-google-workspace",
  "irmind-testkit",
@@ -2842,6 +2868,7 @@ dependencies = [
  "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-guardduty",
  "irmind-testkit",
@@ -2854,6 +2881,7 @@ dependencies = [
  "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-m365",
  "irmind-mod-parser-okta",
@@ -2866,6 +2894,7 @@ version = "0.1.0"
 dependencies = [
  "irmind-app",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-iis-w3c",
  "irmind-testkit",
@@ -2878,6 +2907,7 @@ dependencies = [
  "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mod-parser-linux",
  "irmind-testkit",
  "serde",
@@ -2891,6 +2921,7 @@ dependencies = [
  "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mod-parser-json",
  "irmind-testkit",
  "serde_json",
@@ -2902,6 +2933,7 @@ version = "0.1.0"
 dependencies = [
  "irmind-app",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-kubernetes",
  "irmind-testkit",
@@ -2915,6 +2947,7 @@ dependencies = [
  "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-linux",
  "irmind-testkit",
@@ -2927,6 +2960,7 @@ dependencies = [
  "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-macos",
  "irmind-testkit",
@@ -2939,6 +2973,7 @@ dependencies = [
  "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-suricata",
  "irmind-mod-parser-zeek",
@@ -2952,6 +2987,7 @@ dependencies = [
  "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-ocsf",
  "irmind-testkit",
@@ -2963,6 +2999,7 @@ version = "0.1.0"
 dependencies = [
  "irmind-app",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-route53",
  "irmind-testkit",
@@ -2974,6 +3011,7 @@ version = "0.1.0"
 dependencies = [
  "irmind-app",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-s3-access",
  "irmind-testkit",
@@ -2986,6 +3024,7 @@ dependencies = [
  "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mod-parser-syslog",
  "irmind-testkit",
 ]
@@ -2997,6 +3036,7 @@ dependencies = [
  "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-siem-chronicle",
  "irmind-testkit",
@@ -3008,6 +3048,7 @@ version = "0.1.0"
 dependencies = [
  "irmind-app",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
  "irmind-mod-parser-windows-dns",
 ]

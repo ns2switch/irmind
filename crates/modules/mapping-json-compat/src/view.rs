@@ -1,4 +1,4 @@
-use irmind_app::source_mapping::SourceValue;
+use irmind_mapping_contracts::source_mapping::SourceValue;
 
 pub(super) trait LegacyView {
     fn get(&self, key: &str) -> Option<&SourceValue>;

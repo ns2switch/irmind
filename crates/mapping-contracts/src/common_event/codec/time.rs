@@ -1,4 +1,4 @@
-use super::{AppError, invalid};
+use super::{InvalidCommonEvent, invalid};
 use irmind_domain::{IndexedInstant, IndexedTime, TimePrecision};
 use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
@@ -20,7 +20,7 @@ impl From<IndexedTime> for WireTime {
     }
 }
 impl WireTime {
-    pub(in crate::common_event) fn checked(self) -> Result<IndexedTime, AppError> {
+    pub(in crate::common_event) fn checked(self) -> Result<IndexedTime, InvalidCommonEvent> {
         IndexedTime::new(
             IndexedInstant::new(self.unix_micros, self.submicro_nanos).map_err(|_| invalid())?,
             TimePrecision::from_code(self.precision).map_err(|_| invalid())?,

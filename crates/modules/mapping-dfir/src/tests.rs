@@ -4,6 +4,7 @@ use irmind_app::{
     source_mapping::{SourceInput, SourceMetadata, SourceReferenceV1},
 };
 use irmind_domain::EventOutcome;
+use std::sync::Arc;
 struct Fixture {
     parser: &'static str,
     name: &'static str,

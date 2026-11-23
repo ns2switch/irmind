@@ -7,6 +7,7 @@ use irmind_domain::{
     CommonField as F, EntityIdentityScope, EntityRole, EventCategory, EventOutcome,
     SourceReferenceV1,
 };
+use std::sync::Arc;
 const SAMPLE: &[u8] = br#"{"events":[{"udm":{"metadata":{"eventTimestamp":"2026-10-23T00:00:00.123456789Z","eventType":"NETWORK_CONNECTION","productEventType":"OriginalNetworkAction"},"principal":{"user":{"userid":"alice"},"ip":["203.0.113.77"],"process":{"pid":"42"}},"target":{"user":{"userid":"bob"},"ip":["203.0.113.77"]}}},{"udm":{"metadata":{"eventTimestamp":"2026-10-23T00:00:01.123456789Z","eventType":"PROCESS_LAUNCH"},"principal":{"process":{"pid":"42"}}}}]}"#;
 fn records(bytes: &[u8]) -> Vec<SourceRecordV1> {
     let reference = SourceReferenceV1::file("synthetic-udm.json").unwrap();

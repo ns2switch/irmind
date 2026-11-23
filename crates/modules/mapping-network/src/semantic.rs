@@ -4,10 +4,10 @@ use super::{
     headers::Headers,
     projection::{View, zeek_kind},
 };
-use irmind_app::source_mapping::{MappingDiagnostic, MappingError, SourceRecordV1};
 use irmind_domain::{
     BoundedObservations, CommonEventV1, CommonField as F, CommonValue, EventContextV1, EventText,
 };
+use irmind_mapping_contracts::source_mapping::{MappingDiagnostic, MappingError, SourceRecordV1};
 
 pub(super) fn project(
     parser: &str,

@@ -1,16 +1,15 @@
 #![forbid(unsafe_code)]
 //! Bundled finite FDR classification. Native glue retains unsupported optional
 //! values with a visible coverage diagnostic and the validated partition host.
-use irmind_app::{
-    modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
+use irmind_domain::{COMMON_EVENT_V1, EvidenceHash};
+use irmind_mapping_contracts::{
+    modules::{MappingModule, ModuleManifest, ModulePort},
     source_mapping::{
         MappingDiagnostic, MappingError, MappingIdentityV1, MappingManifest, MappingOutput,
         MappingProvenance, SourceMapper, SourceRecordV1,
     },
 };
-use irmind_domain::{COMMON_EVENT_V1, EvidenceHash};
 use irmind_mapping_tables::TableMapping;
-use std::sync::Arc;
 const BUILD: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/native-mapping-manifest.bin"));
 static MODULE: ModuleManifest = ModuleManifest {
     id: "mapping-fdr",
@@ -33,7 +32,7 @@ impl FdrMapping {
                 TableMapping::bundled(text, reviewed.identity().implementation())
             })
             .collect::<Result<Vec<_>, MappingError>>()?;
-        let hash = EvidenceHash::from_bytes(irmind_app::sha256(BUILD));
+        let hash = EvidenceHash::from_bytes(irmind_mapping_contracts::sha256(BUILD));
         let identity = MappingIdentityV1::try_new(
             MODULE.id,
             &format!("fdr-v1-{}", hash.as_str()),
@@ -56,16 +55,9 @@ impl FdrMapping {
         Ok(Self { manifest, tables })
     }
 }
-impl Module for FdrMapping {
-    fn manifest(&self) -> &'static ModuleManifest {
+impl MappingModule for FdrMapping {
+    fn module_manifest(&self) -> &'static ModuleManifest {
         &MODULE
-    }
-    fn register(
-        self: Box<Self>,
-        registry: &mut ModuleRegistry,
-        _: &ModuleConfig,
-    ) -> Result<(), irmind_app::AppError> {
-        registry.add_source_mapper(Arc::new(*self))
     }
 }
 impl SourceMapper for FdrMapping {
@@ -93,14 +85,15 @@ impl SourceMapper for FdrMapping {
                 let host = source
                     .fields()
                     .field("aid")
-                    .and_then(irmind_app::source_mapping::SourceValue::as_text)
+                    .and_then(irmind_mapping_contracts::source_mapping::SourceValue::as_text)
                     .ok_or(MappingError::UnsupportedSourceValue)?;
-                let partition = irmind_app::source_mapping::MappingPartition::try_new(
-                    irmind_app::PartitionProfile::EndpointHost,
-                    "",
-                    "",
-                    host,
-                )?;
+                let partition =
+                    irmind_mapping_contracts::source_mapping::MappingPartition::try_new(
+                        irmind_mapping_contracts::PartitionProfile::EndpointHost,
+                        "",
+                        "",
+                        host,
+                    )?;
                 let mut record = output.into_record();
                 if let Ok(header) = table.event_header(source) {
                     record.common = irmind_domain::CommonEventV1::try_new(

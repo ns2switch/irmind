@@ -63,9 +63,7 @@ fn read(
             row.inspect(|record| {
                 output = Some(pipeline.extraction_mapper().map(record));
             });
-            let mapped = output
-                .unwrap()
-                .map_err(irmind_app::source_mapping::MappingError::into_app)?;
+            let mapped = output.unwrap().map_err(AppError::from)?;
             emit(Tainted::from_external(
                 mapped.record().indexed.record.clone(),
                 row.provenance().clone(),

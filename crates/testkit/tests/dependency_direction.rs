@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 fn layer(name: &str) -> Result<u8, String> {
     match name {
         "irmind-domain" => Ok(0),
-        "irmind-app" => Ok(1),
+        "irmind-mapping-contracts" | "irmind-app" => Ok(1),
         "irmind-tui" => Ok(2),
         "irmind" => Ok(3),
         name if name.starts_with("irmind-") => Ok(2),
@@ -20,7 +20,21 @@ fn check_edge(from: &str, to: &str) -> Result<(), String> {
             "pure build/calendar utility must not depend on runtime crates: {from} -> {to}"
         ));
     }
-    if from == "irmind-mapping-tables" && !matches!(to, "irmind-domain" | "irmind-app") {
+    if from == "irmind-mapping-contracts" && to != "irmind-domain" {
+        return Err(format!(
+            "mapping contracts depend on an application crate: {from} -> {to}"
+        ));
+    }
+    let can_map = from.starts_with("irmind-mod-mapping-") || from == "irmind-mapping-tables";
+    if can_map
+        && !matches!(
+            to,
+            "irmind-domain"
+                | "irmind-mapping-contracts"
+                | "irmind-build-manifest"
+                | "irmind-mapping-tables"
+        )
+    {
         return Err(format!(
             "pure table interpreter depends on a runtime adapter: {from} -> {to}"
         ));
@@ -89,5 +103,8 @@ fn deliberate_reverse_edge_is_rejected() {
     assert!(check_edge("irmind-calendar", "irmind-domain").is_err());
     assert!(check_edge("irmind-mod-mapping-linux", "irmind-mapping-tables").is_ok());
     assert!(check_edge("irmind-mapping-tables", "irmind-mod-parser-linux").is_err());
+    assert!(check_edge("irmind-mod-mapping-linux", "irmind-app").is_err());
+    assert!(check_edge("irmind-mapping-contracts", "irmind-app").is_err());
+    assert!(check_edge("irmind-mapping-contracts", "irmind-domain").is_ok());
     assert!(check_edge("irmind-mod-siem-splunk", "irmind-http").is_ok());
 }

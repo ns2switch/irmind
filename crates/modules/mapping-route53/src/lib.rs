@@ -1,11 +1,10 @@
 #![forbid(unsafe_code)]
 //! Finite Route 53 DNS field and outcome rules. Native answers stay in evidence.
-use irmind_app::{
-    modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
+use irmind_mapping_contracts::{
+    modules::{MappingModule, ModuleManifest, ModulePort},
     source_mapping::{MappingError, MappingManifest, MappingOutput, SourceMapper, SourceRecordV1},
 };
 use irmind_mapping_tables::TableMapping;
-use std::sync::Arc;
 
 pub struct Route53Mapping(TableMapping);
 
@@ -17,8 +16,8 @@ impl Route53Mapping {
     }
 }
 
-impl Module for Route53Mapping {
-    fn manifest(&self) -> &'static ModuleManifest {
+impl MappingModule for Route53Mapping {
+    fn module_manifest(&self) -> &'static ModuleManifest {
         static MODULE: ModuleManifest = ModuleManifest {
             id: "mapping-route53",
             version: "0.1.0",
@@ -27,14 +26,6 @@ impl Module for Route53Mapping {
             config: &[],
         };
         &MODULE
-    }
-
-    fn register(
-        self: Box<Self>,
-        registry: &mut ModuleRegistry,
-        _: &ModuleConfig,
-    ) -> Result<(), irmind_app::AppError> {
-        registry.add_source_mapper(Arc::new(*self))
     }
 }
 

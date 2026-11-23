@@ -1,8 +1,10 @@
-use irmind_app::source_mapping::{MappingError, MappingOutput, SourceRecordV1, SourceValue};
 use irmind_domain::{
     BoundedObservations, CommonEventV1, CommonField, CommonValue, EntityIdentityScope,
     EntityObservation, EntityRole, EventHeaderV1, EventText, EventType, EventTypeSet,
     ObservedEntity, ObservedEntityKind,
+};
+use irmind_mapping_contracts::source_mapping::{
+    MappingError, MappingOutput, SourceRecordV1, SourceValue,
 };
 
 type ParameterField = (&'static str, CommonField, Option<ObservedEntityKind>);

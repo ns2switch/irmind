@@ -5,6 +5,7 @@ use irmind_app::{
 };
 use irmind_domain::{EntityRole, EventCategory, EventOutcome};
 use irmind_mod_parser_macos::MacosSourceDecoder;
+use std::sync::Arc;
 
 const ENDPOINT: &[u8] =
     include_bytes!("../../../testkit/fixtures/parser-macos/source/endpoint.ndjson");

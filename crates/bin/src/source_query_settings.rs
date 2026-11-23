@@ -242,7 +242,7 @@ impl ConfiguredQuerySource {
                     decoder.file_format(),
                     &identity,
                 )
-                .map_err(irmind_app::source_mapping::MappingError::into_app)?,
+                .map_err(AppError::from)?,
             ),
         })
     }
@@ -281,7 +281,7 @@ impl ConfiguredQuerySource {
                     decoder: Arc::new(irmind_mod_query_athena::AthenaCaptureDecoder),
                     mapper: Box::new(
                         irmind_mod_mapping_cloudtrail::CloudTrailMapping::for_capture()
-                            .map_err(irmind_app::source_mapping::MappingError::into_app)?,
+                            .map_err(AppError::from)?,
                     ),
                 })
             }
@@ -300,7 +300,7 @@ impl ConfiguredQuerySource {
                     decoder: Arc::new(irmind_mod_query_bigquery::BigQueryCaptureDecoder),
                     mapper: Box::new(
                         irmind_mod_mapping_gcp_audit::CloudAuditMapping::for_capture()
-                            .map_err(irmind_app::source_mapping::MappingError::into_app)?,
+                            .map_err(AppError::from)?,
                     ),
                 })
             }

@@ -4,6 +4,7 @@ use irmind_app::{
     source_mapping::{SourceInput, SourceMetadata, SourceReferenceV1},
 };
 use irmind_domain::{EventOutcome, IndexedTime};
+use std::sync::Arc;
 const MODERN:&[u8]=b"<34>1 2026-11-01T00:00:00.123456789Z synthetic-host app 42 ID47 - synthetic message\n<34>1 2026-11-01T00:00:01Z synthetic-host app 43 ID48 - second synthetic message\n";
 fn sources(bytes: &[u8]) -> (irmind_app::ParseReport, Vec<SourceRecordV1>) {
     let source = SourceReferenceV1::file("synthetic.log").unwrap();

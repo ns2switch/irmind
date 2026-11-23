@@ -1,4 +1,4 @@
-use super::{MappingError, MappingManifest, MappingOutput, SourceRecordV1, SourceReferenceV1};
+use super::{SourceRecordV1, SourceReferenceV1};
 use crate::{AppError, CancellationToken, ParseReport, ParserIdentity, ParserTimeContext};
 use irmind_domain::Tainted;
 use std::{fs::File, io::Read};
@@ -136,10 +136,4 @@ pub trait SourceDecoder: Send + Sync {
             emit,
         )
     }
-}
-
-/// A bounded pure function. Modules receive no I/O, secret, clock or tool ports.
-pub trait SourceMapper: Send + Sync {
-    fn manifest(&self) -> &MappingManifest;
-    fn map(&self, source: &SourceRecordV1) -> Result<MappingOutput, MappingError>;
 }

@@ -69,7 +69,7 @@ pub(super) fn experimental_parsers(
         catalog.with_source_parser(std::sync::Arc::new(
             mappings
                 .decoder_selection("parser-evtx", irmind_mod_parser_evtx::SOURCE_VERSION)
-                .map_err(irmind_app::source_mapping::MappingError::into_app)?
+                .map_err(AppError::from)?
                 .with_detector(irmind_mod_parser_evtx::detect_source),
         ))?
     } else {
@@ -80,7 +80,7 @@ pub(super) fn experimental_parsers(
         if id.starts_with("parser-declarative-") && mappings.supports_decoder(&id, &version) {
             let selector = mappings
                 .decoder_selection(&id, &version)
-                .map_err(irmind_app::source_mapping::MappingError::into_app)?
+                .map_err(AppError::from)?
                 .with_selector(catalog.get(&id)?)?;
             catalog = catalog.with_source_parser(std::sync::Arc::new(selector))?;
         }

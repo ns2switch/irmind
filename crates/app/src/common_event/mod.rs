@@ -1,8 +1,5 @@
 //! Strict adapters for the domain's typed common projection.
-mod codec;
-mod values;
-use crate::{AppError, FixedAppError, IndexedGraphRecord};
-pub use codec::{decode_common_event, encode_common_event};
+use crate::{AppError, FixedAppError};
 use irmind_domain::EvidenceHash;
 pub use irmind_domain::{
     BoundedObservations, CategorySet, CommonEventFilter, CommonEventV1, CommonField,
@@ -11,19 +8,13 @@ pub use irmind_domain::{
     EventOrigin, EventOutcome, EventSchemaError, EventText, EventTextList, EventType, EventTypeSet,
     HashAlgorithm, NetworkDirection, ObservedEntity, ObservedEntityKind,
 };
+pub use irmind_mapping_contracts::CommonGraphRecord;
 
-#[derive(Clone, Eq, PartialEq)]
-pub struct CommonGraphRecord {
-    pub indexed: IndexedGraphRecord,
-    pub common: CommonEventV1,
+pub fn encode_common_event(event: &CommonEventV1) -> Result<String, AppError> {
+    irmind_mapping_contracts::encode_common_event(event).map_err(|_| invalid())
 }
-
-impl std::fmt::Debug for CommonGraphRecord {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CommonGraphRecord")
-            .field("origin", self.common.origin())
-            .finish_non_exhaustive()
-    }
+pub fn decode_common_event(input: &str) -> Result<CommonEventV1, AppError> {
+    irmind_mapping_contracts::common_event::decode_common_event(input).map_err(|_| invalid())
 }
 
 pub(crate) fn invalid() -> AppError {
@@ -87,10 +78,10 @@ pub fn check_common_record<'a>(
 mod tests;
 
 pub fn encode_identity_scope(scope: &EntityIdentityScope) -> Result<String, AppError> {
-    codec::encode_scope(scope)
+    irmind_mapping_contracts::common_event::encode_identity_scope(scope).map_err(|_| invalid())
 }
 pub fn decode_identity_scope(input: &str) -> Result<EntityIdentityScope, AppError> {
-    codec::decode_scope(input)
+    irmind_mapping_contracts::common_event::decode_identity_scope(input).map_err(|_| invalid())
 }
 
 #[cfg(test)]

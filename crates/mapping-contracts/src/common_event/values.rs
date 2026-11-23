@@ -1,5 +1,5 @@
 use super::invalid;
-use crate::AppError;
+use crate::InvalidCommonEvent;
 use irmind_domain::{
     CommonField, CommonFieldType, CommonValue, ContentHash, DnsAnswer, DnsAnswers, EventText,
     EventTextList, HashAlgorithm, NetworkDirection,
@@ -26,14 +26,14 @@ pub(super) fn encode(value: &CommonValue) -> Value {
         ),
     }
 }
-fn text(value: &Value) -> Result<&str, AppError> {
+fn text(value: &Value) -> Result<&str, InvalidCommonEvent> {
     value.as_str().ok_or_else(invalid)
 }
-fn event_text(value: &Value) -> Result<EventText, AppError> {
+fn event_text(value: &Value) -> Result<EventText, InvalidCommonEvent> {
     EventText::new(text(value)?).map_err(|_| invalid())
 }
 
-pub(super) fn decode(field: CommonField, value: &Value) -> Result<CommonValue, AppError> {
+pub(super) fn decode(field: CommonField, value: &Value) -> Result<CommonValue, InvalidCommonEvent> {
     let value = match field.value_type() {
         CommonFieldType::Boolean => CommonValue::Boolean(value.as_bool().ok_or_else(invalid)?),
         CommonFieldType::Text | CommonFieldType::LongText => CommonValue::Text(event_text(value)?),

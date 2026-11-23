@@ -1,4 +1,7 @@
-use crate::*;
+use crate::{
+    Actor, AuditEventKind, CaseId, Deserialize, Digest, Error, FixedAppError,
+    ParserTimeRequirement, ParserTimeSuggestion, Serialize, Sha256,
+};
 #[derive(Debug, Error)]
 pub enum AppError {
     #[error(transparent)]
@@ -290,17 +293,7 @@ pub(crate) fn isolate_untrusted(value: &str, nonce: &uuid::Uuid) -> String {
         .replace(&format!("<UNTRUSTED_{nonce}>"), "[ESCAPED_DELIMITER]")
 }
 
-pub fn sha256(bytes: &[u8]) -> [u8; 32] {
-    Sha256::digest(bytes).into()
-}
-
-pub fn hex(bytes: &[u8]) -> String {
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        let _ = write!(&mut out, "{byte:02x}");
-    }
-    out
-}
+pub use irmind_mapping_contracts::{hex, sha256};
 
 pub fn sha256_stream(visit: &mut irmind_domain::ByteStream<'_>) -> [u8; 32] {
     let mut state = Sha256::new();

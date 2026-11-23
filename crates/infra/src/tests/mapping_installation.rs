@@ -85,7 +85,7 @@ fn mapping_changes_preflight_overlap_versions_and_do_not_partially_append() {
         .change_mapping_definition(&base, &manifest, false)
         .unwrap();
     assert!(!disabled.active());
-    assert!(TableMapping::installed(&disabled).is_err());
+    assert!(disabled.installed_manifest().is_err());
     let enabled = engine
         .change_mapping_definition(&base, &manifest, true)
         .unwrap();
@@ -127,7 +127,9 @@ fn installation_proofs_bind_analyst_content_scope_and_active_authorization() {
                 .is_err()
         );
     }
-    let mapper: Arc<dyn SourceMapper> = Arc::new(TableMapping::installed(&approved).unwrap());
+    let mapper: Arc<dyn SourceMapper> = Arc::new(
+        TableMapping::compile_installed_manifest(&approved.installed_manifest().unwrap()).unwrap(),
+    );
     assert!(
         MappingCatalog::freeze(vec![Arc::new(JsonSourceDecoder)], vec![mapper.clone()]).is_err()
     );
@@ -159,7 +161,9 @@ fn installed_mapping_round_trips_v9_without_keyring_and_rebuilds_exact_version()
     let approved = engine
         .change_mapping_definition(&Harness::base(), &definition, true)
         .unwrap();
-    let mapper = Arc::new(TableMapping::installed(&approved).unwrap());
+    let mapper = Arc::new(
+        TableMapping::compile_installed_manifest(&approved.installed_manifest().unwrap()).unwrap(),
+    );
     let catalog = Arc::new(
         MappingCatalog::freeze_authenticated(
             vec![Arc::new(JsonSourceDecoder)],

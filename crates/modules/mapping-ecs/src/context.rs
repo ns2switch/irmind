@@ -1,9 +1,9 @@
 use super::view::View;
-use irmind_app::source_mapping::{MappingError, SourceValue};
 use irmind_domain::{
     CommonField, CommonFieldType, CommonValue, DnsAnswer, DnsAnswers, EventContextV1, EventText,
     IndexedTime,
 };
+use irmind_mapping_contracts::source_mapping::{MappingError, SourceValue};
 pub(super) fn project(view: &View<'_>) -> Result<EventContextV1, MappingError> {
     let mut context = EventContextV1::default();
     for field in CommonField::all().filter(|field| !field.as_str().starts_with("irmind.")) {

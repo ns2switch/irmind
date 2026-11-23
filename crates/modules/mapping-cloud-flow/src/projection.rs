@@ -1,7 +1,7 @@
 //! Original provider metadata supplies partitions. Missing identities stay missing.
 use super::{MappingError, MappingPartition, SourceKind, SourceRecordV1, SourceValue, bad};
-use irmind_app::PartitionProfile;
 use irmind_domain::{CommonField as F, CommonValue, EventContextV1, EventText};
+use irmind_mapping_contracts::PartitionProfile;
 fn text(value: Option<&SourceValue>) -> &str {
     value
         .and_then(SourceValue::as_text)

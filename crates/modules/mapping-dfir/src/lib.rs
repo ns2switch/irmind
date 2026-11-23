@@ -1,19 +1,16 @@
 #![forbid(unsafe_code)]
 //! Extraction modules retain DFIR search aliases without assigning classifications or roles.
 mod projection;
-use irmind_app::{
+use irmind_domain::{COMMON_EVENT_V1, EvidenceHash};
+use irmind_mapping_contracts::{
     IndexedGraphRecord, PartitionProfile, SourceMapper,
-    modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
+    modules::{MappingModule, ModuleManifest, ModulePort},
     source_mapping::{
         MappingDiagnostic, MappingError, MappingIdentityV1, MappingManifest, MappingOutput,
         MappingPartition, MappingProvenance, SourceRecordV1, SourceSelector,
     },
 };
-use irmind_domain::{COMMON_EVENT_V1, EvidenceHash};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    sync::Arc,
-};
+use std::collections::{BTreeMap, BTreeSet};
 const BUILD: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/native-mapping-manifest.bin"));
 pub struct DfirExtractionMapping {
     manifest: MappingManifest,
@@ -37,7 +34,7 @@ impl DfirExtractionMapping {
         let short = parser
             .strip_prefix("parser-")
             .ok_or(MappingError::InvalidManifest)?;
-        let digest = EvidenceHash::from_bytes(irmind_app::sha256(BUILD));
+        let digest = EvidenceHash::from_bytes(irmind_mapping_contracts::sha256(BUILD));
         let identity = MappingIdentityV1::try_new(
             &format!("mapping-{short}-extraction"),
             &format!("extraction-v1-{}", digest.as_str()),
@@ -107,16 +104,9 @@ static MODULES: [ModuleManifest; 5] = [
     module("mapping-plaso-extraction"),
     module("mapping-eztools-extraction"),
 ];
-impl Module for DfirExtractionMapping {
-    fn manifest(&self) -> &'static ModuleManifest {
+impl MappingModule for DfirExtractionMapping {
+    fn module_manifest(&self) -> &'static ModuleManifest {
         self.module
-    }
-    fn register(
-        self: Box<Self>,
-        registry: &mut ModuleRegistry,
-        _: &ModuleConfig,
-    ) -> Result<(), irmind_app::AppError> {
-        registry.add_source_mapper(Arc::new(*self))
     }
 }
 #[cfg(test)]

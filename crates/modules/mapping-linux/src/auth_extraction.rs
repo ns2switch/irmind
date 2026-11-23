@@ -1,9 +1,9 @@
 //! Search-only extraction for account-management and cron messages, never classification.
 use super::{
-    Arc, EvidenceHash, MappingError, MappingManifest, MappingOutput, Module, ModuleConfig,
-    ModuleManifest, ModulePort, ModuleRegistry, SourceMapper, SourceRecordV1,
+    EvidenceHash, MappingError, MappingManifest, MappingModule, MappingOutput, ModuleManifest,
+    ModulePort, SourceMapper, SourceRecordV1,
 };
-use irmind_app::{
+use irmind_mapping_contracts::{
     GraphRecord, IndexedGraphRecord, PartitionProfile,
     source_mapping::{
         MappingDiagnostic, MappingIdentityV1, MappingPartition, MappingProvenance,
@@ -17,7 +17,7 @@ pub struct AuthExtractionMapping {
 }
 impl AuthExtractionMapping {
     pub fn new() -> Result<Self, MappingError> {
-        let digest = EvidenceHash::from_bytes(irmind_app::sha256(BUILD));
+        let digest = EvidenceHash::from_bytes(irmind_mapping_contracts::sha256(BUILD));
         let identity = MappingIdentityV1::try_new(
             "mapping-linux-auth-extraction",
             &format!("extraction-v1-{}", digest.as_str()),
@@ -90,7 +90,7 @@ impl SourceMapper for AuthExtractionMapping {
             index: usize::try_from(source.origin().record()).map_err(|_| invalid())?,
             at: source
                 .timestamp()
-                .map(irmind_app::IndexedTime::to_rfc3339)
+                .map(irmind_mapping_contracts::IndexedTime::to_rfc3339)
                 .unwrap_or_default(),
             event: event.into(),
             text: render_source_fields(&projection).map_err(|_| invalid())?,
@@ -156,16 +156,9 @@ static MODULE: ModuleManifest = ModuleManifest {
     tools: &[],
     config: &[],
 };
-impl Module for AuthExtractionMapping {
-    fn manifest(&self) -> &'static ModuleManifest {
+impl MappingModule for AuthExtractionMapping {
+    fn module_manifest(&self) -> &'static ModuleManifest {
         &MODULE
-    }
-    fn register(
-        self: Box<Self>,
-        registry: &mut ModuleRegistry,
-        _: &ModuleConfig,
-    ) -> Result<(), irmind_app::AppError> {
-        registry.add_source_mapper(Arc::new(*self))
     }
 }
 #[cfg(test)]

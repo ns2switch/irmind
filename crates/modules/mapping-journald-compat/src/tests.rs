@@ -3,6 +3,7 @@ use irmind_app::{
     CancellationToken, SourceDecoder,
     source_mapping::{SourceInput, SourceMetadata},
 };
+use std::sync::Arc;
 #[test]
 fn extracted_identity_and_projection_match_the_frozen_journald_baseline() {
     for epoch in ["1794096000000000", "1794096000123000", "1794096000123456"] {

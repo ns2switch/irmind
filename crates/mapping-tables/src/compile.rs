@@ -3,14 +3,14 @@ use super::{
     definition::{Condition, Definition, Predicate},
     fields, invalid,
 };
-use irmind_app::source_mapping::{
-    ApprovedMappingDefinition, MappingError, MappingIdentityV1, MappingManifest, MappingProvenance,
-    SelectorCondition, SelectorPredicate, SelectorScalar, SourceDiscriminator, SourceNumber,
-    SourcePath, SourceSelector,
-};
 use irmind_domain::{
     CategorySet, EventCategory, EventHeaderV1, EventKind, EventOutcome, EventType, EventTypeSet,
     EvidenceHash, SOURCE_RECORD_V1,
+};
+use irmind_mapping_contracts::source_mapping::{
+    MappingError, MappingIdentityV1, MappingManifest, MappingProvenance, SelectorCondition,
+    SelectorPredicate, SelectorScalar, SourceDiscriminator, SourceNumber, SourcePath,
+    SourceSelector,
 };
 use std::collections::{BTreeMap, BTreeSet};
 const LIMIT: usize = 64 * 1024;
@@ -21,7 +21,7 @@ impl TableMapping {
         let definition = parse_toml(contents)?;
         let canonical = serde_json::to_vec(&definition).map_err(invalid)?;
         if canonical.len() > LIMIT
-            || EvidenceHash::from_bytes(irmind_app::sha256(&canonical)) != *expected
+            || EvidenceHash::from_bytes(irmind_mapping_contracts::sha256(&canonical)) != *expected
         {
             return Err(MappingError::InvalidDefinition);
         }
@@ -67,15 +67,12 @@ impl TableMapping {
     pub fn review(contents: &str) -> Result<MappingManifest, MappingError> {
         let definition = parse_toml(contents)?;
         let canonical = serde_json::to_vec(&definition).map_err(invalid)?;
-        let digest = EvidenceHash::from_bytes(irmind_app::sha256(&canonical));
+        let digest = EvidenceHash::from_bytes(irmind_mapping_contracts::sha256(&canonical));
         Self::bundled(contents, &digest).map(|mapper| mapper.manifest)
     }
-    /// Only an opaque, verified global operation can authorize an installed definition.
-    pub fn installed(approved: &ApprovedMappingDefinition) -> Result<Self, MappingError> {
-        if !approved.active() {
-            return Err(MappingError::InvalidDefinition);
-        }
-        let manifest = approved.installed_manifest()?;
+    /// Compile a declaration. The application's authenticated catalog checks its
+    /// exact analyst-signed admission before the mapper can handle evidence.
+    pub fn compile_installed_manifest(manifest: &MappingManifest) -> Result<Self, MappingError> {
         let MappingProvenance::InstalledDefinition { canonical, .. } = manifest.provenance() else {
             return Err(MappingError::InvalidDefinition);
         };
@@ -84,7 +81,7 @@ impl TableMapping {
             return Err(MappingError::InvalidDefinition);
         }
         let compiled = Self::compile(definition, manifest.provenance().clone())?;
-        if compiled.manifest != manifest {
+        if &compiled.manifest != manifest {
             return Err(MappingError::InvalidDefinition);
         }
         Ok(compiled)
@@ -150,7 +147,7 @@ impl TableMapping {
             &definition.id,
             &definition.version,
             &definition.target_schema,
-            EvidenceHash::from_bytes(irmind_app::sha256(canonical)),
+            EvidenceHash::from_bytes(irmind_mapping_contracts::sha256(canonical)),
         )
         .map_err(invalid)?;
         Ok(Self {

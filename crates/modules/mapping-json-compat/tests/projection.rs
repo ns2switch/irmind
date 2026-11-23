@@ -37,9 +37,7 @@ impl MappedJson {
                 &mut |record| {
                     let mut output = None;
                     record.inspect(|source| output = Some(mapping.map(source)));
-                    let output = output
-                        .unwrap()
-                        .map_err(irmind_app::source_mapping::MappingError::into_app)?;
+                    let output = output.unwrap().map_err(AppError::from)?;
                     emit(Tainted::from_external(
                         output.record().indexed.record.clone(),
                         record.provenance().clone(),
