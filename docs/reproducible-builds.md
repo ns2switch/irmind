@@ -88,6 +88,15 @@ for file in BUILD-ENVIRONMENT.json SHA256SUMS; do
 done
 ```
 
+For releases publishing `NATIVE-MAPPING-INPUTS.json`, download it and its
+Sigstore bundle alongside the two files above. Verify it with the same
+release certificate identity, then check its entry in the signed
+`SHA256SUMS`. Use Python 3.11 or newer and add
+`--mapping-inputs release-checksums/NATIVE-MAPPING-INPUTS.json` to the
+build command below. The workflow combines observations from all five
+release targets. The build script checks the selected target's observation
+again before accepting the reconstructed binary.
+
 ### Install the native tools
 
 Choose the entry under `targets` for the binary being reproduced. Compare

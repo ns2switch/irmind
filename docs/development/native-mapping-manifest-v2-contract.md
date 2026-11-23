@@ -1,6 +1,6 @@
 # Native mapping build manifest V2
 
-**Status.** Proposed encoding and independent synthetic vectors for v0.7.
+**Status.** Approved encoding and independent synthetic vectors for v0.7.
 See the [dependency-closure design](native-mapping-build-identity.md).
 
 The manifest commits to the production inputs that reach one native mapping
@@ -118,6 +118,21 @@ reachability from the root per mask. Format validation in export
 verification authenticates the bytes and their hash; it never loads
 executables. Full reconstruction also requires a locally trusted compiled
 mapping with the identical manifest.
+
+## Reproducing distribution builds
+
+A release publishes the normalized five-target observations as
+`NATIVE-MAPPING-INPUTS.json`. It is included in the signed checksums,
+has its own Sigstore bundle and is attested. Only normalized data and
+digests leave the native runners. The build script compares the actual
+local observation with its record and checks the manifest bytes compiled
+for each native mapper. It does this again in the independently checked
+out reproducibility build. See the [build guide](../reproducible-builds.md).
+
+Release builds require V2 for native mappers. The preflight build and
+direct developer Cargo builds still have a bootstrap identity. The
+declarative extraction interpreter has its separate existing
+definition-specific identity.
 
 ## Independent vectors and measurements
 
