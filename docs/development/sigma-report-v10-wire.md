@@ -8,8 +8,7 @@ implementation. Case marker 6 and export V10 are proposed together.
 A tag is the given ASCII string followed by one zero byte. Integers are
 unsigned big-endian unless indicated. A hash is 32 raw SHA-256 bytes. Text is
 a u32 byte length followed by well-formed UTF-8, with no implicit Unicode
-normalization. Case IDs use the existing 36-byte lowercase hyphenated UUID
-syntax inside a text field. A timestamp bound is a signed i64 UTC
+normalization. Case IDs use a 36-byte lowercase hyphenated UUID inside a text field. A timestamp bound is a signed i64 UTC
 microsecond count. A range is half-open and its start precedes its end.
 An optional hash uses u8 zero for absent and u8 one followed by the hash
 for present. Canonical event bodies become lowercase hex in existing signed
