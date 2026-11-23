@@ -13,17 +13,17 @@ pub fn required_mapping_installations<'a>(
             continue;
         }
         let MappingProfileRecordV1::Snapshot(snapshot) = MappingProfileRecordV1::decode(payload)
-            .map_err(|_| MappingError::InvalidManifest.into_app())?
+            .map_err(|_| AppError::from(MappingError::InvalidManifest))?
         else {
             continue;
         };
-        let manifest = MappingManifest::from_snapshot(&snapshot).map_err(MappingError::into_app)?;
+        let manifest = MappingManifest::from_snapshot(&snapshot).map_err(AppError::from)?;
         if let MappingProvenance::InstalledDefinition { operation, .. } = manifest.provenance() {
             if required
                 .get(operation)
                 .is_some_and(|prior| prior != &manifest)
             {
-                return Err(MappingError::InvalidDefinition.into_app());
+                return Err(AppError::from(MappingError::InvalidDefinition));
             }
             required.insert(operation.clone(), manifest);
         }
@@ -45,12 +45,12 @@ pub fn mapping_installation_proofs(
         if let Some(manifest) = required.get(&hash) {
             verify_mapping_installation(manifest, operation, verifier, analyst_key)?;
             if selected.insert(hash, operation.clone()).is_some() {
-                return Err(MappingError::InvalidDefinition.into_app());
+                return Err(AppError::from(MappingError::InvalidDefinition));
             }
         }
     }
     if selected.len() != required.len() {
-        return Err(MappingError::InvalidDefinition.into_app());
+        return Err(AppError::from(MappingError::InvalidDefinition));
     }
     Ok(selected.into_values().collect())
 }

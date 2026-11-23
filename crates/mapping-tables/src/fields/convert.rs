@@ -1,9 +1,9 @@
 use super::{CompiledField, Conversion};
-use irmind_app::source_mapping::{MappingError, SourceValue};
 use irmind_domain::{
     CommonField, CommonFieldType, CommonValue, ContentHash, EntityIdentityScope, EventText,
     EventTextList, HashAlgorithm, NetworkDirection, ObservedEntity, ObservedEntityKind,
 };
+use irmind_mapping_contracts::source_mapping::{MappingError, SourceValue};
 impl CompiledField {
     pub(crate) fn convert(&self, value: &SourceValue) -> Result<CommonValue, MappingError> {
         let bad = || MappingError::UnsupportedSourceValue;

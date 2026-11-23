@@ -1,5 +1,5 @@
 use super::view::View;
-use irmind_app::{
+use irmind_mapping_contracts::{
     GraphRecord,
     source_mapping::{MappingError, SourceRecordV1, SourceValue, json::render_source_fields},
 };

@@ -1,5 +1,5 @@
 use super::{classifier::classify_field, hunteval, relations, view::LegacyView};
-use irmind_app::{
+use irmind_mapping_contracts::{
     GraphRelation,
     source_mapping::{MappingError, SourceValue as Value},
 };

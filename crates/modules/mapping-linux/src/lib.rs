@@ -4,13 +4,12 @@ mod audit;
 mod auth_extraction;
 pub use audit::AuditMapping;
 pub use auth_extraction::AuthExtractionMapping;
-use irmind_app::{
-    modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
+use irmind_domain::EvidenceHash;
+use irmind_mapping_contracts::{
+    modules::{MappingModule, ModuleManifest, ModulePort},
     source_mapping::{MappingError, MappingManifest, MappingOutput, SourceMapper, SourceRecordV1},
 };
-use irmind_domain::EvidenceHash;
 use irmind_mapping_tables::TableMapping;
-use std::sync::Arc;
 
 macro_rules! table_module {
     ($name:ident, $id:literal, $file:literal, $digest:literal) => {
@@ -30,8 +29,8 @@ macro_rules! table_module {
                 self.0.map(source)
             }
         }
-        impl Module for $name {
-            fn manifest(&self) -> &'static ModuleManifest {
+        impl MappingModule for $name {
+            fn module_manifest(&self) -> &'static ModuleManifest {
                 const MANIFEST: ModuleManifest = ModuleManifest {
                     id: $id,
                     version: "0.1.0",
@@ -40,13 +39,6 @@ macro_rules! table_module {
                     config: &[],
                 };
                 &MANIFEST
-            }
-            fn register(
-                self: Box<Self>,
-                registry: &mut ModuleRegistry,
-                _: &ModuleConfig,
-            ) -> Result<(), irmind_app::AppError> {
-                registry.add_source_mapper(Arc::new(*self))
             }
         }
     };

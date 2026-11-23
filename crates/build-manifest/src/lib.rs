@@ -76,6 +76,7 @@ fn source_files(root: &Path, module: &Path, shared_sources: &[&str]) -> io::Resu
     let mut directories = vec![
         module.to_path_buf(),
         root.join("crates/app"),
+        root.join("crates/mapping-contracts"),
         root.join("crates/domain"),
         root.join("crates/build-manifest"),
     ];

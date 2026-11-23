@@ -1,11 +1,11 @@
-use irmind_app::source_mapping::{MappingError, SourceValue};
+use irmind_mapping_contracts::source_mapping::{MappingError, SourceValue};
 pub(super) struct View<'a> {
     root: &'a SourceValue,
     arrays: bool,
 }
 impl<'a> View<'a> {
     pub(super) fn for_source(
-        source: &'a irmind_app::source_mapping::SourceRecordV1,
+        source: &'a irmind_mapping_contracts::source_mapping::SourceRecordV1,
     ) -> Result<Self, MappingError> {
         if source.origin().parser() != "siem-elastic" {
             return Ok(Self {

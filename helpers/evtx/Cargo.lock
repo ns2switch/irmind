@@ -777,6 +777,7 @@ dependencies = [
  "futures-util",
  "hex",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "secrecy",
  "serde",
  "serde_json",
@@ -859,11 +860,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mapping-contracts"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "irmind-domain",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "irmind-mapping-tables"
 version = "0.1.0"
 dependencies = [
- "irmind-app",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "serde",
  "serde_json",
  "toml",
@@ -873,8 +885,8 @@ dependencies = [
 name = "irmind-mod-mapping-evtx"
 version = "0.1.0"
 dependencies = [
- "irmind-app",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
 ]
 

@@ -10,7 +10,7 @@ use std::sync::Arc;
 mod definitions;
 mod mapping;
 fn mapping_error() -> AppError {
-    crate::source_mapping::MappingError::InvalidDefinition.into_app()
+    AppError::from(crate::source_mapping::MappingError::InvalidDefinition)
 }
 
 #[derive(Default)]

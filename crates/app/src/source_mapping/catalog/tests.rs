@@ -32,7 +32,10 @@ impl SourceMapper for Mapper {
         &self.0
     }
     fn map(&self, source: &SourceRecordV1) -> Result<MappingOutput, MappingError> {
-        crate::source_mapping::output::unmapped(source)
+        MappingOutput::unclassified(
+            source,
+            crate::source_mapping::MappingDiagnostic::Unclassified,
+        )
     }
 }
 fn selector(conditions: Vec<(&[&str], SelectorPredicate)>) -> SourceSelector {

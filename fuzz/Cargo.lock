@@ -1118,6 +1118,7 @@ dependencies = [
  "futures-util",
  "hex",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "secrecy",
  "serde",
  "serde_json",
@@ -1267,11 +1268,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "irmind-mapping-contracts"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "irmind-domain",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "irmind-mapping-tables"
 version = "0.1.0"
 dependencies = [
- "irmind-app",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "serde",
  "serde_json",
  "toml",
@@ -1281,9 +1293,9 @@ dependencies = [
 name = "irmind-mod-mapping-cloud-flow"
 version = "0.1.0"
 dependencies = [
- "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
 ]
 
@@ -1291,9 +1303,9 @@ dependencies = [
 name = "irmind-mod-mapping-defender"
 version = "0.1.0"
 dependencies = [
- "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
 ]
 
@@ -1301,9 +1313,9 @@ dependencies = [
 name = "irmind-mod-mapping-ecs"
 version = "0.1.0"
 dependencies = [
- "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
 ]
 
@@ -1311,9 +1323,9 @@ dependencies = [
 name = "irmind-mod-mapping-email"
 version = "0.1.0"
 dependencies = [
- "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
 ]
 
@@ -1321,9 +1333,9 @@ dependencies = [
 name = "irmind-mod-mapping-entra"
 version = "0.1.0"
 dependencies = [
- "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
 ]
 
@@ -1331,9 +1343,9 @@ dependencies = [
 name = "irmind-mod-mapping-fdr"
 version = "0.1.0"
 dependencies = [
- "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
 ]
 
@@ -1341,9 +1353,9 @@ dependencies = [
 name = "irmind-mod-mapping-guardduty"
 version = "0.1.0"
 dependencies = [
- "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
 ]
 
@@ -1351,9 +1363,9 @@ dependencies = [
 name = "irmind-mod-mapping-identity"
 version = "0.1.0"
 dependencies = [
- "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
 ]
 
@@ -1361,8 +1373,8 @@ dependencies = [
 name = "irmind-mod-mapping-kubernetes"
 version = "0.1.0"
 dependencies = [
- "irmind-app",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
 ]
 
@@ -1370,9 +1382,9 @@ dependencies = [
 name = "irmind-mod-mapping-network"
 version = "0.1.0"
 dependencies = [
- "irmind-app",
  "irmind-build-manifest",
  "irmind-domain",
+ "irmind-mapping-contracts",
  "irmind-mapping-tables",
 ]
 

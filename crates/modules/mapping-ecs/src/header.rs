@@ -1,8 +1,8 @@
 use super::view::View;
-use irmind_app::source_mapping::{MappingDiagnostic, MappingError, SourceValue};
 use irmind_domain::{
     CategorySet, EventCategory, EventHeaderV1, EventKind, EventOutcome, EventType, EventTypeSet,
 };
+use irmind_mapping_contracts::source_mapping::{MappingDiagnostic, MappingError, SourceValue};
 fn labels<T>(
     view: &View<'_>,
     path: &str,

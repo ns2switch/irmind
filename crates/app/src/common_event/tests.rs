@@ -1,5 +1,6 @@
 #![allow(clippy::unwrap_used)]
 use super::*;
+use crate::IndexedGraphRecord;
 use irmind_domain::*;
 
 fn projection() -> CommonEventV1 {

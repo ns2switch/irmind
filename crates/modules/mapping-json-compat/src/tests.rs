@@ -4,6 +4,7 @@ use irmind_app::{
     source_mapping::{SourceInput, SourceMetadata},
 };
 use irmind_domain::Tainted;
+use std::sync::Arc;
 
 #[test]
 fn compatibility_mapping_keeps_cloud_and_generic_lookup_identities_without_classification() {

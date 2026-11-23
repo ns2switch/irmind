@@ -156,10 +156,10 @@ fn validate_snapshots(snapshots: &[MappingSnapshotV1]) -> Result<(), AppError> {
         return Err(invalid());
     }
     for snapshot in snapshots {
-        MappingManifest::from_snapshot(snapshot).map_err(MappingError::into_app)?;
+        MappingManifest::from_snapshot(snapshot).map_err(AppError::from)?;
     }
     Ok(())
 }
 fn invalid() -> AppError {
-    MappingError::InvalidOutput.into_app()
+    AppError::from(MappingError::InvalidOutput)
 }

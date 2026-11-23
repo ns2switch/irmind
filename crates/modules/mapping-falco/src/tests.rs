@@ -1,4 +1,5 @@
 use super::*;
+use std::sync::Arc;
 #[test]
 fn bundled_definitions_have_pinned_identities() {
     let host = TableMapping::review(include_str!("host.toml")).unwrap();

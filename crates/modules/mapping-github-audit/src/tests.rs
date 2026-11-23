@@ -5,6 +5,7 @@ use irmind_app::{
 };
 use irmind_domain::{EntityRole, EventCategory, EventType};
 use irmind_mod_parser_github_audit::GitHubAuditSourceDecoder;
+use std::sync::Arc;
 
 const STREAM: &[u8] =
     include_bytes!("../../../testkit/fixtures/parser-github-audit/source/stream.ndjson");

@@ -1,16 +1,15 @@
 #![forbid(unsafe_code)]
 //! Bundled finite Defender tables. Native glue only selects the exact source
 //! layout/table and retains unsupported optional values with a coverage notice.
-use irmind_app::{
-    modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
+use irmind_domain::{COMMON_EVENT_V1, EvidenceHash};
+use irmind_mapping_contracts::{
+    modules::{MappingModule, ModuleManifest, ModulePort},
     source_mapping::{
         MappingDiagnostic, MappingError, MappingIdentityV1, MappingManifest, MappingOutput,
         MappingProvenance, SourceMapper, SourceRecordV1,
     },
 };
-use irmind_domain::{COMMON_EVENT_V1, EvidenceHash};
 use irmind_mapping_tables::TableMapping;
-use std::sync::Arc;
 const BUILD: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/native-mapping-manifest.bin"));
 static MODULE: ModuleManifest = ModuleManifest {
     id: "mapping-defender",
@@ -64,7 +63,7 @@ impl DefenderMapping {
                 TableMapping::bundled(text, reviewed.identity().implementation())
             })
             .collect::<Result<Vec<_>, MappingError>>()?;
-        let hash = EvidenceHash::from_bytes(irmind_app::sha256(BUILD));
+        let hash = EvidenceHash::from_bytes(irmind_mapping_contracts::sha256(BUILD));
         let identity = MappingIdentityV1::try_new(
             MODULE.id,
             &format!("defender-v1-{}", hash.as_str()),
@@ -87,16 +86,9 @@ impl DefenderMapping {
         Ok(Self { manifest, tables })
     }
 }
-impl Module for DefenderMapping {
-    fn manifest(&self) -> &'static ModuleManifest {
+impl MappingModule for DefenderMapping {
+    fn module_manifest(&self) -> &'static ModuleManifest {
         &MODULE
-    }
-    fn register(
-        self: Box<Self>,
-        registry: &mut ModuleRegistry,
-        _: &ModuleConfig,
-    ) -> Result<(), irmind_app::AppError> {
-        registry.add_source_mapper(Arc::new(*self))
     }
 }
 impl SourceMapper for DefenderMapping {

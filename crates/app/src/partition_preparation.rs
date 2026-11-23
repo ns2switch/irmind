@@ -1,15 +1,5 @@
 use crate::AppError;
 
-/// Closed parser-owned capabilities; directory names never select a profile.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub enum PartitionProfile {
-    #[default]
-    Unpartitioned,
-    CloudAccountRegion,
-    EndpointHost,
-    KubernetesCluster,
-}
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PartitionLimits {
     pub account: u16,

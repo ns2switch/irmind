@@ -1,20 +1,17 @@
 #![forbid(unsafe_code)]
 //! Frozen multi-field journald compatibility projection, not a semantic classifier.
 mod record;
-use irmind_app::{
+use irmind_domain::{COMMON_EVENT_V1, EvidenceHash};
+use irmind_mapping_contracts::{
     IndexedGraphRecord, PartitionProfile, SourceMapper,
-    modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
+    modules::{MappingModule, ModuleManifest, ModulePort},
     source_mapping::{
         MappingDiagnostic, MappingError, MappingIdentityV1, MappingManifest, MappingOutput,
         MappingPartition, MappingProvenance, SourceDiscriminator, SourceRecordV1, SourceSelector,
         SourceValue,
     },
 };
-use irmind_domain::{COMMON_EVENT_V1, EvidenceHash};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    sync::Arc,
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 const BUILD: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/native-mapping-manifest.bin"));
 pub struct JournaldCompatibilityMapping {
@@ -22,7 +19,7 @@ pub struct JournaldCompatibilityMapping {
 }
 impl JournaldCompatibilityMapping {
     pub fn new() -> Result<Self, MappingError> {
-        let digest = EvidenceHash::from_bytes(irmind_app::sha256(BUILD));
+        let digest = EvidenceHash::from_bytes(irmind_mapping_contracts::sha256(BUILD));
         let version = format!("journald-compat-v1-{}", digest.as_str());
         let identity = MappingIdentityV1::try_new(
             "mapping-journald-compat",
@@ -99,16 +96,9 @@ static MODULE: ModuleManifest = ModuleManifest {
     tools: &[],
     config: &[],
 };
-impl Module for JournaldCompatibilityMapping {
-    fn manifest(&self) -> &'static ModuleManifest {
+impl MappingModule for JournaldCompatibilityMapping {
+    fn module_manifest(&self) -> &'static ModuleManifest {
         &MODULE
-    }
-    fn register(
-        self: Box<Self>,
-        registry: &mut ModuleRegistry,
-        _: &ModuleConfig,
-    ) -> Result<(), irmind_app::AppError> {
-        registry.add_source_mapper(Arc::new(*self))
     }
 }
 #[cfg(test)]

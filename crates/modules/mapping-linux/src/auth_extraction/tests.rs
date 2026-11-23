@@ -4,6 +4,7 @@ use irmind_app::{
     source_mapping::{SourceInput, SourceMetadata, SourceReferenceV1},
 };
 use irmind_domain::EventOutcome;
+use std::sync::Arc;
 const INPUT:&[u8]=b"2026-11-01T00:00:00Z synthetic-host useradd[42]: new user: name=synthetic-user, UID=1001\n2026-11-01T00:00:01Z synthetic-host usermod[42]: change user 'synthetic-user' shell\n2026-11-01T00:00:02Z synthetic-host CRON[42]: (synthetic-user) CMD (/usr/bin/true)\n2026-11-01T00:00:03Z synthetic-host crond[42]: (synthetic-user) CMD (/usr/bin/true)\n2026-11-01T00:00:04Z synthetic-host cron[42]: (synthetic-user) CMD (/usr/bin/true)\n";
 #[test]
 fn all_unclassified_auth_datasets_pass_the_shared_contract() {

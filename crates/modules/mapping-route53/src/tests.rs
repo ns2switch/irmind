@@ -5,6 +5,7 @@ use irmind_app::{
 };
 use irmind_domain::{CommonField, CommonValue, EntityRole, EventCategory, EventOutcome};
 use irmind_mod_parser_route53::Route53SourceDecoder;
+use std::sync::Arc;
 
 const ROWS: &[u8] =
     include_bytes!("../../../testkit/fixtures/parser-route53/source/queries.ndjson");

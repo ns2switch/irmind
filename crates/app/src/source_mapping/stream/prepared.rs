@@ -54,10 +54,7 @@ impl<'a> SourceRecordPreparer<'a> {
                     source.format().version(),
                 )
                 .map_err(|_| invalid())?;
-                let (identity, output) = self
-                    .catalog
-                    .map(source)
-                    .map_err(super::super::MappingError::into_app)?;
+                let (identity, output) = self.catalog.map(source).map_err(AppError::from)?;
                 Ok((identity, output, commitment::spool_tuple(source), format))
             })();
         });

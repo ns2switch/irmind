@@ -44,7 +44,7 @@ impl Engine<'_> {
                     output = pipeline
                         .extraction_mapper()
                         .map(record)
-                        .map_err(crate::source_mapping::MappingError::into_app);
+                        .map_err(AppError::from);
                 });
                 let output = output?;
                 rows.push(

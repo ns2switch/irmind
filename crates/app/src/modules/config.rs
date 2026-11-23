@@ -1,38 +1,9 @@
 use super::registry::ModuleRegistry;
 use crate::AppError;
-use irmind_domain::Tool;
 use secrecy::SecretString;
 use std::collections::BTreeMap;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub enum ModulePort {
-    Llm,
-    Siem,
-    Edr,
-    CloudAudit,
-    InternalIntel,
-    ThreatIntel,
-    EventParser,
-    ObjectSource,
-    SourceDecoder,
-    SourceMapper,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct ConfigField {
-    pub name: &'static str,
-    pub required: bool,
-    pub secret: bool,
-}
-
-#[derive(Debug)]
-pub struct ModuleManifest {
-    pub id: &'static str,
-    pub version: &'static str,
-    pub ports: &'static [ModulePort],
-    pub tools: &'static [Tool],
-    pub config: &'static [ConfigField],
-}
+pub use irmind_mapping_contracts::modules::{ConfigField, ModuleManifest, ModulePort};
 
 #[derive(Default)]
 pub struct ModuleConfig {
@@ -105,4 +76,19 @@ pub trait Module: Send + Sync {
         registry: &mut ModuleRegistry,
         config: &ModuleConfig,
     ) -> Result<(), AppError>;
+}
+
+impl<T: irmind_mapping_contracts::modules::MappingModule + 'static> Module for T {
+    fn manifest(&self) -> &'static ModuleManifest {
+        self.module_manifest()
+    }
+
+    fn register(
+        self: Box<Self>,
+        registry: &mut ModuleRegistry,
+        _: &ModuleConfig,
+    ) -> Result<(), AppError> {
+        let mapper: std::sync::Arc<T> = std::sync::Arc::from(self);
+        registry.add_source_mapper(mapper)
+    }
 }

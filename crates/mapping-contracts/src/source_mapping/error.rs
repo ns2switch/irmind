@@ -74,9 +74,3 @@ impl std::fmt::Display for MappingError {
     }
 }
 impl std::error::Error for MappingError {}
-
-impl MappingError {
-    pub fn into_app(self) -> crate::AppError {
-        crate::AppError::Policy(self.to_string())
-    }
-}

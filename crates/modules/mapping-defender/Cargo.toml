@@ -5,12 +5,13 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 [dependencies]
-irmind-app = { path = "../../app", version = "0.1.0" }
+irmind-mapping-contracts = { path = "../../mapping-contracts", version = "0.1.0" }
 irmind-domain = { path = "../../domain", version = "0.1.0" }
 irmind-mapping-tables = { path = "../../mapping-tables", version = "0.1.0" }
 [build-dependencies]
 irmind-build-manifest = { path = "../../build-manifest", version = "0.1.0" }
 [dev-dependencies]
+irmind-app = { path = "../../app", version = "0.1.0" }
 irmind-testkit = { path = "../../testkit", version = "0.1.0" }
 irmind-mod-parser-defender = { path = "../parser-defender", version = "0.1.0" }
 [lints]

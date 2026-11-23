@@ -1,9 +1,9 @@
-use irmind_app::source_mapping::{
-    MappingDiagnostic, MappingError, MappingOutput, SourceRecordV1, SourceValue,
-};
 use irmind_domain::{
     BoundedObservations, CommonEventV1, CommonField as F, CommonValue, EntityIdentityScope,
     EntityObservation, EntityRole, EventContextV1, EventText, ObservedEntity, ObservedEntityKind,
+};
+use irmind_mapping_contracts::source_mapping::{
+    MappingDiagnostic, MappingError, MappingOutput, SourceRecordV1, SourceValue,
 };
 fn bad<T>(_: T) -> MappingError {
     MappingError::UnsupportedSourceValue
@@ -59,7 +59,7 @@ pub(super) fn project(
     let label = source
         .format()
         .discriminators()
-        .get(&irmind_app::source_mapping::SourceDiscriminator::RecordType)
+        .get(&irmind_mapping_contracts::source_mapping::SourceDiscriminator::RecordType)
         .map_or("record", String::as_str);
     record.indexed.record.event = format!("Email {label}");
     record.common = CommonEventV1::try_new(
@@ -80,7 +80,7 @@ pub(super) fn project(
 }
 fn header_projection(
     source: &SourceRecordV1,
-    record: &mut irmind_app::GraphRecord,
+    record: &mut irmind_mapping_contracts::GraphRecord,
     context: &mut EventContextV1,
     observations: &mut Vec<EntityObservation>,
     diagnostics: &mut Vec<MappingDiagnostic>,

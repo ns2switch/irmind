@@ -18,7 +18,6 @@ pub use irmind_domain::{
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
-use std::fmt::Write as _;
 use std::sync::Arc;
 use thiserror::Error;
 pub use tokio_util::sync::CancellationToken;
@@ -107,13 +106,16 @@ pub use custody::{
     SealPreview, export_case, export_case_with_originals, verify_export, verify_export_details,
 };
 pub use engine::{CryptoPorts, Engine, EnginePorts, verify_case_metadata};
-pub use ingest::{GraphRecord, GraphRelation, IndexedGraphRecord, TimelineEvent};
+pub use ingest::TimelineEvent;
+pub use irmind_mapping_contracts::{
+    GraphRecord, GraphRelation, IndexedGraphRecord, PartitionProfile,
+};
 mod indexed_parser;
 pub use indexed_parser::indexed_rfc3339;
 pub use keystore::{KeystoreCapability, KeystoreManifest, SecretBackend, SignerBackend};
 pub use large_case::{LargeCaseUseCases, ParserSelection, SourceCheckMode, SourceCheckReport};
 mod partition_preparation;
-pub use partition_preparation::{PartitionLimits, PartitionProfile};
+pub use partition_preparation::PartitionLimits;
 pub use ports::*;
 use ports::{isolate_untrusted, remote_tool_error, run_async, safe_markdown};
 pub use report::{EntityDetails, Finding, FindingKind};

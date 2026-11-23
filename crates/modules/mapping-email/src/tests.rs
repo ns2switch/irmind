@@ -1,4 +1,5 @@
 use super::*;
+use std::sync::Arc;
 #[test]
 fn email_mapping_contract_preserves_roles_and_unknown_outcome() {
     let bytes = include_bytes!("../../../testkit/fixtures/parser-email/source/multipart.eml");

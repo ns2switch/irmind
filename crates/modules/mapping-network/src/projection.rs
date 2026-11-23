@@ -1,5 +1,5 @@
 //! Preserve network search identities and correlation relations without classifying telemetry.
-use irmind_app::{
+use irmind_mapping_contracts::{
     GraphRecord, GraphRelation,
     source_mapping::{
         MappingError, SourceDiscriminator, SourceRecordV1, SourceValue, json::render_source_fields,
@@ -110,7 +110,7 @@ pub(super) fn project<'a>(
         index: usize::try_from(source.origin().record()).map_err(|_| invalid())?,
         at: source
             .timestamp()
-            .map(irmind_app::IndexedTime::to_rfc3339)
+            .map(irmind_mapping_contracts::IndexedTime::to_rfc3339)
             .unwrap_or_default(),
         event,
         text: render_source_fields(source.fields()).map_err(|_| invalid())?,

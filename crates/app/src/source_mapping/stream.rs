@@ -82,7 +82,7 @@ impl<'a> SourceRecordAccumulator<'a> {
     ) -> Result<Self, AppError> {
         catalog
             .decoder(identity.name, identity.version)
-            .map_err(super::MappingError::into_app)?;
+            .map_err(AppError::from)?;
         Ok(Self {
             metadata,
             identity: SourceDecoderIdentityV1::try_new(identity.name, identity.version)
@@ -125,10 +125,7 @@ impl<'a> SourceRecordAccumulator<'a> {
         if self.formats.len() == 128 && !self.formats.contains(&format) {
             return Err(invalid());
         }
-        let (identity, output) = self
-            .catalog
-            .map(source)
-            .map_err(super::MappingError::into_app)?;
+        let (identity, output) = self.catalog.map(source).map_err(AppError::from)?;
         let bytes = commitment::spool_tuple(source);
         self.append_mapping(source, format, identity.as_ref(), &output, &bytes, spool)?;
         Ok(MappedSourceRecord {
@@ -271,7 +268,7 @@ impl DecodedSourceCommitmentV1 {
     }
 }
 fn invalid() -> AppError {
-    super::MappingError::InvalidOutput.into_app()
+    AppError::from(super::MappingError::InvalidOutput)
 }
 
 #[cfg(test)]

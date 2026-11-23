@@ -47,5 +47,5 @@ pub(super) fn domain_time_context(
         .transpose()
 }
 fn invalid() -> AppError {
-    MappingError::InvalidOutput.into_app()
+    AppError::from(MappingError::InvalidOutput)
 }

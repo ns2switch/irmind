@@ -1,10 +1,9 @@
-use irmind_app::{
-    modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
+use irmind_domain::EvidenceHash;
+use irmind_mapping_contracts::{
+    modules::{MappingModule, ModuleManifest, ModulePort},
     source_mapping::{MappingError, MappingManifest, MappingOutput, SourceMapper, SourceRecordV1},
 };
-use irmind_domain::EvidenceHash;
 use irmind_mapping_tables::TableMapping;
-use std::sync::Arc;
 type Entry = (u16, &'static str, &'static str, ModuleManifest);
 const DEFINITIONS: &[Entry] = &[
     (
@@ -241,15 +240,8 @@ impl SourceMapper for SecurityMapping {
         self.table.map(source)
     }
 }
-impl Module for SecurityMapping {
-    fn manifest(&self) -> &'static ModuleManifest {
+impl MappingModule for SecurityMapping {
+    fn module_manifest(&self) -> &'static ModuleManifest {
         self.module
-    }
-    fn register(
-        self: Box<Self>,
-        registry: &mut ModuleRegistry,
-        _: &ModuleConfig,
-    ) -> Result<(), irmind_app::AppError> {
-        registry.add_source_mapper(Arc::new(*self))
     }
 }
