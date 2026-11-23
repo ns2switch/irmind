@@ -1,19 +1,22 @@
 //! Resolve reviewed finding citations against a single authenticated checkpoint.
 use super::{
-    EntityDetails, ReportDocument, ReportDocumentFormat, ReportDocumentLanguage, ReportLocator,
-    ReportStatement,
+    EntityDetails, ReportDocument, ReportDocumentFormat, ReportDocumentLanguage, ReportLimitation,
+    ReportLocator, ReportStatement,
 };
 use crate::{
-    AppError, CaseId, Engine,
+    AppError, AuditEventKind, CaseId, Engine, SignedEntry,
+    source_queries::SourceQueryResultV1,
     v10_proofs::{
         CaseCheckpointV1, ReportCitationsV1, V10CheckpointView, V10Citation, V10RowReference,
     },
 };
-use irmind_domain::{EvidenceHash, ParquetArtifact};
+use irmind_domain::{EvidenceHash, ParquetArtifact, SourceManifestV2};
+use std::collections::BTreeSet;
 
 impl Engine<'_> {
     /// Render already-confirmed findings using the exact source and row from
     /// the review. A bad citation or confirmation invalidates the selection.
+    /// This builds an unsigned preview of row citations.
     pub fn render_cited_findings(
         &self,
         id: &CaseId,
@@ -33,7 +36,8 @@ impl Engine<'_> {
         let view = V10CheckpointView::resolve(&entries, checkpoint)?;
         let length = usize::try_from(checkpoint.sequence)
             .map_err(|_| AppError::InvalidChain(checkpoint.sequence))?;
-        let findings = self.findings_unlocked(id, &entries[..length])?;
+        let prefix = &entries[..length];
+        let findings = self.findings_unlocked(id, prefix)?;
         let mut resolved = Vec::with_capacity(citations.0.len());
         for selection in &citations.0 {
             view.confirmed_finding(selection.confirmation, &selection.finding_id)?;
@@ -76,13 +80,64 @@ impl Engine<'_> {
                 citations,
             })
             .collect::<Vec<_>>();
+        let coverage = PreviewCoverage::from_entries(prefix)?;
         ReportDocument {
             case_id: id,
             title: &case.title,
             confirmed: &confirmed,
             analyst: None,
-            limitations: &[],
+            limitations: &coverage.limitations(),
         }
         .render(language, format)
+    }
+}
+
+struct PreviewCoverage {
+    unknown_sources: Vec<String>,
+    query_limits: Vec<EvidenceHash>,
+}
+
+impl PreviewCoverage {
+    fn from_entries(entries: &[SignedEntry]) -> Result<Self, AppError> {
+        let mut captures = BTreeSet::new();
+        let mut query_limits = Vec::new();
+        for entry in entries
+            .iter()
+            .filter(|entry| entry.kind == AuditEventKind::SourceQueryResultV1)
+        {
+            let result = SourceQueryResultV1::decode(entry.payload.as_bytes())?;
+            captures.insert(result.capture_identity().0.to_owned());
+            if result.limit_notice().is_some() {
+                query_limits.push(EvidenceHash::from_bytes(entry.hash));
+            }
+        }
+        let mut unknown_sources = Vec::new();
+        for entry in entries
+            .iter()
+            .filter(|entry| entry.kind == AuditEventKind::SourceManifestV2)
+        {
+            let source = SourceManifestV2::decode(&entry.payload)
+                .map_err(|_| AppError::InvalidChain(entry.seq))?
+                .source;
+            if !source.copied && !captures.contains(source.sha256.as_str()) {
+                unknown_sources.push(source.source);
+            }
+        }
+        Ok(Self {
+            unknown_sources,
+            query_limits,
+        })
+    }
+
+    fn limitations(&self) -> Vec<ReportLimitation<'_>> {
+        self.unknown_sources
+            .iter()
+            .map(|source| ReportLimitation::SourceAvailabilityUnknown(source))
+            .chain(
+                self.query_limits
+                    .iter()
+                    .map(|receipt| ReportLimitation::QueryLimit { receipt }),
+            )
+            .collect()
     }
 }

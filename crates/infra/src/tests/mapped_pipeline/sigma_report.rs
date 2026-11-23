@@ -84,6 +84,7 @@ fn sigma_match_stays_out_of_cited_reports_until_analyst_confirms_the_exact_row()
     let markdown = render(&store, &engine, &case.id, &citations).unwrap();
     let markdown = String::from_utf8(markdown).unwrap();
     assert!(markdown.contains(FINDING));
+    assert!(markdown.contains("Source availability unknown"));
     assert!(markdown.contains(&format!("{} · record {}", evidence.as_str(), row.record)));
     citations.0[0].citations[0] = V10Citation::Row(V10RowReference {
         physical_row: row.physical_row + 1,
