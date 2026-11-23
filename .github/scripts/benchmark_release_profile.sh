@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Compare the shipping profile and ThinLTO on the same synthetic inputs.
+# Compare pinned compilers with the same shipping profiles and synthetic inputs.
 set -euo pipefail
 root=$(pwd)
 mkdir -p target
@@ -14,11 +14,10 @@ unset IRMIND_HUNTEVAL_ROOT IRMIND_BENCH_WORKERS IRMIND_BENCH_NDJSON_GIB
 build() (
     profile=$1
     export CARGO_TARGET_DIR="$work/$profile"
-    if [[ "$profile" == thin ]]; then
-        export CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1
-    fi
+    export RUSTUP_TOOLCHAIN="$profile"
+    rustc -vV
     TIMEFORMAT='RELEASE_BINARY_BUILD elapsed_seconds=%R'
-    time cargo build --release --locked -p irmind
+    time env CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 cargo build --release --locked -p irmind
     TIMEFORMAT='RELEASE_HELPER_BUILD elapsed_seconds=%R'
     time cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked --bin irmind-evtx
     wc -c < "$CARGO_TARGET_DIR/release/irmind" | awk '{printf "RELEASE_BINARY bytes=%s\n", $1}'
@@ -69,10 +68,10 @@ exercise() (
         python3 -B "$root/scripts/benchmark_evtx_large.py" "$CARGO_TARGET_DIR/release/examples/large_collection" --output "$root/release-profile-$profile-evtx.json"
     )
 )
-for profile in default thin; do
+for profile in 1.95.0 1.97.1; do
     build "$profile" 2>&1 | tee "release-profile-$profile-build.txt"
 done
-cmp release-profile-default-mapping-identities.txt release-profile-thin-mapping-identities.txt
-for profile in default thin; do
+cmp release-profile-1.95.0-mapping-identities.txt release-profile-1.97.1-mapping-identities.txt
+for profile in 1.95.0 1.97.1; do
     exercise "$profile" 2>&1 | tee "release-profile-$profile-benchmarks.txt"
 done

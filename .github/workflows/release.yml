@@ -115,7 +115,7 @@ jobs:
   benchmark_profiles:
     if: ${{ inputs.profile_benchmark && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     runs-on: ubuntu-22.04
-    timeout-minutes: 60
+    timeout-minutes: 100
     permissions:
       contents: read
     env:
@@ -127,7 +127,9 @@ jobs:
       - uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2
         with: {tool: 'mold@2.42.1', checksum: true, fallback: none}
       - name: Compare release builds and signed-format goldens
-        run: bash .github/scripts/benchmark_release_profile.sh
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal
+          bash .github/scripts/benchmark_release_profile.sh
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
