@@ -1,6 +1,6 @@
 # Compact ordering for Azure flow logs
 
-**Status.** Proposed for v0.6.2. [Performance issue](https://github.com/ns2switch/irmind/issues/360).
+**Status.** Approved for v0.6.2. [Performance issue](https://github.com/ns2switch/irmind/issues/360).
 
 The current direct writer speculates on source order. When an Azure source
 arrives out of order, replay stages expanded, mapped rows and sorts copies of
@@ -12,8 +12,12 @@ It produces the existing decoded records, mappings and Parquet bytes.
 Add an optional `SourceDecoder::compact_ordering()` accessor, returning a
 bounded format-specific iterator/replay adapter or `None` by default. The
 first implementation is restricted to `parser-azure-flow/azure-flow-source-v1`.
-It reads the already-open evidence handle with the existing Azure frame
-decoder. It exposes the physical enclosing frame span and the ordinal of a
+It reads the already-open evidence handle. The compact path shares the
+ordinary decoder's choice of line or document framing. It supports valid
+line-framed, top-level array and standard `records` envelope inputs.
+Each frame is at most 64 KiB with bounded JSON depth and node count.
+Atypical nesting, unknown payloads and malformed frames fall back to the
+ordinary decoder and its existing reporting. It exposes the physical enclosing frame span and the ordinal of a
 tuple inside that frame. The span is private scheduling data. A nested tuple
 still has no claimed byte offset in the signed evidence. A format that cannot
 provide a safe replay locator uses the existing sorted-row path for the whole
@@ -22,8 +26,8 @@ behavior, including the enclosing frame offset where already defined.
 
 A key contains the checked instant (including precision), the existing
 logical record ordinal, and the existing optional signed offset. The caller
-compares keys using `compare_record_keys`, in a single source's scope. Record
-ordinals count rejected tuples the same way as the current `SourceFrameEmitter`.
+compares keys using `compare_record_keys`, in a single source's scope. Any malformed tuple falls back before publication, so the ordinary
+`SourceFrameEmitter` determines rejection counts and sample order.
 The locator contains a checked source frame span and tuple ordinal. For replay,
 verify the frame commitment and bounds, then use the existing validated
 record constructor and mapping. Compare the final row's key with the staged

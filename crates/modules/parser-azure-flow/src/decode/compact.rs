@@ -1,13 +1,13 @@
-//! Only simple, wholly valid line framing is eligible. Any other source uses
-//! the ordinary decoder so that rejection, envelope and offset rules stay exact.
+//! Only wholly valid frames with bounded, exact replay locators are eligible.
+//! Otherwise use ordinary decoding for exact rejection and offset behavior.
 use super::{AzureFlowSourceDecoder, SourceValue, invalid, prepare, tuples};
 use irmind_app::{
     AppError, FixedAppError, SourceDecoder,
     source_mapping::{
         CompactRecordLocator, CompactSourceOrdering, CompactSourceReplay, SourceFileInput,
         SourceInput, SourceMetadata, SourceRecordV1,
-        framed::SourceFrameEmitter,
-        json::{SourceJsonLimits, decode_json_fields},
+        framed::{SourceFrameEmitter, has_json_document_framing},
+        json::{JsonFrames, SourceJsonLimits, decode_json_fields},
     },
 };
 use irmind_domain::Tainted;
@@ -23,67 +23,36 @@ impl CompactSourceOrdering for AzureFlowSourceDecoder {
         input: SourceInput<'_>,
         emit: &mut dyn FnMut(CompactRecordLocator) -> Result<(), AppError>,
     ) -> Result<bool, AppError> {
-        let path = std::path::Path::new(input.metadata.source.reference());
-        if !path.extension().is_some_and(|ext| {
-            ext.eq_ignore_ascii_case("ndjson") || ext.eq_ignore_ascii_case("jsonl")
-        }) {
-            return Ok(false);
-        }
         let mut reader = BufReader::new(input.reader);
-        let mut bytes = Vec::new();
-        let mut offset = 0u64;
-        let mut index = 0u64;
-        loop {
-            if input.metadata.cancel.is_cancelled() {
-                return Err(AppError::Cancelled);
-            }
-            bytes.clear();
-            let len = (&mut reader)
-                .take((FRAME_LIMIT + 1) as u64)
-                .read_until(b'\n', &mut bytes)
-                .map_err(|_| AppError::Fixed(FixedAppError::SourceFormat))?;
-            if len == 0 {
-                return Ok(index != 0);
-            }
-            if len > FRAME_LIMIT || offset + len as u64 > SOURCE_LIMIT {
-                return Ok(false);
-            }
-            let Some(fields) = eligible_fields(&bytes) else {
-                return Ok(false);
-            };
-            let (vnet, version, flows) = tuples::layout(&fields);
-            let Some(version) = version else {
-                return Ok(false);
-            };
-            let hash = irmind_app::sha256(&bytes);
-            let mut ordinal = 0u32;
-            for flow in tuples::array(flows) {
-                for group in tuples::array(flow.field(if vnet { "flowGroups" } else { "flows" })) {
-                    for value in tuples::array(group.field("flowTuples")) {
-                        let Some(time) = tuple_time(value, vnet, version) else {
-                            return Ok(false);
-                        };
-                        if index == RECORD_LIMIT {
+        let cancel = input.metadata.cancel;
+        let keys = &["records"];
+        let document = has_json_document_framing(
+            &mut reader,
+            input.metadata.source.reference(),
+            keys,
+            cancel,
+        )?;
+        let mut index = 0;
+        let mut visit = |start, bytes: &[u8]| scan_frame(start, bytes, &mut index, emit);
+        let accepted = if document {
+            let mut limited = reader.take(SOURCE_LIMIT + 1);
+            let mut frames = JsonFrames::new(&mut limited, cancel).with_record_array_keys(keys)?;
+            loop {
+                match frames.next_frame() {
+                    Ok(Some(frame)) if !frame.oversized() && frame.bytes().len() <= FRAME_LIMIT => {
+                        if !visit(frame.offset(), frame.bytes())? {
                             return Ok(false);
                         }
-                        emit(CompactRecordLocator {
-                            time,
-                            index,
-                            frame_start: offset,
-                            frame_len: u32::try_from(len).map_err(|_| invalid())?,
-                            frame_hash: hash,
-                            tuple: ordinal,
-                        })?;
-                        ordinal += 1;
-                        index += 1;
                     }
+                    Ok(None) => break limited.limit() != 0,
+                    Err(AppError::Cancelled) => return Err(AppError::Cancelled),
+                    _ => return Ok(false),
                 }
             }
-            if ordinal == 0 {
-                return Ok(false);
-            }
-            offset = offset.checked_add(len as u64).ok_or_else(invalid)?;
-        }
+        } else {
+            scan_lines(&mut reader, cancel, &mut visit)?
+        };
+        Ok(accepted && index != 0)
     }
 
     fn replay<'a>(&self, input: SourceFileInput<'a>) -> Box<dyn CompactSourceReplay + 'a> {
@@ -93,6 +62,76 @@ impl CompactSourceOrdering for AzureFlowSourceDecoder {
             cached: None,
         })
     }
+}
+
+fn scan_lines(
+    reader: &mut impl BufRead,
+    cancel: &irmind_app::CancellationToken,
+    visit: &mut impl FnMut(u64, &[u8]) -> Result<bool, AppError>,
+) -> Result<bool, AppError> {
+    let mut bytes = Vec::new();
+    let mut offset = 0u64;
+    loop {
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
+        bytes.clear();
+        let len = reader
+            .by_ref()
+            .take((FRAME_LIMIT + 1) as u64)
+            .read_until(b'\n', &mut bytes)
+            .map_err(|_| AppError::Fixed(FixedAppError::SourceFormat))?;
+        if len == 0 {
+            return Ok(true);
+        }
+        if len > FRAME_LIMIT || offset + len as u64 > SOURCE_LIMIT {
+            return Ok(false);
+        }
+        if !bytes.iter().all(u8::is_ascii_whitespace) && !visit(offset, &bytes)? {
+            return Ok(false);
+        }
+        offset += len as u64;
+    }
+}
+
+fn scan_frame(
+    offset: u64,
+    bytes: &[u8],
+    index: &mut u64,
+    emit: &mut dyn FnMut(CompactRecordLocator) -> Result<(), AppError>,
+) -> Result<bool, AppError> {
+    let Some(fields) = eligible_fields(bytes) else {
+        return Ok(false);
+    };
+    let (vnet, version, flows) = tuples::layout(&fields);
+    let Some(version) = version else {
+        return Ok(false);
+    };
+    let hash = irmind_app::sha256(bytes);
+    let mut ordinal = 0u32;
+    for flow in tuples::array(flows) {
+        for group in tuples::array(flow.field(if vnet { "flowGroups" } else { "flows" })) {
+            for value in tuples::array(group.field("flowTuples")) {
+                let Some(time) = tuple_time(value, vnet, version) else {
+                    return Ok(false);
+                };
+                if *index == RECORD_LIMIT {
+                    return Ok(false);
+                }
+                emit(CompactRecordLocator {
+                    time,
+                    index: *index,
+                    frame_start: offset,
+                    frame_len: u32::try_from(bytes.len()).map_err(|_| invalid())?,
+                    frame_hash: hash,
+                    tuple: ordinal,
+                })?;
+                ordinal += 1;
+                *index += 1;
+            }
+        }
+    }
+    Ok(ordinal != 0)
 }
 
 fn eligible_fields(bytes: &[u8]) -> Option<SourceValue> {

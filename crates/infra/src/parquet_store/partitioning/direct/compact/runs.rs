@@ -224,3 +224,71 @@ fn merge_batch(
         batch.len() as u64,
     )
 }
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use std::io::{Seek as _, SeekFrom};
+
+    fn locator(index: u64) -> CompactRecordLocator {
+        CompactRecordLocator {
+            time: IndexedTime::new(
+                IndexedInstant::new(1_795_392_000_000_000, 0).unwrap(),
+                TimePrecision::Second,
+                false,
+            )
+            .unwrap(),
+            index,
+            frame_start: 0,
+            frame_len: 15,
+            frame_hash: [3; 32],
+            tuple: 0,
+        }
+    }
+
+    #[test]
+    fn compact_run_merge_keeps_ties_in_order_and_rejects_mutation_or_cancellation() {
+        let root = tempfile::tempdir().unwrap();
+        let store = ParquetStore::open(root.path()).unwrap();
+        let id = CaseId::parse("00000000-0000-4000-8000-000000000388").unwrap();
+        let build = |indices: &[u64]| {
+            let mut writer = Writer::new(&store, &id).unwrap();
+            for index in indices {
+                writer.push(locator(*index)).unwrap();
+            }
+            writer.finish(&store, 0, 0).unwrap()
+        };
+        let cancel = CancellationToken::new();
+        let run = merge(&store, &id, vec![build(&[1, 3]), build(&[0, 2])], &cancel).unwrap();
+        let mut output = run.reader().unwrap();
+        for expected in 0..4 {
+            assert_eq!(output.next(&cancel).unwrap().unwrap().index, expected);
+        }
+        assert!(output.next(&cancel).unwrap().is_none());
+        drop(output);
+
+        let stopped = CancellationToken::new();
+        stopped.cancel();
+        assert!(matches!(
+            merge(&store, &id, vec![build(&[0]), build(&[1])], &stopped),
+            Err(AppError::Cancelled)
+        ));
+
+        let mut corrupted = std::fs::OpenOptions::new()
+            .write(true)
+            .open(&run.path)
+            .unwrap();
+        corrupted.seek(SeekFrom::Start(32)).unwrap();
+        corrupted.write_all(&[0]).unwrap();
+        drop(corrupted);
+        let mut output = run.reader().unwrap();
+        for _ in 0..4 {
+            assert!(output.next(&cancel).unwrap().is_some());
+        }
+        assert!(
+            output.next(&cancel).is_err(),
+            "same-sized mutation must fail the digest check"
+        );
+    }
+}

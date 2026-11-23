@@ -17,6 +17,7 @@ use irmind_domain::{
 };
 pub use json::{
     decode_json_envelope_source, decode_json_named_envelope_source, decode_json_source,
+    has_json_document_framing,
 };
 pub use time::source_datetime;
 
