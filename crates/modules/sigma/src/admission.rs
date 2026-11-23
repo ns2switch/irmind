@@ -228,11 +228,17 @@ fn validate_shape(root: &BTreeMap<String, RuleValue>) -> Result<(), AdmissionErr
     let Some(RuleValue::Mapping(detection)) = root.get("detection") else {
         return Err(AdmissionError::RuleShape);
     };
-    let Some(RuleValue::Text(condition)) = detection.get("condition") else {
-        return Err(AdmissionError::RuleShape);
+    let valid_condition = match detection.get("condition") {
+        Some(RuleValue::Text(condition)) => !condition.trim().is_empty(),
+        Some(RuleValue::Sequence(conditions)) => {
+            !conditions.is_empty() && conditions.len() <= 64 && conditions.iter().all(|value| {
+                matches!(value, RuleValue::Text(expression) if !expression.trim().is_empty())
+            })
+        }
+        _ => false,
     };
     if title.trim().is_empty()
-        || condition.trim().is_empty()
+        || !valid_condition
         || detection.len() < 2
         || logsource.is_empty()
         || logsource.iter().any(|(key, value)| {
