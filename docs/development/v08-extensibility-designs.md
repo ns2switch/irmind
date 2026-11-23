@@ -103,7 +103,7 @@ where supported. Each SDK or credential path is a separate decision.
 
 ## Versioned engine API
 
-`irmind serve` initially exposes a local protocol only. Default to a single
+`serve` initially exposes a local protocol only. Default to a single
 stdio peer created by an explicit launch. Optional Unix sockets and Windows
 named pipes are local, same-user and explicitly configured. On Unix use a
 private parent directory, a private socket and peer credentials. On Windows
