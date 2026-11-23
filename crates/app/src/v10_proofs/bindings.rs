@@ -98,7 +98,7 @@ pub fn read_v10_sigma_run(
     if receipt.matched_rows != objects.results.matches.len() as u64
         || covered.len() != objects.compiled_rules.0.len()
         || objects.compiled_rules.0.iter().any(|rule| {
-            admitted.get(&rule.rule).is_none()
+            !admitted.contains(&rule.rule)
                 || covered.get(&rule.rule).is_none_or(|status| {
                     (*status == SigmaCoverageV1::Eligible) == rule.variants.is_empty()
                 })
