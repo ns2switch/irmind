@@ -18,7 +18,7 @@ pub(super) fn needs_visible_escape(ch: char) -> bool {
         )
 }
 
-pub fn render_report_literal(value: &str) -> String {
+pub(super) fn render_report_literal(value: &str) -> String {
     let mut safe = String::with_capacity(value.len());
     for ch in value.chars() {
         if needs_visible_escape(ch) {

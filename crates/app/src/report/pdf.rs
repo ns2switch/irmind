@@ -7,7 +7,9 @@ const MAX_DOCUMENT: usize = 64 * 1024 * 1024;
 const WIDTH: usize = 86;
 const LINES_PER_PAGE: usize = 54;
 
-pub fn render_text_pdf<'a>(lines: impl IntoIterator<Item = &'a str>) -> Result<Vec<u8>, AppError> {
+pub(super) fn render_text_pdf<'a>(
+    lines: impl IntoIterator<Item = &'a str>,
+) -> Result<Vec<u8>, AppError> {
     let mut pages = Pages::default();
     for line in lines {
         pages.line(line)?;
