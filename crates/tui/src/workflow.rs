@@ -102,7 +102,7 @@ impl CaseWorkflow<'_, '_> {
         Ok(self.with_verification_notices(
             id,
             format!("Verified {} audit entries", notices.count),
-            notices,
+            &notices,
         ))
     }
 
@@ -115,14 +115,14 @@ impl CaseWorkflow<'_, '_> {
         let notices = self
             .engine
             .verify_with_mapping_and_query_notices(id, cancel)?;
-        Ok(self.with_verification_notices(id, message.into(), notices))
+        Ok(self.with_verification_notices(id, message.into(), &notices))
     }
 
     fn with_verification_notices(
         &self,
         id: &CaseId,
         mut message: String,
-        notices: irmind_app::VerifiedCaseNotices,
+        notices: &irmind_app::VerifiedCaseNotices,
     ) -> String {
         use std::fmt::Write as _;
         if notices.provisional_mappings != 0 {
