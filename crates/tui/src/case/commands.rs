@@ -552,8 +552,29 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         Ok(false)
     }
 
+    fn sigma_pack_command(&mut self, prompt: &str) -> bool {
+        if prompt == "/sigma" || prompt == "/sigma inspect" {
+            self.state
+                .messages
+                .push("Usage: /sigma inspect <directory>".into());
+            return true;
+        }
+        if let Some(directory) = prompt.strip_prefix("/sigma inspect ") {
+            let root = std::path::PathBuf::from(directory.trim());
+            let io = self.io_ops;
+            self.start_task("Sigma pack", move |cancel| {
+                io.inspect_sigma_pack(&root, &cancel)
+            });
+            return true;
+        }
+        false
+    }
+
     fn case_command(&mut self, prompt: &str) -> Result<bool> {
         if self.source_query_command(prompt) {
+            return Ok(true);
+        }
+        if self.sigma_pack_command(prompt) {
             return Ok(true);
         }
         if prompt == "/report preview" || prompt.starts_with("/report preview ") {

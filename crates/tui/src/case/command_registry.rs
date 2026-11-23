@@ -12,7 +12,7 @@ impl Command {
         match self.name {
             "skills" => "Skills",
             "case" | "subagents" | "budget" | "ingest" | "verify" | "seal" | "export"
-            | "report" | "scope" | "home" | "rebuild" => "Case",
+            | "report" | "sigma" | "scope" | "home" | "rebuild" => "Case",
             "evidence" | "evidence-save" | "raw" | "graph" | "timeline" | "entity"
             | "neighbors" | "path" | "search" | "entity-timeline" | "siem-alert"
             | "verify-graph" | "objects" | "object-read" => "Evidence",
@@ -32,6 +32,7 @@ impl Command {
             "settings" => " [model|connectors|keystore|preferences|limits]",
             "subagents" => " [cancel <task>|recover]",
             "report" => " [preview [en|es]]",
+            "sigma" => " inspect <directory>",
             "open" => " <case title or ID>",
             "case" => " delete [case title or ID]",
             "cases" => " [all|open|sealed|inconsistent|deleted]",

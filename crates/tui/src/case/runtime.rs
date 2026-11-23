@@ -443,6 +443,7 @@ fn is_result_card_label(label: &str) -> bool {
     matches!(
         label,
         "Report preview"
+            | "Sigma pack"
             | "SIEM alert"
             | "Show source query plan"
             | "Acquire source query"

@@ -29,6 +29,30 @@ pub struct LocalSigmaPack {
     pub rules: Vec<Vec<u8>>,
 }
 
+/// Validate the exact rule bytes before presenting an analyst's import preview.
+#[cfg(feature = "sigma")]
+pub fn inspect_local_sigma_pack(
+    root: &Path,
+    cancel: &CancellationToken,
+) -> Result<LocalSigmaPack, AppError> {
+    use irmind_sigma::RuleValue;
+    read_local_sigma_pack(root, cancel, |raw| {
+        let document = irmind_sigma::admit_rule(raw).map_err(|_| {
+            AppError::Policy("A Sigma rule is invalid or uses unsupported YAML syntax".into())
+        })?;
+        let text = |name| match document.fields().get(name) {
+            None => Ok(None),
+            Some(RuleValue::Text(value)) => Ok(Some(value.clone())),
+            Some(_) => Err(AppError::Policy("Sigma rule metadata must be text".into())),
+        };
+        Ok(SigmaRuleIdentity {
+            id: text("id")?,
+            version: text("version")?,
+            author: text("author")?,
+        })
+    })
+}
+
 /// Ingest the selected directory without consulting the network. The admission
 /// function validates the complete bounded YAML document and returns its provenance.
 pub fn read_local_sigma_pack(

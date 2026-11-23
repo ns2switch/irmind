@@ -191,6 +191,15 @@ pub trait WorkspaceIo: Send + Sync {
     fn save_evidence(&self, path: &Path, bytes: &[u8]) -> Result<()>;
     fn verify_export(&self, path: &Path, expected_key: &str) -> Result<String>;
     fn case_exporter(&self) -> &dyn irmind_app::CaseExporter;
+    fn inspect_sigma_pack(
+        &self,
+        _directory: &Path,
+        _cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, irmind_app::AppError> {
+        Err(irmind_app::AppError::Policy(
+            "Sigma is unavailable in this workspace".into(),
+        ))
+    }
     fn preview_cited_report(
         &self,
         _engine: &Engine<'_>,
