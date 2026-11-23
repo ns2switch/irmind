@@ -3,9 +3,9 @@
 #![forbid(unsafe_code)]
 use std::{
     env,
-    fs::OpenOptions,
+    fs::{File, OpenOptions},
     io::{self, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Command, ExitCode},
 };
 
@@ -30,10 +30,7 @@ fn run() -> io::Result<ExitCode> {
             env::var_os("IRMIND_NATIVE_MAPPING_OBSERVATIONS")
                 .ok_or_else(|| io::Error::other("missing native mapping observation directory"))?,
         );
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(spool.join(format!("{}.bin", std::process::id())))?;
+        let mut file = create_observation(&spool, std::process::id())?;
         for name in [
             "CARGO_MANIFEST_DIR",
             "CARGO_PKG_NAME",
@@ -47,6 +44,20 @@ fn run() -> io::Result<ExitCode> {
         }
     }
     Ok(ExitCode::SUCCESS)
+}
+
+fn create_observation(spool: &Path, pid: u32) -> io::Result<File> {
+    // Windows may recycle a compiler process ID within the same build.
+    for ordinal in 0..=u16::MAX {
+        let path = spool.join(format!("{pid}-{ordinal}.bin"));
+        match OpenOptions::new().write(true).create_new(true).open(path) {
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
+            result => return result,
+        }
+    }
+    Err(io::Error::other(
+        "too many compiler observations for one process ID",
+    ))
 }
 
 fn write_field(file: &mut impl Write, value: std::ffi::OsString) -> io::Result<()> {
