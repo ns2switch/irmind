@@ -1223,8 +1223,8 @@ dependencies = [
  "irmind-mod-query-athena",
  "irmind-mod-query-azure-log-analytics",
  "irmind-mod-query-bigquery",
- "irmind-mod-sigma",
  "irmind-security",
+ "irmind-sigma",
  "libfuzzer-sys",
  "serde_json",
  "tempfile",
@@ -1754,14 +1754,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "irmind-mod-sigma"
-version = "0.1.0"
-dependencies = [
- "regex",
- "saphyr-parser",
-]
-
-[[package]]
 name = "irmind-process-containment"
 version = "0.1.0"
 dependencies = [
@@ -1783,6 +1775,14 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "unicode-normalization",
+]
+
+[[package]]
+name = "irmind-sigma"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "saphyr-parser",
 ]
 
 [[package]]

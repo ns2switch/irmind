@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 fn layer(name: &str) -> Result<u8, String> {
     match name {
         "irmind-domain" => Ok(0),
-        "irmind-mapping-contracts" | "irmind-app" => Ok(1),
+        "irmind-mapping-contracts" | "irmind-app" | "irmind-sigma" => Ok(1),
         "irmind-tui" => Ok(2),
         "irmind" => Ok(3),
         name if name.starts_with("irmind-") => Ok(2),
@@ -15,6 +15,11 @@ fn layer(name: &str) -> Result<u8, String> {
 }
 
 fn check_edge(from: &str, to: &str) -> Result<(), String> {
+    if from == "irmind-sigma" {
+        return Err(format!(
+            "pure Sigma matcher must not depend on workspace crates: {from} -> {to}"
+        ));
+    }
     if matches!(from, "irmind-build-manifest" | "irmind-calendar") {
         return Err(format!(
             "pure build/calendar utility must not depend on runtime crates: {from} -> {to}"
@@ -92,6 +97,9 @@ fn workspace_dependencies_point_inward() -> Result<(), Box<dyn std::error::Error
 #[test]
 fn deliberate_reverse_edge_is_rejected() {
     assert!(check_edge("irmind-domain", "irmind-app").is_err());
+    assert!(check_edge("irmind-infra", "irmind-sigma").is_ok());
+    assert!(check_edge("irmind-sigma", "irmind-domain").is_err());
+    assert!(check_edge("irmind-sigma", "irmind-infra").is_err());
     assert!(check_edge("irmind-app", "irmind-domain").is_ok());
     assert!(check_edge("irmind-tui", "irmind-domain").is_err());
     assert!(check_edge("irmind-tui", "irmind-app").is_ok());

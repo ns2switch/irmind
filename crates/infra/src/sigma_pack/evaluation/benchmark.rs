@@ -27,6 +27,8 @@ use std::{
 #[cfg(not(debug_assertions))]
 const GIB: u64 = 1024 * 1024 * 1024;
 const INCIDENT_RECORD: u64 = 8192;
+// A benign audit row has the same legacy value as the incident. The original
+// fixture rule tests only that value, so both matches are expected.
 const NEGATIVE_CONTROL: u64 = 8224;
 #[cfg(not(debug_assertions))]
 const RULES_PER_LANE: u64 = 1000;
@@ -236,7 +238,19 @@ fn lane(file: &std::path::Path, original: bool, count: u64) {
     assert!(run.status() == SigmaRunStatusV1::Complete);
     let name = if original { "original" } else { "common" };
     let truth = std::collections::BTreeSet::from([(format!("{name}-0000"), INCIDENT_RECORD)]);
-    let false_positives = actual.difference(&truth).count();
+    let false_matches = actual
+        .difference(&truth)
+        .map(|(id, record)| (id.as_str(), *record))
+        .collect::<Vec<_>>();
+    if original {
+        assert_eq!(false_matches, [("original-0000", NEGATIVE_CONTROL)]);
+        println!(
+            "expected_false_positive=original-0000 record={NEGATIVE_CONTROL} event.code=audit event.action=background LegacyEvent=legacy-signal"
+        );
+    } else {
+        assert!(false_matches.is_empty());
+    }
+    let false_positives = false_matches.len();
     let true_positives = actual.intersection(&truth).count();
     let false_negatives = truth.difference(&actual).count();
     assert_eq!(

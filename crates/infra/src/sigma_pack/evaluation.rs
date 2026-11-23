@@ -8,9 +8,7 @@ use irmind_app::{
     v10_proofs::{SigmaCoverageV1, SigmaRuleKeyV1, SigmaRunStatusV1},
 };
 use irmind_domain::{CommonEventV1, CommonField, CommonValue};
-use irmind_mod_sigma::{
-    RuleValue, SigmaField, SigmaFieldKind, SigmaProgram, SigmaScalar, admit_rule,
-};
+use irmind_sigma::{RuleValue, SigmaField, SigmaFieldKind, SigmaProgram, SigmaScalar, admit_rule};
 use serde_json::Value;
 use std::collections::BTreeMap;
 
@@ -74,7 +72,7 @@ impl<'a> SigmaVariantPrograms<'a> {
                     programs.needs_original |= rule_uses_original(&rule, variant);
                     programs.eligible.push((key, program));
                 }
-                Err(irmind_mod_sigma::CompileError::MissingBinding) => {
+                Err(irmind_sigma::CompileError::MissingBinding) => {
                     programs
                         .skipped
                         .push((key, SigmaCoverageV1::UnsupportedField));
@@ -177,12 +175,12 @@ impl SigmaEvaluation<'_> {
                     self.matches += 1;
                 }
                 Ok(false) => {}
-                Err(irmind_mod_sigma::EvaluationError::OversizedInput) => {
+                Err(irmind_sigma::EvaluationError::OversizedInput) => {
                     self.status = SigmaRunStatusV1::OversizedInput;
                     return Ok(false);
                 }
-                Err(irmind_mod_sigma::EvaluationError::FieldTypeMismatch) => return Err(invalid()),
-                Ok(true) | Err(irmind_mod_sigma::EvaluationError::WorkLimit) => {
+                Err(irmind_sigma::EvaluationError::FieldTypeMismatch) => return Err(invalid()),
+                Ok(true) | Err(irmind_sigma::EvaluationError::WorkLimit) => {
                     self.status = SigmaRunStatusV1::WorkLimit;
                     return Ok(false);
                 }
@@ -214,7 +212,7 @@ impl SigmaEvaluation<'_> {
     }
 }
 
-fn covers(rule: &irmind_mod_sigma::RuleDocument, variant: &SigmaSourceVariant) -> bool {
+fn covers(rule: &irmind_sigma::RuleDocument, variant: &SigmaSourceVariant) -> bool {
     let Some(RuleValue::Mapping(logsource)) = rule.fields().get("logsource") else {
         return false;
     };
@@ -231,7 +229,7 @@ fn covers(rule: &irmind_mod_sigma::RuleDocument, variant: &SigmaSourceVariant) -
     })
 }
 
-fn rule_uses_original(rule: &irmind_mod_sigma::RuleDocument, variant: &SigmaSourceVariant) -> bool {
+fn rule_uses_original(rule: &irmind_sigma::RuleDocument, variant: &SigmaSourceVariant) -> bool {
     fn has_original(node: &RuleValue, fields: &[SigmaFieldBinding]) -> bool {
         match node {
             RuleValue::Mapping(map) => map.keys().any(|name| {
