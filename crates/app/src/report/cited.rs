@@ -4,7 +4,7 @@ use super::{
     ReportLocator, ReportStatement,
 };
 use crate::{
-    AppError, AuditEventKind, CaseId, Engine, SignedEntry,
+    AppError, AuditEventKind, CancellationToken, CaseId, Engine, SignedEntry,
     source_queries::SourceQueryResultV1,
     v10_proofs::{
         CaseCheckpointV1, ReportCitationsV1, V10CheckpointView, V10Citation, V10RowReference,
@@ -14,6 +14,18 @@ use irmind_domain::{EvidenceHash, ParquetArtifact, SourceManifestV2};
 use std::collections::BTreeSet;
 
 impl Engine<'_> {
+    pub fn cited_report_inputs(
+        &self,
+        id: &CaseId,
+        cancel: &CancellationToken,
+    ) -> Result<(Vec<SignedEntry>, Vec<super::Finding>), AppError> {
+        let _lock = self.repo.lock_case(id)?;
+        self.verify_unlocked_cancelable(id, cancel)?;
+        let entries = self.audit_log.entries(id)?;
+        let findings = self.findings_unlocked(id, &entries)?;
+        Ok((entries, findings))
+    }
+
     /// Render already-confirmed findings using the exact source and row from
     /// the review. A bad citation or confirmation invalidates the selection.
     /// This builds an unsigned preview of row citations.

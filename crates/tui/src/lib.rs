@@ -191,6 +191,17 @@ pub trait WorkspaceIo: Send + Sync {
     fn save_evidence(&self, path: &Path, bytes: &[u8]) -> Result<()>;
     fn verify_export(&self, path: &Path, expected_key: &str) -> Result<String>;
     fn case_exporter(&self) -> &dyn irmind_app::CaseExporter;
+    fn preview_cited_report(
+        &self,
+        _engine: &Engine<'_>,
+        _id: &irmind_app::CaseId,
+        _language: irmind_app::ReportDocumentLanguage,
+        _cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, irmind_app::AppError> {
+        Err(irmind_app::AppError::Policy(
+            "Cited report previews are unavailable in this workspace".into(),
+        ))
+    }
     fn large_case_exporter(&self) -> Option<&dyn irmind_app::LargeCaseExporter> {
         None
     }

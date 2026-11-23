@@ -1,6 +1,6 @@
 //! Read only the provenance columns at the authenticated physical row offsets.
 use super::{AppError, FrameReader, storage, storage_reason};
-use arrow_array::{Array, StringArray, UInt64Array};
+use arrow_array::{Array, RecordBatch, StringArray, UInt64Array};
 use irmind_app::{
     CancellationToken,
     v10_proofs::{V10RowReference, verify_v10_row_identity},
@@ -9,11 +9,15 @@ use irmind_domain::{ArtifactSchemaV2, ParquetArtifact};
 use parquet::{
     arrow::{
         ProjectionMask,
-        arrow_reader::{ParquetRecordBatchReaderBuilder, RowSelection, RowSelector},
+        arrow_reader::{
+            ArrowReaderBuilder, ParquetRecordBatchReaderBuilder, RowSelection, RowSelector,
+            SyncReader,
+        },
     },
     file::reader::ChunkReader,
 };
 use std::{
+    collections::{BTreeMap, BTreeSet},
     fs::File,
     io::{Seek, SeekFrom},
 };
@@ -68,17 +72,7 @@ fn verify_rows(
     if references.is_empty() {
         return Ok(());
     }
-    let builder = ParquetRecordBatchReaderBuilder::try_new(reader).map_err(storage)?;
-    let row_count =
-        usize::try_from(builder.metadata().file_metadata().num_rows()).map_err(storage)?;
-    if row_count as u64 != expected_rows {
-        return Err(invalid());
-    }
-    let schema = builder.schema();
-    let source_column = schema.index_of("source_hash").map_err(storage)?;
-    let record_column = schema.index_of("record_index").map_err(storage)?;
-    let projection =
-        ProjectionMask::roots(builder.parquet_schema(), [source_column, record_column]);
+    let (builder, row_count) = row_identity_reader(reader, expected_rows)?;
     let mut selected = Vec::new();
     let mut next = 0usize;
     for reference in references {
@@ -96,9 +90,7 @@ fn verify_rows(
         selected.push(RowSelector::skip(row_count - next));
     }
     let rows = builder
-        .with_projection(projection)
         .with_row_selection(RowSelection::from(selected))
-        .with_batch_size(4096)
         .build()
         .map_err(storage)?;
     let mut expected = references.iter().copied();
@@ -107,14 +99,7 @@ fn verify_rows(
             return Err(AppError::Cancelled);
         }
         let batch = batch.map_err(storage)?;
-        let hashes = batch
-            .column_by_name("source_hash")
-            .and_then(|column| column.as_any().downcast_ref::<StringArray>())
-            .ok_or_else(invalid)?;
-        let records = batch
-            .column_by_name("record_index")
-            .and_then(|column| column.as_any().downcast_ref::<UInt64Array>())
-            .ok_or_else(invalid)?;
+        let (hashes, records) = row_identity_columns(&batch)?;
         for row in 0..batch.num_rows() {
             if hashes.is_null(row) || records.is_null(row) {
                 return Err(invalid());
@@ -130,6 +115,81 @@ fn verify_rows(
         return Err(invalid());
     }
     Ok(())
+}
+
+/// Resolve eligible logical references in physical row order. Authenticate
+/// the artifact under the same open handle before decoding any provenance.
+pub(in crate::seal) fn locate_v10_artifact_rows(
+    mut file: File,
+    artifact: &ParquetArtifact,
+    wanted: &BTreeMap<String, BTreeSet<u64>>,
+    cancel: &CancellationToken,
+    mut found: impl FnMut(&str, u64, u64) -> Result<(), AppError>,
+) -> Result<(), AppError> {
+    let ParquetArtifact::V3(envelope) = artifact;
+    if file.metadata().map_err(storage)?.len() != envelope.core().size {
+        return Err(invalid());
+    }
+    verify_v10_artifact_rows(&mut file, 0, artifact, &[], cancel)?;
+    let (reader, _) = row_identity_reader(file, envelope.pipeline().rows())?;
+    let mut physical_row = 0u64;
+    for batch in reader.build().map_err(storage)? {
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
+        let batch = batch.map_err(storage)?;
+        let (hashes, records) = row_identity_columns(&batch)?;
+        for index in 0..batch.num_rows() {
+            if hashes.is_null(index) || records.is_null(index) {
+                return Err(invalid());
+            }
+            let source = hashes.value(index);
+            let record = records.value(index);
+            if wanted
+                .get(source)
+                .is_some_and(|records| records.contains(&record))
+            {
+                found(source, record, physical_row)?;
+            }
+            physical_row = physical_row.checked_add(1).ok_or_else(invalid)?;
+        }
+    }
+    if physical_row != envelope.pipeline().rows() {
+        return Err(invalid());
+    }
+    Ok(())
+}
+
+fn row_identity_reader<R: ChunkReader + 'static>(
+    reader: R,
+    expected_rows: u64,
+) -> Result<(ArrowReaderBuilder<SyncReader<R>>, usize), AppError> {
+    let builder = ParquetRecordBatchReaderBuilder::try_new(reader).map_err(storage)?;
+    let row_count =
+        usize::try_from(builder.metadata().file_metadata().num_rows()).map_err(storage)?;
+    if row_count as u64 != expected_rows {
+        return Err(invalid());
+    }
+    let schema = builder.schema();
+    let source = schema.index_of("source_hash").map_err(storage)?;
+    let record = schema.index_of("record_index").map_err(storage)?;
+    let projection = ProjectionMask::roots(builder.parquet_schema(), [source, record]);
+    Ok((
+        builder.with_projection(projection).with_batch_size(4096),
+        row_count,
+    ))
+}
+
+fn row_identity_columns(batch: &RecordBatch) -> Result<(&StringArray, &UInt64Array), AppError> {
+    let hashes = batch
+        .column_by_name("source_hash")
+        .and_then(|column| column.as_any().downcast_ref::<StringArray>())
+        .ok_or_else(invalid)?;
+    let records = batch
+        .column_by_name("record_index")
+        .and_then(|column| column.as_any().downcast_ref::<UInt64Array>())
+        .ok_or_else(invalid)?;
+    Ok((hashes, records))
 }
 
 fn invalid() -> AppError {

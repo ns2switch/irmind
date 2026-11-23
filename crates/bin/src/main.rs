@@ -173,6 +173,28 @@ impl RootWorkspaceIo {
 }
 
 impl WorkspaceIo for RootWorkspaceIo {
+    fn preview_cited_report(
+        &self,
+        engine: &Engine<'_>,
+        id: &irmind_app::CaseId,
+        language: irmind_app::ReportDocumentLanguage,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, AppError> {
+        use std::fmt::Write as _;
+        let preview = self
+            .store
+            .preview_cited_report(engine, id, language, cancel)?;
+        let mut heading = "Unsigned cited preview".to_owned();
+        if preview.omitted_findings > 0 {
+            let _ = write!(
+                heading,
+                "\nConfirmed findings without a verified row citation: {}",
+                preview.omitted_findings
+            );
+        }
+        Ok(format!("{heading}\n\n{}", preview.markdown))
+    }
+
     fn definition_store(&self) -> Option<&dyn irmind_app::ParserDefinitionStore> {
         Some(&self.definition_store)
     }

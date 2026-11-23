@@ -442,7 +442,8 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
 fn is_result_card_label(label: &str) -> bool {
     matches!(
         label,
-        "SIEM alert"
+        "Report preview"
+            | "SIEM alert"
             | "Show source query plan"
             | "Acquire source query"
             | "Cloud objects"

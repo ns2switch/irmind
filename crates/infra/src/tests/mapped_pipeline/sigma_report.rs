@@ -35,20 +35,9 @@ fn sigma_match_stays_out_of_cited_reports_until_analyst_confirms_the_exact_row()
         store: store.as_ref(),
         parser: &parser,
     };
-    let source_file = "aws.jsonl";
-    let raw = include_bytes!("../../../../testkit/fixtures/common/cloudtrail-console-login.jsonl");
-    let mut success: serde_json::Value = serde_json::from_slice(raw).unwrap();
-    success["responseElements"]["ConsoleLogin"] = "Success".into();
-    success["eventTime"] = "2026-11-01T00:00:01.123456Z".into();
-    success["eventID"] = "synthetic-console-success".into();
-    let mut source = raw.to_vec();
-    serde_json::to_writer(&mut source, &success).unwrap();
-    source.push(b'\n');
-    fs::write(root.path().join(source_file), source).unwrap();
     let cancel = CancellationToken::new();
-    large
-        .ingest_local(&case.id, root.path(), source_file, false, &cancel)
-        .unwrap();
+    let source_file = "aws.jsonl";
+    ingest_login_pair(&large, &case.id, root.path(), source_file, &cancel);
     engine.verify(&case.id).unwrap();
     let row = scan(&store, &case.id, &cancel);
     let evidence = irmind_domain::EvidenceHash::from_bytes(row.source.evidence_sha256);
@@ -74,11 +63,29 @@ fn sigma_match_stays_out_of_cited_reports_until_analyst_confirms_the_exact_row()
     }]);
     assert!(render(&store, &engine, &case.id, &citations).is_err());
     assert!(!engine.report(&case.id).unwrap().contains(FINDING));
+    let preview = store
+        .preview_cited_report(&engine, &case.id, ReportDocumentLanguage::English, &cancel)
+        .unwrap();
+    assert_eq!(preview.omitted_findings, 0);
+    assert!(!preview.markdown.contains(FINDING));
+
     let empty = render(&store, &engine, &case.id, &ReportCitationsV1(vec![])).unwrap();
     assert!(!String::from_utf8(empty).unwrap().contains(FINDING));
 
     engine.confirm_finding(&case.id, &id).unwrap();
     assert!(engine.report(&case.id).unwrap().contains(FINDING));
+    let preview = store
+        .preview_cited_report(&engine, &case.id, ReportDocumentLanguage::Spanish, &cancel)
+        .unwrap();
+    assert_eq!(preview.omitted_findings, 0);
+    assert!(preview.markdown.contains(FINDING));
+    assert!(preview.markdown.contains("Hallazgos confirmados"));
+    assert!(
+        preview
+            .markdown
+            .contains(&format!("{} · registro {}", evidence.as_str(), row.record))
+    );
+
     let entries = store.entries(&case.id).unwrap();
     citations.0[0].confirmation = reference(entries.last().unwrap());
     let markdown = render(&store, &engine, &case.id, &citations).unwrap();
@@ -91,6 +98,27 @@ fn sigma_match_stays_out_of_cited_reports_until_analyst_confirms_the_exact_row()
         ..row
     });
     assert!(render(&store, &engine, &case.id, &citations).is_err());
+}
+
+fn ingest_login_pair(
+    large: &LargeCaseUseCases<'_, '_>,
+    case: &CaseId,
+    root: &Path,
+    source_file: &str,
+    cancel: &CancellationToken,
+) {
+    let raw = include_bytes!("../../../../testkit/fixtures/common/cloudtrail-console-login.jsonl");
+    let mut success: serde_json::Value = serde_json::from_slice(raw).unwrap();
+    success["responseElements"]["ConsoleLogin"] = "Success".into();
+    success["eventTime"] = "2026-11-01T00:00:01.123456Z".into();
+    success["eventID"] = "synthetic-console-success".into();
+    let mut source = raw.to_vec();
+    serde_json::to_writer(&mut source, &success).unwrap();
+    source.push(b'\n');
+    fs::write(root.join(source_file), source).unwrap();
+    large
+        .ingest_local(case, root, source_file, false, cancel)
+        .unwrap();
 }
 
 fn reference(entry: &irmind_app::SignedEntry) -> V10AuditReference {
