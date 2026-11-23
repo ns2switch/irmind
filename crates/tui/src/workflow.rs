@@ -128,7 +128,7 @@ impl CaseWorkflow<'_, '_> {
         if notices.provisional_mappings != 0 {
             let _ = write!(
                 message,
-                "\nNative mappings: {} provisional bootstrap identities from development builds. Rebuild with the creating build.",
+                "\nNative mappings: {} V1 identities (development bootstrap or pre-V2 release). Rebuild with the creating build.",
                 notices.provisional_mappings
             );
         }

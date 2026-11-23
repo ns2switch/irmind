@@ -76,7 +76,9 @@ identity.
 ## Verification and mapping count
 
 `/verify` distinguishes provisional bootstrap identities recorded by
-development builds from V2 release-profile identities. It obtains the
+development builds from V2 release-profile identities. Releases before V2
+used the same V1 recipe as the bootstrap path, so V1 snapshots carry both
+possibilities in the display. The interface obtains the
 classification from the authenticated mapping snapshots. This identifies
 the recipe used to reproduce the mapping. It does not certify where the
 binary came from. A matching creating build remains necessary to reconstruct
