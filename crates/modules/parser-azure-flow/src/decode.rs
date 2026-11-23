@@ -1,3 +1,4 @@
+mod compact;
 mod tuples;
 use irmind_app::{
     AppError, FixedAppError, ParseReport, ParserIdentity, SourceDecoder,
@@ -42,6 +43,9 @@ impl SourceDecoder for AzureFlowSourceDecoder {
             name: "parser-azure-flow",
             version: "azure-flow-source-v1",
         }
+    }
+    fn compact_ordering(&self) -> Option<&dyn irmind_app::source_mapping::CompactSourceOrdering> {
+        Some(self)
     }
     fn decode_reader(
         &self,

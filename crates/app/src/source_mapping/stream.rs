@@ -1,7 +1,9 @@
 //! Streaming input accounting uses a caller-owned private tuple spool, not a decoded cache.
 mod commitment;
 mod prepared;
+mod reordered;
 mod replay;
+pub use reordered::ReorderedRecords;
 mod validation;
 use super::{
     MappingCatalog, MappingDiagnostic, MappingIdentityV1, MappingOutput, SourceMetadata,
@@ -146,6 +148,17 @@ impl<'a> SourceRecordAccumulator<'a> {
     ) -> Result<(), AppError> {
         spool.write_all(bytes).map_err(|_| invalid())?;
         self.spool_hash.update(bytes);
+        self.count_mapping(source, format, identity, output);
+        Ok(())
+    }
+
+    fn count_mapping(
+        &mut self,
+        source: &SourceRecordV1,
+        format: SourceFormatIdentityV1,
+        identity: Option<&MappingIdentityV1>,
+        output: &MappingOutput,
+    ) {
         self.records += 1;
         self.previous = Some(source.origin().record());
         self.offset = source
@@ -157,12 +170,20 @@ impl<'a> SourceRecordAccumulator<'a> {
             .entry(identity.cloned())
             .or_default()
             .add(output);
-        Ok(())
     }
     pub fn finish<S: Read + Seek>(
         self,
         spool: &mut S,
         report: &ParseReport,
+    ) -> Result<DecodedSourceCommitmentV1, AppError> {
+        let hash = commitment::finish(spool, self.records, self.metadata, self.spool_hash.clone())?;
+        self.finish_accounting(report, hash)
+    }
+
+    fn finish_accounting(
+        self,
+        report: &ParseReport,
+        hash: EvidenceHash,
     ) -> Result<DecodedSourceCommitmentV1, AppError> {
         if self.records == 0
             || self.records != report.accepted as u64
@@ -172,7 +193,6 @@ impl<'a> SourceRecordAccumulator<'a> {
         {
             return Err(invalid());
         }
-        let hash = commitment::finish(spool, self.records, self.metadata, self.spool_hash)?;
         let source = self.source_hash;
         let routes = self
             .routes

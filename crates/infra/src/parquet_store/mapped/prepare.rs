@@ -104,7 +104,7 @@ pub(super) fn decode_projected(
         })
     })
 }
-fn project_row(
+pub(in crate::parquet_store) fn project_row(
     mapped: &MappedSourceRecord,
     id: irmind_app::ParserIdentity<'_>,
     hash: &irmind_domain::EvidenceHash,

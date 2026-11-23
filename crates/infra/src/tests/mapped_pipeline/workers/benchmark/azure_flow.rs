@@ -147,12 +147,16 @@ fn profile_ingest(
 }
 
 fn azure_catalog() -> Arc<MappingCatalog> {
+    azure_catalog_with(Arc::new(AzureFlowSourceDecoder))
+}
+
+fn azure_catalog_with(decoder: Arc<dyn SourceDecoder>) -> Arc<MappingCatalog> {
     let mappings = CloudFlowMapping::azure()
         .unwrap()
         .into_iter()
         .map(|mapping| Arc::new(mapping) as Arc<dyn SourceMapper>)
         .collect();
-    Arc::new(MappingCatalog::freeze(vec![Arc::new(AzureFlowSourceDecoder)], mappings).unwrap())
+    Arc::new(MappingCatalog::freeze(vec![decoder], mappings).unwrap())
 }
 
 #[test]
@@ -174,8 +178,8 @@ fn disordered_azure_wide_merge_preserves_artifacts_and_chain_at_each_worker_cap(
     let mut expected = None;
     let clock = Arc::new(FixedClock::new(1_793_491_200));
     let cancel = CancellationToken::new();
-    for cap in [1, 4] {
-        let run = root.path().join(format!("workers-{cap}"));
+    for (cap, legacy) in [(1, true), (1, false), (4, false)] {
+        let run = root.path().join(format!("workers-{cap}-{legacy}"));
         fs::create_dir(&run).unwrap();
         fs::copy(seed.join("irmind.db"), run.join("irmind.db")).unwrap();
         let ProfiledFixture {
@@ -184,7 +188,14 @@ fn disordered_azure_wide_merge_preserves_artifacts_and_chain_at_each_worker_cap(
             catalog,
             profile,
             ..
-        } = profiled_fixture_with_catalog(&run, azure_catalog());
+        } = profiled_fixture_with_catalog(
+            &run,
+            if legacy {
+                azure_catalog_with(Arc::new(LegacyAzure))
+            } else {
+                azure_catalog()
+            },
+        );
         engine.clock = clock.clone();
         store.set_parallel_worker_limit(NonZeroU16::new(cap));
         let identity = AzureFlowSourceDecoder.identity();
@@ -203,8 +214,16 @@ fn disordered_azure_wide_merge_preserves_artifacts_and_chain_at_each_worker_cap(
                 .len(),
             paths.len()
         );
-        let [_, _, _, _, fan_in, _, _, _] = profile.sort_snapshot();
-        assert!(fan_in > 2);
+        let [runs, _, _, _, fan_in, _, final_copy, _] = profile.sort_snapshot();
+        assert!(runs != 0);
+        if legacy {
+            assert!(fan_in > 2 && final_copy != 0);
+        } else {
+            assert_eq!(
+                final_copy, 0,
+                "compact runs must avoid normalized row spools"
+            );
+        }
         assert!(ingest.verify_parquet(&case.id, &cancel).unwrap() > 0);
         let entries = store.entries(&case.id).unwrap();
         let actual = (
@@ -216,5 +235,33 @@ fn disordered_azure_wide_merge_preserves_artifacts_and_chain_at_each_worker_cap(
         } else {
             expected = Some(actual);
         }
+    }
+}
+
+struct LegacyAzure;
+impl SourceDecoder for LegacyAzure {
+    fn identity(&self) -> irmind_app::ParserIdentity<'_> {
+        AzureFlowSourceDecoder.identity()
+    }
+
+    fn decode_reader(
+        &self,
+        input: irmind_app::source_mapping::SourceInput<'_>,
+        emit: &mut dyn FnMut(
+            irmind_domain::Tainted<irmind_domain::SourceRecordV1>,
+        ) -> Result<(), AppError>,
+    ) -> Result<irmind_app::ParseReport, AppError> {
+        AzureFlowSourceDecoder.decode_reader(input, emit)
+    }
+
+    fn decode_with_budget(
+        &self,
+        input: irmind_app::source_mapping::DecodeInput<'_>,
+        budget: irmind_app::source_mapping::DecodeBudget,
+        emit: &mut dyn FnMut(
+            irmind_domain::Tainted<irmind_domain::SourceRecordV1>,
+        ) -> Result<(), AppError>,
+    ) -> Result<irmind_app::ParseReport, AppError> {
+        AzureFlowSourceDecoder.decode_with_budget(input, budget, emit)
     }
 }

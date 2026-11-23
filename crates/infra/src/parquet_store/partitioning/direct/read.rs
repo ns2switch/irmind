@@ -11,6 +11,7 @@ use std::io::{BufRead, Read as _, Seek as _};
 pub(super) enum Plan {
     Stream(Input, EvidenceHash),
     Sorted(Box<StagedSource>),
+    Compact(Box<super::compact::Planned>),
 }
 #[derive(Clone, Copy)]
 pub(super) struct OrderHints<'a> {
@@ -185,6 +186,14 @@ fn plan_hashed(
     if path == first_path && &hash != first_hash {
         return Err(source_changed(path)?);
     }
+    let (input, initial) = match hash_failure(
+        super::compact::plan(store, request, input, initial, cancel),
+        &path,
+    )? {
+        super::compact::Choice::Stream(input) => return Ok(Plan::Stream(input, hash)),
+        super::compact::Choice::Compact(source) => return Ok(Plan::Compact(source)),
+        super::compact::Choice::Fallback(input, initial) => (input, initial),
+    };
     if path != first_path {
         return hash_failure(
             prefix::plan_source(store, request, input, initial, hash, cancel),

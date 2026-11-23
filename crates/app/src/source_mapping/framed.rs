@@ -121,6 +121,20 @@ impl<'a> SourceFrameEmitter<'a> {
         ordinal: u64,
     ) -> Result<Tainted<SourceRecordV1>, AppError> {
         let record = self.report.accepted as u64;
+        self.record_at(frame, offset, record, ordinal)
+    }
+
+    /// Recreate a previously validated source-order position from a private locator.
+    pub fn record_at(
+        &self,
+        frame: DecodedSourceFrame,
+        offset: Option<u64>,
+        record: u64,
+        ordinal: u64,
+    ) -> Result<Tainted<SourceRecordV1>, AppError> {
+        if record > ordinal || ordinal >= 10_000_000 {
+            return Err(limit());
+        }
         let origin = EventOrigin::try_new(
             self.source_hash.clone(),
             record,

@@ -6,6 +6,7 @@ mod projection;
 mod rebuild;
 use super::{AppError, ParquetStore};
 use irmind_app::source_mapping::MappingCatalog;
+pub(in crate::parquet_store) use prepare::project_row;
 pub(in crate::parquet_store) use projection::route_from_path;
 use std::{path::Path, sync::Arc};
 
