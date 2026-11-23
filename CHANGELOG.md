@@ -4,6 +4,24 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+## 0.6.2 — Reproducible macOS binaries and build toolchain records
+
+- Reproduce the macOS main executable across clean checkouts on Intel and
+  Apple Silicon with fixed build paths. Check the main and EVTX SHA-256 on
+  all five release targets.
+- Sign and publish `BUILD-ENVIRONMENT.json` with exact release tool
+  versions. See the [reproducible build guide](docs/reproducible-builds.md)
+  for steps to reinstall those tools and compare binaries from the tag.
+- Sort disordered Azure VNet and NSG flow logs using compact
+  frame locators before expanding rows. Retain the existing signed record
+  order, normalization quota and disk admission check.
+  [Release benchmark](https://github.com/ns2switch/irmind/pull/388).
+- Pin Rust 1.97.1 for release and CI builds. The release version changes
+  the root lockfile, and the ingestion change updates code covered by the
+  existing native mapping identities. Keep v0.6.1 for
+  complete reconstruction of v0.6.1 artifacts. The case marker and export
+  V9 encoding are unchanged.
+
 ## 0.6.1 — Reproducible release builds and URL dependency update
 
 - Update `url` to 2.5.9 for [RUSTSEC-2026-0592](https://rustsec.org/advisories/RUSTSEC-2026-0592.html)
