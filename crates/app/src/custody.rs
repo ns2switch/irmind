@@ -85,3 +85,4 @@ impl SealPreview {
 pub(crate) mod incremental;
 mod migration;
 mod seal_verify;
+pub use seal_verify::VerifiedCaseNotices;

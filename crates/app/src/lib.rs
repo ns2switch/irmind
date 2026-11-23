@@ -103,7 +103,8 @@ pub use configuration::{
     StatusColor, StatusItem, StatusSegment,
 };
 pub use custody::{
-    SealPreview, export_case, export_case_with_originals, verify_export, verify_export_details,
+    SealPreview, VerifiedCaseNotices, export_case, export_case_with_originals, verify_export,
+    verify_export_details,
 };
 pub use engine::{CryptoPorts, Engine, EnginePorts, verify_case_metadata};
 pub use ingest::TimelineEvent;

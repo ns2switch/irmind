@@ -14,6 +14,7 @@ pub mod ordered_decode;
 mod ports;
 pub use normalization_budget::{NormalizedExpansionProfile, NormalizedSourceBudget};
 mod proofs;
+pub(crate) use proofs::native_mapping_build_counts;
 pub use proofs::{mapping_installation_proofs, required_mapping_installations};
 mod prepared;
 mod stream;

@@ -2,7 +2,7 @@
 use super::{MappingError, MappingManifest, MappingProvenance, verify_mapping_installation};
 use crate::{AppError, SignedOperation, Verifier};
 use irmind_domain::{AuditEventKind, EvidenceHash, MappingProfileRecordV1};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub fn required_mapping_installations<'a>(
     events: impl IntoIterator<Item = (AuditEventKind, &'a str)>,
@@ -29,6 +29,34 @@ pub fn required_mapping_installations<'a>(
         }
     }
     Ok(required)
+}
+
+/// Count distinct native build recipes in an authenticated snapshot.
+pub(crate) fn native_mapping_build_counts(
+    entries: &[crate::SignedEntry],
+) -> Result<(usize, usize), AppError> {
+    let (mut provisional, mut release) = (BTreeSet::new(), BTreeSet::new());
+    for entry in entries
+        .iter()
+        .filter(|entry| entry.kind == AuditEventKind::MappingProfileV1)
+    {
+        let MappingProfileRecordV1::Snapshot(snapshot) =
+            MappingProfileRecordV1::decode(&entry.payload)
+                .map_err(|_| MappingError::InvalidManifest)?
+        else {
+            continue;
+        };
+        let manifest = MappingManifest::from_snapshot(&snapshot)?;
+        if let Some(is_provisional) = manifest.native_build_is_provisional() {
+            let builds = if is_provisional {
+                &mut provisional
+            } else {
+                &mut release
+            };
+            builds.insert(manifest.identity().implementation().clone());
+        }
+    }
+    Ok((provisional.len(), release.len()))
 }
 
 /// Exactly one matching proof per referenced installation; unrelated global
