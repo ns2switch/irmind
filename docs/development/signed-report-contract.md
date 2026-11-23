@@ -17,8 +17,7 @@ because a citation cannot be resolved. Omission leaves their case status intact.
 Claims consist of typed facts, analyst-confirmed conclusions attributed to
 the analyst, and explicit supported and refuting references. Populate
 descriptive claims from the resolved fields and preserve provenance and
-outcome distinctions. A recommendation is expressed as an analyst judgment
-linked to the confirmed evidence. Arithmetic, range endpoints and UTC
+outcome distinctions.  Arithmetic, range endpoints and UTC
 precision have a deterministic checked representation. For a limited cloud
 query or partial detection, attach the signed limitation with its citation
 whenever a claim uses that source. A partial capture cannot support a claim
@@ -33,6 +32,24 @@ model prose remains in a separate review draft. An analyst who wants to add a
 new claim uses the existing propose-and-confirm flow with exact citations.
 This avoids treating citation membership as proof of an arbitrary sentence.
 Local report generation works with the model disabled.
+
+### Analyst-authored material and mandatory coverage
+
+The analyst can author scope, methodology, context and recommendations.
+Show these under their own heading and identify the analyst and signature.
+These sections do not require citations. Render them separately from sourced
+facts and never use them as evidence for a claim. The model may suggest a
+draft that the analyst can edit. Only the analyst’s attended signature on
+the exact edited text publishes it. An unsigned draft stays out of both
+renderings and the signed export.
+
+Include a mandatory Limitations and coverage section in both renderings.
+At the report checkpoint, enumerate unavailable sources, declared coverage
+gaps for loaded skills, committed query row limits and partial Sigma
+executions. Keep exact receipt identifiers for limits and partial results.
+Separate known coverage gaps from unknown availability. An empty list means
+no limitations were recorded by these checks. It cannot establish complete
+source coverage.
 
 ## Deterministic rendering
 
@@ -53,18 +70,15 @@ URI actions, scripts, annotations with actions, attachments or embedded HTML.
 Copy source bytes only in the existing evidence export, with their existing
 custody and access controls.
 
-## PDF implementation options
+## Text-only PDF
 
-| Option | Cost and risk |
-| --- | --- |
-| Fixed text-only PDF serializer with no new production crate | Recommended first option. A small closed object grammar and fixed metrics make stable bytes feasible. IRMind owns escaping, pagination, offsets and xref correctness, so verify the result with an independent reader. Use Base 14 Courier with a fixed WinAnsi encoding for initial English and Spanish output. Render unsupported code points as reversible visible escapes in PDF and retain exact text in the UTF-8 Markdown. This is a simple PDF, with no PDF/A, custom fonts or shaping claim. |
-| Restricted low-level `pdf-writer` | Upstream handles object and string serialization, which reduces manual offset and escape code. An exact release and its dependency closure would need review and reproducibility measurements. The same IRMind text, font and layout restrictions still apply. |
-| Higher-level `printpdf` with default features disabled | Offers pagination and font facilities depending on features, with a broader code and dependency surface. A pinned font file and license, fixed shaping inputs, and cross-platform binary and document reproducibility tests would be needed. HTML, image and dynamic font resolution paths offer little value for this report. |
-
-Review expected binary-size and compile-time changes with a dev-only probe
-before choosing a production dependency. The proposal recommends starting
-with the bounded dependency-free option. [Low-level PDF writer upstream](https://github.com/typst/pdf-writer) ·
-[Higher-level PDF tooling and features](https://github.com/fschutt/printpdf/blob/master/Cargo.toml)
+Use the approved small text-only serializer without a new production
+dependency. Its closed object grammar, Base 14 Courier with fixed WinAnsi
+encoding, fixed pagination and explicit xref offsets produce deterministic
+bytes. Unsupported characters use reversible visible escapes in PDF. The
+UTF-8 Markdown preserves their literal representation. Validate structure,
+escaping, page boundaries and absent active content with an independent
+reader. The release makes no PDF/A or custom typography claim.
 
 ## Proposed signing and export
 
@@ -75,6 +89,7 @@ with the bounded dependency-free option. [Low-level PDF writer upstream](https:/
    and export previously signed reports.
 2. A proposed `ReportPublishedV1` binds the input checkpoint, confirmed
    finding and citation manifest commitment, optional model draft receipt,
+   a digest of the exact analyst-authored sections, a coverage manifest,
    rendering options, renderer version, media type, byte length and output
    SHA-256. Stage the immutable report in a private case directory before the
    ledger commit. Publication and recovery follow the signed inventory,
@@ -85,7 +100,8 @@ with the bounded dependency-free option. [Low-level PDF writer upstream](https:/
    Each referenced report and citation manifest is covered by the chain and
    export verification. Agree on both section layouts before the first
    release that writes V10. Generate independent canonical records and
-   export-header vectors before implementation.
+   export-header vectors before implementation. The shared byte proposal is
+   in [the Sigma and reports V10 contract review](https://github.com/ns2switch/irmind/pull/389).
 4. `/verify` checks the output digest and length, the chain and author,
    the original checkpoint and confirmation, and the exact row/object
    citations. With the matching renderer it can also reproduce the report
