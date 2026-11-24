@@ -8,11 +8,24 @@ de datos permanecen en sus ubicaciones registradas. Sellar hace inmutable el cas
 
 ## Casos y exportaciones de una versión anterior
 
-La versión 0.6 usa el marcador de caso 5, artefactos Parquet V3 con mapeo y la
-exportación V9. Usa la versión que creó el caso para abrirlo, verificarlo o
+La versión 0.7 usa el marcador de caso 6, artefactos Parquet V3 con mapeo y la
+exportación V10. Usa la versión que creó el caso para abrirlo, verificarlo o
 exportarlo. Para usar la versión actual, verifica los originales con la versión
 que creó el caso e ingiérelos en un caso nuevo. El caso original conserva sus
 aprobaciones, hallazgos confirmados y sello.
+
+## Publicar un informe firmado
+
+En un caso abierto, usa `/report preview en` o `/report preview es`. El informe
+incluye solo hallazgos que hayas confirmado y que apunten a una fila exacta de
+evidencia. Consulta la sección de cobertura para ver la disponibilidad de las
+fuentes, los huecos de las skills y las consultas que alcanzaron su límite.
+
+Usa `/report save md en` o `/report save pdf es` para firmar y conservar
+el documento en el caso. El comando muestra su SHA-256. Tras sellar el caso, la
+exportación V10 incluye sus informes publicados. `/verify` comprueba la firma,
+las filas de origen, la cobertura y los bytes del documento. Para publicar otra
+revisión, usa un caso abierto.
 
 ## Borrar un caso no sellado
 
