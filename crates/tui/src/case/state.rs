@@ -32,6 +32,7 @@ pub(super) struct ParserPrompt {
     pub descriptions: std::collections::BTreeMap<String, String>,
     pub selected: usize,
     pub typed_option: String,
+    pub invalid_number: bool,
 }
 
 pub(super) enum ParserPromptAction {
@@ -41,38 +42,86 @@ pub(super) enum ParserPromptAction {
 }
 
 impl ParserPrompt {
-    pub(super) fn update(&mut self, key: KeyCode) -> ParserPromptAction {
+    pub(super) fn new(
+        source: String,
+        mut candidates: Vec<(String, u8)>,
+        descriptions: BTreeMap<String, String>,
+    ) -> Self {
+        candidates.sort_by_key(|(_, confidence)| std::cmp::Reverse(*confidence));
+        if candidates
+            .first()
+            .is_some_and(|(_, confidence)| *confidence > 0)
+        {
+            candidates.retain(|(_, confidence)| *confidence > 0);
+        }
+        Self {
+            source,
+            candidates,
+            descriptions,
+            selected: 0,
+            typed_option: String::new(),
+            invalid_number: false,
+        }
+    }
+
+    pub(super) fn page_size(body_height: u16) -> usize {
+        usize::from(body_height.saturating_sub(6).max(1))
+    }
+
+    pub(super) fn update(&mut self, key: KeyCode, page: usize) -> ParserPromptAction {
+        let last = self.candidates.len().saturating_sub(1);
         match key {
-            KeyCode::Esc => ParserPromptAction::Cancel,
-            KeyCode::Up => {
-                self.selected = self.selected.saturating_sub(1);
-                self.typed_option.clear();
-                ParserPromptAction::Keep
-            }
-            KeyCode::Down => {
-                self.selected = (self.selected + 1).min(self.candidates.len().saturating_sub(1));
-                self.typed_option.clear();
-                ParserPromptAction::Keep
-            }
-            KeyCode::Char(ch) if ch.is_ascii_digit() && self.typed_option.len() < 3 => {
-                self.typed_option.push(ch);
-                ParserPromptAction::Keep
+            KeyCode::Esc => return ParserPromptAction::Cancel,
+            KeyCode::Enter if self.invalid_number => return ParserPromptAction::Keep,
+            KeyCode::Enter if self.typed_option.is_empty() => {
+                return self
+                    .candidates
+                    .get(self.selected)
+                    .map_or(ParserPromptAction::Keep, |(parser, _)| {
+                        ParserPromptAction::Select(parser.clone())
+                    });
             }
             KeyCode::Enter => {
-                let selected = self
+                let choice = self
                     .typed_option
                     .parse::<usize>()
                     .ok()
                     .and_then(|number| number.checked_sub(1))
-                    .unwrap_or(self.selected);
-                self.candidates
-                    .get(selected)
-                    .map_or(ParserPromptAction::Keep, |(parser, _)| {
-                        ParserPromptAction::Select(parser.clone())
-                    })
+                    .and_then(|index| self.candidates.get(index));
+                if let Some((parser, _)) = choice {
+                    return ParserPromptAction::Select(parser.clone());
+                }
+                self.invalid_number = true;
+                return ParserPromptAction::Keep;
             }
-            _ => ParserPromptAction::Keep,
+            KeyCode::Backspace => {
+                self.typed_option.pop();
+                self.invalid_number = false;
+                return ParserPromptAction::Keep;
+            }
+            KeyCode::Char(ch) if ch.is_ascii_digit() => {
+                let max_digits = usize::MAX.ilog10() as usize + 1;
+                if self.typed_option.len() > max_digits {
+                    return ParserPromptAction::Keep;
+                }
+                if self.invalid_number {
+                    self.typed_option.clear();
+                }
+                self.typed_option.push(ch);
+                self.invalid_number = self.typed_option.len() > max_digits;
+                return ParserPromptAction::Keep;
+            }
+            KeyCode::Up => self.selected = self.selected.saturating_sub(1),
+            KeyCode::Down => self.selected = self.selected.saturating_add(1).min(last),
+            KeyCode::PageUp => self.selected = self.selected.saturating_sub(page),
+            KeyCode::PageDown => self.selected = self.selected.saturating_add(page).min(last),
+            KeyCode::Home => self.selected = 0,
+            KeyCode::End => self.selected = last,
+            _ => return ParserPromptAction::Keep,
         }
+        self.typed_option.clear();
+        self.invalid_number = false;
+        ParserPromptAction::Keep
     }
 }
 
@@ -398,26 +447,32 @@ mod tests {
 
     #[test]
     fn parser_prompt_uses_arrows_or_number_then_enter_and_escape_cancels() {
-        let mut prompt = ParserPrompt {
-            descriptions: std::collections::BTreeMap::default(),
-            source: "events.json".into(),
-            candidates: vec![("parser-json".into(), 45), ("parser-ecs".into(), 45)],
-            selected: 0,
-            typed_option: String::new(),
-        };
+        let mut prompt = ParserPrompt::new(
+            "events.json".into(),
+            vec![("parser-json".into(), 45), ("parser-ecs".into(), 45)],
+            BTreeMap::new(),
+        );
         assert!(matches!(
-            prompt.update(KeyCode::Down),
+            prompt.update(KeyCode::Down, 12),
             ParserPromptAction::Keep
         ));
         assert!(
-            matches!(prompt.update(KeyCode::Enter), ParserPromptAction::Select(name) if name == "parser-ecs")
+            matches!(prompt.update(KeyCode::Enter, 12), ParserPromptAction::Select(name) if name == "parser-ecs")
         );
-        prompt.update(KeyCode::Char('1'));
+        prompt.update(KeyCode::Char('1'), 12);
         assert!(
-            matches!(prompt.update(KeyCode::Enter), ParserPromptAction::Select(name) if name == "parser-json")
+            matches!(prompt.update(KeyCode::Enter, 12), ParserPromptAction::Select(name) if name == "parser-json")
         );
+        prompt.typed_option = format!("{}1", "0".repeat(usize::MAX.ilog10() as usize));
+        prompt.update(KeyCode::Char('9'), 12);
+        prompt.update(KeyCode::Char('1'), 12);
+        assert!(prompt.invalid_number);
         assert!(matches!(
-            prompt.update(KeyCode::Esc),
+            prompt.update(KeyCode::Enter, 12),
+            ParserPromptAction::Keep
+        ));
+        assert!(matches!(
+            prompt.update(KeyCode::Esc, 12),
             ParserPromptAction::Cancel
         ));
     }

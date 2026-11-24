@@ -436,3 +436,128 @@ fn interrupted_plan_recovery_is_legible_at_eighty_columns() {
     }
     insta::assert_snapshot!("interrupted_plan_recovery_80", shown);
 }
+
+#[test]
+fn parser_prompt_keeps_all_forty_choices_reachable_at_both_heights() {
+    use crate::case::state::{ParserPrompt, ParserPromptAction};
+    use crossterm::event::KeyCode;
+
+    for height in [24, 50] {
+        let mut terminal = Terminal::new(TestBackend::new(80, height)).unwrap();
+        let body = overlay_body(terminal.size().unwrap().into(), "", false, false);
+        let page = ParserPrompt::page_size(body.height);
+        let mut prompt = ParserPrompt::new(
+            "very-long/".repeat(20),
+            (1..=40)
+                .rev()
+                .map(|n| (format!("parser-{n}"), 41 - n))
+                .collect(),
+            (1..=40)
+                .map(|n| (format!("parser-{n}"), "long description ".repeat(40)))
+                .collect(),
+        );
+        for (key, expected) in [(KeyCode::Down, 0..40), (KeyCode::Up, 0..40)] {
+            for offset in expected {
+                let index = if key == KeyCode::Down {
+                    offset
+                } else {
+                    39 - offset
+                };
+                assert_eq!(prompt.selected, index);
+                let shown = render_parser_prompt(&mut terminal, &prompt, body);
+                assert!(shown.contains(&format!("> {}. parser-{}", index + 1, index + 1)));
+                assert_eq!(shown.contains("↑ more"), index > page / 2);
+                assert!(shown.contains("Enter confirm"));
+                prompt.update(key, page);
+            }
+        }
+        assert!(render_parser_prompt(&mut terminal, &prompt, body).contains("↓ more"));
+        prompt.update(KeyCode::End, page);
+        assert!(!render_parser_prompt(&mut terminal, &prompt, body).contains("↓ more"));
+        prompt.update(KeyCode::PageUp, page);
+        assert_eq!(prompt.selected, 39 - page);
+        prompt.update(KeyCode::Home, page);
+        prompt.update(KeyCode::PageDown, page);
+        assert_eq!(prompt.selected, page);
+        for digit in ['9', '9'] {
+            prompt.update(KeyCode::Char(digit), page);
+        }
+        assert!(matches!(
+            prompt.update(KeyCode::Enter, page),
+            ParserPromptAction::Keep
+        ));
+        assert!(render_parser_prompt(&mut terminal, &prompt, body).contains("No option 99"));
+        for digit in ['3', '7'] {
+            prompt.update(KeyCode::Char(digit), page);
+        }
+        assert!(
+            matches!(prompt.update(KeyCode::Enter, page), ParserPromptAction::Select(id) if id == "parser-37")
+        );
+    }
+}
+
+fn render_parser_prompt(
+    terminal: &mut Terminal<TestBackend>,
+    prompt: &crate::case::state::ParserPrompt,
+    body: Rect,
+) -> String {
+    let overlay =
+        crate::case::render::parser_prompt_text(prompt, body, |text| Ok(text.to_owned())).unwrap();
+    draw_case(
+        terminal,
+        &CaseFrame {
+            title: "Synthetic",
+            guide: None,
+            guide_scroll: 0,
+            messages: "",
+            visible_lines: None,
+            input: "",
+            input_focused: false,
+            panel: "",
+            overlay: Some(&overlay),
+            menu: None,
+            tab: 0,
+            sidebar_visible: false,
+            sidebar_scroll: 0,
+            overlay_scroll: 0,
+            new_content: false,
+            model: "local",
+            tokens: None,
+            cost: "",
+            pending: 0,
+            detections: 0,
+            status: "idle",
+            footer: None,
+        },
+    )
+    .unwrap();
+    screen(terminal)
+}
+
+#[test]
+fn parser_prompt_hides_zero_confidence_unless_no_positive_candidates_exist() {
+    use crate::case::state::ParserPrompt;
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).unwrap();
+    let body = overlay_body(terminal.size().unwrap().into(), "", false, false);
+    let prompt = ParserPrompt::new(
+        "synthetic".into(),
+        vec![
+            ("unknown".into(), 0),
+            ("csv".into(), 50),
+            ("json".into(), 78),
+        ],
+        std::collections::BTreeMap::new(),
+    );
+    let shown = render_parser_prompt(&mut terminal, &prompt, body);
+    assert!(shown.contains("> 1. json"));
+    assert!(shown.contains("2. csv"));
+    assert!(!shown.contains("unknown"));
+    let prompt = ParserPrompt::new(
+        "synthetic".into(),
+        vec![("unknown".into(), 0)],
+        std::collections::BTreeMap::new(),
+    );
+    let shown = render_parser_prompt(&mut terminal, &prompt, body);
+    assert!(shown.contains("Detection found no positive match"));
+    assert!(shown.contains("> 1. unknown"));
+}
