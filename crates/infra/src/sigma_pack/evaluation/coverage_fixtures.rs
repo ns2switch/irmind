@@ -244,3 +244,96 @@ fn sigma_cloudtrail_operation_and_principal_require_the_aws_cloudtrail_source() 
         );
     }
 }
+
+#[test]
+fn sigma_network_separates_event_classes_and_source_destination_roles() {
+    let reviewed = parse_table(include_str!("../network-v1.toml"));
+    for (product, service, field, condition) in [
+        (
+            "zeek",
+            "dns",
+            CommonField::DnsQuestionName,
+            "{query: probe.example.test, 'id.orig_h|cidr': 203.0.113.0/24}",
+        ),
+        (
+            "zeek",
+            "http",
+            CommonField::UrlDomain,
+            "{host: probe.example.test, 'id.orig_h|cidr': 203.0.113.0/24}",
+        ),
+        (
+            "zeek",
+            "conn",
+            CommonField::NetworkTransport,
+            "{proto: tcp, 'id.orig_h|cidr': 203.0.113.0/24}",
+        ),
+        (
+            "suricata",
+            "dns",
+            CommonField::DnsQuestionName,
+            "{dns.rrname: probe.example.test, 'src_ip|cidr': 203.0.113.0/24}",
+        ),
+        (
+            "suricata",
+            "http",
+            CommonField::UrlDomain,
+            "{http.hostname: probe.example.test, 'src_ip|cidr': 203.0.113.0/24}",
+        ),
+        (
+            "suricata",
+            "flow",
+            CommonField::NetworkTransport,
+            "{Protocol: tcp, 'src_ip|cidr': 203.0.113.0/24}",
+        ),
+    ] {
+        let variant = reviewed
+            .variants
+            .iter()
+            .find(|binding| {
+                binding.product.as_deref() == Some(product)
+                    && binding.service.as_deref() == Some(service)
+            })
+            .unwrap();
+        let taxonomy = format!("{{product: {product}, service: {service}}}");
+        for (action, source, dest, expected) in [
+            (service, "203.0.113.77", "192.0.2.5", 1),
+            (service, "192.0.2.5", "203.0.113.77", 0),
+            ("unreviewed", "203.0.113.77", "192.0.2.5", 0),
+        ] {
+            let value = if field == CommonField::NetworkTransport {
+                "tcp"
+            } else {
+                "probe.example.test"
+            };
+            let row = synthetic_row(
+                variant,
+                EventHeaderV1::default().with_action(action).unwrap(),
+                [
+                    (field, CommonValue::Text(EventText::new(value).unwrap())),
+                    (
+                        CommonField::SourceIp,
+                        CommonValue::Ip(source.parse().unwrap()),
+                    ),
+                    (
+                        CommonField::DestinationIp,
+                        CommonValue::Ip(dest.parse().unwrap()),
+                    ),
+                ],
+            );
+            assert_eq!(
+                evaluate(variant, &taxonomy, condition, &row, None),
+                (expected, None)
+            );
+            assert_eq!(
+                evaluate(
+                    variant,
+                    &format!("{{product: {product}, service: unreviewed}}"),
+                    condition,
+                    &row,
+                    None
+                ),
+                (0, Some(SigmaCoverageV1::UnsupportedLogsource))
+            );
+        }
+    }
+}
