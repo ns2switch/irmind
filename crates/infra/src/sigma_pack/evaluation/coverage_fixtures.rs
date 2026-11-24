@@ -203,3 +203,44 @@ fn sigma_linux_ecs_requires_linux_platform_and_a_supported_service() {
         );
     }
 }
+
+#[test]
+fn sigma_cloudtrail_operation_and_principal_require_the_aws_cloudtrail_source() {
+    let table = parse_table(include_str!("../cloudtrail-v1.toml"));
+    let variant = &table.variants[0];
+    for (action, principal, expected) in [
+        ("DeleteTrail", "synthetic/operator", 1),
+        ("DeleteTrail", "synthetic/auditor", 0),
+        ("StartLogging", "synthetic/operator", 0),
+    ] {
+        let row = synthetic_row(
+            variant,
+            EventHeaderV1::default().with_action(action).unwrap(),
+            [],
+        );
+        let raw = format!(
+            r#"{{"eventName":"{action}","eventSource":"cloudtrail.amazonaws.com","userIdentity":{{"principalId":"{principal}"}},"sourceIPAddress":"203.0.113.77"}}"#
+        );
+        let selection = "{eventName: DeleteTrail, eventSource: cloudtrail.amazonaws.com, userIdentity.principalId: synthetic/operator, sourceIPAddress: 203.0.113.77}";
+        assert_eq!(
+            evaluate(
+                variant,
+                "{product: aws, service: cloudtrail}",
+                selection,
+                &row,
+                Some(&raw)
+            ),
+            (expected, None)
+        );
+        assert_eq!(
+            evaluate(
+                variant,
+                "{product: aws, service: guardduty}",
+                selection,
+                &row,
+                Some(&raw)
+            ),
+            (0, Some(SigmaCoverageV1::UnsupportedLogsource))
+        );
+    }
+}
