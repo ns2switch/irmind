@@ -43,14 +43,84 @@ def common(parser, action):
     }
 
 
-def projection(label, parser, action, input_record, original):
-    envelope = {"common": common(parser, action), "format": FORMAT, "original": original}
-    return {
+def projection(label, parser, action, input_record, original, unavailable=None, xff=None):
+    envelope = {
+        "common": common(parser, action),
+        "format": FORMAT,
+        "original": original,
+        "unavailable": unavailable or {},
+    }
+    expected = {
         "case": label,
         "source": input_record,
-        "common": envelope["common"],
         "retained": envelope,
         **commitment(canonical(envelope)),
+    }
+    if xff is not None:
+        expected["request"] = {"X-Forwarded-For": xff}
+    if unavailable:
+        expected["exact_field_rule_result"] = "partial"
+    return expected
+
+
+def partial_run_vectors(field_table):
+    # A rule matches a healthy row and is indeterminate for two other rows.
+    # A second source supplies a separate unavailable field to another rule.
+    def sha(raw):
+        return hashlib.sha256(raw).digest()
+
+    def u64(value):
+        return struct.pack(">Q", value)
+
+    def entries(*items):
+        return u64(len(items)) + b"".join(items)
+
+    def ref(sequence, name):
+        return u64(sequence) + sha(name)
+
+    ip = text(b"synthetic-ip-rule") + sha(b"synthetic IP rule")
+    status = text(b"synthetic-status-rule") + sha(b"synthetic status rule")
+    kubernetes = ref(2, b"synthetic Kubernetes manifest") + sha(b"synthetic Kubernetes original")
+    gke = ref(4, b"synthetic GKE manifest") + sha(b"synthetic GKE original")
+    row = kubernetes + u64(9) + ref(3, b"synthetic Kubernetes artifact") + sha(b"synthetic Parquet") + u64(5)
+    source_scope = b"irmind-sigma-source-scope-v1\0" + entries(kubernetes, gke)
+    compiled = b"irmind-sigma-compiled-rules-v1\0" + entries(ip + entries(u64(3)), status + entries(u64(6)))
+    prefix = (b"irmind-sigma-run-results-v2\0"
+              + entries(ip + bytes(2), status + bytes(2))
+              + entries(ip + row + bytes(1)))
+    rule_counts = entries(ip + u64(2), status + u64(1))
+    results = prefix + entries(kubernetes + u64(2), gke + u64(1)) + rule_counts
+
+    descriptors = entries(*(
+        bytes([kind]) + sha(body) + u64(len(body))
+        for kind, body in [(2, field_table), (3, source_scope), (4, compiled), (5, results)]
+    ))
+    receipt = (
+        b"irmind-sigma-run-v1\0"
+        + text(b"00000000-0000-4000-8000-000000000010") + ref(7, b"synthetic checkpoint")
+        + sha(b"synthetic pack admission") + sha(b"synthetic artifact inventory") + sha(source_scope)
+        + struct.pack(">qq", 1795392000000000, 1795395600000000)
+        + sha(compiled) + sha(field_table) + text(b"irmind-sigma-evaluator-v2")
+        + u64(1500) + u64(1125) + bytes([5]) + u64(1) + sha(results)
+        + sha(b"irmind-sigma-proof-set-v1\0" + descriptors)
+    )
+    return {
+        "results": commitment(results),
+        "receipt": commitment(receipt),
+        "scope": commitment(source_scope),
+        "compiled_rules": commitment(compiled),
+        "invalid_results": {
+            "duplicate_source": commitment(prefix + entries(kubernetes + u64(2), kubernetes + u64(1)) + rule_counts),
+            "zero_source_rows": commitment(prefix + entries(kubernetes + u64(0), gke + u64(1)) + rule_counts),
+            "out_of_scope_source": commitment(prefix + entries(ref(6, b"outside scope") + sha(b"other source") + u64(2)) + rule_counts),
+        },
+        "expected_coverage": {
+            "one_valid_match": True,
+            "distinct_unavailable_rows_by_source": {"kubernetes": 2, "gke": 1},
+            "indeterminate_rows_by_rule": {"synthetic-ip-rule": 2, "synthetic-status-rule": 1},
+            "run_status": "exact_fields_unavailable",
+            "report_limitations": "include_partial_sigma_run",
+        },
     }
 
 
@@ -58,6 +128,8 @@ def main():
     addresses = ["203.0.113.8", "2001:0db8::1", "192.0.2.9"]
     kubernetes = "parser-kubernetes"
     gke = "parser-gcp-audit"
+    gke_action = "io.k8s.core.v1.secrets.get"
+    xff_addresses = [f"192.0.2.{n}" for n in range(1, 34)]
     table = ROOT.joinpath("sigma_exact_source_fields.toml").read_bytes()
     proof = b"irmind-sigma-field-table-v1\0" + b"".join(
         map(text, [b"irmind-sigma-source-coverage", b"v2", table])
@@ -73,18 +145,40 @@ def main():
                        {"audit_event": {"sourceIPs": addresses}}),
             projection("explicit_empty_list", kubernetes, "get", {"sourceIPs": []}, {"sourceIPs": []}),
             projection("missing_list", kubernetes, "get", {}, {}),
-            projection("gke_status", gke, "io.k8s.core.v1.secrets.get",
+            projection("gke_status", gke, gke_action,
                        {"protoPayload": {"status": {"code": 7, "message": "not retained"}}},
                        {"protoPayload": {"status": {"code": 7}}}),
-            projection("gke_missing_status", gke, "io.k8s.core.v1.secrets.get", {"protoPayload": {}}, {}),
+            projection("gke_missing_status", gke, gke_action, {"protoPayload": {}}, {}),
+            projection("xff_33_ips", kubernetes, "get", {"sourceIPs": xff_addresses},
+                       {}, {"sourceIPs": "overflow"}, ", ".join(xff_addresses)),
+            projection("invalid_first_ip", kubernetes, "get",
+                       {"sourceIPs": ["not-an-ip", "203.0.113.8"]},
+                       {}, {"sourceIPs": "invalid_ip"}),
+            projection("duplicate_ip", kubernetes, "get",
+                       {"sourceIPs": ["203.0.113.8", "203.0.113.8"]},
+                       {}, {"sourceIPs": "duplicate"}),
+            projection("wrapped_duplicate_ipv6_spelling", kubernetes, "get",
+                       {"audit_event": {"sourceIPs": ["2001:0db8::1", "2001:db8::1"]}},
+                       {}, {"audit_event.sourceIPs": "duplicate"}),
+            projection("non_string_ip", kubernetes, "get",
+                       {"sourceIPs": ["203.0.113.8", 4]},
+                       {}, {"sourceIPs": "unexpected_type"}),
+            projection("non_array_ips", kubernetes, "get",
+                       {"sourceIPs": "203.0.113.8"}, {}, {"sourceIPs": "unexpected_type"}),
+            projection("gke_string_status", gke, gke_action,
+                       {"protoPayload": {"status": {"code": "7"}}},
+                       {}, {"protoPayload.status.code": "unexpected_type"}),
+            projection("gke_null_status", gke, gke_action,
+                       {"protoPayload": {"status": {"code": None}}},
+                       {}, {"protoPayload.status.code": "unexpected_type"}),
+            projection("gke_out_of_range", gke, gke_action,
+                       {"protoPayload": {"status": {"code": 2147483648}}},
+                       {}, {"protoPayload.status.code": "overflow"}),
+            projection("gke_negative_status", gke, gke_action,
+                       {"protoPayload": {"status": {"code": -1}}},
+                       {}, {"protoPayload.status.code": "overflow"}),
         ],
-        "projection_rejections": [
-            {"case": "invalid_ip", "source": {"sourceIPs": ["203.0.113.8", "not-an-ip"]}},
-            {"case": "duplicate_ip", "source": {"sourceIPs": ["203.0.113.8", "203.0.113.8"]}},
-            {"case": "duplicate_ipv6_spelling", "source": {"sourceIPs": ["2001:0db8::1", "2001:db8::1"]}},
-            {"case": "too_many_ips", "source": {"sourceIPs": [f"192.0.2.{n}" for n in range(1, 34)]}},
-            {"case": "string_status", "source": {"protoPayload": {"status": {"code": "7"}}}},
-        ],
+        "partial_run_wire": partial_run_vectors(proof),
         "defender_bindings": [
             {
                 "case": "complete_paths",
