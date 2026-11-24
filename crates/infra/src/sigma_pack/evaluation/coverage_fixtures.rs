@@ -245,47 +245,49 @@ fn sigma_cloudtrail_operation_and_principal_require_the_aws_cloudtrail_source() 
     }
 }
 
+const NETWORK_EXAMPLES: [(&str, &str, CommonField, &str); 6] = [
+    (
+        "zeek",
+        "dns",
+        CommonField::DnsQuestionName,
+        "{query: probe.example.test, 'id.orig_h|cidr': 203.0.113.0/24}",
+    ),
+    (
+        "zeek",
+        "http",
+        CommonField::UrlDomain,
+        "{host: probe.example.test, 'id.orig_h|cidr': 203.0.113.0/24}",
+    ),
+    (
+        "zeek",
+        "conn",
+        CommonField::NetworkTransport,
+        "{proto: tcp, 'id.orig_h|cidr': 203.0.113.0/24}",
+    ),
+    (
+        "suricata",
+        "dns",
+        CommonField::DnsQuestionName,
+        "{dns.rrname: probe.example.test, 'src_ip|cidr': 203.0.113.0/24}",
+    ),
+    (
+        "suricata",
+        "http",
+        CommonField::UrlDomain,
+        "{http.hostname: probe.example.test, 'src_ip|cidr': 203.0.113.0/24}",
+    ),
+    (
+        "suricata",
+        "flow",
+        CommonField::NetworkTransport,
+        "{Protocol: tcp, 'src_ip|cidr': 203.0.113.0/24}",
+    ),
+];
+
 #[test]
 fn sigma_network_separates_event_classes_and_source_destination_roles() {
     let reviewed = parse_table(include_str!("../network-v1.toml"));
-    for (product, service, field, condition) in [
-        (
-            "zeek",
-            "dns",
-            CommonField::DnsQuestionName,
-            "{query: probe.example.test, 'id.orig_h|cidr': 203.0.113.0/24}",
-        ),
-        (
-            "zeek",
-            "http",
-            CommonField::UrlDomain,
-            "{host: probe.example.test, 'id.orig_h|cidr': 203.0.113.0/24}",
-        ),
-        (
-            "zeek",
-            "conn",
-            CommonField::NetworkTransport,
-            "{proto: tcp, 'id.orig_h|cidr': 203.0.113.0/24}",
-        ),
-        (
-            "suricata",
-            "dns",
-            CommonField::DnsQuestionName,
-            "{dns.rrname: probe.example.test, 'src_ip|cidr': 203.0.113.0/24}",
-        ),
-        (
-            "suricata",
-            "http",
-            CommonField::UrlDomain,
-            "{http.hostname: probe.example.test, 'src_ip|cidr': 203.0.113.0/24}",
-        ),
-        (
-            "suricata",
-            "flow",
-            CommonField::NetworkTransport,
-            "{Protocol: tcp, 'src_ip|cidr': 203.0.113.0/24}",
-        ),
-    ] {
+    for (product, service, field, condition) in NETWORK_EXAMPLES {
         let variant = reviewed
             .variants
             .iter()
@@ -338,57 +340,56 @@ fn sigma_network_separates_event_classes_and_source_destination_roles() {
     }
 }
 
+const ENTRA: &str =
+    include_str!("../../../../testkit/fixtures/parser-entra/source/signin-table.ndjson");
+const AUDIT: &str =
+    include_str!("../../../../testkit/fixtures/parser-entra/source/audit-resource.ndjson");
+const M365: &str = include_str!("../../../../testkit/fixtures/parser-m365/source/events.ndjson");
+const OKTA: &str = include_str!("../../../../testkit/fixtures/parser-okta/source/events.ndjson");
+const GCP: &str = include_str!("../../../../testkit/fixtures/parser-gcp-audit/source/event.ndjson");
+const IDENTITY_EXAMPLES: [(&str, &str, &str, &str, EventCategory); 5] = [
+    (
+        "entra-signin-table",
+        ENTRA,
+        "{ResultType: '50076', UserPrincipalName: analyst@example.invalid}",
+        "{ResultType: '0'}",
+        EventCategory::Authentication,
+    ),
+    (
+        "entra-audit-resource",
+        AUDIT,
+        "{OperationName: Add service principal credentials, Result: success}",
+        "{Result: failure}",
+        EventCategory::Iam,
+    ),
+    (
+        "m365-audit",
+        M365,
+        "{Operation: UserLoginFailed, ClientIP: 203.0.113.77}",
+        "{Operation: UserLoggedIn}",
+        EventCategory::Authentication,
+    ),
+    (
+        "okta-system-log",
+        OKTA,
+        "{eventType: user.session.start, actor.alternateId: alice@example.invalid}",
+        "{actor.alternateId: bob@example.invalid}",
+        EventCategory::Authentication,
+    ),
+    (
+        "gcp-audit",
+        GCP,
+        "{protoPayload.methodName: google.iam.admin.v1.CreateServiceAccountKey}",
+        "{protoPayload.methodName: google.iam.admin.v1.DeleteServiceAccountKey}",
+        EventCategory::Iam,
+    ),
+];
+
 #[test]
 fn sigma_cloud_identity_uses_exact_source_fields_and_keeps_missing_status_absent() {
     use SigmaCoverageV1::UnsupportedLogsource;
-    const ENTRA: &str =
-        include_str!("../../../../testkit/fixtures/parser-entra/source/signin-table.ndjson");
-    const AUDIT: &str =
-        include_str!("../../../../testkit/fixtures/parser-entra/source/audit-resource.ndjson");
-    const M365: &str =
-        include_str!("../../../../testkit/fixtures/parser-m365/source/events.ndjson");
-    const OKTA: &str =
-        include_str!("../../../../testkit/fixtures/parser-okta/source/events.ndjson");
-    const GCP: &str =
-        include_str!("../../../../testkit/fixtures/parser-gcp-audit/source/event.ndjson");
     let reviewed = parse_table(include_str!("../cloud-identity-v1.toml"));
-    for (dataset, fixture, positive, negative, category) in [
-        (
-            "entra-signin-table",
-            ENTRA,
-            "{ResultType: '50076', UserPrincipalName: analyst@example.invalid}",
-            "{ResultType: '0'}",
-            EventCategory::Authentication,
-        ),
-        (
-            "entra-audit-resource",
-            AUDIT,
-            "{OperationName: Add service principal credentials, Result: success}",
-            "{Result: failure}",
-            EventCategory::Iam,
-        ),
-        (
-            "m365-audit",
-            M365,
-            "{Operation: UserLoginFailed, ClientIP: 203.0.113.77}",
-            "{Operation: UserLoggedIn}",
-            EventCategory::Authentication,
-        ),
-        (
-            "okta-system-log",
-            OKTA,
-            "{eventType: user.session.start, actor.alternateId: alice@example.invalid}",
-            "{actor.alternateId: bob@example.invalid}",
-            EventCategory::Authentication,
-        ),
-        (
-            "gcp-audit",
-            GCP,
-            "{protoPayload.methodName: google.iam.admin.v1.CreateServiceAccountKey}",
-            "{protoPayload.methodName: google.iam.admin.v1.DeleteServiceAccountKey}",
-            EventCategory::Iam,
-        ),
-    ] {
+    for (dataset, fixture, positive, negative, category) in IDENTITY_EXAMPLES {
         let variant = reviewed
             .variants
             .iter()
