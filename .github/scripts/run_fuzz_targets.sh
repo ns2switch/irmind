@@ -31,6 +31,13 @@ print(",".join(next(target for target in targets if target["name"] == sys.argv[1
   corpus="$registry/corpus/$name"
   mkdir -p "$corpus"
   case "$target" in
+    fuzz:sigma_field_table)
+      for table in crates/infra/src/sigma_pack/*-v1.toml; do
+        sed -E 's/mapping_version = "@([^"]+)"/mapping_version = "\10000000000000000000000000000000000000000000000000000000000000000"/' "$table" \
+          > "$corpus/$(basename "$table")"
+      done
+      cat "$corpus/"*-v1.toml > "$corpus/all-variants.toml"
+      ;;
     helpers/evtx/fuzz:evtx_decode) cp "$registry/seeds/security.evtx" "$corpus/" ;;
     helpers/evtx/fuzz:evtx_protocol) cp "$registry/seeds/protocol/"* "$corpus/" ;;
     *) if [[ -d "$registry/seeds/$name" ]]; then cp "$registry/seeds/$name/"* "$corpus/"; fi ;;
@@ -41,6 +48,9 @@ print(",".join(next(target for target in targets if target["name"] == sys.argv[1
       ;;
     fuzz:sigma_admission)
       cargo +nightly fuzz run "$name" --target x86_64-unknown-linux-gnu --sanitizer address -- -max_total_time="$seconds" -rss_limit_mb=2048 -max_len=65537 -verbosity=0
+      ;;
+    fuzz:sigma_field_table)
+      CARGO_PROFILE_RELEASE_OPT_LEVEL=1 cargo +nightly fuzz run "$name" --target x86_64-unknown-linux-gnu --features export --sanitizer address -- -max_total_time="$seconds" -rss_limit_mb=2048 -max_len=524289 -verbosity=0
       ;;
     helpers/evtx/fuzz:evtx_decode)
       cargo +nightly fuzz run "$name" --target x86_64-unknown-linux-gnu --fuzz-dir "$registry" --sanitizer address -- -max_total_time="$seconds" -rss_limit_mb=1024 -timeout=30 -max_len=131072
