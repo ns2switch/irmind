@@ -329,6 +329,9 @@ fn sigma_reviewed_families_2000_rules_on_one_gib_parquet() {
 }
 
 #[cfg(not(debug_assertions))]
+const UNMAPPED_TEST_FIELD: &str = "__synthetic_unmapped_field";
+
+#[cfg(not(debug_assertions))]
 fn measure_variant(
     variant: &SigmaSourceVariant,
     count: usize,
@@ -365,6 +368,13 @@ fn measure_variant(
         )
     });
     let taxonomy = condition(variant);
+    assert!(
+        variant
+            .fields
+            .iter()
+            .all(|field| field.name != UNMAPPED_TEST_FIELD),
+        "{taxonomy} declares the reserved benchmark negative-control field"
+    );
     let rules = measure_rules(&taxonomy, binding, count);
     let start = Instant::now();
     let plans = SigmaVariantPrograms::compile(
@@ -375,6 +385,14 @@ fn measure_variant(
     )
     .unwrap();
     let compile_seconds = start.elapsed().as_secs_f64();
+    let [(omitted, reason)] = plans.skipped() else {
+        panic!("{taxonomy} must omit only the synthetic negative control");
+    };
+    assert!(
+        omitted == &rules.last().unwrap().0 && *reason == SigmaCoverageV1::UnsupportedField,
+        "{taxonomy} omitted {} with reason {reason:?}",
+        omitted.id
+    );
     let start = Instant::now();
     let file_reader = File::open(file).unwrap();
     let bytes = file_reader.metadata().unwrap().len();
@@ -410,7 +428,7 @@ fn measure_variant(
         binding.name
     );
     println!(
-        "source={taxonomy} class={} scope={} field={} lane={} parquet_bytes={bytes} rows={rows} rules={count} evaluated={} skipped={} tp={true_positives} fp={false_positives} compile_s={compile_seconds:.3} scan_s={scan_seconds:.3}",
+        "source={taxonomy} class={} scope={} field={} lane={} parquet_bytes={bytes} rows={rows} rules={count} evaluated={} skipped={} skipped_reason={reason:?} expected=1 tp={true_positives} fp={false_positives} compile_s={compile_seconds:.6} scan_s={scan_seconds:.6}",
         variant
             .dataset
             .as_deref()
@@ -437,7 +455,7 @@ fn measure_rules(
     count: usize,
 ) -> Vec<(SigmaRuleKeyV1, String)> {
     (0..count).map(|index| {
-        let name = if index + 1 == count { "unsupported" } else { binding.name.as_str() };
+        let name = if index + 1 == count { UNMAPPED_TEST_FIELD } else { binding.name.as_str() };
         let predicate = if index == 0 {
             binding_selection(binding, &sample(binding, true))
         } else if name == binding.name && binding.value_type == SigmaBindingType::PairList {
