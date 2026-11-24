@@ -84,6 +84,10 @@ pub use parser_time_json::{ParserTimeFields, json_time_requirement};
 mod ports;
 pub use fixed_errors::FixedAppError;
 mod report;
+pub use report::{
+    ReportDocument, ReportDocumentFormat, ReportDocumentLanguage, ReportLimitation, ReportLocator,
+    ReportStatement,
+};
 mod skills;
 pub use skills::{
     ApprovedSkills, CompiledSkill, SkillCompiler, SkillOrigin, SkillPackageStore,
