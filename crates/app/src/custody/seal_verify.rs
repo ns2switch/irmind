@@ -246,6 +246,21 @@ impl Engine<'_> {
             }
             prev = self.verify_chain_entry(id, index, prev, entry)?;
         }
+        if entries
+            .iter()
+            .any(|entry| entry.kind == crate::AuditEventKind::SigmaRunV1)
+        {
+            let store = self
+                .large_case_store
+                .as_ref()
+                .ok_or(AppError::InvalidChain(0))?;
+            store.verify_sigma_executions(
+                id,
+                &entries,
+                &self.verifier.trusted_public_key(&Actor::Analyst)?,
+                cancel,
+            )?;
+        }
         verify_case_metadata(&case.title, case.severity, &case.scope, &entries)?;
         self.verify_source_query_journal(&entries, cancel, true)?;
         self.verify_mapping_events(entries.iter().map(|e| (e.kind, e.payload.as_str())))?;

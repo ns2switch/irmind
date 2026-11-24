@@ -37,6 +37,7 @@ struct ExportRequest<'a> {
     evidence: Vec<String>,
     source_count: u64,
     queries: &'a SourceQueryJournal<'a>,
+    sigma: super::sigma_export::SigmaArchive,
 }
 
 impl LargeCaseExporter for LocalStore {
@@ -79,6 +80,13 @@ impl LocalStore {
             scope: case.scope,
             seal,
         };
+        let sigma = super::sigma_export::SigmaArchive::collect(
+            self,
+            id,
+            &entries,
+            &header.seal.public_key,
+            cancel,
+        )?;
         let entry_count = self.last_entry(id)?.ok_or(AppError::InvalidChain(0))?.seq;
         let evidence = self.evidence_hashes(id)?;
         let query_operations = if entries
@@ -108,6 +116,7 @@ impl LocalStore {
                 evidence,
                 source_count,
                 queries: &queries,
+                sigma,
             },
             &mut created,
         );
@@ -143,6 +152,7 @@ impl LocalStore {
             evidence,
             source_count,
             queries,
+            sigma,
         } = request;
         let mut options = OpenOptions::new();
         options.write(true).create_new(true);
@@ -182,15 +192,7 @@ impl LocalStore {
         if *include_originals {
             self.write_source_bytes(id, *source_root, queries, &mut out, cancel)?;
         }
-        let operations = self.operations(id)?;
-        out.write_all(&((operations.len() + queries.adoptions().len()) as u64).to_be_bytes())
-            .map_err(storage)?;
-        for operation in operations.iter().chain(queries.adoptions()) {
-            if cancel.is_cancelled() {
-                return Err(AppError::Cancelled);
-            }
-            write_frame(&mut out, &serde_json::to_vec(operation).map_err(storage)?)?;
-        }
+        self.write_operations(id, queries, sigma, &mut out, cancel)?;
         super::mapping_proofs::write(self, id, &header.seal.public_key, &mut out, cancel)?;
         self.write_artifact_frames(id, &mut out, cancel)?;
         let (catalog, mut skills) =
@@ -206,9 +208,35 @@ impl LocalStore {
             cancel,
         )?;
         write_stored_query_capture_section(&mut out, queries.captures(), self, id, cancel)?;
+        sigma.write(&mut out, cancel)?;
         super::extensions::write(self, id, &mut out, cancel)?;
         out.sync_all().map_err(storage)?;
         Ok(header.seal.analyst_key_fingerprint.clone())
+    }
+
+    fn write_operations(
+        &self,
+        id: &CaseId,
+        queries: &SourceQueryJournal<'_>,
+        sigma: &super::sigma_export::SigmaArchive,
+        out: &mut File,
+        cancel: &CancellationToken,
+    ) -> Result<(), AppError> {
+        let operations = self.operations(id)?;
+        let mut global = queries
+            .adoptions()
+            .chain(sigma.operations.values())
+            .collect::<Vec<_>>();
+        global.sort_unstable_by_key(|operation| operation.hash);
+        out.write_all(&((operations.len() + global.len()) as u64).to_be_bytes())
+            .map_err(storage)?;
+        for operation in operations.iter().chain(global) {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            write_frame(out, &serde_json::to_vec(operation).map_err(storage)?)?;
+        }
+        Ok(())
     }
 
     fn write_source_bytes(

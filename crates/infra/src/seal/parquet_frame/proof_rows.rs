@@ -20,6 +20,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs::File,
     io::{Seek, SeekFrom},
+    ops::Range,
 };
 
 pub fn verify_v10_artifact_rows(
@@ -27,6 +28,28 @@ pub fn verify_v10_artifact_rows(
     offset: u64,
     artifact: &ParquetArtifact,
     references: &[V10RowReference],
+    cancel: &CancellationToken,
+) -> Result<(), AppError> {
+    verify_artifact(file, offset, artifact, references, None, cancel)
+}
+
+pub(in crate::seal) fn verify_v10_sigma_rows(
+    file: &mut File,
+    offset: u64,
+    artifact: &ParquetArtifact,
+    references: &[V10RowReference],
+    time: &Range<i64>,
+    cancel: &CancellationToken,
+) -> Result<(), AppError> {
+    verify_artifact(file, offset, artifact, references, Some(time), cancel)
+}
+
+fn verify_artifact(
+    file: &mut File,
+    offset: u64,
+    artifact: &ParquetArtifact,
+    references: &[V10RowReference],
+    time: Option<&Range<i64>>,
     cancel: &CancellationToken,
 ) -> Result<(), AppError> {
     let ParquetArtifact::V3(envelope) = artifact;
@@ -55,7 +78,7 @@ pub fn verify_v10_artifact_rows(
         start: offset,
         size: core.size,
     };
-    let result = verify_rows(reader, envelope.pipeline().rows(), references, cancel);
+    let result = verify_rows(reader, envelope.pipeline().rows(), references, time, cancel);
     file.seek(SeekFrom::Start(end)).map_err(storage)?;
     result
 }
@@ -64,6 +87,7 @@ fn verify_rows(
     reader: impl ChunkReader + 'static,
     expected_rows: u64,
     references: &[V10RowReference],
+    time: Option<&Range<i64>>,
     cancel: &CancellationToken,
 ) -> Result<(), AppError> {
     if cancel.is_cancelled() {
@@ -72,7 +96,7 @@ fn verify_rows(
     if references.is_empty() {
         return Ok(());
     }
-    let (builder, row_count) = row_identity_reader(reader, expected_rows)?;
+    let (builder, row_count) = row_identity_reader(reader, expected_rows, time.is_some())?;
     let mut selected = Vec::new();
     let mut next = 0usize;
     for reference in references {
@@ -100,7 +124,23 @@ fn verify_rows(
         }
         let batch = batch.map_err(storage)?;
         let (hashes, records) = row_identity_columns(&batch)?;
+        let common = time
+            .map(|_| {
+                batch
+                    .column_by_name("common_payload")
+                    .and_then(|column| column.as_any().downcast_ref::<StringArray>())
+                    .ok_or_else(invalid)
+            })
+            .transpose()?;
         for row in 0..batch.num_rows() {
+            if let Some((time, common)) = time.zip(common)
+                && (common.is_null(row)
+                    || !irmind_app::decode_common_event(common.value(row))?
+                        .timestamp()
+                        .is_some_and(|at| time.contains(&at.instant().unix_micros())))
+            {
+                return Err(invalid());
+            }
             if hashes.is_null(row) || records.is_null(row) {
                 return Err(invalid());
             }
@@ -131,7 +171,7 @@ pub(in crate::seal) fn locate_v10_artifact_rows(
         return Err(invalid());
     }
     verify_v10_artifact_rows(&mut file, 0, artifact, &[], cancel)?;
-    let (reader, _) = row_identity_reader(file, envelope.pipeline().rows())?;
+    let (reader, _) = row_identity_reader(file, envelope.pipeline().rows(), false)?;
     let mut physical_row = 0u64;
     for batch in reader.build().map_err(storage)? {
         if cancel.is_cancelled() {
@@ -163,6 +203,7 @@ pub(in crate::seal) fn locate_v10_artifact_rows(
 fn row_identity_reader<R: ChunkReader + 'static>(
     reader: R,
     expected_rows: u64,
+    with_time: bool,
 ) -> Result<(ArrowReaderBuilder<SyncReader<R>>, usize), AppError> {
     let builder = ParquetRecordBatchReaderBuilder::try_new(reader).map_err(storage)?;
     let row_count =
@@ -173,7 +214,11 @@ fn row_identity_reader<R: ChunkReader + 'static>(
     let schema = builder.schema();
     let source = schema.index_of("source_hash").map_err(storage)?;
     let record = schema.index_of("record_index").map_err(storage)?;
-    let projection = ProjectionMask::roots(builder.parquet_schema(), [source, record]);
+    let mut columns = vec![source, record];
+    if with_time {
+        columns.push(schema.index_of("common_payload").map_err(storage)?);
+    }
+    let projection = ProjectionMask::roots(builder.parquet_schema(), columns);
     Ok((
         builder.with_projection(projection).with_batch_size(4096),
         row_count,
@@ -251,7 +296,13 @@ mod tests {
         };
         let bytes = bytes::Bytes::from(output);
         let check = |references: &[V10RowReference]| {
-            verify_rows(bytes.clone(), 3, references, &CancellationToken::new())
+            verify_rows(
+                bytes.clone(),
+                3,
+                references,
+                None,
+                &CancellationToken::new(),
+            )
         };
         check(&[pointer(0, 0xaa, 1), pointer(2, 0xbb, 1)]).unwrap();
         assert!(check(&[pointer(1, 0xaa, 1)]).is_err());

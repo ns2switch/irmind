@@ -11,6 +11,7 @@ use irmind_app::{
 use irmind_domain::{ArtifactSchemaV2, SourceManifestV2};
 use std::time::{Duration, Instant};
 
+const SIGMA_RULE: &[u8] = b"title: Synthetic failed AWS sign in\nlogsource: {product: aws, service: cloudtrail}\ndetection: {selection: {Outcome: failure}, condition: selection}\n";
 const FINDING: &str = "Synthetic failed AWS sign in found by Sigma";
 
 #[test]
@@ -259,14 +260,13 @@ fn scan(store: &LocalStore, case: &CaseId, cancel: &CancellationToken) -> V10Row
     let mut file = irmind_fs::open_regular_no_follow(&root, Path::new(artifact.path())).unwrap();
     crate::verify_v10_artifact_rows(&mut file, 0, &artifact, &[], cancel).unwrap();
     let table = cloudtrail_table();
-    let rule = b"title: Synthetic failed AWS sign in\nlogsource: {product: aws, service: cloudtrail}\ndetection: {selection: {Outcome: failure}, condition: selection}\n";
+    let rule = SIGMA_RULE;
     let key = SigmaRuleKeyV1 {
         id: "synthetic-login".into(),
         sha256: sha256(rule),
     };
     let programs =
-        SigmaVariantPrograms::compile(&table.variants[0], [(key.clone(), rule.as_slice())])
-            .unwrap();
+        SigmaVariantPrograms::compile(&table.variants[0], [(key.clone(), rule)]).unwrap();
     let mut evaluation = programs.start(10_000);
     let mut matches = Vec::new();
     evaluation
@@ -442,8 +442,8 @@ product = "aws"
 service = "cloudtrail"
 parser_id = "parser-json"
 parser_version = "json-source-v1"
-mapping_id = "cloudtrail-tables"
-mapping_version = "v1"
+mapping_id = "mapping-cloudtrail"
+mapping_version = "cloudtrail-tables-v1"
 dataset = "cloudtrail"
 [[variants.events]]
 column = "event.action"
@@ -460,4 +460,87 @@ null_policy = "absent"
 
 fn digest(value: &str) -> [u8; 32] {
     std::array::from_fn(|index| u8::from_str_radix(&value[index * 2..index * 2 + 2], 16).unwrap())
+}
+
+#[test]
+fn signed_sigma_run_and_admitted_rules_verify_in_the_actual_sealed_v10_export() {
+    let root = tempfile::tempdir().unwrap();
+    let catalog = Arc::new(
+        MappingCatalog::freeze(
+            vec![Arc::new(JsonSourceDecoder)],
+            vec![Arc::new(
+                irmind_mod_mapping_cloudtrail::CloudTrailMapping::new().unwrap(),
+            )],
+        )
+        .unwrap(),
+    );
+    let (store, engine, catalog) = fixture_catalog(root.path(), catalog);
+    let engine = engine.with_large_case_pipeline(store.clone(), Arc::new(json_source_parser()));
+    let case = engine
+        .create_case("Signed Sigma run", "local only")
+        .unwrap();
+    let parser = catalog
+        .decoder_selection("parser-json", "json-source-v1")
+        .unwrap();
+    let large = LargeCaseUseCases {
+        engine: &engine,
+        store: store.as_ref(),
+        parser: &parser,
+    };
+    let cancel = CancellationToken::new();
+    ingest_login_pair(&large, &case.id, root.path(), "aws.jsonl", &cancel);
+    let pack = admit_test_sigma_pack(&store, &engine, root.path(), &cancel);
+    let time = |text| {
+        irmind_app::IndexedTime::from_rfc3339(text, false)
+            .unwrap()
+            .instant()
+            .unix_micros()
+    };
+    let range = time("2026-11-01T00:00:00Z")..time("2026-11-01T00:00:02Z");
+    let receipt = store
+        .run_sigma(&engine, &case.id, pack, range, &cancel)
+        .unwrap();
+    assert_eq!(receipt.receipt.matched_rows, 1);
+    assert_eq!(receipt.skipped_rules, 0);
+    let findings = engine.findings(&case.id).unwrap();
+    assert_eq!(findings.len(), 1);
+    assert!(!findings[0].confirmed);
+    engine.verify(&case.id).unwrap();
+    engine.seal(&case.id).unwrap();
+    let package = root.path().join("sigma-executed.irmind");
+    let key =
+        irmind_app::export_case(&engine, store.as_ref(), &case.id, &package, &cancel).unwrap();
+    let result = LocalExportVerifier
+        .verify_export_details(&package, Some(&key))
+        .unwrap();
+    assert_eq!(result.format_version, 10);
+    let mut bytes = fs::read(&package).unwrap();
+    let rule = bytes
+        .windows(SIGMA_RULE.len())
+        .position(|bytes| bytes == SIGMA_RULE)
+        .unwrap();
+    bytes[rule] ^= 1;
+    fs::write(&package, bytes).unwrap();
+    assert!(
+        LocalExportVerifier
+            .verify_export_details(&package, Some(&key))
+            .is_err()
+    );
+}
+
+fn admit_test_sigma_pack(
+    store: &LocalStore,
+    engine: &Engine<'_>,
+    root: &Path,
+    cancel: &CancellationToken,
+) -> [u8; 32] {
+    let rules = root.join("rules");
+    fs::create_dir(&rules).unwrap();
+    fs::write(rules.join("auth.yml"), SIGMA_RULE).unwrap();
+    let preview = crate::sigma_pack::inspect_local_sigma_pack(&rules, cancel).unwrap();
+    let digest = sha256(&preview.manifest.encode().unwrap());
+    store
+        .admit_local_sigma_pack(engine, &rules, digest, "MIT", cancel)
+        .unwrap();
+    digest
 }

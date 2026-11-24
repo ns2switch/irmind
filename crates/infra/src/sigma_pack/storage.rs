@@ -71,10 +71,18 @@ impl LocalStore {
             .ok_or_else(|| AppError::Policy("Sigma pack has no signed admission".into()))?;
         let receipt =
             sigma_pack_operation(&operation)?.ok_or(AppError::InvalidChain(operation.seq))?;
-        let root = self.sigma_pack_root(false)?;
-        let file = open_pack(&root, manifest)?;
-        let pack = read_pack(file, &receipt, cancel)?;
+        let pack = self.read_signed_sigma_pack(&receipt, cancel)?;
         Ok(AdmittedSigmaPack { operation, pack })
+    }
+
+    pub(crate) fn read_signed_sigma_pack(
+        &self,
+        receipt: &SigmaPackAdmissionV1,
+        cancel: &CancellationToken,
+    ) -> Result<LocalSigmaPack, AppError> {
+        let root = self.sigma_pack_root(false)?;
+        let file = open_pack(&root, receipt.pack_manifest)?;
+        read_pack(file, receipt, cancel)
     }
 
     fn publish_sigma_pack(

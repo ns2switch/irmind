@@ -221,6 +221,18 @@ pub trait WorkspaceIo: Send + Sync {
             "Sigma admission is unavailable in this workspace".into(),
         ))
     }
+    fn run_sigma_pack(
+        &self,
+        _engine: &Engine<'_>,
+        _case: &irmind_app::CaseId,
+        _manifest: [u8; 32],
+        _time: std::ops::Range<i64>,
+        _cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, irmind_app::AppError> {
+        Err(irmind_app::AppError::Policy(
+            "Sigma execution is unavailable in this workspace".into(),
+        ))
+    }
     fn publish_cited_report(
         &self,
         _engine: &Engine<'_>,

@@ -3,6 +3,8 @@
 pub mod evaluation;
 pub mod field_table;
 #[cfg(feature = "sigma")]
+mod runtime;
+#[cfg(feature = "sigma")]
 mod storage;
 use irmind_app::{
     AppError, CancellationToken,

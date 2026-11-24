@@ -212,6 +212,31 @@ impl WorkspaceIo for RootWorkspaceIo {
             .admit_local_sigma_pack(engine, directory, manifest, license, cancel)
     }
 
+    #[cfg(feature = "sigma")]
+    fn run_sigma_pack(
+        &self,
+        engine: &Engine<'_>,
+        case: &irmind_app::CaseId,
+        manifest: [u8; 32],
+        time: std::ops::Range<i64>,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, AppError> {
+        use irmind_app::v10_proofs::SigmaRunStatusV1;
+        let summary = self.store.run_sigma(engine, case, manifest, time, cancel)?;
+        let run = summary.receipt;
+        let status = match run.status {
+            SigmaRunStatusV1::Complete => "complete",
+            SigmaRunStatusV1::TimeLimit => "partial (time limit)",
+            SigmaRunStatusV1::WorkLimit => "partial (work limit)",
+            SigmaRunStatusV1::OversizedInput => "partial (oversized input)",
+            SigmaRunStatusV1::Cancelled => "partial (cancelled)",
+        };
+        Ok(format!(
+            "Sigma run {status} · {} unconfirmed matches · {} skipped rules · {} work units",
+            run.matched_rows, summary.skipped_rules, run.used_units
+        ))
+    }
+
     fn publish_cited_report(
         &self,
         engine: &Engine<'_>,

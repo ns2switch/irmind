@@ -288,6 +288,18 @@ pub trait LargeCaseStore: Send + Sync {
         ))
     }
 
+    fn verify_sigma_executions(
+        &self,
+        _case: &CaseId,
+        _entries: &[crate::SignedEntry],
+        _analyst_key: &[u8],
+        _cancel: &CancellationToken,
+    ) -> Result<(), AppError> {
+        Err(AppError::Policy(
+            "Sigma execution verification is unavailable".into(),
+        ))
+    }
+
     fn verify_report_row(
         &self,
         _case: &CaseId,

@@ -14,6 +14,20 @@ exportarlo. Para usar la versión actual, verifica los originales con la versió
 que creó el caso e ingiérelos en un caso nuevo. El caso original conserva sus
 aprobaciones, hallazgos confirmados y sello.
 
+## Ejecutar un análisis Sigma firmado
+
+Usa `/sigma inspect <directorio>` para revisar un pack local. Con
+`/sigma import --license <id> <directorio>`, confirma el hash del manifiesto
+mostrado para firmar la admisión. Si una ejecución usa el pack, la exportación
+V10 del caso incluye las reglas exactas admitidas.
+
+Ejecuta `/sigma run <SHA-256 del pack> <inicio UTC> <fin UTC>` desde un caso
+abierto. La tabla inicial cubre los eventos revisados de CloudTrail. IRMind
+informa de las reglas omitidas y marca como parciales los análisis que alcanzan
+un límite de tiempo o trabajo. Cada coincidencia propone un hallazgo sin
+confirmar vinculado a una fila de evidencia. Revísalo y usa
+`/confirm <id del hallazgo>` antes de publicar el informe.
+
 ## Publicar un informe firmado
 
 En un caso abierto, usa `/report preview en` o `/report preview es`. El informe

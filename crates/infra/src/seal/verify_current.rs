@@ -66,7 +66,7 @@ fn verify_open_export_with_catalog(
     }
     verify_evidence_blobs(&mut input, &mut chain)?;
     let provided_count = verify_source_frames(&mut input, &mut chain)?;
-    let adoptions = verify_operation_frames(&mut input, &mut chain, &header)?;
+    let operations = verify_operation_frames(&mut input, &chain, &header)?;
     let cancel = irmind_app::CancellationToken::new();
     {
         super::mapping_proofs::read(
@@ -80,22 +80,23 @@ fn verify_open_export_with_catalog(
     verify_methodology_tail(&mut input, &mut chain, &header, catalog)?;
     let journal = irmind_app::source_queries::SourceQueryJournal::replay(
         &chain.metadata_entries,
-        &adoptions,
+        &operations.query_adoptions,
         &chain.verifier,
         &cancel,
     )?;
-    if journal.adoptions().len() != adoptions.len() {
+    if journal.adoptions().len() != operations.query_adoptions.len() {
         return Err(AppError::InvalidChain(header.seal.seq));
     }
     journal.verify_source_links(&chain.metadata_entries)?;
     let captures = journal.captures().collect::<Vec<_>>();
     irmind_app::source_queries::read_query_capture_section(&mut input, &captures, &cancel)?;
-    let report_entries = chain.read_report_history(&mut input, &id, audit_start, count, &cancel)?;
+    let proof_entries = chain.read_proof_history(&mut input, &id, audit_start, count, &cancel)?;
     super::extensions::verify(
         &mut input,
         &super::extensions::ReportVerification {
             title: &header.title,
-            entries: &report_entries,
+            entries: &proof_entries,
+            sigma_admissions: &operations.sigma_admissions,
             evidence: &chain.copied_evidence,
             skills: &chain.skills,
             offsets: &offsets,
@@ -187,33 +188,46 @@ pub(crate) fn verify_export_with_catalog(
     verify_open_export_with_catalog(input, size, expected_key, catalog)
 }
 
+struct ScopedOperations {
+    query_adoptions: Vec<SignedOperation>,
+    sigma_admissions: BTreeMap<[u8; 32], SignedOperation>,
+}
+
 fn verify_operation_frames(
     input: &mut File,
-    chain: &mut ChainState,
+    chain: &ChainState,
     header: &HeaderV10,
-) -> Result<Vec<SignedOperation>, AppError> {
+) -> Result<ScopedOperations, AppError> {
     let count = read_u64(input)?;
     if count > MAX_AUDIT_ENTRIES {
         return Err(storage_reason("too many operational entries"));
     }
     let mut previous = [0; 32];
-    let mut adoptions: Vec<SignedOperation> = Vec::new();
+    let mut previous_global = None;
+    let mut operations = ScopedOperations {
+        query_adoptions: Vec::new(),
+        sigma_admissions: BTreeMap::new(),
+    };
     for index in 0..count {
         let operation: SignedOperation =
             serde_json::from_slice(&read_frame(input)?).map_err(storage)?;
         if operation.case_id == irmind_app::GLOBAL_OPERATION_SCOPE {
-            if adoptions
-                .last()
-                .is_some_and(|prior| prior.hash >= operation.hash)
-            {
+            if previous_global.is_some_and(|prior| prior >= operation.hash) {
                 return Err(AppError::InvalidChain(operation.seq));
             }
-            // The signed adoption is authenticated by journal replay, which
-            // also requires each proof to be referenced by a plan.
-            adoptions.push(operation);
+            previous_global = Some(operation.hash);
+            if irmind_app::v10_proofs::sigma_pack_operation(&operation)?.is_some() {
+                irmind_app::v10_proofs::verify_sigma_pack_operation(&operation, &chain.verifier)?;
+                operations
+                    .sigma_admissions
+                    .insert(operation.hash, operation);
+            } else {
+                // The query journal authenticates its proofs and requires references.
+                operations.query_adoptions.push(operation);
+            }
             continue;
         }
-        if !adoptions.is_empty()
+        if previous_global.is_some()
             || operation.case_id != header.case_id
             || operation.seq != index + 1
             || operation.prev != previous
@@ -231,7 +245,7 @@ fn verify_operation_frames(
     if !chain.source_hashes.is_subset(&chain.artifact_sources) {
         return Err(AppError::InvalidChain(header.seal.seq));
     }
-    Ok(adoptions)
+    Ok(operations)
 }
 
 fn verify_evidence_blobs(input: &mut File, chain: &mut ChainState) -> Result<(), AppError> {
@@ -322,7 +336,7 @@ struct ChainState {
     last: Option<SignedEntry>,
     referenced_evidence: BTreeSet<String>,
     copied_evidence: BTreeSet<String>,
-    report_checkpoints: BTreeSet<u64>,
+    proof_checkpoints: BTreeSet<u64>,
     sources: BTreeMap<(String, u64), usize>,
     source_hashes: BTreeSet<String>,
     artifact_paths: BTreeSet<String>,
@@ -350,7 +364,7 @@ impl ChainState {
             last: None,
             referenced_evidence: BTreeSet::new(),
             copied_evidence: BTreeSet::new(),
-            report_checkpoints: BTreeSet::new(),
+            proof_checkpoints: BTreeSet::new(),
             sources: BTreeMap::new(),
             source_hashes: BTreeSet::new(),
             artifact_paths: BTreeSet::new(),
@@ -404,8 +418,15 @@ impl ChainState {
         super::mapping_proofs::collect(&entry, &mut self.mapping_installations)?;
         self.skills.accept(&entry, &crate::TomlSkillCompiler)?;
         self.accept_metadata(&entry)?;
+        if entry.kind == AuditEventKind::SigmaRunV1 {
+            self.proof_checkpoints.insert(
+                irmind_app::v10_proofs::sigma_execution(&entry)?
+                    .checkpoint
+                    .sequence,
+            );
+        }
         if entry.kind == AuditEventKind::ReportPublishedV1 {
-            self.report_checkpoints
+            self.proof_checkpoints
                 .insert(irmind_app::report_publication(&entry)?.checkpoint.sequence);
         }
         if let Some(hash) = &entry.evidence {
@@ -416,7 +437,7 @@ impl ChainState {
         Ok(())
     }
 
-    fn read_report_history(
+    fn read_proof_history(
         &self,
         input: &mut File,
         case: &CaseId,
@@ -424,7 +445,7 @@ impl ChainState {
         count: u64,
         cancel: &irmind_app::CancellationToken,
     ) -> Result<Vec<SignedEntry>, AppError> {
-        if self.report_checkpoints.is_empty() {
+        if self.proof_checkpoints.is_empty() {
             return Ok(Vec::new());
         }
         let resume = input.stream_position().map_err(storage)?;
@@ -451,11 +472,12 @@ impl ChainState {
                 .verify(&entry.public_key, &entry.hash, &entry.sig)
                 .map_err(|_| AppError::InvalidChain(entry.seq))?;
             previous = entry.hash;
-            if self.report_checkpoints.contains(&entry.seq)
+            if self.proof_checkpoints.contains(&entry.seq)
                 || entry.kind.is_mapped_custody()
                 || matches!(
                     entry.kind,
                     AuditEventKind::ReportPublishedV1
+                        | AuditEventKind::SigmaRunV1
                         | AuditEventKind::SourceManifestV2
                         | AuditEventKind::SourceQueryResultV1
                         | AuditEventKind::FindingProposed
