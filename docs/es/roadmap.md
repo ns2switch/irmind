@@ -85,7 +85,7 @@ binario actual.
 
 ## Lanzamiento público
 
-Publicar un artículo, un vídeo de demostración con datos sintéticos, publicaciones comunitarias, un benchmark público de modelos con HuntEval y un catálogo inicial de skills. El lanzamiento público es el siguiente hito tras estabilizar v0.5.x. Publicar
+Publicar un artículo, un vídeo de demostración con datos sintéticos, publicaciones comunitarias y un catálogo inicial de skills. El lanzamiento público es el siguiente hito tras estabilizar v0.5.x. Publicar
 solo afirmaciones medidas: firma nativa, validaciones del analista y catálogo
 son elementos explícitos de la lista, no garantías implícitas.
 
@@ -95,23 +95,33 @@ Consultas estructuradas y con presupuesto para CloudTrail en Athena, Cloud
 Audit Logs en BigQuery y las tablas admitidas de Azure Log Analytics en el
 plan Analytics. El resultado se firma y se conserva como evidencia derivada
 para el análisis local. Las consultas desde subagentes, la reverificación
-de originales en la nube y los demás conjuntos de datos y proveedores
-quedan para después. Consulta el [diseño](source-queries-design.md) y el
+de originales en la nube se prevén para v0.8. Los demás conjuntos de datos y
+proveedores quedan para más adelante. Consulta el [diseño](source-queries-design.md) y el
 [contrato de implementación](source-queries-format-contract.md).
 
-## v0.7: detección, informes, extensibilidad y API del motor
+## v0.7: identidades de mapeo, detección e informes
 
-- Priorizar las identidades de mapeo nativo acotadas a sus dependencias para
+- Acotar las identidades de mapeo nativo a sus dependencias de producción para
   conservar la reconstrucción cuando cambien dependencias ajenas al mapeo.
   [Diseño](../development/native-mapping-build-identity.md).
 - Ejecutar reglas Sigma sobre Parquet local sin LLM.
-- Exportar informes Markdown y PDF que citan solo evidencia confirmada.
-- Evaluar IRMind como deployment completo con el protocolo HuntEval.
-- Permitir hooks locales firmados antes o después de llamadas, incluida una
-  barra de estado con script admitido explícitamente. La barra actual es
-  declarativa y no ejecuta comandos externos.
-- Ofrecer un cliente MCP opcional y desactivado por defecto, con modelo de amenazas. Cada herramienta declara riesgo, pasa por política y devuelve contenido no confiable.
-- Aprobar el diseño de una API del motor antes de añadir el futuro subcomando `serve` de `irmind`. El protocolo versionado transmite eventos por stdio, socket Unix o named pipe de Windows, sin TCP abierto por defecto. Las claves permanecen en IRMind: el cliente solicita aprobación, el analista confirma e IRMind firma.
+- Generar informes firmados en Markdown y PDF a partir de hallazgos
+  confirmados con citas.
+- Diseñar los hooks locales firmados, el cliente MCP y la API del motor para v0.8.
+
+## v0.8: extensibilidad, API del motor y validación
+
+- Añadir hooks locales firmados alrededor de las llamadas a herramientas,
+  incluido un script de la barra de estado admitido expresamente por el analista.
+- Ofrecer un cliente MCP opcional y desactivado por defecto. Cada herramienta
+  declara su riesgo, pasa por la política y devuelve contenido no confiable.
+- Ofrecer un protocolo del motor versionado para `serve` por stdio,
+  socket Unix o named pipe de Windows. El cliente solicita la aprobación, el
+  analista confirma e IRMind firma. TCP queda desactivado por defecto.
+- Añadir consultas en origen para subagentes y reverificación remota de los
+  objetos originales en la nube.
+- Evaluar IRMind como sistema completo con HuntEval y publicar las mediciones
+  comparativas de los modelos.
 
 ## Criterios para 1.0
 
