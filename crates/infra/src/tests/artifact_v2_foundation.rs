@@ -58,7 +58,7 @@ fn retired_artifact_kind_is_rejected_before_payload_interpretation() {
 #[test]
 fn older_export_headers_fail_with_an_actionable_format_error() {
     let root = tempfile::tempdir().unwrap();
-    for version in 3..=8 {
+    for version in 3..=9 {
         let path = root.path().join(format!("synthetic-v{version}.irmind"));
         fs::write(&path, format!("IRMIND-EXPORT-V{version}\0")).unwrap();
         let error = verify_export(&path).unwrap_err();

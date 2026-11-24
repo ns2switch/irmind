@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Refresh synthetic export vectors or derive V9 vectors from the frozen V8 seeds.
+"""Refresh synthetic export vectors or derive V9 and V10 from frozen synthetic seeds.
 
 Development only; requires Python cryptography. Only the published synthetic
-[43; 32] signing key is accepted. Original signatures and seed digests are checked
+signing keys are accepted. Original signatures and seed digests are checked
 before updating profiles, artifact bindings, receipts, inventory and signatures.
 No evidence, mapping installation or Parquet bytes are changed.
 """
@@ -155,6 +155,10 @@ def refresh(path, case_v5=False):
         rewrite_pipeline(entries)
         entries[-1]['payload'] = inventory(entries[:-1])
         magic = MAGIC
+    return resign(magic, header, entries, remainder), match[1]
+
+
+def resign(magic, header, entries, remainder):
     previous = bytes(32)
     for entry in entries:
         entry['prev'] = list(previous)
@@ -164,15 +168,104 @@ def refresh(path, case_v5=False):
     challenge = b'irmind-seal-v1\0' + field(header['case_id']) + number(final['seq']) + previous + field(final['payload'])
     assert bytes(header['seal']['public_key']) == PUBLIC
     header['seal'].update(hash=list(previous), sig=list(KEY.sign(challenge)))
-    result = magic + frame(header) + number(len(entries)) + b''.join(map(frame, entries)) + remainder
-    return result, match[1]
+    ordered_header = {key: header[key] for key in (
+        'version', 'case_id', 'title', 'severity', 'scope', 'seal',
+    )}
+    ordered_header['seal'] = {key: header['seal'][key] for key in (
+        'seq', 'hash', 'sig', 'public_key', 'analyst_key_fingerprint',
+    )}
+    prefix = frame(header) if magic != b'IRMIND-EXPORT-V10\0' else field(
+        json.dumps(ordered_header, ensure_ascii=False, separators=(',', ':')),
+    )
+    return magic + prefix + number(len(entries)) + b''.join(map(frame, entries)) + remainder
+
+
+def derive_v10(path):
+    test = (ROOT / 'crates/infra/src/tests/mapped_export/seed.rs').read_text()
+    expected = re.search(re.escape(path.name) + r'"\),\s*"([0-9a-f]{64})"', test)
+    original = path.read_bytes()
+    assert expected and sha(original).hex() == expected[1]
+    source = Reader(original)
+    assert source.take(len(MAGIC)) == b'IRMIND-EXPORT-V9\0'
+    header = json.loads(source.field())
+    entries = [json.loads(source.field()) for _ in range(source.number())]
+    previous = bytes(32)
+    for entry in entries:
+        assert bytes(entry['public_key']) == PUBLIC and bytes(entry['prev']) == previous
+        previous = sha(canonical(entry))
+        assert previous == bytes(entry['hash'])
+        KEY.public_key().verify(bytes(entry['sig']), previous)
+    final = entries[-1]
+    old_seal = header['seal']
+    assert bytes(old_seal['public_key']) == PUBLIC and bytes(old_seal['hash']) == previous
+    challenge = (b'irmind-seal-v1\0' + field(header['case_id']) + number(final['seq'])
+                 + previous + field(final['payload']))
+    KEY.public_key().verify(bytes(old_seal['sig']), challenge)
+    assert header['version'] == 9 and entries[0]['kind'] == 'CaseCreated'
+    created = json.loads(entries[0]['payload'])
+    assert created['version'] == 5
+    created['version'] = 6
+    entries[0]['payload'] = json.dumps(created, ensure_ascii=False, separators=(',', ':'))
+    header['version'] = 10
+    return resign(b'IRMIND-EXPORT-V10\0', header, entries, source.data[source.offset:] + bytes(16))
+
+
+
+def derive_v6_query_chain(name):
+    directory = ROOT / 'docs/development/source-query-format-vectors'
+    original = (directory / f'{name}.json').read_bytes()
+    sums = (directory / 'SHA256SUMS').read_text()
+    expected = next(
+        line.split()[0] for line in sums.splitlines() if line.split()[-1] == f'{name}.json'
+    )
+    assert sha(original).hex() == expected
+    edge = bytes(32)
+    entries = json.loads(original)
+    assert entries[0]['kind'] == 'CaseCreated'
+    keys = {actor: Ed25519PrivateKey.from_private_bytes(bytes([seed]) * 32)
+            for actor, seed in [('analyst', 77), ('agent:main', 88)]}
+    for entry in entries:
+        public = keys[entry['actor']].public_key()
+        assert bytes(entry['public_key']) == public.public_bytes(Encoding.Raw, PublicFormat.Raw)
+        assert bytes(entry['prev']) == edge
+        edge = sha(canonical(entry))
+        assert edge == bytes(entry['hash'])
+        public.verify(bytes(entry['sig']), edge)
+    created = json.loads(entries[0]['payload'])
+    assert created['version'] == 5
+    created['version'] = 6
+    entries[0]['payload'] = json.dumps(created, ensure_ascii=False, separators=(',', ':'))
+    edge = bytes(32)
+    for entry in entries:
+        entry['prev'] = list(edge)
+        edge = sha(canonical(entry))
+        entry['hash'] = list(edge)
+        entry['sig'] = list(keys[entry['actor']].sign(edge))
+    return (json.dumps(entries, separators=(',', ':'), sort_keys=True) + '\n').encode()
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--write', action='store_true')
-    parser.add_argument('--case-v5', action='store_true')
+    versions = parser.add_mutually_exclusive_group()
+    versions.add_argument('--case-v5', action='store_true')
+    versions.add_argument('--case-v6', action='store_true')
     args = parser.parse_args()
+    if args.case_v6:
+        for suffix in ("mapped", "installed"):
+            directory = ROOT / 'fuzz/seeds/export'
+            data = derive_v10(directory / f'valid-v9-{suffix}.irmind')
+            path = directory / f'valid-v10-{suffix}.irmind'
+            print(path.name, sha(data).hex())
+            if args.write:
+                path.write_bytes(data)
+        for name in ('signed-record-chain', 'signed-recovery-chain'):
+            data = derive_v6_query_chain(name)
+            path = ROOT / 'crates/testkit/fixtures/contracts' / f'{name}-case-v6.json'
+            print(path.name, sha(data).hex())
+            if args.write:
+                path.write_bytes(data)
+        return
     updates = []
     for name in ['valid-v8-mapped.irmind', 'valid-v8-installed.irmind']:
         path = ROOT / 'fuzz/seeds/export' / name

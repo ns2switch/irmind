@@ -4,6 +4,15 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+**Format impact:** Case marker 6 and export V10 require their creating minor
+version. Use IRMind v0.6.x for cases with marker 5 and exports with magic V9,
+or re-ingest the verified originals in a new case.
+
+- Native mapping implementation identities change to the V2 production
+  dependency manifest. Full reconstruction of v0.6.x cases requires the
+  original IRMind executable. Subsequent dependency changes outside the
+  production closure of a native mapper leave its identity intact.
+
 ## 0.6.2 — Reproducible macOS binaries and build toolchain records
 
 - Reproduce the macOS main executable across clean checkouts on Intel and

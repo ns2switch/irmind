@@ -14,7 +14,7 @@ mod cases;
 mod investigation;
 mod model_request;
 
-pub(crate) const CASE_CREATION_VERSION: u8 = 5;
+pub(crate) const CASE_CREATION_VERSION: u8 = 6;
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -465,10 +465,11 @@ impl Engine<'_> {
 mod format_tests {
     use super::*;
     #[test]
-    fn case_created_v5_matches_the_approved_contract_bytes() {
+    fn case_created_v6_matches_the_approved_contract_bytes() {
         for bytes in [
-            include_bytes!("../../../docs/development/source-query-format-vectors/case-created-v5.json").as_slice(),
-            include_bytes!("../../../docs/development/source-query-format-vectors/case-created-v5-disabled.json").as_slice(),
+            include_bytes!("../../testkit/fixtures/contracts/case-created-v6.json").as_slice(),
+            include_bytes!("../../testkit/fixtures/contracts/case-created-v6-disabled.json")
+                .as_slice(),
         ] {
             let created: CaseCreatedEvent = serde_json::from_slice(bytes).unwrap();
             assert_eq!(created.version, CASE_CREATION_VERSION);
@@ -487,7 +488,7 @@ mod format_tests {
             actor: Actor::Analyst,
             origin: "analyst".into(),
             kind: AuditEventKind::CaseCreated,
-            payload: r#"{"version":5,"title":"Synthetic","severity":"medium","scope":"local","budget":{"model_tokens":2000000,"tool_calls":1000,"cloud_bytes":536870912000},"source_queries":{"enabled":false,"analytics_allowed":false,"scan_bytes":null,"retained_rows":0,"retained_bytes":0}}"#
+            payload: r#"{"version":6,"title":"Synthetic","severity":"medium","scope":"local","budget":{"model_tokens":2000000,"tool_calls":1000,"cloud_bytes":536870912000},"source_queries":{"enabled":false,"analytics_allowed":false,"scan_bytes":null,"retained_rows":0,"retained_bytes":0}}"#
                 .into(),
             evidence: None,
             prev: [0; 32],
@@ -499,6 +500,9 @@ mod format_tests {
             verify_case_metadata("Synthetic", Severity::Medium, "local", &[first.clone()]).is_ok()
         );
         for retired in [
+            include_str!(
+                "../../../docs/development/source-query-format-vectors/case-created-v5.json"
+            ),
             include_str!("../../../docs/development/subagent-format-vectors/case-created-v4.json"),
             r#"{"version":3,"title":"Synthetic","severity":"medium","scope":"local"}"#,
             r#"{"version":2,"title":"Synthetic","severity":"medium","scope":"local"}"#,

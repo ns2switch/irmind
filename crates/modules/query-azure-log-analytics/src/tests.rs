@@ -113,7 +113,7 @@ async fn lost_synchronous_query_is_not_replayed_and_cancel_prevents_a_new_reques
     assert_eq!(server.finish().unwrap().len(), 2);
 }
 
-#[path = "../../../testkit/provider_tests/source_query_v9.rs"]
+#[path = "../../../testkit/provider_tests/source_query_v10.rs"]
 mod case_contract;
 
 #[test]

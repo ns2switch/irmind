@@ -1,4 +1,4 @@
-use super::export_current::{HeaderV9, MAGIC_V9, v9_result};
+use super::export_current::{EXPORT_VERSION, HeaderV10, MAGIC_V10, v10_result};
 use super::frames::{read_frame, read_hash, read_u64, verify_raw};
 use super::{
     AppError, CaseId, LocalVerifier, Path, Severity, hex, seal_challenge, sha256, storage,
@@ -14,7 +14,7 @@ const MAX_AUDIT_ENTRIES: u64 = 5_000_000;
 const MAX_SOURCE_MANIFESTS: usize = 1_000_000;
 const MAX_PACKAGE_FILE_BYTES: u64 = 2_000_000_000_000;
 
-pub(super) fn verify_export_v9(
+pub(super) fn verify_export_v10(
     path: &Path,
     expected_key: Option<&str>,
 ) -> Result<ExportVerification, AppError> {
@@ -40,24 +40,10 @@ fn verify_open_export_with_catalog(
     expected_key: Option<&str>,
     catalog: &dyn irmind_app::catalog::CatalogIndexVerifier,
 ) -> Result<ExportVerification, AppError> {
-    let version = 9;
     if size > MAX_PACKAGE_FILE_BYTES {
         return Err(storage_reason("export package exceeds size limit"));
     }
-    let mut magic = [0u8; MAGIC_V9.len()];
-    if input.read_exact(&mut magic).is_err() || magic != MAGIC_V9 {
-        return Err(AppError::Fixed(
-            irmind_app::FixedAppError::RetiredExportFormat,
-        ));
-    }
-    let header: HeaderV9 = serde_json::from_slice(&read_frame(&mut input)?).map_err(storage)?;
-    if header.version != version {
-        return Err(AppError::Fixed(
-            irmind_app::FixedAppError::RetiredExportFormat,
-        ));
-    }
-    let id =
-        CaseId::parse(&header.case_id).map_err(|_| storage_reason("invalid case id in export"))?;
+    let (header, id) = read_header(&mut input)?;
     let count = read_u64(&mut input)?;
     if count == 0 || count > MAX_AUDIT_ENTRIES {
         return Err(storage_reason("invalid audit entry count"));
@@ -104,14 +90,14 @@ fn verify_open_export_with_catalog(
     }
     journal.verify_source_links(&chain.metadata_entries)?;
     let captures = journal.captures().collect::<Vec<_>>();
-    irmind_app::source_queries::verify_query_capture_section(&mut input, &captures, &cancel)?;
-    let mut result = v9_result(
+    irmind_app::source_queries::read_query_capture_section(&mut input, &captures, &cancel)?;
+    super::extensions::verify_empty(&mut input)?;
+    let mut result = v10_result(
         fingerprint,
         usize::try_from(count).map_err(storage)?,
         chain.source_count,
         provided_count + captures.len(),
     );
-    result.format_version = version;
     result.source_query_limits = captures
         .iter()
         .filter_map(|receipt| receipt.limit_notice())
@@ -119,10 +105,42 @@ fn verify_open_export_with_catalog(
     Ok(result)
 }
 
+fn read_header(input: &mut File) -> Result<(HeaderV10, CaseId), AppError> {
+    let mut magic = [0u8; MAGIC_V10.len()];
+    if input.read_exact(&mut magic).is_err() || magic != MAGIC_V10 {
+        return Err(AppError::Fixed(
+            irmind_app::FixedAppError::RetiredExportFormat,
+        ));
+    }
+    let encoded_header = read_frame(input)?;
+    let header: HeaderV10 = serde_json::from_slice(&encoded_header).map_err(storage)?;
+    if header.version != EXPORT_VERSION {
+        return Err(AppError::Fixed(
+            irmind_app::FixedAppError::RetiredExportFormat,
+        ));
+    }
+    if serde_json::to_vec(&header).map_err(storage)? != encoded_header {
+        return Err(storage_reason("noncanonical export header"));
+    }
+    let id = CaseId::parse(&header.case_id)
+        .ok()
+        .filter(|id| {
+            id.as_str().bytes().enumerate().all(|(index, byte)| {
+                if matches!(index, 8 | 13 | 18 | 23) {
+                    byte == b'-'
+                } else {
+                    matches!(byte, b'0'..=b'9' | b'a'..=b'f')
+                }
+            })
+        })
+        .ok_or_else(|| storage_reason("invalid case id in export"))?;
+    Ok((header, id))
+}
+
 fn verify_methodology_tail(
     input: &mut File,
     chain: &mut ChainState,
-    header: &HeaderV9,
+    header: &HeaderV10,
     catalog: &dyn irmind_app::catalog::CatalogIndexVerifier,
 ) -> Result<(), AppError> {
     let proofs = super::skill_proofs::read(
@@ -162,7 +180,7 @@ pub(crate) fn verify_export_with_catalog(
 fn verify_operation_frames(
     input: &mut File,
     chain: &mut ChainState,
-    header: &HeaderV9,
+    header: &HeaderV10,
 ) -> Result<Vec<SignedOperation>, AppError> {
     let count = read_u64(input)?;
     if count > MAX_AUDIT_ENTRIES {
@@ -471,7 +489,7 @@ impl ChainState {
         Ok(())
     }
 
-    fn verify_seal(&self, id: &CaseId, header: &HeaderV9) -> Result<(), AppError> {
+    fn verify_seal(&self, id: &CaseId, header: &HeaderV10) -> Result<(), AppError> {
         {
             self.catalog.validate()?;
         }

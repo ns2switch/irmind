@@ -154,7 +154,7 @@ fn ingest(
 
 #[test]
 #[allow(clippy::too_many_lines)]
-fn v9_export_authenticates_retained_parents_receipts_schema_and_public_key() {
+fn v10_export_authenticates_retained_parents_receipts_schema_and_public_key() {
     let root = tempfile::tempdir().unwrap();
     let (store, engine, signer) = setup(root.path());
     let case = engine
@@ -219,7 +219,7 @@ fn v9_export_authenticates_retained_parents_receipts_schema_and_public_key() {
     let details = crate::LocalExportVerifier
         .verify_export_details(&package, Some(&expected))
         .unwrap();
-    assert_eq!(details.format_version, 9);
+    assert_eq!(details.format_version, 10);
     assert_eq!(details.source_manifests, 2);
     assert!(
         crate::LocalExportVerifier
@@ -227,7 +227,7 @@ fn v9_export_authenticates_retained_parents_receipts_schema_and_public_key() {
             .is_err()
     );
     let mut bytes = fs::read(&package).unwrap();
-    assert!(bytes.starts_with(b"IRMIND-EXPORT-V9\0"));
+    assert!(bytes.starts_with(b"IRMIND-EXPORT-V10\0"));
     seed::verify_required_tail(&bytes, root.path());
     bytes[..b"IRMIND-EXPORT-V5\0".len()].copy_from_slice(b"IRMIND-EXPORT-V5\0");
     let downgrade = root.path().join("downgrade.irmind");
@@ -309,7 +309,7 @@ fn source_query_recovery_requires_a_signed_expired_analytics_observation() {
         "../../../../docs/development/source-query-format-vectors/signed-recovery-configuration.json"
     )).unwrap();
     let mut chain: Vec<SignedEntry> = serde_json::from_slice(include_bytes!(
-        "../../../../docs/development/source-query-format-vectors/signed-recovery-chain.json"
+        "../../../testkit/fixtures/contracts/signed-recovery-chain-case-v6.json"
     ))
     .unwrap();
     let record =
@@ -355,7 +355,7 @@ fn source_query_reservation_and_submit_intent_survive_reopen_as_one_batch() {
     use irmind_app::CaseMutation;
     let root = tempfile::tempdir().unwrap();
     let chain: Vec<SignedEntry> = serde_json::from_slice(include_bytes!(
-        "../../../../docs/development/source-query-format-vectors/signed-record-chain.json"
+        "../../../testkit/fixtures/contracts/signed-record-chain-case-v6.json"
     ))
     .unwrap();
     let first = &chain[0];
@@ -402,7 +402,7 @@ fn source_query_broker_requires_the_pinned_analyst_and_agent_proofs() {
     };
     use irmind_domain::{AgentId, CaseScope};
     let chain: Vec<SignedEntry> = serde_json::from_slice(include_bytes!(
-        "../../../../docs/development/source-query-format-vectors/signed-record-chain.json"
+        "../../../testkit/fixtures/contracts/signed-record-chain-case-v6.json"
     ))
     .unwrap();
     let principal = AgentId::parse("main").unwrap();

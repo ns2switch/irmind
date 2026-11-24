@@ -1,6 +1,6 @@
 use super::*;
 
-#[path = "../../../../testkit/provider_tests/source_query_v9.rs"]
+#[path = "../../../../testkit/provider_tests/source_query_v10.rs"]
 mod case_contract;
 
 const TOKEN: &str = "synthetic-bigquery-export-bearer";

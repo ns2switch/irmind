@@ -36,7 +36,8 @@ pub use completion::{
     SourceQueryResultV1, SourceQuerySettlementV1,
 };
 pub use export::{
-    verify_query_capture_section, write_query_capture_section, write_stored_query_capture_section,
+    read_query_capture_section, verify_query_capture_section, write_query_capture_section,
+    write_stored_query_capture_section,
 };
 pub use journal::SourceQueryJournal;
 pub use page::{InspectedQueryPage, QueryPageInput, QueryPageSchema, SourceQueryPageDecoder};

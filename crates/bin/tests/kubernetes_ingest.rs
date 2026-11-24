@@ -196,7 +196,7 @@ fn native_and_falco_records_keep_cluster_roles_through_rebuild_seal_and_export()
             .verify_export_details(&target, Some(&key))
             .unwrap()
             .format_version,
-        9
+        10
     );
 }
 
@@ -297,6 +297,6 @@ fn verify_gcp_custody(
             .verify_export_details(path, Some(&key))
             .unwrap()
             .format_version,
-        9
+        10
     );
 }
