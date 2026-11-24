@@ -1,4 +1,4 @@
-name: Synthetic graph benchmark
+name: Synthetic ingestion and evidence-query benchmarks
 on:
   workflow_dispatch:
     inputs:
@@ -19,8 +19,6 @@ on:
         description: Full reference commit for the paired worker sweep
         type: string
         default: ""
-  schedule:
-    - cron: '31 4 * * 1'
 permissions:
   contents: read
 concurrency:
@@ -44,7 +42,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           key: worker-sweep-${{ runner.os }}
-          save-if: ${{ github.ref_name == 'main' }}
+          save-if: false
       - name: Configure the Linux linker and RSS measurement
         if: runner.os == 'Linux'
         shell: bash
@@ -60,6 +58,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
+          retention-days: 7
           name: worker-sweep
           path: worker-sweep-*.txt
           if-no-files-found: warn
@@ -81,7 +80,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           key: evtx-parallel-release-${{ runner.os }}
-          save-if: ${{ github.ref_name == 'main' }}
+          save-if: false
       - name: Build the release helper and current signed-ingestion benchmark
         shell: bash
         run: cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked --bin irmind-evtx --example large_collection
@@ -95,6 +94,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
+          retention-days: 7
           name: evtx-workers-${{ runner.os }}
           path: evtx-worker-sweep.json
           if-no-files-found: error
@@ -117,7 +117,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           key: common-schema-benchmark-linux
-          save-if: ${{ github.ref_name == 'main' }}
+          save-if: false
       - run: sudo apt-get update && sudo apt-get install -y mold
       - name: Fetch and verify pinned HuntEval public sources and private answers
         shell: bash
@@ -140,6 +140,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
+          retention-days: 7
           name: current-v3-${{ matrix.scenario }}
           path: current-v3.txt
           if-no-files-found: error
@@ -164,7 +165,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           key: common-schema-benchmark-linux
-          save-if: ${{ github.ref_name == 'main' }}
+          save-if: false
       - run: sudo apt-get update && sudo apt-get install -y mold
       - name: Fetch and verify pinned HuntEval public sources and private answers
         shell: bash
@@ -189,6 +190,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
+          retention-days: 7
           name: hunteval-synthetic-results
           path: hunteval.txt
           if-no-files-found: error
@@ -221,6 +223,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
+          retention-days: 7
           name: current-graph-metrics
           path: |
             metrics.json

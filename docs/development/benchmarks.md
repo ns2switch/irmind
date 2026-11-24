@@ -146,7 +146,7 @@ This is not a standard-runner performance gate or a varied 15 GB corpus.
 
 Current measured targets are 900 seconds for 15 GB cloud/chronological ingestion and 1,350 seconds for disordered stress. The approved 1,025-host stress ingestion miss is nonblocking; ordinary query limits remain required. See the [current policy](#current-policy-sole-mapped-v3-writer). Earlier comparisons retain their historical acceptance criteria and workflow outcomes.
 
-This page is for maintainers comparing signed Parquet ingestion and bounded evidence queries. The [manual and weekly workflow](../../.github/workflows/graph-benchmark.yml) generates synthetic 1 GB and 15 GB corpora on a standard Linux runner. It uploads the raw output. No corpus or original evidence is kept as an artifact.
+This page is for maintainers comparing signed Parquet ingestion and bounded evidence queries. The [manual ingestion and evidence-query workflow](../../.github/workflows/graph-benchmark.yml) generates synthetic 1 GB and 15 GB corpora on a standard Linux runner. It uploads the raw output. No corpus or original evidence is kept as an artifact.
 
 ## Current policy: sole mapped V3 writer
 
@@ -290,7 +290,7 @@ The model-free check asserts that `entity_lookup`, term search, entity timeline,
 | 18 isolated episodes | 19/19 · 10/10 · 14/14 | 19/19 · 10/10 · 14/14 | 19/19 · 10/10 · 14/14 | 0 |
 | 50 MB synthetic noise plus all 18 episodes | 19/19 · 10/10 · 14/14 | 19/19 · 10/10 · 14/14 | 19/19 · 10/10 · 14/14 | 0 |
 
-The 1 GB and 15 GB standard-runner needle measurements are collected by the [manual and weekly benchmark workflow](../../.github/workflows/graph-benchmark.yml). Its synthetic noise uses account `999900001111` and IP `198.18.254.42`, which do not occur in the pinned HuntEval corpus. The episode files remain unchanged and are added before Parquet compaction. The [pinned baseline run](https://github.com/ns2switch/irmind/actions/runs/41190348193) passed both corpora; its raw output is attached to that run. These times are from the same runner class as the earlier direct-reader measurements, not a guarantee that GitHub assigned the same physical host.
+The 1 GB and 15 GB standard-runner needle measurements are collected by the [manual benchmark workflow](../../.github/workflows/graph-benchmark.yml). Its synthetic noise uses account `999900001111` and IP `198.18.254.42`, which do not occur in the pinned HuntEval corpus. The episode files remain unchanged and are added before Parquet compaction. The [pinned baseline run](https://github.com/ns2switch/irmind/actions/runs/41190348193) passed both corpora; its raw output is attached to that run. These times are from the same runner class as the earlier direct-reader measurements, not a guarantee that GitHub assigned the same physical host.
 
 | Baseline corpus | Ingest | Parquet disk | Term p95 | Entity p95 | Neighbors p95 | Timeline p95 | Path p95 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -854,7 +854,7 @@ The `large_collection` example uses a generated, entirely synthetic Security log
 
 The two collections contain 100 MiB and 1 GiB of chunks, plus file headers. The latter uses four sources of 256 MiB plus a 4 KiB header each. They use the application's signed V2 ingestion use case, followed by a complete chain/artifact verification and an exact indexed-record count. Ingestion timing includes hashing, the contained decoder, normalization, Parquet and audit signatures. Fixture generation, initial sandbox setup and final verification are separate. The parent is the release ingestion host, not the interactive TUI or a model process. Its synthetic signing key is restricted to the temporary benchmark case.
 
-The manual **Weekly fuzzing** workflow input `evtx_large=true` runs only this benchmark on Linux and Windows. It builds the normal-feature decoder after the benchmark host so test-only broker features do not enter the auxiliary executable. No external provider is used. The Windows network witness still performs its approved local positive controls.
+The manual **Scheduled fuzzing** workflow input `evtx_large=true` runs only this benchmark on Linux and Windows. It builds the normal-feature decoder after the benchmark host so test-only broker features do not enter the auxiliary executable. No external provider is used. The Windows network witness still performs its approved local positive controls.
 
 Memory is the largest observed per-process OS high-water resident set (Linux) or peak working set (Windows), sampled every 20 ms. Auxiliary values are the maximum individual child, not the sum of concurrent children. Sampling can miss a short-lived process or a final spike; the harness refuses a successful result with no observed parent or decoder memory. Sources, provisional artifacts and runtime directories are removed after each collection.
 

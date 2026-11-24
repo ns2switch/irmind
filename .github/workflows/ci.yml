@@ -6,7 +6,8 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review]
   schedule:
-    - cron: '17 3 * * *'
+    - cron: '17 3 * * 0'
+    - cron: '17 3 * * 1-6'
   workflow_dispatch:
     inputs:
       profile_linux:
@@ -32,7 +33,8 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: rust-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  # An unrelated label must not cancel a run that supplies the required checks.
+  group: rust-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}-${{ github.event_name == 'pull_request' && (github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'full-ci' && 'ignored-label' || (github.event_name == 'schedule' && 'nightly' || 'checks') }}
   cancel-in-progress: true
 env:
   CARGO_INCREMENTAL: 0
@@ -41,10 +43,20 @@ env:
   CARGO_PROFILE_RELEASE_STRIP: symbols
 jobs:
   dco:
+    # Skipped label checks use different names so they cannot replace a required check.
+    name: ${{ (github.event_name != 'pull_request' || (github.event.action != 'labeled' && github.event.action != 'unlabeled') || github.event.label.name == 'full-ci') && 'dco' || 'dco (ignored label)' }}
+    if: ${{ github.event_name != 'pull_request' || (github.event.action != 'labeled' && github.event.action != 'unlabeled') || github.event.label.name == 'full-ci' }}
+    permissions:
+      contents: read
+      actions: read
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     outputs:
       run_ci: ${{ steps.scope.outputs.run_ci }}
+      docs_only: ${{ steps.scope.outputs.docs_only }}
+      docs_binary_run: ${{ steps.scope.outputs.docs_binary_run }}
+      cache_epoch: ${{ steps.scope.outputs.cache_epoch }}
+      pr_fuzz_targets: ${{ steps.fuzz.outputs.pr_targets }}
       platforms: ${{ steps.scope.outputs.platforms }}
       cross_verify: ${{ steps.scope.outputs.cross_verify }}
       release_build: ${{ steps.scope.outputs.release_build }}
@@ -53,7 +65,18 @@ jobs:
         with: {persist-credentials: false, fetch-depth: 0}
       - name: Select CI scope and skip stale nightly runs
         id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: python3 .github/scripts/select_ci_scope.py
+      - name: Verify CI and fuzz target selection
+        if: steps.scope.outputs.docs_only != 'true'
+        run: |
+          python3 -B .github/scripts/test_select_ci_scope.py
+          python3 -B .github/scripts/test_select_fuzz_targets.py
+      - name: Select required fuzz campaigns for new decoders
+        if: github.event_name == 'pull_request' && steps.scope.outputs.docs_only != 'true'
+        id: fuzz
+        run: python3 -B .github/scripts/select_fuzz_targets.py
       - name: Verify DCO sign-off on every PR commit
         if: github.event_name == 'pull_request'
         env:
@@ -61,129 +84,219 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: python3 .github/scripts/check_dco.py
   linux:
+    name: ${{ (github.event_name != 'pull_request' || (github.event.action != 'labeled' && github.event.action != 'unlabeled') || github.event.label.name == 'full-ci') && 'linux' || 'linux (ignored label)' }}
+    permissions:
+      contents: read
+      actions: read
     needs: dco
     if: ${{ !cancelled() && needs.dco.result == 'success' && needs.dco.outputs.run_ci == 'true' && (github.event_name != 'workflow_dispatch' || (!inputs.release_profile_benchmark && !inputs.release_profile_reproducibility && !inputs.release_binary_reproducibility)) }}
     runs-on: ubuntu-22.04
-    timeout-minutes: 120
+    timeout-minutes: ${{ needs.dco.outputs.pr_fuzz_targets != '' && 360 || 120 }}
     env:
       RUSTFLAGS: -C link-arg=-fuse-ld=mold
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: {persist-credentials: false, fetch-depth: 0}
+      - name: Test documented command ownership
+        run: python3 -B .github/scripts/test_check_docs.py
+      - name: Download the compatible CLI from a successful main push
+        if: needs.dco.outputs.docs_only == 'true' && needs.dco.outputs.docs_binary_run != ''
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: docs-cli
+          path: docs-cli
+          github-token: ${{ github.token }}
+          run-id: ${{ needs.dco.outputs.docs_binary_run }}
+      - name: Check documentation without a Rust build
+        if: needs.dco.outputs.docs_only == 'true'
+        env:
+          DOCS_BINARY_RUN: ${{ needs.dco.outputs.docs_binary_run }}
+        run: |
+          if [ -n "$DOCS_BINARY_RUN" ]; then
+            (cd docs-cli && sha256sum --check SHA256SUMS)
+            chmod +x docs-cli/irmind
+            python3 -B .github/scripts/check_docs.py --binary docs-cli/irmind
+          else
+            echo "No compatible main CLI artifact exists. Checking the CLI against the source."
+            python3 -B .github/scripts/check_docs.py
+          fi
       - uses: dtolnay/rust-toolchain@766a42937d994bd78bb4591385445c188ccb3f09 # 1.97.1
+        if: needs.dco.outputs.docs_only != 'true'
         with: {components: 'rustfmt, clippy'}
       - name: Keep only the pinned Rust toolchain for a stable cache key
+        if: needs.dco.outputs.docs_only != 'true'
         run: |
           rustup toolchain list | awk '{print $1}' | while read -r toolchain; do
             case "$toolchain" in 1.97.1-*) ;; *) rustup toolchain uninstall "$toolchain" ;; esac
           done
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        if: needs.dco.outputs.docs_only != 'true'
         id: rust_cache
         with:
-          key: linux-ubuntu22-mold-${{ hashFiles('Cargo.lock', 'helpers/evtx/Cargo.lock') }}
+          key: linux-ubuntu22-mold-1.97.1-${{ needs.dco.outputs.cache_epoch }}
           add-rust-environment-hash-key: false
           cache-targets: true
+          cache-bin: false
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Report dependency cache restoration
+        if: needs.dco.outputs.docs_only != 'true'
         run: |
           echo "Rust dependency cache exact hit: ${{ steps.rust_cache.outputs.cache-hit }}" >> "$GITHUB_STEP_SUMMARY"
       - name: Install the pinned prebuilt linker
+        if: needs.dco.outputs.docs_only != 'true'
         uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2, reviewed mold manifest
         with: {tool: 'mold@2.42.1', checksum: true, fallback: none}
       - run: mold --version
+        if: needs.dco.outputs.docs_only != 'true'
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+        if: needs.dco.outputs.docs_only != 'true'
         with: {tool: 'cargo-nextest,cargo-deny', fallback: none}
-      - run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_select_ci_scope.py
       - run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_release_json_features.py
+        if: needs.dco.outputs.docs_only != 'true'
       - name: Resolve all locked workspaces and check shipping versions
+        if: needs.dco.outputs.docs_only != 'true'
         run: python3 -B .github/scripts/check_locked_workspaces.py
       - run: python3 -B .github/scripts/check_mapping_dependency_graph.py
+        if: needs.dco.outputs.docs_only != 'true'
       - run: python3 -B .github/scripts/test_native_mapping_manifest.py
+        if: needs.dco.outputs.docs_only != 'true'
       - run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_sign_macos.py
+        if: needs.dco.outputs.docs_only != 'true'
       - run: PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_hunteval_benchmark.py
+        if: needs.dco.outputs.docs_only != 'true'
       - run: PYTHONDONTWRITEBYTECODE=1 python3 tools/real-validation/test_lab.py
+        if: needs.dco.outputs.docs_only != 'true'
       - run: PYTHONDONTWRITEBYTECODE=1 python3 tools/real-validation/test_port_forward.py
+        if: needs.dco.outputs.docs_only != 'true'
       - name: Verify the pinned offline core-skill mirror
+        if: needs.dco.outputs.docs_only != 'true'
         run: |
           python3 -B scripts/skills_inventory.py
           python3 -B scripts/sync_core_skills.py
           python3 -B scripts/test_sync_core_skills.py
-      - name: Test documented command ownership
-        run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_check_docs.py
       - name: Test native release coverage
+        if: needs.dco.outputs.docs_only != 'true'
         run: |
           python3 -B .github/scripts/test_release_platforms.py
           python3 -B .github/scripts/test_release_build_environment.py
       - name: Test release-note policy links and retry behavior
+        if: needs.dco.outputs.docs_only != 'true'
         run: |
           python3 -B .github/scripts/test_release_notes.py
           python3 -B .github/scripts/test_homebrew_dispatch.py
       - name: Test allocation profile attribution
+        if: needs.dco.outputs.docs_only != 'true'
         run: PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_profile_pipeline_allocations.py
       - name: Test current absolute benchmark criteria
+        if: needs.dco.outputs.docs_only != 'true'
         run: |
           python3 -B .github/scripts/test_collect_graph_metrics.py
           python3 -B .github/scripts/test_evaluate_v3_gates.py
       - run: sh -n install.sh
+        if: needs.dco.outputs.docs_only != 'true'
       - run: python3 -B scripts/test_install_sh.py
+        if: needs.dco.outputs.docs_only != 'true'
       - run: cargo fmt --all -- --check
+        if: needs.dco.outputs.docs_only != 'true'
       - run: python3 scripts/check_no_rust_includes.py
+        if: needs.dco.outputs.docs_only != 'true'
       - run: python3 scripts/code_metrics.py --check-audit-literals
+        if: needs.dco.outputs.docs_only != 'true'
       - run: cargo fmt --manifest-path fuzz/Cargo.toml -- --check
+        if: needs.dco.outputs.docs_only != 'true'
       - name: Cargo build timings (manual profiling only)
-        if: github.event_name == 'workflow_dispatch' && inputs.profile_linux == true
+        if: ${{ needs.dco.outputs.docs_only != 'true' && (github.event_name == 'workflow_dispatch' && inputs.profile_linux == true) }}
         run: cargo build --timings --workspace --all-features --profile ci --locked
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: github.event_name == 'workflow_dispatch' && inputs.profile_linux == true
-        with: {name: linux-cargo-timings, path: target/cargo-timings/, if-no-files-found: error}
+        if: ${{ needs.dco.outputs.docs_only != 'true' && (github.event_name == 'workflow_dispatch' && inputs.profile_linux == true) }}
+        with: {name: linux-cargo-timings, path: target/cargo-timings/, if-no-files-found: error, retention-days: 7}
       - name: Clippy (CI profile)
+        if: needs.dco.outputs.docs_only != 'true'
         run: cargo clippy --workspace --all-targets --all-features --profile ci --locked -- -D warnings
       - name: Test verified installer behavior without network
+        if: needs.dco.outputs.docs_only != 'true'
         run: PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_installers.py
       - name: Check the first-party unsafe boundary
+        if: needs.dco.outputs.docs_only != 'true'
         run: |
           PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_check_unsafe_boundary.py
           python3 .github/scripts/check_unsafe_boundary.py
           PYTHONDONTWRITEBYTECODE=1 python3 .github/scripts/test_check_date_dependencies.py
           python3 .github/scripts/check_date_dependencies.py
       - name: Lint and test the separately resolved EVTX helper
+        if: needs.dco.outputs.docs_only != 'true'
         run: |
           cargo fmt --manifest-path helpers/evtx/Cargo.toml --all --check
           cargo clippy --manifest-path helpers/evtx/Cargo.toml --all-targets --profile ci --locked -- -D warnings
           python3 helpers/evtx/test.py
           python3 .github/scripts/check_evtx_linux.py target/ci/irmind-evtx native-only
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: needs.dco.outputs.platforms == 'true' && needs.dco.outputs.release_build != 'true'
-        with: {name: evtx-linux-ci, path: target/ci/irmind-evtx, if-no-files-found: error}
+        if: ${{ needs.dco.outputs.docs_only != 'true' && (needs.dco.outputs.platforms == 'true' && needs.dco.outputs.release_build != 'true') }}
+        with: {name: evtx-linux-ci, path: target/ci/irmind-evtx, if-no-files-found: error, retention-days: 7}
       - name: Nextest (CI profile)
-        run: cargo nextest run --workspace --all-features --cargo-profile ci --locked
+        if: needs.dco.outputs.docs_only != 'true'
+        env:
+          IRMIND_CROSS_VERIFY: ${{ needs.dco.outputs.cross_verify }}
+        run: |
+          if [ "$IRMIND_CROSS_VERIFY" = true ]; then
+            export IRMIND_PORTABLE_EXPORT_DIR="$GITHUB_WORKSPACE/portable-export"
+          fi
+          cargo nextest run --workspace --all-features --cargo-profile ci --locked
       - run: cargo deny check --hide-inclusion-graph
+        if: needs.dco.outputs.docs_only != 'true'
       - run: cargo deny --manifest-path helpers/evtx/Cargo.toml --config deny.toml check --hide-inclusion-graph
+        if: needs.dco.outputs.docs_only != 'true'
       - run: cargo deny --manifest-path fuzz/Cargo.toml --config deny.toml check --hide-inclusion-graph
+        if: needs.dco.outputs.docs_only != 'true'
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
-        if: github.event_name == 'schedule'
+        if: ${{ needs.dco.outputs.docs_only != 'true' && (github.event_name == 'schedule') }}
         with: {tool: 'cargo-audit', fallback: none}
-      - if: github.event_name == 'schedule'
+      - if: ${{ needs.dco.outputs.docs_only != 'true' && (github.event_name == 'schedule') }}
         run: cargo audit --ignore RUSTSEC-2026-0370 --ignore RUSTSEC-2026-0371 --ignore RUSTSEC-2026-0372
       - name: Stage CLI test executable for cross-platform verification
-        if: needs.dco.outputs.cross_verify == 'true'
+        if: ${{ needs.dco.outputs.docs_only != 'true' && (needs.dco.outputs.cross_verify == 'true') }}
         run: mkdir -p verify-bin && cp target/ci/irmind verify-bin/irmind
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: needs.dco.outputs.cross_verify == 'true'
-        with: {name: verify-test-linux, path: verify-bin/, if-no-files-found: error}
+        if: ${{ needs.dco.outputs.docs_only != 'true' && (needs.dco.outputs.cross_verify == 'true') }}
+        with: {name: verify-test-linux, path: verify-bin/, if-no-files-found: error, retention-days: "${{ inputs.release_dry_run && '30' || '7' }}"}
       - name: Check links and documented CLI commands against the built test binary
+        if: needs.dco.outputs.docs_only != 'true'
         run: python3 .github/scripts/check_docs.py --binary target/ci/irmind
-      - if: needs.dco.outputs.cross_verify == 'true'
-        run: IRMIND_PORTABLE_EXPORT_DIR="$GITHUB_WORKSPACE/portable-export" cargo nextest run -p irmind --test verify_export_no_keyring --all-features --cargo-profile ci --locked -E 'test(portable_export_fixture)'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: needs.dco.outputs.cross_verify == 'true'
-        with: {name: portable-export-linux, path: portable-export/, if-no-files-found: error}
+        if: ${{ needs.dco.outputs.docs_only != 'true' && (needs.dco.outputs.cross_verify == 'true') }}
+        with: {name: portable-export-linux, path: portable-export/, if-no-files-found: error, retention-days: "${{ inputs.release_dry_run && '30' || '7' }}"}
+      - name: Install nightly Rust for new decoder campaigns
+        if: needs.dco.outputs.pr_fuzz_targets != ''
+        uses: dtolnay/rust-toolchain@2c76c034f9e32a5d6e2c104dc4df23a22476db04 # nightly
+      - name: Install verified cargo-fuzz
+        if: needs.dco.outputs.pr_fuzz_targets != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/install_cargo_fuzz.sh
+      - name: Fuzz each new decoder with AddressSanitizer for ten minutes
+        if: needs.dco.outputs.pr_fuzz_targets != ''
+        env:
+          FUZZ_TARGETS: ${{ needs.dco.outputs.pr_fuzz_targets }}
+          RUSTFLAGS: ''
+        run: |
+          read -r -a targets <<< "$FUZZ_TARGETS"
+          bash .github/scripts/run_fuzz_targets.sh pr "${targets[@]}"
+      - name: Stage CLI for future documentation checks
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          mkdir docs-cli
+          cp target/ci/irmind docs-cli/irmind
+          (cd docs-cli && sha256sum irmind > SHA256SUMS)
+      - name: Publish main CLI for documentation checks
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with: {name: docs-cli, path: docs-cli/, retention-days: 7, if-no-files-found: error}
       - name: Clean staging
         if: always()
-        run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('portable-export', 'verify-bin')) if p.is_dir()]"
+        run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('docs-cli', 'portable-export', 'verify-bin')) if p.is_dir()]"
   json_formats:
     needs: [linux, dco]
-    if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.run_ci == 'true' }}
+    if: ${{ !cancelled() && needs.linux.result == 'success' && needs.dco.outputs.run_ci == 'true' && needs.dco.outputs.docs_only != 'true' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
@@ -192,8 +305,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@766a42937d994bd78bb4591385445c188ccb3f09 # 1.97.1
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
-          key: json-formats-${{ hashFiles('Cargo.lock', 'helpers/evtx/Cargo.lock') }}
+          key: json-formats-1.97.1-${{ needs.dco.outputs.cache_epoch }}
           add-rust-environment-hash-key: false
+          cache-targets: true
+          cache-bin: false
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         with: {tool: cargo-nextest, fallback: none}
@@ -265,9 +380,10 @@ jobs:
           done
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
-          key: windows-msvc-${{ hashFiles('Cargo.lock', 'helpers/evtx/Cargo.lock') }}
+          key: windows-msvc-1.97.1-${{ needs.dco.outputs.cache_epoch }}
           add-rust-environment-hash-key: false
           cache-targets: true
+          cache-bin: false
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         with: {tool: cargo-nextest, fallback: none}
@@ -289,7 +405,14 @@ jobs:
       - name: Inspect helper DLL imports after native startup failure
         if: failure()
         run: python3 .github/scripts/inspect_evtx_windows.py target/x86_64-pc-windows-msvc/ci/irmind-evtx.exe
-      - run: cargo nextest run --workspace --all-features --cargo-profile ci --locked --no-fail-fast
+      - name: Nextest (CI profile)
+        env:
+          IRMIND_CROSS_VERIFY: ${{ needs.dco.outputs.cross_verify }}
+        run: |
+          if [ "$IRMIND_CROSS_VERIFY" = true ]; then
+            export IRMIND_PORTABLE_EXPORT_DIR="$GITHUB_WORKSPACE/portable-export"
+          fi
+          cargo nextest run --workspace --all-features --cargo-profile ci --locked --no-fail-fast
       - name: Parse the PowerShell installer without running it
         run: |
           pwsh -NoProfile -Command '$tokens=$null; $errors=$null; [System.Management.Automation.Language.Parser]::ParseFile("install.ps1",[ref]$tokens,[ref]$errors) | Out-Null; if ($errors.Count) { throw ($errors -join "`n") }'
@@ -298,7 +421,7 @@ jobs:
         run: mkdir -p verify-bin && cp target/x86_64-pc-windows-msvc/ci/irmind.exe verify-bin/irmind.exe
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: needs.dco.outputs.cross_verify == 'true'
-        with: {name: verify-test-windows, path: verify-bin/, if-no-files-found: error}
+        with: {name: verify-test-windows, path: verify-bin/, if-no-files-found: error, retention-days: "${{ inputs.release_dry_run && '30' || '7' }}"}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         if: needs.dco.outputs.cross_verify == 'true'
         with: {name: portable-export-linux, path: foreign-export}
@@ -306,11 +429,9 @@ jobs:
         if: needs.dco.outputs.cross_verify == 'true'
         run: |
           ./verify-bin/irmind.exe verify-export foreign-export/synthetic.irmind.json --expected-key "$(tr -d '\r\n' < foreign-export/expected-key.txt)"
-      - if: needs.dco.outputs.cross_verify == 'true'
-        run: IRMIND_PORTABLE_EXPORT_DIR="$GITHUB_WORKSPACE/portable-export" cargo nextest run -p irmind --test verify_export_no_keyring --all-features --cargo-profile ci --locked -E 'test(portable_export_fixture)'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: needs.dco.outputs.cross_verify == 'true'
-        with: {name: portable-export-windows, path: portable-export/, if-no-files-found: error}
+        with: {name: portable-export-windows, path: portable-export/, if-no-files-found: error, retention-days: "${{ inputs.release_dry_run && '30' || '7' }}"}
       - name: Clean staging
         if: always()
         run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('foreign-export', 'portable-export', 'verify-bin')) if p.is_dir()]"
@@ -356,9 +477,10 @@ jobs:
           done
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
-          key: macos-${{ matrix.arch }}-${{ hashFiles('Cargo.lock', 'helpers/evtx/Cargo.lock') }}
+          key: macos-${{ matrix.arch }}-1.97.1-${{ needs.dco.outputs.cache_epoch }}
           add-rust-environment-hash-key: false
           cache-targets: true
+          cache-bin: false
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         with: {tool: cargo-nextest, fallback: none}
@@ -384,7 +506,7 @@ jobs:
         run: mkdir -p verify-bin && cp target/${{ matrix.target }}/ci/irmind verify-bin/irmind
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: needs.dco.outputs.cross_verify == 'true' && matrix.arch == 'arm64'
-        with: {name: verify-test-macos, path: verify-bin/, if-no-files-found: error}
+        with: {name: verify-test-macos, path: verify-bin/, if-no-files-found: error, retention-days: "${{ inputs.release_dry_run && '30' || '7' }}"}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         if: needs.dco.outputs.cross_verify == 'true' && matrix.arch == 'arm64'
         with: {name: portable-export-linux, path: foreign-export}
@@ -601,7 +723,7 @@ jobs:
           done
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: github.event_name == 'workflow_dispatch'
-        with: {name: signed-release-dry-run, path: release/, if-no-files-found: error}
+        with: {name: signed-release-dry-run, path: release/, if-no-files-found: error, retention-days: 30}
       - name: Publish the signed prerelease only for an existing tag
         if: startsWith(github.ref, 'refs/tags/v')
         env:
