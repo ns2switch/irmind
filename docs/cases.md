@@ -20,8 +20,13 @@ to sign its admission. The case keeps the exact admitted rules in its V10 export
 when a run references them.
 
 Run `/sigma run <pack SHA-256> <start UTC> <end UTC>` from an open case. The
-initial field table covers reviewed CloudTrail events. IRMind reports skipped
-rules and marks scans that hit a time or work limit as partial. Each match
+v0.7 field table covers the reviewed Windows EVTX Security, Sysmon and PowerShell
+channels, Linux authentication, auditd and mapped ECS, AWS CloudTrail, and
+Zeek and Suricata DNS, HTTP and connections. It also covers Entra ID sign-in
+and audit, Azure Activity, Microsoft 365, Okta, GCP and Kubernetes audit, and
+the reviewed Defender, CrowdStrike FDR and eslogger process and related classes.
+Coverage depends on the exact logsource, fields and mapping version. IRMind
+reports skipped rules and marks scans that hit a time or work limit as partial. Each match
 proposes an unconfirmed finding tied to an exact evidence row. Review it and
 use `/confirm <finding-id>` before publishing a report.
 
