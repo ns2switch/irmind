@@ -277,7 +277,6 @@ fn measure_variant(
     rows: u64,
     file: &std::path::Path,
 ) -> u64 {
-    use irmind_app::encode_common_event;
     use std::{
         fs::File,
         time::{Duration, Instant},
@@ -287,22 +286,7 @@ fn measure_variant(
         .iter()
         .find(|binding| selector_value(variant, binding).is_none())
         .unwrap();
-    let mut incident = ProjectionInput::for_variant(variant);
-    let mut background = ProjectionInput::for_variant(variant);
-    incident.binding(binding, sample(binding, true));
-    background.binding(binding, sample(binding, false));
-    for input in [&mut incident, &mut background] {
-        input
-            .original
-            .insert("synthetic_padding".into(), Value::from("x".repeat(4096)));
-    }
-    benchmark::write_fixture_rows(file, rows, |row| {
-        let input = if row == 0 { &incident } else { &background };
-        (
-            encode_common_event(&input.row(variant, row)).unwrap(),
-            input.original(),
-        )
-    });
+    write_variant_fixture(variant, binding, rows, file);
     let taxonomy = condition(variant);
     let rules = measure_rules(&taxonomy, binding, count);
     let start = Instant::now();
@@ -367,6 +351,32 @@ fn measure_variant(
     );
     std::fs::remove_file(file).unwrap();
     bytes
+}
+
+#[cfg(not(debug_assertions))]
+fn write_variant_fixture(
+    variant: &SigmaSourceVariant,
+    binding: &SigmaFieldBinding,
+    rows: u64,
+    file: &std::path::Path,
+) {
+    use irmind_app::encode_common_event;
+    let mut incident = ProjectionInput::for_variant(variant);
+    let mut background = ProjectionInput::for_variant(variant);
+    incident.binding(binding, sample(binding, true));
+    background.binding(binding, sample(binding, false));
+    for input in [&mut incident, &mut background] {
+        input
+            .original
+            .insert("synthetic_padding".into(), Value::from("x".repeat(4096)));
+    }
+    benchmark::write_fixture_rows(file, rows, |row| {
+        let input = if row == 0 { &incident } else { &background };
+        (
+            encode_common_event(&input.row(variant, row)).unwrap(),
+            input.original(),
+        )
+    });
 }
 
 #[cfg(not(debug_assertions))]
