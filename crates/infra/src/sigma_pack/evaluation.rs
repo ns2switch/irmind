@@ -1,7 +1,6 @@
 //! Evaluate admitted Sigma predicates on authenticated common and original fields.
 use super::field_table::{
-    SigmaBindingType, SigmaEventFilter, SigmaFieldBinding, SigmaLiteral, SigmaNullPolicy,
-    SigmaSourceVariant,
+    SigmaBindingType, SigmaEventFilter, SigmaLiteral, SigmaNullPolicy, SigmaSourceVariant,
 };
 use irmind_app::{
     AppError, CancellationToken,
