@@ -250,6 +250,11 @@ fn scan_matches<'a>(
             break;
         }
     }
+    sort_hits(&mut hit_rows);
+    Ok((hit_rows, status, scope.reserved - remaining))
+}
+
+fn sort_hits(hit_rows: &mut Vec<Hit<'_>>) {
     hit_rows.sort_unstable_by(
         |(rule, time, source, offset, row),
          (other_rule, other_time, other_source, other_offset, other_row)| {
@@ -274,7 +279,6 @@ fn scan_matches<'a>(
         },
     );
     hit_rows.dedup_by(|left, right| left.0 == right.0 && left.4 == right.4);
-    Ok((hit_rows, status, scope.reserved - remaining))
 }
 
 struct WorkSource {
