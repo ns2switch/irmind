@@ -80,6 +80,8 @@ pub enum AdapterModelError {
     ProviderRequestFailed,
     #[error("model: provider response failed")]
     ProviderResponseFailed,
+    #[error("model: the provider blocked the response with its content filter")]
+    ProviderContentFiltered,
     #[error("model: provider stopped unexpectedly")]
     ProviderStoppedUnexpectedly,
     #[error("model: provider stream error")]

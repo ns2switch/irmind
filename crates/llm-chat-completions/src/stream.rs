@@ -1,10 +1,15 @@
-use irmind_app::{AppError, ModelResponse, ModelToolCall, ModelUsage};
+use irmind_app::{
+    AdapterModelError, AppError, FixedAppError, ModelResponse, ModelToolCall, ModelUsage,
+};
 use irmind_domain::{ProposedCall, Tool};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::io::{BufRead as _, BufReader, Read};
 
 mod cache;
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod terminal_frames;
 pub(super) use cache::UsageProfile;
 use cache::UsageSnapshots;
 
@@ -13,6 +18,7 @@ const MAX_STREAM_BYTES: usize = 2_000_000;
 #[derive(Default)]
 pub(super) struct TextPreview {
     pending: Vec<u8>,
+    finished: bool,
 }
 
 impl TextPreview {
@@ -36,6 +42,9 @@ impl TextPreview {
             };
             let data = data.trim_start();
             if data == "[DONE]" {
+                self.finished = true;
+            }
+            if self.finished {
                 continue;
             }
             let value: Value = serde_json::from_str(data).map_err(|_| {
@@ -43,11 +52,15 @@ impl TextPreview {
                     irmind_app::AdapterModelError::UnexpectedProviderStreamField,
                 ))
             })?;
-            if let Some(part) = value["choices"][0]["delta"]["content"].as_str()
+            let choice = &value["choices"][0];
+            let reason = choice["finish_reason"].as_str();
+            if let Some(part) = choice["delta"]["content"].as_str()
                 && !part.is_empty()
+                && reason != Some("content_filter")
             {
                 text.push(part.to_owned());
             }
+            self.finished = reason.is_some();
         }
         Ok(text)
     }
@@ -66,8 +79,7 @@ struct StreamState {
     text: String,
     tools: BTreeMap<usize, ToolDelta>,
     usage: UsageSnapshots,
-    finished: bool,
-    truncated: bool,
+    finish_reason: Option<FinishReason>,
     done: bool,
     bytes_read: usize,
 }
@@ -125,6 +137,37 @@ pub(super) fn parse_profile(
     state.finish()
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FinishReason {
+    Stop,
+    ToolCalls,
+    Length,
+}
+
+impl FinishReason {
+    fn parse(reason: &str) -> Result<Self, AppError> {
+        match reason {
+            "stop" => Ok(Self::Stop),
+            "tool_calls" => Ok(Self::ToolCalls),
+            "length" => Ok(Self::Length),
+            "content_filter" => Err(model_error(AdapterModelError::ProviderContentFiltered)),
+            _ => Err(model_error(AdapterModelError::ProviderStoppedUnexpectedly)),
+        }
+    }
+
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Stop => "stop",
+            Self::ToolCalls => "tool_calls",
+            Self::Length => "length",
+        }
+    }
+}
+
+fn model_error(error: AdapterModelError) -> AppError {
+    AppError::Fixed(FixedAppError::AdapterModel(error))
+}
+
 impl StreamState {
     fn apply_chunk(&mut self, chunk: &Value) -> Result<(), AppError> {
         self.usage.push(chunk);
@@ -150,11 +193,36 @@ impl StreamState {
                 irmind_app::AdapterModelError::UnexpectedProviderChoiceIndex,
             )));
         }
-        if self.finished {
-            return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
-                irmind_app::AdapterModelError::ProviderOutputAfterFinish,
-            )));
+        if let Some(previous) = self.finish_reason {
+            let same_finish = choice.get("finish_reason").is_none_or(|reason| {
+                reason.is_null() || reason.as_str() == Some(previous.as_str())
+            });
+            let empty_delta = choice.get("delta").is_none_or(|delta| {
+                delta.is_null()
+                    || delta.as_object().is_some_and(|fields| {
+                        fields.iter().all(|(field, value)| {
+                            value.is_null()
+                                || (field == "role" && value.as_str() == Some("assistant"))
+                                || (field != "tool_calls" && value.as_str() == Some(""))
+                        })
+                    })
+            });
+            let empty_legacy_payload = choice
+                .get("text")
+                .is_none_or(|text| text.is_null() || text.as_str() == Some(""))
+                && ["message", "function_call", "tool_calls"]
+                    .into_iter()
+                    .all(|field| choice.get(field).is_none_or(Value::is_null));
+            if !same_finish || !empty_delta || !empty_legacy_payload {
+                return Err(model_error(AdapterModelError::ProviderOutputAfterFinish));
+            }
+            return Ok(());
         }
+        let finish_reason = choice
+            .get("finish_reason")
+            .and_then(Value::as_str)
+            .map(FinishReason::parse)
+            .transpose()?;
         let delta = choice.get("delta").and_then(Value::as_object).ok_or({
             AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
                 irmind_app::AdapterModelError::MissingProviderDelta,
@@ -168,15 +236,7 @@ impl StreamState {
                 self.apply_tool_delta(call)?;
             }
         }
-        if let Some(reason) = choice.get("finish_reason").and_then(Value::as_str) {
-            if !matches!(reason, "stop" | "tool_calls" | "length") {
-                return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
-                    irmind_app::AdapterModelError::ProviderStoppedUnexpectedly,
-                )));
-            }
-            self.finished = true;
-            self.truncated = reason == "length";
-        }
+        self.finish_reason = finish_reason;
         Ok(())
     }
 
@@ -221,15 +281,16 @@ impl StreamState {
     }
 
     fn finish(self) -> Result<(ModelResponse, Option<ModelUsage>), AppError> {
-        if !self.done || !self.finished {
+        if !self.done || self.finish_reason.is_none() {
             return Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
                 irmind_app::AdapterModelError::ProviderStreamIncomplete,
             )));
         }
+        let truncated = self.finish_reason == Some(FinishReason::Length);
         let usage = self.usage.finish();
         let mut calls = Vec::with_capacity(self.tools.len());
         for (expected, (index, tool)) in self.tools.into_iter().enumerate() {
-            if self.truncated {
+            if truncated {
                 break;
             }
             if index != expected {
@@ -250,7 +311,7 @@ impl StreamState {
                 text: self.text,
                 calls,
                 raw: self.raw,
-                truncated: self.truncated,
+                truncated,
             },
             usage,
         ))
