@@ -554,9 +554,14 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
 
     fn sigma_pack_command(&mut self, prompt: &str) -> bool {
         if prompt == "/sigma" || prompt == "/sigma inspect" {
-            self.state
-                .messages
-                .push("Usage: /sigma inspect <directory>".into());
+            self.state.messages.push(
+                "Usage: /sigma inspect <directory> or /sigma import --license <id> <directory>"
+                    .into(),
+            );
+            return true;
+        }
+        if let Some(rest) = prompt.strip_prefix("/sigma import ") {
+            self.sigma_import(prompt, rest);
             return true;
         }
         if let Some(directory) = prompt.strip_prefix("/sigma inspect ") {
@@ -568,6 +573,60 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             return true;
         }
         false
+    }
+
+    fn sigma_import(&mut self, prompt: &str, rest: &str) {
+        use super::Confirmation;
+        let io = self.io_ops;
+        if let Some(Confirmation::SigmaImport {
+            command,
+            directory,
+            manifest,
+            license,
+            ..
+        }) = self.state.confirmed_action.take()
+            && command == prompt
+        {
+            let engine = self.engine;
+            self.start_task("Import Sigma pack", move |cancel| {
+                io.admit_sigma_pack(engine, &directory, manifest, &license, &cancel)?;
+                Ok(format!(
+                    "Sigma pack admitted · SHA-256 {}",
+                    irmind_app::hex(&manifest)
+                ))
+            });
+            return;
+        }
+        let parsed = rest
+            .strip_prefix("--license ")
+            .and_then(|value| value.split_once(' '));
+        let Some((license, directory)) = parsed.filter(|(license, directory)| {
+            (1..=128).contains(&license.len())
+                && license
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || b"-.+".contains(&byte))
+                && !directory.trim().is_empty()
+        }) else {
+            self.state
+                .messages
+                .push("Use /sigma import --license <id> <directory>".into());
+            return;
+        };
+        let command = prompt.to_owned();
+        let directory = PathBuf::from(directory.trim());
+        let license = license.to_owned();
+        let sender = self.confirmation_tx.clone();
+        self.start_task("Prepare Sigma pack", move |cancel| {
+            let (manifest, rules) = io.prepare_sigma_admission(&directory, &cancel)?;
+            let detail = format!(
+                "Sign Sigma pack admission?\nLocal directory: {}\nRules: {rules}\nLicense: {license}\nManifest SHA-256 {}",
+                directory.display(), irmind_app::hex(&manifest)
+            );
+            sender.send(Confirmation::SigmaImport {
+                command, directory, manifest, license, detail,
+            }).map_err(|_| irmind_app::AppError::Cancelled)?;
+            Ok("Review the rule pack before signing".into())
+        });
     }
 
     fn report_command(&mut self, prompt: &str) -> bool {

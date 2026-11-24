@@ -200,6 +200,27 @@ pub trait WorkspaceIo: Send + Sync {
             "Sigma is unavailable in this workspace".into(),
         ))
     }
+    fn prepare_sigma_admission(
+        &self,
+        _directory: &Path,
+        _cancel: &irmind_app::CancellationToken,
+    ) -> Result<([u8; 32], usize), irmind_app::AppError> {
+        Err(irmind_app::AppError::Policy(
+            "Sigma admission is unavailable in this workspace".into(),
+        ))
+    }
+    fn admit_sigma_pack(
+        &self,
+        _engine: &Engine<'_>,
+        _directory: &Path,
+        _manifest: [u8; 32],
+        _license: &str,
+        _cancel: &irmind_app::CancellationToken,
+    ) -> Result<(), irmind_app::AppError> {
+        Err(irmind_app::AppError::Policy(
+            "Sigma admission is unavailable in this workspace".into(),
+        ))
+    }
     fn publish_cited_report(
         &self,
         _engine: &Engine<'_>,
