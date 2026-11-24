@@ -178,10 +178,10 @@ fn evaluate(
     expect_result(&mut ui, "1 validated rules");
     let digest = pack_digest();
     ui.expect(&digest).unwrap();
-    ui.send(format!("/sigma import {}\r", pack.display()))
+    ui.send(format!("/sigma import --license MIT {}\r", pack.display()))
         .unwrap();
     ui.expect("Sign Sigma pack admission").unwrap();
-    ui.send("\r").unwrap();
+    ui.send("2\r").unwrap();
     ui.expect("Sigma pack admitted").unwrap();
     ui.send(format!(
         "/sigma run {digest} 2026-11-01T00:00:00Z 2026-11-01T00:02:00Z\r",
