@@ -43,11 +43,19 @@ fn documented_compatible_endings_and_empty_followups_keep_one_usage_snapshot() {
             vec![
                 stop.clone(),
                 json!({"choices":[{"index":0,"delta":{"content":null}}]}),
+                json!({"choices":[{"index":0,"delta":null}],"usage":counts}),
                 usage_only.clone(),
             ],
         ),
         // https://github.com/OpenRouterTeam/docs/blob/main/api_reference/streaming.mdx
-        ("OpenRouter", vec![stop.clone(), stop_with_usage]),
+        (
+            "OpenRouter",
+            vec![
+                stop.clone(),
+                stop_with_usage,
+                json!({"choices":[{"index":0}],"usage":counts}),
+            ],
+        ),
     ];
     for (provider, endings) in cases {
         let mut frames = vec![answer.clone()];
@@ -77,6 +85,7 @@ fn rejects_effective_output_and_conflicting_reasons_after_finish() {
         json!({"index":0,"delta":{"function_call":{"name":"late"}}}),
         json!({"index":0,"delta":{"reasoning_content":"late text"}}),
         json!({"index":0,"delta":{"content":false}}),
+        json!({"index":0,"delta":[]}),
         json!({"index":0,"delta":{},"message":{"content":"late text"}}),
         json!({"index":0,"delta":{},"finish_reason":"length"}),
         json!({"index":0,"delta":{},"finish_reason":0}),

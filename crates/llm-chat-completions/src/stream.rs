@@ -193,19 +193,19 @@ impl StreamState {
                 irmind_app::AdapterModelError::UnexpectedProviderChoiceIndex,
             )));
         }
-        let delta = choice.get("delta").and_then(Value::as_object).ok_or({
-            AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
-                irmind_app::AdapterModelError::MissingProviderDelta,
-            ))
-        })?;
         if let Some(previous) = self.finish_reason {
             let same_finish = choice.get("finish_reason").is_none_or(|reason| {
                 reason.is_null() || reason.as_str() == Some(previous.as_str())
             });
-            let empty_delta = delta.iter().all(|(field, value)| {
-                value.is_null()
-                    || (field == "role" && value.as_str() == Some("assistant"))
-                    || (field != "tool_calls" && value.as_str() == Some(""))
+            let empty_delta = choice.get("delta").is_none_or(|delta| {
+                delta.is_null()
+                    || delta.as_object().is_some_and(|fields| {
+                        fields.iter().all(|(field, value)| {
+                            value.is_null()
+                                || (field == "role" && value.as_str() == Some("assistant"))
+                                || (field != "tool_calls" && value.as_str() == Some(""))
+                        })
+                    })
             });
             let empty_legacy_payload = choice
                 .get("text")
@@ -218,6 +218,11 @@ impl StreamState {
             }
             return Ok(());
         }
+        let delta = choice.get("delta").and_then(Value::as_object).ok_or({
+            AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
+                irmind_app::AdapterModelError::MissingProviderDelta,
+            ))
+        })?;
         if let Some(part) = delta.get("content").and_then(Value::as_str) {
             self.text.push_str(part);
         }
