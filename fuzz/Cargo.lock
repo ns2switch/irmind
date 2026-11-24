@@ -1757,6 +1757,7 @@ dependencies = [
 name = "irmind-mod-sigma"
 version = "0.1.0"
 dependencies = [
+ "regex",
  "saphyr-parser",
 ]
 
