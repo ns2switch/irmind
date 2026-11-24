@@ -1,4 +1,4 @@
-name: Weekly fuzzing
+name: Scheduled fuzzing
 on:
   schedule:
     - cron: '41 2 * * 0'
@@ -33,14 +33,55 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: fuzz-${{ github.ref }}
+  group: fuzz-${{ github.ref }}-${{ github.event.schedule || 'manual' }}
   cancel-in-progress: true
 jobs:
+  scope:
+    if: inputs.evtx_large != true && inputs.native_windows != true && inputs.linux_compatibility != true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      core_targets: ${{ steps.targets.outputs.core_targets }}
+      identity_targets: ${{ steps.targets.outputs.identity_targets }}
+      daily_targets: ${{ steps.targets.outputs.daily_targets }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false, fetch-depth: 0}
+      - id: targets
+        run: python3 -B .github/scripts/select_fuzz_targets.py
+
+  daily:
+    needs: scope
+    if: github.event_name == 'schedule' && needs.scope.outputs.daily_targets != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      CARGO_INCREMENTAL: 0
+      FUZZ_TARGETS: ${{ needs.scope.outputs.daily_targets }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: dtolnay/rust-toolchain@2c76c034f9e32a5d6e2c104dc4df23a22476db04 # nightly
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with: {key: fuzz-registry, add-rust-environment-hash-key: false, cache-targets: false, cache-bin: false}
+      - name: Install verified cargo-fuzz
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/install_cargo_fuzz.sh
+      - name: Fuzz changed targets with a 90-second budget per target
+        run: |
+          read -r -a targets <<< "$FUZZ_TARGETS"
+          bash .github/scripts/run_fuzz_targets.sh daily "${targets[@]}"
+      - name: Remove temporary fuzz inputs and artifacts
+        if: always()
+        run: rm -rf .tools fuzz/corpus fuzz/artifacts helpers/evtx/fuzz/corpus helpers/evtx/fuzz/artifacts
+
   fuzz:
+    needs: scope
     if: ${{ inputs.evtx_large != true && inputs.native_windows != true && inputs.linux_compatibility != true && (github.event_name != 'schedule' || github.event.schedule == '41 2 * * 0') }}
     runs-on: ubuntu-latest
-    # Twenty ten-minute targets plus compilation; each target keeps its full budget.
-    timeout-minutes: 240
+    # The core targets keep ten minutes each, with time for compilation.
+    timeout-minutes: 270
     env:
       CARGO_INCREMENTAL: 0
     steps:
@@ -48,47 +89,34 @@ jobs:
         with: {persist-credentials: false}
       - uses: dtolnay/rust-toolchain@2c76c034f9e32a5d6e2c104dc4df23a22476db04 # nightly
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
-        with: {key: weekly-fuzz}
+        with: {key: weekly-fuzz, cache-bin: false}
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         with: {tool: 'cargo-deny', fallback: none}
       - run: cargo deny --manifest-path fuzz/Cargo.toml --config deny.toml check --hide-inclusion-graph
       - name: Install verified upstream cargo-fuzz binary
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p .tools
-          gh release download 0.13.2 -R rust-fuzz/cargo-fuzz -p cargo-fuzz-0.13.2-x86_64-unknown-linux-musl.tar.gz -O .tools/cargo-fuzz.tar.gz
-          printf '%s  %s\n' b5b704018b63e0f151c17a057ac53b5111e1db545d1b9f72fee79f08a545931c .tools/cargo-fuzz.tar.gz | sha256sum --check
-          tar -xzf .tools/cargo-fuzz.tar.gz -C .tools
-          install -m 0755 .tools/cargo-fuzz "$HOME/.cargo/bin/cargo-fuzz"
-      - name: Copy versioned seeds to temporary corpora
-        run: |
-          for target in guard parsers parser_syslog parser_linux parser_ecs parser_ocsf parser_velociraptor parser_hayabusa parser_chainsaw parser_plaso parser_eztools parser_declarative parser_zeek parser_suricata parser_kubernetes parser_falco parser_gcp_audit parser_entra canonical subagents spl export; do
-            mkdir -p "fuzz/corpus/$target"
-            cp "fuzz/seeds/$target/"* "fuzz/corpus/$target/"
-          done
-      - name: Fuzz guard, parser, canonical format and SPL
-        run: |
-          for target in guard parsers parser_syslog parser_linux parser_ecs parser_ocsf parser_velociraptor parser_hayabusa parser_chainsaw parser_plaso parser_eztools parser_declarative parser_zeek parser_suricata parser_kubernetes parser_falco parser_gcp_audit parser_entra canonical subagents spl; do
-            cargo +nightly fuzz run "$target" --target x86_64-unknown-linux-gnu -- -max_total_time=600 -rss_limit_mb=2048 -verbosity=0
-          done
-      - name: Fuzz exported packages within memory budget
+        run: bash .github/scripts/install_cargo_fuzz.sh
+      - name: Run the full core campaign with the existing ten-minute budget
         env:
-          CARGO_PROFILE_RELEASE_OPT_LEVEL: 0
-        run: cargo +nightly fuzz run export --target x86_64-unknown-linux-gnu --features export --sanitizer none -- -max_total_time=600 -rss_limit_mb=2048 -verbosity=0
+          FUZZ_TARGETS: ${{ needs.scope.outputs.core_targets }}
+        run: |
+          read -r -a targets <<< "$FUZZ_TARGETS"
+          bash .github/scripts/run_fuzz_targets.sh weekly "${targets[@]}"
       - name: Delete fuzz artifacts and temporary corpora
         if: always()
         run: python -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('.tools', 'fuzz/artifacts', 'fuzz/corpus')) if p.is_dir()]"
 
   identity:
+    needs: scope
     if: ${{ inputs.evtx_large != true && inputs.native_windows != true && inputs.linux_compatibility != true && (github.event_name != 'schedule' || github.event.schedule == '41 2 * * 0') }}
     strategy:
       fail-fast: false
       max-parallel: 2
       matrix:
-        target: [parser_s3_access, parser_elb, parser_iis_w3c, parser_windows_dns, parser_route53, parser_github_audit, parser_google_workspace, parser_macos, parser_fdr, parser_defender, parser_email, parser_m365, parser_okta, parser_guardduty, parser_vpc_flow, parser_azure_flow, parser_gcp_flow, query_page_athena, query_page_bigquery, query_page_azure_analytics]
+        include: ${{ fromJSON(needs.scope.outputs.identity_targets || '[]') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 150
     env:
       CARGO_INCREMENTAL: 0
     steps:
@@ -96,23 +124,20 @@ jobs:
         with: {persist-credentials: false}
       - uses: dtolnay/rust-toolchain@2c76c034f9e32a5d6e2c104dc4df23a22476db04 # nightly
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
-        with: {key: identity-fuzz}
+        with: {key: fuzz-identity-batch, cache-bin: false, save-if: false}
       - name: Install verified upstream cargo-fuzz binary
         env:
           GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/install_cargo_fuzz.sh
+      - name: Run the full identity target campaign with AddressSanitizer
+        env:
+          FUZZ_TARGETS: ${{ matrix.targets }}
         run: |
-          mkdir -p .tools
-          gh release download 0.13.2 -R rust-fuzz/cargo-fuzz -p cargo-fuzz-0.13.2-x86_64-unknown-linux-musl.tar.gz -O .tools/cargo-fuzz.tar.gz
-          printf '%s  %s\n' b5b704018b63e0f151c17a057ac53b5111e1db545d1b9f72fee79f08a545931c .tools/cargo-fuzz.tar.gz | sha256sum --check
-          tar -xzf .tools/cargo-fuzz.tar.gz -C .tools
-          install -m 0755 .tools/cargo-fuzz "$HOME/.cargo/bin/cargo-fuzz"
-      - run: |
-          mkdir -p "fuzz/corpus/${{ matrix.target }}"
-          cp "fuzz/seeds/${{ matrix.target }}/"* "fuzz/corpus/${{ matrix.target }}/"
-          cargo +nightly fuzz run "${{ matrix.target }}" --sanitizer address -- -max_total_time=600 -rss_limit_mb=2048 -max_len=4194304
+          read -r -a targets <<< "$FUZZ_TARGETS"
+          bash .github/scripts/run_fuzz_targets.sh identity "${targets[@]}"
 
   evtx:
-    if: inputs.evtx_large != true && inputs.native_windows != true && inputs.linux_compatibility != true
+    if: ${{ inputs.evtx_large != true && inputs.native_windows != true && inputs.linux_compatibility != true && (github.event_name != 'schedule' || github.event.schedule == '41 2 * * 0') }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
@@ -126,12 +151,7 @@ jobs:
       - name: Install the verified upstream cargo-fuzz binary
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p .tools
-          gh release download 0.13.2 -R rust-fuzz/cargo-fuzz -p cargo-fuzz-0.13.2-x86_64-unknown-linux-musl.tar.gz -O .tools/cargo-fuzz.tar.gz
-          printf '%s  %s\n' b5b704018b63e0f151c17a057ac53b5111e1db545d1b9f72fee79f08a545931c .tools/cargo-fuzz.tar.gz | sha256sum --check
-          tar -xzf .tools/cargo-fuzz.tar.gz -C .tools
-          install -m 0755 .tools/cargo-fuzz "$HOME/.cargo/bin/cargo-fuzz"
+        run: bash .github/scripts/install_cargo_fuzz.sh
       - name: Fuzz isolated-workspace decoder and parent protocol with AddressSanitizer
         run: |
           cargo metadata --locked --manifest-path helpers/evtx/fuzz/Cargo.toml --format-version 1 > /dev/null
@@ -162,7 +182,7 @@ jobs:
           key: windows-msvc-${{ hashFiles('Cargo.lock', 'helpers/evtx/Cargo.lock') }}
           add-rust-environment-hash-key: false
           cache-targets: true
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          save-if: false
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
         with: {tool: cargo-nextest, fallback: none}
       - name: Record native OS and session versions
@@ -216,7 +236,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           key: evtx-ubuntu-22.04-${{ hashFiles('helpers/evtx/Cargo.lock') }}
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          save-if: false
       - run: CARGO_TARGET_DIR=target cargo build --manifest-path helpers/evtx/Cargo.toml --bin irmind-evtx --profile ci --locked
       - run: python3 .github/scripts/check_evtx_linux.py target/ci/irmind-evtx
 
@@ -248,7 +268,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           key: evtx-large-${{ matrix.platform }}-${{ hashFiles('Cargo.lock', 'helpers/evtx/Cargo.lock') }}
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          save-if: false
       - name: Build the release host and the normal-feature contained decoder
         run: |
           cargo build --manifest-path helpers/evtx/Cargo.toml --release --locked --example large_collection
@@ -267,6 +287,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
+          retention-days: 7
           name: evtx-large-${{ matrix.platform }}
           path: |
             evtx-large-${{ matrix.platform }}.json
