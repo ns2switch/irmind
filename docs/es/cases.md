@@ -27,7 +27,7 @@ Sysmon y PowerShell, la autenticación de Linux, auditd y ECS mapeado, AWS Cloud
 y los eventos DNS, HTTP y de conexión de Zeek y Suricata. También cubre los inicios
 de sesión y la auditoría de Entra ID, Azure Activity, Microsoft 365, Okta, la
 auditoría de GCP y Kubernetes y las clases revisadas de procesos y eventos
-relacionados de Defender, CrowdStrike FDR y eslogger. La cobertura depende del
+relacionados de Defender, CrowdStrike FDR y eslogger. La [guía de Sigma](sigma.md) detalla los campos por fuente. La cobertura depende del
 logsource, los campos y la versión exacta del mapeo. IRMind informa de las reglas
 omitidas, las ejecuciones parciales y cuántas filas por fuente tienen campos
 exactos no disponibles. Una fila es indeterminada para una regla cuando falta

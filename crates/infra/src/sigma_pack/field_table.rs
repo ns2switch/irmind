@@ -423,6 +423,47 @@ fn invalid() -> AppError {
 mod tests {
     use super::*;
 
+    #[cfg(feature = "sigma")]
+    #[test]
+    fn sigma_field_table_materializes_exact_native_build_identity() {
+        use irmind_app::source_mapping::{MappingCatalog, SourceMapper};
+        use irmind_mod_mapping_json_compat::JsonCompatibilityMapping;
+        use irmind_mod_parser_json::JsonSourceDecoder;
+        use std::sync::Arc;
+
+        let mapping = JsonCompatibilityMapping::new().unwrap();
+        let expected = mapping.manifest().identity().version().to_owned();
+        let catalog =
+            MappingCatalog::freeze(vec![Arc::new(JsonSourceDecoder)], vec![Arc::new(mapping)])
+                .unwrap();
+        let baseline = include_str!("cloudtrail-v1.toml");
+        let native = baseline
+            .replace("mapping-cloudtrail", "mapping-json-compat")
+            .replace("cloudtrail-tables-v1", "@json-compat-v1-");
+        let absent = native
+            .replace("@json-compat-v1-", "@outdated-recipe-")
+            .replace("dataset = \"cloudtrail\"", "dataset = \"retired\"");
+        let input = SigmaFieldTableV1 {
+            id: "synthetic-native-build-pinning".into(),
+            version: "v1".into(),
+            toml: format!("{baseline}\n{native}\n{absent}"),
+        };
+        assert!(ReviewedSigmaFieldTable::parse(&input).is_err());
+        let (proof, table) = ReviewedSigmaFieldTable::materialize_native(input, &catalog).unwrap();
+        assert!(!proof.toml.contains("@json-compat"));
+        assert_eq!(table.variants.len(), 2);
+        assert_eq!(table.variants[1].mapping_version, expected);
+        let wire = proof.encode().unwrap();
+        let independent = SigmaFieldTableV1::decode(&wire).unwrap();
+        assert_eq!(
+            ReviewedSigmaFieldTable::parse(&independent)
+                .unwrap()
+                .variants[1]
+                .mapping_version,
+            expected
+        );
+    }
+
     #[test]
     fn parses_the_exact_fields_in_the_approved_table_vector() {
         let bundle: serde_json::Value = serde_json::from_str(include_str!(
