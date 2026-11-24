@@ -19,6 +19,9 @@ mod parquet_scan;
 mod benchmark;
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
+mod coverage_fixtures;
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod windows;
 const MAX_RECORD_BYTES: usize = 64 * 1024;
 pub(super) const MAX_MATCHES: usize = 100_000;
@@ -266,6 +269,22 @@ fn event_matches(
     common: &CommonEventV1,
     original: Option<&Value>,
 ) -> Result<bool, AppError> {
+    use irmind_domain::{EventCategory, EventType};
+    match filter.column.as_deref() {
+        Some("event.category") => {
+            return Ok(filter.values().iter().any(|literal| {
+                matches!(literal, SigmaLiteral::Text(text) if EventCategory::parse(text)
+                .is_ok_and(|category| common.event().categories().contains(category)))
+            }));
+        }
+        Some("event.type") => {
+            return Ok(filter.values().iter().any(|literal| {
+                matches!(literal, SigmaLiteral::Text(text) if EventType::parse(text)
+                .is_ok_and(|event_type| common.event().types().contains(event_type)))
+            }));
+        }
+        _ => {}
+    }
     let value = if let Some(column) = &filter.column {
         project_common(common, column)?
     } else {
