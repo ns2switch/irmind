@@ -5,6 +5,7 @@ import hashlib
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import tempfile
 
@@ -47,6 +48,19 @@ def verify(executable, directory):
         )
         if rejected.returncode == 0 or "fingerprint" not in rejected.stderr.lower():
             raise ValueError("verification did not reject the wrong key")
+        changed = Path(scratch) / "changed.irmind"
+        shutil.copyfile(archive, changed)
+        with changed.open("r+b") as output:
+            output.seek(-1, os.SEEK_END)
+            byte = output.read(1)
+            output.seek(-1, os.SEEK_END)
+            output.write(bytes([byte[0] ^ 1]))
+        rejected = subprocess.run(
+            [*base[:-1], str(changed), "--expected-key", key],
+            capture_output=True, text=True, timeout=60,
+        )
+        if rejected.returncode == 0 or home.exists():
+            raise ValueError("verification accepted the altered archive or created a vault")
         print(result.stdout.strip())
 
     message = f"Linux export verified on {os.environ.get('RUNNER_OS', os.name)} ({expected})."

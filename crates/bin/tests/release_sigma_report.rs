@@ -159,6 +159,8 @@ fn open_tui(binary: &Path, home: &Path, case: &str) -> DemoSession {
     let mut ui = DemoSession::spawn_sized(&command, 140, 50).unwrap();
     ui.expect("Unlock the configured file keystore").unwrap();
     ui.send(format!("{PASSPHRASE}\r")).unwrap();
+    ui.expect("Analyst public-key fingerprint").unwrap();
+    ui.send("\r").unwrap();
     ui.expect("Synthetic Sigma release case").unwrap();
     ui
 }
@@ -171,14 +173,18 @@ fn evaluate(
     cli: &impl Fn(&[&str]) -> String,
 ) -> String {
     let mut ui = open_tui(binary, home, case);
+    ui.send(format!("/sigma inspect {}\r", pack.display()))
+        .unwrap();
+    expect_result(&mut ui, "1 validated rules");
+    let digest = pack_digest();
+    ui.expect(&digest).unwrap();
     ui.send(format!("/sigma import {}\r", pack.display()))
         .unwrap();
     ui.expect("Sign Sigma pack admission").unwrap();
     ui.send("\r").unwrap();
     ui.expect("Sigma pack admitted").unwrap();
     ui.send(format!(
-        "/sigma run {} 2026-11-01T00:00:00Z 2026-11-01T00:02:00Z\r",
-        pack_digest(),
+        "/sigma run {digest} 2026-11-01T00:00:00Z 2026-11-01T00:02:00Z\r",
     ))
     .unwrap();
     ui.expect("Sigma run complete").unwrap();
@@ -212,15 +218,21 @@ fn pack_digest() -> String {
 fn publish(binary: &Path, home: &Path, case: &str) {
     let mut ui = open_tui(binary, home, case);
     ui.send("/report save md en\r").unwrap();
-    ui.expect("Signed report").unwrap();
+    expect_result(&mut ui, "Signed report");
     ui.send("/quit\r").unwrap();
     ui.expect_exit().unwrap();
 
     let mut ui = open_tui(binary, home, case);
     ui.send("/report save pdf en\r").unwrap();
-    ui.expect("Signed report").unwrap();
+    expect_result(&mut ui, "Signed report");
     ui.send("/quit\r").unwrap();
     ui.expect_exit().unwrap();
+}
+
+fn expect_result(ui: &mut DemoSession, expected: &str) {
+    ui.expect("approved · result available").unwrap();
+    ui.send("/expand\r").unwrap();
+    ui.expect(expected).unwrap();
 }
 
 fn read_count(reader: &mut impl Read) -> u64 {
