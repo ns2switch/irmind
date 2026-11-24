@@ -552,11 +552,16 @@ fn run_objects(
     .collect()
 }
 
-fn enrolled_field_table() -> SigmaFieldTableV1 {
+pub(super) fn enrolled_field_table() -> SigmaFieldTableV1 {
     SigmaFieldTableV1 {
         id: "irmind-sigma-source-coverage".into(),
         version: "v1".into(),
-        toml: include_str!("cloudtrail-v1.toml").into(),
+        toml: concat!(
+            include_str!("cloudtrail-v1.toml"),
+            "\n",
+            include_str!("windows-v1.toml"),
+        )
+        .into(),
     }
 }
 
@@ -567,7 +572,10 @@ mod tests {
 
     #[test]
     fn signed_sigma_plan_requires_every_matching_source_binding() {
-        let mut table = enrolled_field_table();
+        let mut table = SigmaFieldTableV1 {
+            toml: include_str!("cloudtrail-v1.toml").into(),
+            ..enrolled_field_table()
+        };
         let other = table
             .toml
             .replace("dataset = \"cloudtrail\"", "dataset = \"other-dataset\"")

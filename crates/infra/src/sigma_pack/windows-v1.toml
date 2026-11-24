@@ -1,0 +1,555 @@
+# Exact EVTX paths preserved by the parser. Native EventID and LogonType are text.
+
+[[variants]]
+product = "windows"
+service = "security"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-security-4624"
+mapping_version = "evtx-security-4624-tables-v1"
+channel = "Security"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Security" },
+  { path = ["Event", "System", "EventID"], one_of = ["4624"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
+  { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
+  { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "security"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-security-4625"
+mapping_version = "evtx-security-4625-tables-v1"
+channel = "Security"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Security" },
+  { path = ["Event", "System", "EventID"], one_of = ["4625"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
+  { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
+  { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "security"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-security-4634"
+mapping_version = "evtx-security-4634-tables-v1"
+channel = "Security"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Security" },
+  { path = ["Event", "System", "EventID"], one_of = ["4634"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
+  { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
+  { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "security"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-security-4648"
+mapping_version = "evtx-security-4648-tables-v1"
+channel = "Security"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Security" },
+  { path = ["Event", "System", "EventID"], one_of = ["4648"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
+  { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
+  { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "security"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-security-4672"
+mapping_version = "evtx-security-4672-tables-v1"
+channel = "Security"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Security" },
+  { path = ["Event", "System", "EventID"], one_of = ["4672"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
+  { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
+  { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "security"
+category = "process_creation"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-security-4688"
+mapping_version = "evtx-security-4688-tables-v1"
+channel = "Security"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Security" },
+  { path = ["Event", "System", "EventID"], one_of = ["4688"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
+  { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
+  { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "Image", column = "process.executable", value_type = "text", null_policy = "absent" },
+  { name = "ParentImage", column = "process.parent.executable", value_type = "text", null_policy = "absent" },
+  { name = "CommandLine", column = "process.command_line", value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "security"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-security-4697"
+mapping_version = "evtx-security-4697-tables-v1"
+channel = "Security"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Security" },
+  { path = ["Event", "System", "EventID"], one_of = ["4697"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
+  { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
+  { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "security"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-security-4720"
+mapping_version = "evtx-security-4720-tables-v1"
+channel = "Security"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Security" },
+  { path = ["Event", "System", "EventID"], one_of = ["4720"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
+  { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
+  { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "security"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-security-4722"
+mapping_version = "evtx-security-4722-tables-v1"
+channel = "Security"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Security" },
+  { path = ["Event", "System", "EventID"], one_of = ["4722"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
+  { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
+  { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "security"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-security-4724"
+mapping_version = "evtx-security-4724-tables-v1"
+channel = "Security"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Security" },
+  { path = ["Event", "System", "EventID"], one_of = ["4724"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
+  { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
+  { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "security"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-security-4728"
+mapping_version = "evtx-security-4728-tables-v1"
+channel = "Security"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Security" },
+  { path = ["Event", "System", "EventID"], one_of = ["4728"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
+  { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
+  { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "security"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-security-4732"
+mapping_version = "evtx-security-4732-tables-v1"
+channel = "Security"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Security" },
+  { path = ["Event", "System", "EventID"], one_of = ["4732"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
+  { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
+  { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "security"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-security-4756"
+mapping_version = "evtx-security-4756-tables-v1"
+channel = "Security"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Security" },
+  { path = ["Event", "System", "EventID"], one_of = ["4756"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
+  { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
+  { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "security"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-security-4768"
+mapping_version = "evtx-security-4768-tables-v1"
+channel = "Security"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Security" },
+  { path = ["Event", "System", "EventID"], one_of = ["4768"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
+  { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
+  { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "security"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-security-4769"
+mapping_version = "evtx-security-4769-tables-v1"
+channel = "Security"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Security" },
+  { path = ["Event", "System", "EventID"], one_of = ["4769"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
+  { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
+  { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "security"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-security-4771"
+mapping_version = "evtx-security-4771-tables-v1"
+channel = "Security"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Security" },
+  { path = ["Event", "System", "EventID"], one_of = ["4771"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
+  { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
+  { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "security"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-security-4776"
+mapping_version = "evtx-security-4776-tables-v1"
+channel = "Security"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Security" },
+  { path = ["Event", "System", "EventID"], one_of = ["4776"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
+  { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
+  { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "sysmon"
+category = "process_creation"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-sysmon"
+mapping_version = "evtx-sysmon-tables-v1"
+channel = "Microsoft-Windows-Sysmon/Operational"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Microsoft-Windows-Sysmon/Operational" },
+  { path = ["Event", "System", "EventID"], one_of = ["1"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "Image", column = "process.executable", value_type = "text", null_policy = "absent" },
+  { name = "ParentImage", column = "process.parent.executable", value_type = "text", null_policy = "absent" },
+  { name = "CommandLine", column = "process.command_line", value_type = "text", null_policy = "absent" },
+  { name = "ParentCommandLine", column = "process.parent.command_line", value_type = "text", null_policy = "absent" },
+  { name = "User", path = ["Event", "EventData", "User"], value_type = "text", null_policy = "absent" },
+  { name = "ProcessGuid", path = ["Event", "EventData", "ProcessGuid"], value_type = "text", null_policy = "absent" },
+  { name = "ParentProcessGuid", path = ["Event", "EventData", "ParentProcessGuid"], value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "sysmon"
+category = "network_connection"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-sysmon"
+mapping_version = "evtx-sysmon-tables-v1"
+channel = "Microsoft-Windows-Sysmon/Operational"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Microsoft-Windows-Sysmon/Operational" },
+  { path = ["Event", "System", "EventID"], one_of = ["3"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "Image", column = "process.executable", value_type = "text", null_policy = "absent" },
+  { name = "SourceIp", path = ["Event", "EventData", "SourceIp"], value_type = "text", null_policy = "absent" },
+  { name = "DestinationIp", path = ["Event", "EventData", "DestinationIp"], value_type = "text", null_policy = "absent" },
+  { name = "SourcePort", path = ["Event", "EventData", "SourcePort"], value_type = "text", null_policy = "absent" },
+  { name = "DestinationPort", path = ["Event", "EventData", "DestinationPort"], value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "sysmon"
+category = "file_event"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-sysmon"
+mapping_version = "evtx-sysmon-tables-v1"
+channel = "Microsoft-Windows-Sysmon/Operational"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Microsoft-Windows-Sysmon/Operational" },
+  { path = ["Event", "System", "EventID"], one_of = ["11"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "Image", column = "process.executable", value_type = "text", null_policy = "absent" },
+  { name = "TargetFilename", path = ["Event", "EventData", "TargetFilename"], value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "sysmon"
+category = "registry_set"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-sysmon"
+mapping_version = "evtx-sysmon-tables-v1"
+channel = "Microsoft-Windows-Sysmon/Operational"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Microsoft-Windows-Sysmon/Operational" },
+  { path = ["Event", "System", "EventID"], one_of = ["13"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "Image", column = "process.executable", value_type = "text", null_policy = "absent" },
+  { name = "TargetObject", path = ["Event", "EventData", "TargetObject"], value_type = "text", null_policy = "absent" },
+  { name = "Details", path = ["Event", "EventData", "Details"], value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "sysmon"
+category = "dns_query"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-sysmon"
+mapping_version = "evtx-sysmon-tables-v1"
+channel = "Microsoft-Windows-Sysmon/Operational"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Microsoft-Windows-Sysmon/Operational" },
+  { path = ["Event", "System", "EventID"], one_of = ["22"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "Image", column = "process.executable", value_type = "text", null_policy = "absent" },
+  { name = "QueryName", path = ["Event", "EventData", "QueryName"], value_type = "text", null_policy = "absent" },
+  { name = "QueryStatus", path = ["Event", "EventData", "QueryStatus"], value_type = "text", null_policy = "absent" },
+  { name = "QueryResults", path = ["Event", "EventData", "QueryResults"], value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "powershell"
+category = "ps_module"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-powershell"
+mapping_version = "evtx-powershell-tables-v1"
+channel = "Microsoft-Windows-PowerShell/Operational"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Microsoft-Windows-PowerShell/Operational" },
+  { path = ["Event", "System", "EventID"], one_of = ["4103"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "Payload", path = ["Event", "EventData", "Payload"], value_type = "text", null_policy = "absent" },
+  { name = "ContextInfo", path = ["Event", "EventData", "ContextInfo"], value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "powershell"
+category = "ps_script"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-powershell"
+mapping_version = "evtx-powershell-tables-v1"
+channel = "Microsoft-Windows-PowerShell/Operational"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Microsoft-Windows-PowerShell/Operational" },
+  { path = ["Event", "System", "EventID"], one_of = ["4104"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "ScriptBlockText", path = ["Event", "EventData", "ScriptBlockText"], value_type = "text", null_policy = "absent" },
+  { name = "ScriptBlockId", path = ["Event", "EventData", "ScriptBlockId"], value_type = "text", null_policy = "absent" },
+  { name = "Path", path = ["Event", "EventData", "Path"], value_type = "text", null_policy = "absent" },
+]
