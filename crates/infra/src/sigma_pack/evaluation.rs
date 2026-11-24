@@ -18,7 +18,7 @@ mod parquet_scan;
 #[allow(clippy::unwrap_used)]
 mod benchmark;
 const MAX_RECORD_BYTES: usize = 64 * 1024;
-const MAX_MATCHES: usize = 100_000;
+pub(super) const MAX_MATCHES: usize = 100_000;
 
 pub struct SigmaVariantPrograms<'a> {
     variant: &'a SigmaSourceVariant,
@@ -33,6 +33,7 @@ pub struct SigmaEvaluation<'a> {
     reserved_units: u64,
     rules_evaluated: Vec<bool>,
     matches: usize,
+    match_limit: usize,
     status: SigmaRunStatusV1,
 }
 
@@ -85,13 +86,23 @@ impl<'a> SigmaVariantPrograms<'a> {
         Ok(programs)
     }
 
+    #[cfg(test)]
     pub fn start(&'a self, units: u64) -> SigmaEvaluation<'a> {
+        self.start_with_match_limit(units, MAX_MATCHES)
+    }
+
+    pub(super) fn start_with_match_limit(
+        &'a self,
+        units: u64,
+        match_limit: usize,
+    ) -> SigmaEvaluation<'a> {
         SigmaEvaluation {
             programs: self,
             remaining_units: units,
             reserved_units: units,
             rules_evaluated: vec![false; self.eligible.len()],
             matches: 0,
+            match_limit,
             status: SigmaRunStatusV1::Complete,
         }
     }
@@ -104,6 +115,7 @@ impl<'a> SigmaVariantPrograms<'a> {
         &self.skipped
     }
 
+    #[cfg(test)]
     pub fn eligible(&self) -> usize {
         self.eligible.len()
     }
@@ -170,7 +182,7 @@ impl SigmaEvaluation<'_> {
                 },
                 &mut self.remaining_units,
             ) {
-                Ok(true) if self.matches < MAX_MATCHES => {
+                Ok(true) if self.matches < self.match_limit => {
                     matched(key)?;
                     self.matches += 1;
                 }
@@ -212,7 +224,7 @@ impl SigmaEvaluation<'_> {
     }
 }
 
-fn covers(rule: &irmind_sigma::RuleDocument, variant: &SigmaSourceVariant) -> bool {
+pub(super) fn covers(rule: &irmind_sigma::RuleDocument, variant: &SigmaSourceVariant) -> bool {
     let Some(RuleValue::Mapping(logsource)) = rule.fields().get("logsource") else {
         return false;
     };
