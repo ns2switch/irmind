@@ -327,3 +327,56 @@ fn empty_optional_principal_target_and_ip_fields_do_not_reject_valid_audits() {
             .any(|o| o.entity().value() == "synthetic-principal" && o.role() == R::Actor)
     );
 }
+
+#[test]
+fn capture_mapping_preserves_canonical_production_manifest_and_signed_selector() {
+    let fixture: Value = serde_json::from_str(include_str!(
+        "../../../../docs/development/vectors/native-mapping-manifest-v2.json"
+    ))
+    .unwrap();
+    let hex = fixture["canonical_hex"].as_str().unwrap();
+    let production: Vec<u8> = (0..hex.len())
+        .step_by(2)
+        .map(|index| u8::from_str_radix(&hex[index..index + 2], 16).unwrap())
+        .collect();
+    let decoder =
+        irmind_domain::SourceDecoderIdentityV1::try_new("query-azure-signin", "capture-source-v1")
+            .unwrap();
+    for format in [
+        "entra-signin-table",
+        "entra-audit-table",
+        "azure-activity-table",
+    ] {
+        let mapper = EntraMapping::for_capture_with_build(format, &decoder, &production).unwrap();
+        let manifest = mapper.manifest();
+        assert!(matches!(
+            manifest.provenance(),
+            MappingProvenance::NativeBuild { manifest: bytes } if bytes == &production
+        ));
+        assert_eq!(
+            manifest.identity().implementation().as_str(),
+            fixture["sha256"].as_str().unwrap()
+        );
+        assert_eq!(manifest.native_build_is_provisional(), Some(false));
+        assert_eq!(manifest.selectors()[0].parser(), decoder.id());
+        assert!(
+            manifest.selectors()[0]
+                .versions()
+                .contains(decoder.version())
+        );
+        assert_eq!(
+            MappingManifest::from_snapshot(&manifest.snapshot().unwrap()).unwrap(),
+            *manifest
+        );
+    }
+
+    let bootstrap = b"irmind-native-mapping-build-v1\0synthetic";
+    let mapper =
+        EntraMapping::for_capture_with_build("entra-signin-table", &decoder, bootstrap).unwrap();
+    let expected = b"irmind-native-mapping-build-v1\0synthetic\0irmind-analytics-capture-mapping-v1\0query-azure-signin\0capture-source-v1";
+    assert!(matches!(
+        mapper.manifest().provenance(),
+        MappingProvenance::NativeBuild { manifest: bytes } if bytes == expected
+    ));
+    assert_eq!(mapper.manifest().native_build_is_provisional(), Some(true));
+}

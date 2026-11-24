@@ -11,6 +11,7 @@ use irmind_mapping_contracts::{
 };
 use irmind_mapping_tables::TableMapping;
 const BUILD: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/native-mapping-manifest.bin"));
+const PRODUCTION_MANIFEST: &[u8] = b"irmind-native-mapping-build-v2\0";
 pub struct EntraMapping {
     manifest: MappingManifest,
     module: &'static ModuleManifest,
@@ -33,6 +34,14 @@ impl EntraMapping {
         format: &str,
         decoder: &irmind_domain::SourceDecoderIdentityV1,
     ) -> Result<Self, MappingError> {
+        Self::for_capture_with_build(format, decoder, BUILD)
+    }
+
+    fn for_capture_with_build(
+        format: &str,
+        decoder: &irmind_domain::SourceDecoderIdentityV1,
+        build: &[u8],
+    ) -> Result<Self, MappingError> {
         let definition = DEFINITIONS
             .iter()
             .find(|definition| definition.format == format)
@@ -51,11 +60,16 @@ impl EntraMapping {
             .as_ref()
             .map(|status| status.capture_alias(&format!("{id}-status"), decoder))
             .transpose()?;
-        let mut build = BUILD.to_vec();
-        build.extend_from_slice(b"\0irmind-analytics-capture-mapping-v1\0");
-        build.extend_from_slice(decoder.id().as_bytes());
-        build.push(0);
-        build.extend_from_slice(decoder.version().as_bytes());
+        let mut build = build.to_vec();
+        // The signed selector pins the capture decoder. Production provenance
+        // commits the shared crate input graph verbatim. Retain the suffix for
+        // bootstrap builds to preserve their previously issued identities.
+        if !build.starts_with(PRODUCTION_MANIFEST) {
+            build.extend_from_slice(b"\0irmind-analytics-capture-mapping-v1\0");
+            build.extend_from_slice(decoder.id().as_bytes());
+            build.push(0);
+            build.extend_from_slice(decoder.version().as_bytes());
+        }
         let digest = EvidenceHash::from_bytes(irmind_mapping_contracts::sha256(&build));
         mapper.manifest = MappingManifest::try_new(
             MappingIdentityV1::try_new(
