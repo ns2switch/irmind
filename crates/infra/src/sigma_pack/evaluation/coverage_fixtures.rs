@@ -337,3 +337,193 @@ fn sigma_network_separates_event_classes_and_source_destination_roles() {
         }
     }
 }
+
+#[test]
+fn sigma_cloud_identity_uses_exact_source_fields_and_keeps_missing_status_absent() {
+    use SigmaCoverageV1::UnsupportedLogsource;
+    const ENTRA: &str =
+        include_str!("../../../../testkit/fixtures/parser-entra/source/signin-table.ndjson");
+    const AUDIT: &str =
+        include_str!("../../../../testkit/fixtures/parser-entra/source/audit-resource.ndjson");
+    const M365: &str =
+        include_str!("../../../../testkit/fixtures/parser-m365/source/events.ndjson");
+    const OKTA: &str =
+        include_str!("../../../../testkit/fixtures/parser-okta/source/events.ndjson");
+    const GCP: &str =
+        include_str!("../../../../testkit/fixtures/parser-gcp-audit/source/event.ndjson");
+    let reviewed = parse_table(include_str!("../cloud-identity-v1.toml"));
+    for (dataset, fixture, positive, negative, category) in [
+        (
+            "entra-signin-table",
+            ENTRA,
+            "{ResultType: '50076', UserPrincipalName: analyst@example.invalid}",
+            "{ResultType: '0'}",
+            EventCategory::Authentication,
+        ),
+        (
+            "entra-audit-resource",
+            AUDIT,
+            "{OperationName: Add service principal credentials, Result: success}",
+            "{Result: failure}",
+            EventCategory::Iam,
+        ),
+        (
+            "m365-audit",
+            M365,
+            "{Operation: UserLoginFailed, ClientIP: 203.0.113.77}",
+            "{Operation: UserLoggedIn}",
+            EventCategory::Authentication,
+        ),
+        (
+            "okta-system-log",
+            OKTA,
+            "{eventType: user.session.start, actor.alternateId: alice@example.invalid}",
+            "{actor.alternateId: bob@example.invalid}",
+            EventCategory::Authentication,
+        ),
+        (
+            "gcp-audit",
+            GCP,
+            "{protoPayload.methodName: google.iam.admin.v1.CreateServiceAccountKey}",
+            "{protoPayload.methodName: google.iam.admin.v1.DeleteServiceAccountKey}",
+            EventCategory::Iam,
+        ),
+    ] {
+        let variant = reviewed
+            .variants
+            .iter()
+            .find(|entry| entry.dataset.as_deref() == Some(dataset))
+            .unwrap();
+        let product = variant.product.as_deref().unwrap();
+        let service = variant.service.as_deref().unwrap();
+        let condition = format!("{{product: {product}, service: {service}}}");
+        let row = synthetic_row(
+            variant,
+            EventHeaderV1::new(
+                CategorySet::new([category]),
+                EventTypeSet::default(),
+                EventOutcome::Unknown,
+                EventKind::Event,
+            ),
+            [],
+        );
+        let raw = fixture.lines().next();
+        assert_eq!(
+            evaluate(variant, &condition, positive, &row, raw),
+            (1, None),
+            "{dataset}"
+        );
+        assert_eq!(
+            evaluate(variant, &condition, negative, &row, raw),
+            (0, None),
+            "{dataset}"
+        );
+        assert_eq!(
+            evaluate(
+                variant,
+                &format!("{{product: {product}, service: unreviewed}}"),
+                positive,
+                &row,
+                raw
+            ),
+            (0, Some(UnsupportedLogsource)),
+            "{dataset}"
+        );
+        if product == "gcp" {
+            let mut value: Value = serde_json::from_str(raw.unwrap()).unwrap();
+            value["protoPayload"]
+                .as_object_mut()
+                .unwrap()
+                .remove("status");
+            let raw = value.to_string();
+            assert_eq!(
+                evaluate(
+                    variant,
+                    &condition,
+                    "{'protoPayload.status.code|exists': false}",
+                    &row,
+                    Some(&raw)
+                ),
+                (1, None)
+            );
+            assert_eq!(
+                evaluate(
+                    variant,
+                    &condition,
+                    "{protoPayload.status.code: 0}",
+                    &row,
+                    Some(&raw)
+                ),
+                (0, None)
+            );
+        }
+    }
+}
+
+#[test]
+fn sigma_kubernetes_requires_the_exact_resource_and_does_not_scalarize_source_ips() {
+    let reviewed = parse_table(include_str!("../cloud-identity-v1.toml"));
+    let taxonomy = "{product: kubernetes, service: audit}";
+    for variant in reviewed
+        .variants
+        .iter()
+        .filter(|variant| variant.product.as_deref() == Some("kubernetes"))
+    {
+        let header = EventHeaderV1::new(
+            CategorySet::new([EventCategory::Api]),
+            EventTypeSet::default(),
+            EventOutcome::Success,
+            EventKind::Event,
+        )
+        .with_action("get")
+        .unwrap();
+        let row = synthetic_row(
+            variant,
+            header,
+            [
+                (
+                    CommonField::OrchestratorResourceType,
+                    CommonValue::Text(EventText::new("secrets").unwrap()),
+                ),
+                (
+                    CommonField::OrchestratorNamespace,
+                    CommonValue::Text(EventText::new("synthetic-ns").unwrap()),
+                ),
+            ],
+        );
+        assert_eq!(
+            evaluate(
+                variant,
+                taxonomy,
+                "{objectRef.resource: secrets, objectRef.namespace: synthetic-ns}",
+                &row,
+                None
+            ),
+            (1, None)
+        );
+        assert_eq!(
+            evaluate(variant, taxonomy, "{objectRef.resource: pods}", &row, None),
+            (0, None)
+        );
+        assert_eq!(
+            evaluate(
+                variant,
+                taxonomy,
+                "{'sourceIPs|cidr': 203.0.113.0/24}",
+                &row,
+                None
+            ),
+            (0, Some(SigmaCoverageV1::UnsupportedField))
+        );
+        assert_eq!(
+            evaluate(
+                variant,
+                "{product: kubernetes, service: unreviewed}",
+                "{objectRef.resource: secrets}",
+                &row,
+                None
+            ),
+            (0, Some(SigmaCoverageV1::UnsupportedLogsource))
+        );
+    }
+}

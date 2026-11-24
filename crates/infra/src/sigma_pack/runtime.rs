@@ -582,6 +582,8 @@ pub(super) fn enrolled_field_table() -> SigmaFieldTableV1 {
             include_str!("linux-v1.toml"),
             "\n",
             include_str!("network-v1.toml"),
+            "\n",
+            include_str!("cloud-identity-v1.toml"),
         )
         .into(),
     }
