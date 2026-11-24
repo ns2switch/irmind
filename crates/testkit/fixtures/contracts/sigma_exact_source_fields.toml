@@ -1,0 +1,113 @@
+[[variants]]
+product = "windows"
+service = "security"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-security-4625"
+mapping_version = "evtx-security-4625-tables-v1"
+channel = "Security"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Security" },
+  { path = ["Event", "System", "EventID"], equals = "4625" },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "integer", conversion = "evtx_logon_type", null_policy = "absent" },
+]
+
+[[variants]]
+product = "m365"
+service = "exchange"
+parser_id = "parser-m365"
+parser_version = "m365-source-v1"
+mapping_id = "mapping-m365"
+mapping_version = "identity-v1-1111111111111111111111111111111111111111111111111111111111111111"
+dataset = "m365-audit"
+events = [
+  { path = ["Workload"], equals = "Exchange" },
+]
+fields = [
+  { name = "Parameters", path = ["Parameters"], value_type = "pair_list", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "defender"
+category = "process_creation"
+parser_id = "parser-defender"
+parser_version = "defender-source-v1"
+mapping_id = "mapping-defender"
+mapping_version = "defender-v1-2222222222222222222222222222222222222222222222222222222222222222"
+dataset = "defender-hunting-process"
+events = [
+  { path = ["OSPlatform"], equals = "Windows11" },
+  { column = "event.action", equals = "ProcessCreated" },
+]
+fields = [
+  { name = "Image", path = ["FolderPath"], basename_path = ["FileName"], value_type = "text", conversion = "defender_full_path", null_policy = "absent" },
+  { name = "ParentImage", path = ["InitiatingProcessFolderPath"], basename_path = ["InitiatingProcessFileName"], value_type = "text", conversion = "defender_full_path", null_policy = "absent" },
+]
+
+[[variants]]
+product = "kubernetes"
+service = "audit"
+parser_id = "parser-kubernetes"
+parser_version = "kubernetes-source-v1"
+mapping_id = "mapping-kubernetes"
+mapping_version = "kubernetes-audit-tables-v2"
+dataset = "kubernetes-audit"
+events = [
+  { path = ["format"], equals = "irmind-kubernetes-sigma-projection-v1" },
+  { column = "event.action", equals = "get" },
+]
+fields = [
+  { name = "sourceIPs", path = ["original", "sourceIPs"], value_type = "ip_list", null_policy = "absent" },
+]
+
+[[variants]]
+product = "kubernetes"
+service = "audit"
+parser_id = "parser-kubernetes"
+parser_version = "kubernetes-source-v1"
+mapping_id = "mapping-eks-audit"
+mapping_version = "kubernetes-audit-tables-v2"
+dataset = "eks-audit"
+events = [
+  { path = ["format"], equals = "irmind-kubernetes-sigma-projection-v1" },
+  { column = "event.action", equals = "get" },
+]
+fields = [
+  { name = "sourceIPs", path = ["original", "audit_event", "sourceIPs"], value_type = "ip_list", null_policy = "absent" },
+]
+
+[[variants]]
+product = "kubernetes"
+service = "audit"
+parser_id = "parser-kubernetes"
+parser_version = "kubernetes-source-v1"
+mapping_id = "mapping-aks-audit"
+mapping_version = "kubernetes-audit-tables-v2"
+dataset = "aks-audit"
+events = [
+  { path = ["format"], equals = "irmind-kubernetes-sigma-projection-v1" },
+  { column = "event.action", equals = "get" },
+]
+fields = [
+  { name = "sourceIPs", path = ["original", "audit_event", "sourceIPs"], value_type = "ip_list", null_policy = "absent" },
+]
+
+[[variants]]
+product = "kubernetes"
+service = "audit"
+parser_id = "parser-gcp-audit"
+parser_version = "gcp-audit-source-v1"
+mapping_id = "mapping-gke-audit"
+mapping_version = "gke-paths-v2-3333333333333333333333333333333333333333333333333333333333333333"
+dataset = "gke-audit"
+events = [
+  { path = ["format"], equals = "irmind-kubernetes-sigma-projection-v1" },
+  { column = "event.category", equals = "api" },
+]
+fields = [
+  { name = "protoPayload.status.code", path = ["original", "protoPayload", "status", "code"], value_type = "integer", null_policy = "absent" },
+]

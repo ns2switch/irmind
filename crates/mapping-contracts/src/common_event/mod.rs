@@ -1,4 +1,5 @@
 //! Canonical encoders and strict decoders of typed `CommonEvent` projections.
+pub mod cluster_audit;
 mod codec;
 mod values;
 

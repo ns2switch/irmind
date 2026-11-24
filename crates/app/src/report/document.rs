@@ -63,6 +63,10 @@ pub enum ReportLimitation<'a> {
     PartialSigma {
         receipt: &'a EvidenceHash,
     },
+    IndeterminateSigma {
+        receipt: &'a EvidenceHash,
+        stopped_early: bool,
+    },
 }
 
 impl ReportDocument<'_> {
@@ -271,6 +275,27 @@ impl Document {
                 ),
                 receipt.as_str(),
             ),
+            ReportLimitation::IndeterminateSigma {
+                receipt,
+                stopped_early,
+            } => {
+                let reason = if *stopped_early {
+                    language.text(
+                        "The Sigma scan stopped before the end. See the signed run for any indeterminate rows.",
+                        "La búsqueda de Sigma se detuvo antes del final. Consulta la ejecución firmada para saber si hubo filas indeterminadas."
+                    )
+                } else {
+                    language.text(
+                        "Sigma coverage is partial.",
+                        "La cobertura de Sigma es parcial.",
+                    )
+                };
+                let explanation = language.text(
+                    "Indeterminate rows are rows Sigma could not evaluate because an exact field was unavailable. This may indicate source manipulation.",
+                    "Las filas indeterminadas son filas que Sigma no pudo evaluar porque un campo exacto no estaba disponible. Esto puede indicar manipulación de la fuente."
+                );
+                format!("{reason} {explanation} {}", receipt.as_str())
+            }
             ReportLimitation::PartialSigma { receipt } => format!(
                 "{} {}",
                 language.text(

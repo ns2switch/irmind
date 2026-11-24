@@ -13,12 +13,12 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["4624"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
   { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
-  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "integer", conversion = "evtx_logon_type", null_policy = "absent" },
   { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
   { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
 ]
@@ -36,12 +36,12 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["4625"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
   { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
-  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "integer", conversion = "evtx_logon_type", null_policy = "absent" },
   { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
   { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
 ]
@@ -59,12 +59,12 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["4634"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
   { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
-  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "integer", conversion = "evtx_logon_type", null_policy = "absent" },
   { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
   { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
 ]
@@ -82,12 +82,12 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["4648"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
   { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
-  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "integer", conversion = "evtx_logon_type", null_policy = "absent" },
   { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
   { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
 ]
@@ -105,12 +105,12 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["4672"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
   { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
-  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "integer", conversion = "evtx_logon_type", null_policy = "absent" },
   { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
   { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
 ]
@@ -129,12 +129,12 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["4688"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
   { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
-  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "integer", conversion = "evtx_logon_type", null_policy = "absent" },
   { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
   { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
   { name = "Image", column = "process.executable", value_type = "text", null_policy = "absent" },
@@ -155,12 +155,12 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["4697"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
   { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
-  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "integer", conversion = "evtx_logon_type", null_policy = "absent" },
   { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
   { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
 ]
@@ -178,12 +178,12 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["4720"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
   { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
-  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "integer", conversion = "evtx_logon_type", null_policy = "absent" },
   { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
   { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
 ]
@@ -201,12 +201,12 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["4722"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
   { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
-  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "integer", conversion = "evtx_logon_type", null_policy = "absent" },
   { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
   { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
 ]
@@ -224,12 +224,12 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["4724"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
   { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
-  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "integer", conversion = "evtx_logon_type", null_policy = "absent" },
   { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
   { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
 ]
@@ -247,12 +247,12 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["4728"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
   { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
-  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "integer", conversion = "evtx_logon_type", null_policy = "absent" },
   { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
   { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
 ]
@@ -270,12 +270,12 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["4732"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
   { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
-  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "integer", conversion = "evtx_logon_type", null_policy = "absent" },
   { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
   { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
 ]
@@ -293,12 +293,12 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["4756"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
   { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
-  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "integer", conversion = "evtx_logon_type", null_policy = "absent" },
   { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
   { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
 ]
@@ -316,12 +316,12 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["4768"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
   { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
-  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "integer", conversion = "evtx_logon_type", null_policy = "absent" },
   { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
   { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
 ]
@@ -339,12 +339,12 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["4769"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
   { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
-  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "integer", conversion = "evtx_logon_type", null_policy = "absent" },
   { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
   { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
 ]
@@ -362,12 +362,12 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["4771"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
   { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
-  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "integer", conversion = "evtx_logon_type", null_policy = "absent" },
   { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
   { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
 ]
@@ -385,12 +385,12 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["4776"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "SubjectUserName", path = ["Event", "EventData", "SubjectUserName"], value_type = "text", null_policy = "absent" },
   { name = "TargetUserName", path = ["Event", "EventData", "TargetUserName"], value_type = "text", null_policy = "absent" },
-  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "text", null_policy = "absent" },
+  { name = "LogonType", path = ["Event", "EventData", "LogonType"], value_type = "integer", conversion = "evtx_logon_type", null_policy = "absent" },
   { name = "IpAddress", path = ["Event", "EventData", "IpAddress"], value_type = "text", null_policy = "absent" },
   { name = "SourceIp", column = "source.ip", value_type = "ip", null_policy = "absent" },
 ]
@@ -409,7 +409,7 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["1"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "Image", column = "process.executable", value_type = "text", null_policy = "absent" },
@@ -435,7 +435,7 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["3"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "Image", column = "process.executable", value_type = "text", null_policy = "absent" },
@@ -459,7 +459,7 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["11"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "Image", column = "process.executable", value_type = "text", null_policy = "absent" },
@@ -480,7 +480,7 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["13"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "Image", column = "process.executable", value_type = "text", null_policy = "absent" },
@@ -502,7 +502,7 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["22"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "Image", column = "process.executable", value_type = "text", null_policy = "absent" },
@@ -525,7 +525,7 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["4103"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "Payload", path = ["Event", "EventData", "Payload"], value_type = "text", null_policy = "absent" },
@@ -546,7 +546,7 @@ events = [
   { path = ["Event", "System", "EventID"], one_of = ["4104"] },
 ]
 fields = [
-  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "text", null_policy = "absent" },
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
   { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
   { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
   { name = "ScriptBlockText", path = ["Event", "EventData", "ScriptBlockText"], value_type = "text", null_policy = "absent" },

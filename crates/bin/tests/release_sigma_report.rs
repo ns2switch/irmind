@@ -3,8 +3,9 @@
 #![allow(clippy::unwrap_used)]
 
 use irmind_app::v10_proofs::{
-    ReportCitationsV1, ReportCoverageV2, ReportMediaV1, ReportPublishedV1, SigmaPackManifestV1,
-    SigmaPackRuleV1, SigmaRuleKeyV1, SigmaRunResultsV1, SigmaRunV1, V10Citation,
+    ReportCitationsV1, ReportCoverageV2, ReportMediaV1, ReportPublishedV1, SIGMA_EVALUATOR_V2,
+    SigmaPackManifestV1, SigmaPackRuleV1, SigmaRuleKeyV1, SigmaRunResultsV2, SigmaRunV1,
+    V10Citation,
 };
 use irmind_app::{SignerBackend, hex, sha256};
 use irmind_domain::{Actor, CaseId};
@@ -57,7 +58,7 @@ detection: {selection: {Outcome: failure}, condition: selection}
         rule: "title: Synthetic Sysmon process start
 id: 427b4a53-2c9b-4c89-8b76-25ef2a96e2ab
 logsource: {product: windows, service: sysmon, category: process_creation}
-detection: {selection: {EventID: '1', 'CommandLine|contains': 'echo synthetic'}, condition: selection}
+detection: {selection: {EventID: 1, 'CommandLine|contains': 'echo synthetic'}, condition: selection}
 ",
         time_range: "2026-11-01T12:00:00Z 2026-11-01T12:02:00Z",
         evidence: write_sysmon,
@@ -329,12 +330,15 @@ fn assert_package(bytes: &[u8], finding: &str, scenario: &Scenario) {
     let runs = payloads("sigma-run-v1").collect::<Vec<_>>();
     assert_eq!(runs.len(), 1);
     let run = SigmaRunV1::decode(runs[0]).unwrap();
+    assert_eq!(run.evaluator, SIGMA_EVALUATOR_V2);
     assert_eq!(run.matched_rows, 1);
     assert!(run.status == irmind_app::v10_proofs::SigmaRunStatusV1::Complete);
     assert_ne!(run.pack_admission, [0; 32]);
-    let results = SigmaRunResultsV1::decode(&object(bytes, 5, &run.result_manifest)).unwrap();
-    assert_eq!(results.matches.len(), 1);
-    let matched = &results.matches[0];
+    let results = SigmaRunResultsV2::decode(&object(bytes, 5, &run.result_manifest)).unwrap();
+    assert!(results.unavailable_by_source.is_empty());
+    assert!(results.indeterminate_by_rule.is_empty());
+    assert_eq!(results.results.matches.len(), 1);
+    let matched = &results.results.matches[0];
     assert_eq!(matched.rule.id, scenario.rule_id);
     assert_eq!(
         object(bytes, 1, &matched.rule.sha256),

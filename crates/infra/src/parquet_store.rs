@@ -96,6 +96,11 @@ impl ParquetStore {
         self.profile = Some(profile);
     }
 
+    #[cfg(feature = "sigma")]
+    pub(crate) fn mapping_catalog(&self) -> Option<&irmind_app::source_mapping::MappingCatalog> {
+        self.mapping_catalog.as_deref()
+    }
+
     pub(crate) fn owned_case_path(&self, id: &CaseId) -> PathBuf {
         self.root.join(id.as_str())
     }
