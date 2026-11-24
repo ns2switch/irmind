@@ -69,28 +69,36 @@ fn forwarded_list_overflow_stays_in_custody_and_warns_in_the_signed_report() {
     assert_eq!(result.indeterminate_by_rule.len(), 1);
     assert_eq!(result.indeterminate_by_rule[0].1, 1);
 
+    verify_signed_limitations(&engine, &store, &case.id, root.path(), &cancel);
+}
+
+fn verify_signed_limitations(
+    engine: &Engine<'_>,
+    store: &LocalStore,
+    case: &irmind_domain::CaseId,
+    root: &std::path::Path,
+    cancel: &CancellationToken,
+) {
     let preview = store
-        .preview_cited_report(&engine, &case.id, ReportDocumentLanguage::Spanish, &cancel)
+        .preview_cited_report(engine, case, ReportDocumentLanguage::Spanish, cancel)
         .unwrap();
     assert!(preview.markdown.contains("filas indeterminadas"));
     assert!(preview.markdown.contains("manipulación de la fuente"));
     assert!(!preview.markdown.contains("Synthetic forwarded source"));
     let plan = store
         .plan_cited_report(
-            &engine,
-            &case.id,
+            engine,
+            case,
             ReportDocumentLanguage::Spanish,
             ReportDocumentFormat::Markdown,
-            &cancel,
+            cancel,
         )
         .unwrap();
-    engine
-        .publish_cited_report(&case.id, plan, &cancel)
-        .unwrap();
-    engine.verify(&case.id).unwrap();
-    engine.seal(&case.id).unwrap();
-    let target = root.path().join("retained-audit.irmind");
-    let key = irmind_app::export_case(&engine, store.as_ref(), &case.id, &target, &cancel).unwrap();
+    engine.publish_cited_report(case, plan, cancel).unwrap();
+    engine.verify(case).unwrap();
+    engine.seal(case).unwrap();
+    let target = root.join("retained-audit.irmind");
+    let key = irmind_app::export_case(engine, store, case, &target, cancel).unwrap();
     let verified = irmind_infra::LocalExportVerifier
         .verify_export_details(&target, Some(&key))
         .unwrap();
