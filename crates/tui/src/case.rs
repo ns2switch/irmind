@@ -363,7 +363,7 @@ pub(crate) fn run_case(
     }
     let (progress_tx, progress_rx) = mpsc::channel::<String>();
     let (model_tx, model_rx) = mpsc::channel::<irmind_app::ModelProgress>();
-    let (seal_tx, seal_rx) = mpsc::channel::<irmind_app::SealPreview>();
+    let (confirmation_tx, confirmation_rx) = mpsc::channel::<Confirmation>();
     std::thread::scope(|scope| {
         let mut runtime = CaseRuntime {
             terminal,
@@ -386,8 +386,8 @@ pub(crate) fn run_case(
             progress_rx,
             model_tx,
             model_rx,
-            seal_tx,
-            seal_rx,
+            confirmation_tx,
+            confirmation_rx,
             overrides_active: presentation.overrides_active,
             modules: presentation.modules,
             exit_to: CaseExit::Home,

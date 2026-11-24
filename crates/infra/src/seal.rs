@@ -18,7 +18,10 @@ mod proof_files;
 mod report_preview;
 pub use proof_files::V10PreparedObjects;
 pub use report_preview::CitedReportPreview;
+#[cfg(feature = "sigma")]
+pub(crate) use sigma_export::check_sigma_append;
 mod read;
+mod sigma_export;
 mod skill_proofs;
 mod subagent_branches;
 mod verify_current;

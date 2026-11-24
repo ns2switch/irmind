@@ -13,6 +13,10 @@ pub use report_objects::*;
 pub use report_skills::*;
 mod section;
 pub use section::{V10ObjectSection, write_v10_object_section};
+mod sigma_admission;
+pub use sigma_admission::*;
+mod sigma_execution;
+pub use sigma_execution::*;
 mod sigma_objects;
 pub use sigma_objects::*;
 

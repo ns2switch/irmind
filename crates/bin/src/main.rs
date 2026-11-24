@@ -179,14 +179,61 @@ impl WorkspaceIo for RootWorkspaceIo {
         directory: &Path,
         cancel: &irmind_app::CancellationToken,
     ) -> Result<String, AppError> {
+        let (manifest, rules) = self.prepare_sigma_admission(directory, cancel)?;
+        Ok(format!(
+            "Sigma pack preview · {rules} validated rules\nManifest SHA-256 {}",
+            irmind_app::hex(&manifest)
+        ))
+    }
+
+    #[cfg(feature = "sigma")]
+    fn prepare_sigma_admission(
+        &self,
+        directory: &Path,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<([u8; 32], usize), AppError> {
         let pack = irmind_infra::sigma_pack::inspect_local_sigma_pack(directory, cancel)?;
         let manifest = pack.manifest.encode().map_err(|_| {
             AppError::Policy("Sigma pack manifest exceeds the supported limits".into())
         })?;
+        Ok((irmind_app::sha256(&manifest), pack.rules.len()))
+    }
+
+    #[cfg(feature = "sigma")]
+    fn admit_sigma_pack(
+        &self,
+        engine: &Engine<'_>,
+        directory: &Path,
+        manifest: [u8; 32],
+        license: &str,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<(), AppError> {
+        self.store
+            .admit_local_sigma_pack(engine, directory, manifest, license, cancel)
+    }
+
+    #[cfg(feature = "sigma")]
+    fn run_sigma_pack(
+        &self,
+        engine: &Engine<'_>,
+        case: &irmind_app::CaseId,
+        manifest: [u8; 32],
+        time: std::ops::Range<i64>,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, AppError> {
+        use irmind_app::v10_proofs::SigmaRunStatusV1;
+        let summary = self.store.run_sigma(engine, case, manifest, time, cancel)?;
+        let run = summary.receipt;
+        let status = match run.status {
+            SigmaRunStatusV1::Complete => "complete",
+            SigmaRunStatusV1::TimeLimit => "partial (time limit)",
+            SigmaRunStatusV1::WorkLimit => "partial (work limit)",
+            SigmaRunStatusV1::OversizedInput => "partial (oversized input)",
+            SigmaRunStatusV1::Cancelled => "partial (cancelled)",
+        };
         Ok(format!(
-            "Sigma pack preview · {} validated rules\nManifest SHA-256 {}",
-            pack.rules.len(),
-            irmind_app::hex(&irmind_app::sha256(&manifest))
+            "Sigma run {status} · {} unconfirmed matches · {} skipped rules · {} work units",
+            run.matched_rows, summary.skipped_rules, run.used_units
         ))
     }
 

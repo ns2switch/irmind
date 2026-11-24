@@ -12,6 +12,19 @@ the current version, verify the originals with the creating version and ingest
 them into a new case. The original case retains its approvals, confirmed
 findings and seal.
 
+## Run a signed Sigma scan
+
+Use `/sigma inspect <directory>` to review a local pack. Use
+`/sigma import --license <id> <directory>` and confirm the displayed manifest hash
+to sign its admission. The case keeps the exact admitted rules in its V10 export
+when a run references them.
+
+Run `/sigma run <pack SHA-256> <start UTC> <end UTC>` from an open case. The
+initial field table covers reviewed CloudTrail events. IRMind reports skipped
+rules and marks scans that hit a time or work limit as partial. Each match
+proposes an unconfirmed finding tied to an exact evidence row. Review it and
+use `/confirm <finding-id>` before publishing a report.
+
 ## Publish a signed report
 
 In an open case, use `/report preview en` or `/report preview es`. The report

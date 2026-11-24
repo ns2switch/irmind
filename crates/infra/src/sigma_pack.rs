@@ -2,6 +2,10 @@
 #[cfg(feature = "sigma")]
 pub mod evaluation;
 pub mod field_table;
+#[cfg(feature = "sigma")]
+mod runtime;
+#[cfg(feature = "sigma")]
+mod storage;
 use irmind_app::{
     AppError, CancellationToken,
     v10_proofs::{SigmaPackManifestV1, SigmaPackRuleV1, SigmaRuleKeyV1},
@@ -11,6 +15,8 @@ use std::{
     io::Read as _,
     path::{Path, PathBuf},
 };
+#[cfg(feature = "sigma")]
+pub use storage::AdmittedSigmaPack;
 
 const MAX_FILES: usize = 4096;
 const MAX_DEPTH: usize = 16;
