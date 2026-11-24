@@ -1,4 +1,4 @@
-"""Run the staged release verifier on the portable synthetic Sigma case."""
+"""Run the staged release verifier on both portable synthetic Sigma cases."""
 
 import argparse
 import hashlib
@@ -63,7 +63,7 @@ def verify(executable, directory):
             raise ValueError("verification accepted the altered archive or created a vault")
         print(result.stdout.strip())
 
-    message = f"Linux export verified on {os.environ.get('RUNNER_OS', os.name)} ({expected})."
+    message = f"Linux {directory.name} export verified on {os.environ.get('RUNNER_OS', os.name)} ({expected})."
     print(message)
     if summary := os.environ.get("GITHUB_STEP_SUMMARY"):
         with Path(summary).open("a", encoding="utf-8") as report:
@@ -75,4 +75,5 @@ if __name__ == "__main__":
     parser.add_argument("executable", type=lambda path: Path(path).resolve(strict=True))
     parser.add_argument("artifact", type=lambda path: Path(path).resolve(strict=True))
     options = parser.parse_args()
-    verify(options.executable, options.artifact)
+    for scenario in ("cloudtrail", "windows"):
+        verify(options.executable, options.artifact / scenario)

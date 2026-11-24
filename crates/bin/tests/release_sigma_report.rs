@@ -25,13 +25,45 @@ mod terminal_screen;
 use demo_session::DemoSession;
 
 const PASSPHRASE: &str = "synthetic release test file keystore";
-const TITLE: &str = "Synthetic failed CloudTrail sign-in";
-const RULE_ID: &str = "427b4a53-2c9b-4c89-8b76-25ef2a96e2aa";
-const RULE: &str = "title: Synthetic failed CloudTrail sign-in
+struct Scenario {
+    name: &'static str,
+    title: &'static str,
+    parser: &'static str,
+    rule_id: &'static str,
+    rule: &'static str,
+    time_range: &'static str,
+    evidence: fn(&Path) -> PathBuf,
+}
+
+const SCENARIOS: [Scenario; 2] = [
+    Scenario {
+        name: "cloudtrail",
+        title: "Synthetic failed CloudTrail sign-in",
+        parser: "parser-json",
+        rule_id: "427b4a53-2c9b-4c89-8b76-25ef2a96e2aa",
+        rule: "title: Synthetic failed CloudTrail sign-in
 id: 427b4a53-2c9b-4c89-8b76-25ef2a96e2aa
 logsource: {product: aws, service: cloudtrail}
 detection: {selection: {Outcome: failure}, condition: selection}
-";
+",
+        time_range: "2026-11-01T00:00:00Z 2026-11-01T00:02:00Z",
+        evidence: write_cloudtrail,
+    },
+    Scenario {
+        name: "windows",
+        title: "Synthetic Sysmon process start",
+        parser: "parser-evtx",
+        rule_id: "427b4a53-2c9b-4c89-8b76-25ef2a96e2ab",
+        rule: "title: Synthetic Sysmon process start
+id: 427b4a53-2c9b-4c89-8b76-25ef2a96e2ab
+logsource: {product: windows, service: sysmon, category: process_creation}
+detection: {selection: {EventID: '1', 'CommandLine|contains': 'echo synthetic'}, condition: selection}
+",
+        time_range: "2026-11-01T12:00:00Z 2026-11-01T12:02:00Z",
+        evidence: write_sysmon,
+    },
+];
+const RULE_FILE: &str = "synthetic.yml";
 
 #[test]
 #[ignore = "requires the staged distribution binary and an artifact output directory"]
@@ -40,16 +72,24 @@ fn release_binary_sigma_report_v10() {
     let output = required_path("IRMIND_RELEASE_SIGMA_OUTPUT");
     assert!(binary.is_file());
     fs::create_dir(&output).unwrap();
+    for scenario in &SCENARIOS {
+        let output = output.join(scenario.name);
+        fs::create_dir(&output).unwrap();
+        run_scenario(&binary, &output, scenario);
+    }
+}
+
+fn run_scenario(binary: &Path, output: &Path, scenario: &Scenario) {
     let scratch = tempfile::tempdir().unwrap();
     let home = scratch.path().join("vault");
     fs::create_dir(&home).unwrap();
     let key = prepare_keystore(&home);
     let pack = scratch.path().join("rules");
     fs::create_dir(&pack).unwrap();
-    fs::write(pack.join("failed-login.yml"), RULE).unwrap();
+    fs::write(pack.join(RULE_FILE), scenario.rule).unwrap();
 
-    let source = write_evidence(scratch.path());
-    let cli = |args: &[&str]| run_cli(&binary, &home, args);
+    let source = (scenario.evidence)(scratch.path());
+    let cli = |args: &[&str]| run_cli(binary, &home, args);
     let case = cli(&[
         "case",
         "new",
@@ -64,12 +104,12 @@ fn release_binary_sigma_report_v10() {
         case,
         source.to_str().unwrap(),
         "--parser",
-        "parser-json",
+        scenario.parser,
     ]);
 
-    let finding = evaluate(&binary, &home, case, &pack, &cli);
+    let finding = evaluate(binary, &home, case, &pack, scenario, &cli);
     cli(&["confirm-finding", case, &finding]);
-    publish(&binary, &home, case);
+    publish(binary, &home, case);
     cli(&[
         "verify",
         case,
@@ -82,7 +122,7 @@ fn release_binary_sigma_report_v10() {
     cli(&["export", case, export.to_str().unwrap()]);
     let bytes = fs::read(&export).unwrap();
     assert!(bytes.len() < 16 * 1024 * 1024);
-    assert_package(&bytes, &finding);
+    assert_package(&bytes, &finding, scenario);
     fs::write(output.join("expected-key.txt"), format!("{key}\n")).unwrap();
     fs::write(
         output.join("archive-sha256.txt"),
@@ -115,7 +155,7 @@ fn prepare_keystore(home: &Path) -> String {
     fingerprint
 }
 
-fn write_evidence(root: &Path) -> PathBuf {
+fn write_cloudtrail(root: &Path) -> PathBuf {
     let failure = include_str!("../../testkit/fixtures/common/cloudtrail-console-login.jsonl");
     let mut success: serde_json::Value = serde_json::from_str(failure).unwrap();
     success["responseElements"]["ConsoleLogin"] = "Success".into();
@@ -123,6 +163,16 @@ fn write_evidence(root: &Path) -> PathBuf {
     success["eventID"] = "synthetic-console-success".into();
     let path = root.join("cloudtrail.jsonl");
     fs::write(&path, format!("{}\n{success}\n", failure.trim_end())).unwrap();
+    path
+}
+
+fn write_sysmon(root: &Path) -> PathBuf {
+    let path = root.join("synthetic-sysmon.evtx");
+    fs::write(
+        &path,
+        include_bytes!("../../testkit/fixtures/mapping-evtx/source/sysmon.evtx"),
+    )
+    .unwrap();
     path
 }
 
@@ -175,23 +225,22 @@ fn evaluate(
     home: &Path,
     case: &str,
     pack: &Path,
+    scenario: &Scenario,
     cli: &impl Fn(&[&str]) -> String,
 ) -> String {
     let mut ui = open_tui(binary, home, case);
     ui.send(format!("/sigma inspect {}\r", pack.display()))
         .unwrap();
     expect_result(&mut ui, "1 validated rules");
-    let digest = pack_digest();
+    let digest = pack_digest(scenario);
     ui.expect(&digest).unwrap();
     ui.send(format!("/sigma import --license MIT {}\r", pack.display()))
         .unwrap();
     ui.expect("Sign Sigma pack admission").unwrap();
     ui.send("2\r").unwrap();
     ui.expect("Sigma pack admitted").unwrap();
-    ui.send(format!(
-        "/sigma run {digest} 2026-11-01T00:00:00Z 2026-11-01T00:02:00Z\r",
-    ))
-    .unwrap();
+    ui.send(format!("/sigma run {digest} {}\r", scenario.time_range,))
+        .unwrap();
     ui.expect("Sigma run complete").unwrap();
     quit(&mut ui);
 
@@ -200,21 +249,25 @@ fn evaluate(
         .lines()
         .filter(|line| line.contains(" proposed "))
         .collect::<Vec<_>>();
-    assert_eq!(proposals.len(), 1, "only the failing login should match");
-    assert!(proposals[0].contains(TITLE));
+    assert_eq!(
+        proposals.len(),
+        1,
+        "only the selected synthetic row should match"
+    );
+    assert!(proposals[0].contains(scenario.title));
     proposals[0].split_whitespace().next().unwrap().to_owned()
 }
 
-fn pack_digest() -> String {
+fn pack_digest(scenario: &Scenario) -> String {
     let manifest = SigmaPackManifestV1(vec![SigmaPackRuleV1 {
-        path: "failed-login.yml".into(),
+        path: RULE_FILE.into(),
         rule: SigmaRuleKeyV1 {
-            id: RULE_ID.into(),
-            sha256: sha256(RULE.as_bytes()),
+            id: scenario.rule_id.into(),
+            sha256: sha256(scenario.rule.as_bytes()),
         },
         version: None,
         author: None,
-        size: RULE.len() as u64,
+        size: scenario.rule.len() as u64,
     }]);
     hex(&sha256(&manifest.encode().unwrap()))
 }
@@ -258,7 +311,7 @@ fn read_frame(reader: &mut impl Read) -> serde_json::Value {
     serde_json::from_slice(&frame).unwrap()
 }
 
-fn assert_package(bytes: &[u8], finding: &str) {
+fn assert_package(bytes: &[u8], finding: &str, scenario: &Scenario) {
     let magic = b"IRMIND-EXPORT-V10\0";
     let mut reader = Cursor::new(bytes.strip_prefix(magic).unwrap());
     assert_eq!(read_frame(&mut reader)["version"], 10);
@@ -282,8 +335,11 @@ fn assert_package(bytes: &[u8], finding: &str) {
     let results = SigmaRunResultsV1::decode(&object(bytes, 5, &run.result_manifest)).unwrap();
     assert_eq!(results.matches.len(), 1);
     let matched = &results.matches[0];
-    assert_eq!(matched.rule.id, RULE_ID);
-    assert_eq!(object(bytes, 1, &matched.rule.sha256), RULE.as_bytes());
+    assert_eq!(matched.rule.id, scenario.rule_id);
+    assert_eq!(
+        object(bytes, 1, &matched.rule.sha256),
+        scenario.rule.as_bytes()
+    );
     assert_eq!(matched.row.record, 0);
 
     let reports = payloads("report-published-v1").collect::<Vec<_>>();
@@ -294,7 +350,7 @@ fn assert_package(bytes: &[u8], finding: &str) {
     {
         let report = ReportPublishedV1::decode(payload).unwrap();
         assert!(report.media == format);
-        assert_report_objects(bytes, &report, finding, matched.row);
+        assert_report_objects(bytes, &report, finding, matched.row, scenario.title);
     }
 }
 
@@ -318,6 +374,7 @@ fn assert_report_objects(
     report: &ReportPublishedV1,
     finding: &str,
     matched_row: irmind_app::v10_proofs::V10RowReference,
+    title: &str,
 ) {
     let citations = ReportCitationsV1::decode(&object(bytes, 0, &report.citations)).unwrap();
     assert_eq!(citations.0.len(), 1);
@@ -333,11 +390,11 @@ fn assert_report_objects(
         assert!(document.starts_with(b"%PDF-"));
         assert!(
             document
-                .windows(TITLE.len())
-                .any(|part| part == TITLE.as_bytes())
+                .windows(title.len())
+                .any(|part| part == title.as_bytes())
         );
     } else {
-        let escaped_title = TITLE.replace('-', r"\-");
+        let escaped_title = title.replace('-', r"\-");
         assert!(
             String::from_utf8(document)
                 .unwrap()
