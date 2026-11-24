@@ -1,0 +1,203 @@
+[[variants]]
+product = "windows"
+service = "defender"
+category = "process_creation"
+parser_id = "parser-defender"
+parser_version = "defender-source-v1"
+mapping_id = "mapping-defender"
+mapping_version = "@defender-v1-"
+dataset = "defender-hunting-process"
+events = [
+  { path = ["OSPlatform"], one_of = ["Windows", "Windows10", "Windows11", "WindowsServer2019", "WindowsServer2022", "WindowsServer2025"] },
+  { column = "event.action", equals = "ProcessCreated" },
+  { column = "event.category", equals = "process" },
+  { column = "event.type", equals = "start" },
+]
+fields = [
+  { name = "CommandLine", path = ["ProcessCommandLine"], value_type = "text", null_policy = "absent" },
+  { name = "ParentCommandLine", path = ["InitiatingProcessCommandLine"], value_type = "text", null_policy = "absent" },
+  { name = "FileName", path = ["FileName"], value_type = "text", null_policy = "absent" },
+  { name = "FolderPath", path = ["FolderPath"], value_type = "text", null_policy = "absent" },
+  { name = "InitiatingProcessFileName", path = ["InitiatingProcessFileName"], value_type = "text", null_policy = "absent" },
+  { name = "InitiatingProcessFolderPath", path = ["InitiatingProcessFolderPath"], value_type = "text", null_policy = "absent" },
+  { name = "DeviceName", path = ["DeviceName"], value_type = "text", null_policy = "absent" },
+  { name = "ActionType", path = ["ActionType"], value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "defender"
+category = "network_connection"
+parser_id = "parser-defender"
+parser_version = "defender-source-v1"
+mapping_id = "mapping-defender"
+mapping_version = "@defender-v1-"
+dataset = "defender-hunting-network"
+events = [
+  { path = ["OSPlatform"], one_of = ["Windows", "Windows10", "Windows11", "WindowsServer2019", "WindowsServer2022", "WindowsServer2025"] },
+  { column = "event.category", equals = "network" },
+  { column = "event.type", equals = "connection" },
+]
+fields = [
+  { name = "LocalIP", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "RemoteIP", column = "destination.ip", value_type = "ip", null_policy = "absent" },
+  { name = "LocalPort", column = "source.port", value_type = "integer", null_policy = "absent" },
+  { name = "RemotePort", column = "destination.port", value_type = "integer", null_policy = "absent" },
+  { name = "ActionType", path = ["ActionType"], value_type = "text", null_policy = "absent" },
+  { name = "DeviceName", path = ["DeviceName"], value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "defender"
+category = "process_creation"
+parser_id = "parser-defender"
+parser_version = "defender-source-v1"
+mapping_id = "mapping-defender"
+mapping_version = "@defender-v1-"
+dataset = "defender-stream-process"
+events = [
+  { path = ["properties", "OSPlatform"], one_of = ["Windows", "Windows10", "Windows11", "WindowsServer2019", "WindowsServer2022", "WindowsServer2025"] },
+  { column = "event.action", equals = "ProcessCreated" },
+  { column = "event.category", equals = "process" },
+  { column = "event.type", equals = "start" },
+]
+fields = [
+  { name = "CommandLine", path = ["properties", "ProcessCommandLine"], value_type = "text", null_policy = "absent" },
+  { name = "ParentCommandLine", path = ["properties", "InitiatingProcessCommandLine"], value_type = "text", null_policy = "absent" },
+  { name = "FileName", path = ["properties", "FileName"], value_type = "text", null_policy = "absent" },
+  { name = "FolderPath", path = ["properties", "FolderPath"], value_type = "text", null_policy = "absent" },
+  { name = "InitiatingProcessFileName", path = ["properties", "InitiatingProcessFileName"], value_type = "text", null_policy = "absent" },
+  { name = "InitiatingProcessFolderPath", path = ["properties", "InitiatingProcessFolderPath"], value_type = "text", null_policy = "absent" },
+  { name = "DeviceName", path = ["properties", "DeviceName"], value_type = "text", null_policy = "absent" },
+  { name = "ActionType", path = ["properties", "ActionType"], value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "defender"
+category = "network_connection"
+parser_id = "parser-defender"
+parser_version = "defender-source-v1"
+mapping_id = "mapping-defender"
+mapping_version = "@defender-v1-"
+dataset = "defender-stream-network"
+events = [
+  { path = ["properties", "OSPlatform"], one_of = ["Windows", "Windows10", "Windows11", "WindowsServer2019", "WindowsServer2022", "WindowsServer2025"] },
+  { column = "event.category", equals = "network" },
+  { column = "event.type", equals = "connection" },
+]
+fields = [
+  { name = "LocalIP", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "RemoteIP", column = "destination.ip", value_type = "ip", null_policy = "absent" },
+  { name = "LocalPort", column = "source.port", value_type = "integer", null_policy = "absent" },
+  { name = "RemotePort", column = "destination.port", value_type = "integer", null_policy = "absent" },
+  { name = "ActionType", path = ["properties", "ActionType"], value_type = "text", null_policy = "absent" },
+  { name = "DeviceName", path = ["properties", "DeviceName"], value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "crowdstrike"
+category = "process_creation"
+parser_id = "parser-fdr"
+parser_version = "fdr-source-v1"
+mapping_id = "mapping-fdr"
+mapping_version = "@fdr-v1-"
+dataset = "fdr-process"
+events = [
+  { path = ["event_platform"], equals = "Win" },
+  { path = ["event_simpleName"], one_of = ["ProcessRollup2", "SyntheticProcessRollup2"] },
+]
+fields = [
+  { name = "Image", path = ["ImageFileName"], value_type = "text", null_policy = "absent" },
+  { name = "CommandLine", path = ["CommandLine"], value_type = "text", null_policy = "absent" },
+  { name = "ParentBaseFileName", path = ["ParentBaseFileName"], value_type = "text", null_policy = "absent" },
+  { name = "TargetProcessId", column = "process.entity_id", value_type = "text", null_policy = "absent" },
+  { name = "ParentProcessId", column = "process.parent.entity_id", value_type = "text", null_policy = "absent" },
+  { name = "aid", path = ["aid"], value_type = "text", null_policy = "absent" },
+  { name = "cid", path = ["cid"], value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "crowdstrike"
+category = "network_connection"
+parser_id = "parser-fdr"
+parser_version = "fdr-source-v1"
+mapping_id = "mapping-fdr"
+mapping_version = "@fdr-v1-"
+dataset = "fdr-ipv4"
+events = [
+  { path = ["event_platform"], equals = "Win" },
+  { path = ["event_simpleName"], equals = "NetworkConnectIP4" },
+]
+fields = [
+  { name = "LocalAddressIP4", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "RemoteAddressIP4", column = "destination.ip", value_type = "ip", null_policy = "absent" },
+  { name = "LocalPort", column = "source.port", value_type = "integer", null_policy = "absent" },
+  { name = "RemotePort", column = "destination.port", value_type = "integer", null_policy = "absent" },
+  { name = "aid", path = ["aid"], value_type = "text", null_policy = "absent" },
+  { name = "cid", path = ["cid"], value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "crowdstrike"
+category = "network_connection"
+parser_id = "parser-fdr"
+parser_version = "fdr-source-v1"
+mapping_id = "mapping-fdr"
+mapping_version = "@fdr-v1-"
+dataset = "fdr-ipv6"
+events = [
+  { path = ["event_platform"], equals = "Win" },
+  { path = ["event_simpleName"], equals = "NetworkConnectIP6" },
+]
+fields = [
+  { name = "LocalAddressIP6", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "RemoteAddressIP6", column = "destination.ip", value_type = "ip", null_policy = "absent" },
+  { name = "LocalPort", column = "source.port", value_type = "integer", null_policy = "absent" },
+  { name = "RemotePort", column = "destination.port", value_type = "integer", null_policy = "absent" },
+  { name = "aid", path = ["aid"], value_type = "text", null_policy = "absent" },
+  { name = "cid", path = ["cid"], value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "macos"
+service = "eslogger"
+category = "process_creation"
+parser_id = "parser-macos"
+parser_version = "macos-source-v1"
+mapping_id = "mapping-macos"
+mapping_version = "@macos-v1-"
+dataset = "eslogger-v1-exec"
+events = [
+  { path = ["event_type"], equals = 9 },
+  { path = ["action_type"], equals = 1 },
+  { column = "event.category", equals = "process" },
+]
+fields = [
+  { name = "Image", path = ["event", "exec", "target", "executable", "path"], value_type = "text", null_policy = "absent" },
+  { name = "Arguments", path = ["event", "exec", "args"], value_type = "text_list", null_policy = "absent" },
+  { name = "ProcessId", column = "process.pid", value_type = "integer", null_policy = "absent" },
+]
+
+[[variants]]
+product = "macos"
+service = "eslogger"
+category = "file_event"
+parser_id = "parser-macos"
+parser_version = "macos-source-v1"
+mapping_id = "mapping-macos"
+mapping_version = "@macos-v1-"
+dataset = "eslogger-v1-create"
+events = [
+  { path = ["action_type"], equals = 1 },
+  { column = "event.category", equals = "file" },
+  { column = "event.type", equals = "creation" },
+]
+fields = [
+  { name = "TargetFilename", column = "file.path", value_type = "text", null_policy = "absent" },
+  { name = "ActorExecutable", path = ["process", "executable", "path"], value_type = "text", null_policy = "absent" },
+]

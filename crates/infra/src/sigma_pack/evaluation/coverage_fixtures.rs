@@ -527,3 +527,83 @@ fn sigma_kubernetes_requires_the_exact_resource_and_does_not_scalarize_source_ip
         );
     }
 }
+
+#[test]
+fn sigma_endpoint_process_creation_requires_the_enrolled_platform_and_exact_paths() {
+    let reviewed = parse_table(include_str!("../endpoint-v1.toml"));
+    const DEFENDER: &str =
+        include_str!("../../../../testkit/fixtures/parser-defender/source/events.ndjson");
+    const FDR: &str = include_str!("../../../../testkit/fixtures/parser-fdr/source/events.ndjson");
+    const ESLOGGER: &str =
+        include_str!("../../../../testkit/fixtures/parser-macos/source/endpoint.ndjson");
+    for (dataset, source, predicate, field, accepted, rejected) in [
+        (
+            "defender-hunting-process",
+            DEFENDER,
+            "{'CommandLine|contains': synthetic}",
+            "OSPlatform",
+            Value::from("Windows11"),
+            Value::from("Linux"),
+        ),
+        (
+            "fdr-process",
+            FDR,
+            "{'Image|endswith': client.exe, 'CommandLine|contains': synthetic}",
+            "event_platform",
+            Value::from("Win"),
+            Value::from("Mac"),
+        ),
+        (
+            "eslogger-v1-exec",
+            ESLOGGER,
+            "{Image: /Users/synthetic/bin/example-test}",
+            "event_type",
+            Value::from(9),
+            Value::from(10),
+        ),
+    ] {
+        let variant = reviewed
+            .variants
+            .iter()
+            .find(|entry| entry.dataset.as_deref() == Some(dataset))
+            .unwrap();
+        let product = variant.product.as_deref().unwrap();
+        let service = variant.service.as_deref().unwrap();
+        let taxonomy =
+            format!("{{product: {product}, service: {service}, category: process_creation}}");
+        let header = EventHeaderV1::new(
+            CategorySet::new([EventCategory::Process]),
+            EventTypeSet::new([EventType::Start]),
+            EventOutcome::Success,
+            EventKind::Event,
+        )
+        .with_action("ProcessCreated")
+        .unwrap();
+        let row = synthetic_row(variant, header, []);
+        let mut raw: Value = serde_json::from_str(source.lines().next().unwrap()).unwrap();
+        raw[field] = accepted;
+        let matching = raw.to_string();
+        assert_eq!(
+            evaluate(variant, &taxonomy, predicate, &row, Some(&matching)),
+            (1, None),
+            "{dataset}"
+        );
+        raw[field] = rejected;
+        assert_eq!(
+            evaluate(variant, &taxonomy, predicate, &row, Some(&raw.to_string())),
+            (0, None),
+            "{dataset}"
+        );
+        assert_eq!(
+            evaluate(
+                variant,
+                "{product: unreviewed, category: process_creation}",
+                predicate,
+                &row,
+                Some(&matching)
+            ),
+            (0, Some(SigmaCoverageV1::UnsupportedLogsource)),
+            "{dataset}"
+        );
+    }
+}
