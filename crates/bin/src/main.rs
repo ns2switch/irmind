@@ -173,6 +173,23 @@ impl RootWorkspaceIo {
 }
 
 impl WorkspaceIo for RootWorkspaceIo {
+    #[cfg(feature = "sigma")]
+    fn inspect_sigma_pack(
+        &self,
+        directory: &Path,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, AppError> {
+        let pack = irmind_infra::sigma_pack::inspect_local_sigma_pack(directory, cancel)?;
+        let manifest = pack.manifest.encode().map_err(|_| {
+            AppError::Policy("Sigma pack manifest exceeds the supported limits".into())
+        })?;
+        Ok(format!(
+            "Sigma pack preview · {} validated rules\nManifest SHA-256 {}",
+            pack.rules.len(),
+            irmind_app::hex(&irmind_app::sha256(&manifest))
+        ))
+    }
+
     fn preview_cited_report(
         &self,
         engine: &Engine<'_>,

@@ -80,6 +80,12 @@ pub(super) const COMMANDS: &[Command] = &[
         slash: true,
     },
     Command {
+        name: "sigma",
+        description: "Inspect a local Sigma rule pack",
+        shortcut: "",
+        slash: true,
+    },
+    Command {
         name: "report",
         description: "Preview a report with evidence citations",
         shortcut: "",
