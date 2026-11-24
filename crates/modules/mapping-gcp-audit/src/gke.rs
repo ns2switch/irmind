@@ -3,10 +3,15 @@ use super::{
     TableMapping,
 };
 use irmind_domain::{
-    BoundedObservations, CommonEventV1, CommonField as F, CommonValue, EntityIdentityScope,
-    EntityObservation, EntityRole, EventContextV1, EventText, ObservedEntity, ObservedEntityKind,
+    BoundedObservations, CategorySet, CommonEventV1, CommonField as F, CommonValue,
+    EntityIdentityScope, EntityObservation, EntityRole, EventCategory, EventContextV1,
+    EventHeaderV1, EventKind, EventOutcome, EventText, EventType, EventTypeSet, ObservedEntity,
+    ObservedEntityKind,
 };
-use irmind_mapping_contracts::source_mapping::{MappingIdentityV1, MappingProvenance};
+use irmind_mapping_contracts::{
+    common_event::cluster_audit::{self, AuditExactField},
+    source_mapping::{MappingIdentityV1, MappingProvenance},
+};
 const BUILD: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/native-mapping-manifest.bin"));
 const BASE: &str = include_str!("gke.toml");
 const BASE_DIGEST: &str = "0114a289c7b4a50c8c37dd2f3f721f38166506874add399cbb415fb03defcbcf";
@@ -23,7 +28,7 @@ impl GkeMapping {
         let digest = EvidenceHash::from_bytes(irmind_mapping_contracts::sha256(BUILD));
         let identity = MappingIdentityV1::try_new(
             "mapping-gke-audit",
-            &format!("gke-paths-v1-{}", digest.as_str()),
+            &format!("gke-paths-v2-{}", digest.as_str()),
             irmind_domain::COMMON_EVENT_V1,
             digest,
         )
@@ -44,26 +49,66 @@ impl SourceMapper for GkeMapping {
         &self.manifest
     }
     fn map(&self, source: &SourceRecordV1) -> Result<MappingOutput, MappingError> {
-        let output = self.base.map(source)?;
+        let output = self.base.project_cluster_audit(source)?;
         let partition = output.partition().clone();
         let mut record = output.into_record();
         let mut context = record.common.context().clone();
         let mut observations = record.common.observations().values().to_vec();
-        regional_location(source, &mut context)?;
-        resource(source, &mut context, &mut observations)?;
+        omit_invalid_enrichment(&mut context, &mut observations, |context, _| {
+            regional_location(source, context)
+        })?;
+        omit_invalid_enrichment(&mut context, &mut observations, |context, observations| {
+            resource(source, context, observations)
+        })?;
+        let header = record.common.event();
+        let header = if header.categories().iter().next().is_none() {
+            let fallback = EventHeaderV1::new(
+                CategorySet::new([EventCategory::Api]),
+                EventTypeSet::new([EventType::Access]),
+                EventOutcome::Unknown,
+                EventKind::Event,
+            );
+            match header.action() {
+                Some(action) => fallback.with_action(action).map_err(bad)?,
+                None => fallback,
+            }
+        } else {
+            header.clone()
+        };
         record.common = CommonEventV1::try_new(
             source.origin().clone(),
             source.timestamp(),
-            record.common.event().clone(),
+            header,
             context,
             BoundedObservations::try_new(observations).map_err(bad)?,
         )
         .map_err(bad)?;
         record.indexed.record.text =
-            irmind_mapping_contracts::encode_common_event(&record.common).map_err(bad)?;
+            cluster_audit::encode(&record.common, source.fields(), AuditExactField::GkeStatus)
+                .map_err(bad)?;
         MappingOutput::try_new(source, record.indexed, record.common, partition, vec![])
     }
 }
+fn omit_invalid_enrichment(
+    context: &mut EventContextV1,
+    observations: &mut Vec<EntityObservation>,
+    enrich: impl FnOnce(&mut EventContextV1, &mut Vec<EntityObservation>) -> Result<(), MappingError>,
+) -> Result<(), MappingError> {
+    let mut candidate_context = context.clone();
+    let count = observations.len();
+    match enrich(&mut candidate_context, observations) {
+        Ok(()) => {
+            *context = candidate_context;
+            Ok(())
+        }
+        Err(MappingError::UnsupportedSourceValue) => {
+            observations.truncate(count);
+            Ok(())
+        }
+        Err(error) => Err(error),
+    }
+}
+
 fn resource(
     source: &SourceRecordV1,
     context: &mut EventContextV1,

@@ -114,6 +114,7 @@ pub use custody::{
 };
 pub use engine::{CryptoPorts, Engine, EnginePorts, verify_case_metadata};
 pub use ingest::TimelineEvent;
+pub use irmind_mapping_contracts::common_event::cluster_audit;
 pub use irmind_mapping_contracts::{
     GraphRecord, GraphRelation, IndexedGraphRecord, PartitionProfile,
 };

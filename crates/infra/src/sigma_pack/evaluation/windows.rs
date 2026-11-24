@@ -108,19 +108,19 @@ fn sigma_evtx_channel_and_provider_scoped_event_fields_match_exact_rows() {
             SECURITY,
             "security",
             "4625",
-            r#"{EventID: '4625', TargetUserName: alice}"#,
+            "{EventID: 4625, TargetUserName: alice}",
         ),
         (
             SYSMON,
             "sysmon",
             "1",
-            r#"{EventID: '1', 'Image|endswith': 'cmd.exe', 'ParentImage|endswith': 'explorer.exe'}"#,
+            "{EventID: 1, 'Image|endswith': 'cmd.exe', 'ParentImage|endswith': 'explorer.exe'}",
         ),
         (
             POWERSHELL,
             "powershell",
             "4104",
-            r#"{EventID: '4104', ScriptBlockText: 'Write-Output synthetic'}"#,
+            "{EventID: 4104, ScriptBlockText: 'Write-Output synthetic'}",
         ),
     ] {
         let variant = table
@@ -157,7 +157,7 @@ fn sigma_evtx_channel_and_provider_scoped_event_fields_match_exact_rows() {
 #[test]
 fn sigma_windows_without_an_enrolled_channel_skips_the_rule() {
     let table = windows_table();
-    let rule = b"title: Synthetic unknown channel\nlogsource: {product: windows, service: unreviewed}\ndetection: {selection: {EventID: '1'}, condition: selection}\n";
+    let rule = b"title: Synthetic unknown channel\nlogsource: {product: windows, service: unreviewed}\ndetection: {selection: {EventID: 1}, condition: selection}\n";
     for variant in table
         .variants
         .iter()

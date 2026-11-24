@@ -1,8 +1,7 @@
 # Exact Sigma source fields for v0.7
 
-**Status** · Defender, EVTX and Microsoft 365 approved. Revised
-Kubernetes and GKE projection and Sigma coverage vectors submitted for review.
-Production implementation of the revised contract awaits approval.
+**Status** · Approved with the independent vectors at `ac2f888f`.
+The implementation and regression tests are included in this change.
 
 ## Kubernetes and GKE
 
@@ -107,11 +106,12 @@ The existing early-stop status takes precedence when applicable and the
 result body still includes the observed counts. A run with no applicable
 rule affected can complete and still show the per-source quality counts.
 The report's existing `ReportCoverageV2` partial-run reference authenticates
-the result proof, and its limitations section prints the affected source
-counts. Verification authenticates the source and rule references and
-reconciles status and counts. The selected-source set also bounds the number
-of source counters. Full reproduction recomputes the counts
-from the committed rows with the pinned evaluator.
+the result proof. Its limitations section explains indeterminate rows and
+cites the signed run. The scan output shows the per-source and per-rule
+counts, which remain in that run's authenticated result proof.
+Verification authenticates the source and rule references and reconciles
+status and counts. The selected-source set bounds the number of source
+counters.
 The approved V10 header, proof-set kinds and historical vectors retain
 their encodings.
 

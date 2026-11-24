@@ -235,7 +235,7 @@ fn lane(file: &std::path::Path, original: bool, count: u64) {
     )
     .unwrap();
     let seconds = start.elapsed().as_secs_f64();
-    assert!(run.status() == SigmaRunStatusV1::Complete);
+    assert_eq!(run.status(), SigmaRunStatusV1::Complete);
     let name = if original { "original" } else { "common" };
     let truth = std::collections::BTreeSet::from([(format!("{name}-0000"), INCIDENT_RECORD)]);
     let false_matches = actual
@@ -266,7 +266,7 @@ fn lane(file: &std::path::Path, original: bool, count: u64) {
         usize::try_from(count.saturating_sub(950)).unwrap()
     );
     println!(
-        "fields={name} rules={count} compiled={} evaluated={} skipped={} compile_s={:.3} scan_s={seconds:.3} read_bytes={} tp={true_positives} fp={false_positives} fn={false_negatives} units={}",
+        "evaluator=irmind-sigma-evaluator-v2 fields={name} rules={count} compiled={} evaluated={} skipped={} compile_s={:.3} scan_s={seconds:.3} read_bytes={} tp={true_positives} fp={false_positives} fn={false_negatives} units={}",
         programs.eligible(),
         run.rules_evaluated(),
         programs.skipped().len(),

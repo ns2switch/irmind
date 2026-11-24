@@ -1,13 +1,14 @@
 #![forbid(unsafe_code)]
 //! Finite Kubernetes audit interpretation; source context never grants permissions.
 use irmind_domain::EvidenceHash;
+use irmind_mapping_contracts::common_event::cluster_audit::{self, AuditExactField};
 use irmind_mapping_contracts::{
     modules::{MappingModule, ModuleManifest, ModulePort},
     source_mapping::{MappingError, MappingManifest, MappingOutput, SourceMapper, SourceRecordV1},
 };
 use irmind_mapping_tables::TableMapping;
 const DEFINITION: &str = include_str!("kubernetes.toml");
-const DIGEST: &str = "832d119ca0d776a13a10ff56c814e98eecd575a5eee5eb25d3d492079d7bd63f";
+const DIGEST: &str = "28a09caaed2973d2276939a71540ad4e6d9182dc3ccee2b67194b778da51fac7";
 pub struct KubernetesMapping {
     table: TableMapping,
     module: &'static ModuleManifest,
@@ -21,12 +22,12 @@ impl KubernetesMapping {
             Self::new()?,
             Self::included(
                 include_str!("eks.toml"),
-                "6946c0c91035030f453ea9a5614c3f199f2324f7440c4753c61130d3fa431b40",
+                "c7a2ab7a418cede5a586c0607761de98c453795927be2c085b5a28861b1750a2",
                 &EKS_MODULE,
             )?,
             Self::included(
                 include_str!("aks.toml"),
-                "67b131b48babbdec174758e46349e492cf3a71df8abd38e92df20268518e77f5",
+                "59d339d022033157ac00d4c43ccc26bf2742aa5e7ac87c3d7ec9b7f3dbb302a3",
                 &AKS_MODULE,
             )?,
         ])
@@ -48,7 +49,17 @@ impl SourceMapper for KubernetesMapping {
         self.table.manifest()
     }
     fn map(&self, source: &SourceRecordV1) -> Result<MappingOutput, MappingError> {
-        self.table.map(source)
+        let output = self.table.project_cluster_audit(source)?;
+        let partition = output.partition().clone();
+        let mut record = output.into_record();
+        let field = if self.module.id == MODULE.id {
+            AuditExactField::SourceIps
+        } else {
+            AuditExactField::WrappedSourceIps
+        };
+        record.indexed.record.text = cluster_audit::encode(&record.common, source.fields(), field)
+            .map_err(|_| MappingError::InvalidOutput)?;
+        MappingOutput::try_new(source, record.indexed, record.common, partition, vec![])
     }
 }
 static MODULE: ModuleManifest = ModuleManifest {

@@ -26,8 +26,11 @@ Zeek and Suricata DNS, HTTP and connections. It also covers Entra ID sign-in
 and audit, Azure Activity, Microsoft 365, Okta, GCP and Kubernetes audit, and
 the reviewed Defender, CrowdStrike FDR and eslogger process and related classes.
 Coverage depends on the exact logsource, fields and mapping version. IRMind
-reports skipped rules and marks scans that hit a time or work limit as partial. Each match
-proposes an unconfirmed finding tied to an exact evidence row. Review it and
+reports skipped rules, partial scans and rows with unavailable exact fields by
+source. A row is indeterminate for a rule when an exact field it needs is
+unavailable. This can indicate source manipulation. Review the intact original.
+The report explains the coverage gap and cites the signed execution.
+Each match proposes an unconfirmed finding tied to an exact evidence row. Review it and
 use `/confirm <finding-id>` before publishing a report.
 
 ## Publish a signed report
