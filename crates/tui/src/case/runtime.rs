@@ -6,7 +6,7 @@ use super::state::{CaseMessage, CaseState, update};
 use super::{
     ActiveTask, CancellationToken, CaseId, CaseWorkflow, Confirmation, CrosstermBackend, Duration,
     Engine, Event, Instant, LlmPort, Result, Terminal, WorkspaceIo, cancelled_operation, event, io,
-    mpsc, seal_confirmation,
+    mpsc,
 };
 use crossterm::event::KeyEventKind;
 use irmind_app::AnalystToolOutcome;
@@ -26,8 +26,8 @@ pub(super) struct CaseRuntime<'scope, 'env, 'ports> {
     pub progress_rx: mpsc::Receiver<String>,
     pub model_tx: mpsc::Sender<irmind_app::ModelProgress>,
     pub model_rx: mpsc::Receiver<irmind_app::ModelProgress>,
-    pub seal_tx: mpsc::Sender<irmind_app::SealPreview>,
-    pub seal_rx: mpsc::Receiver<irmind_app::SealPreview>,
+    pub confirmation_tx: mpsc::Sender<Confirmation>,
+    pub confirmation_rx: mpsc::Receiver<Confirmation>,
     pub overrides_active: bool,
     pub modules: &'env [crate::ModuleStatus],
     pub exit_to: CaseExit,
@@ -302,14 +302,13 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
             self.state.conversation.discard_preview();
             self.state.pending_final_reply = Some(self.engine.guard.screen(&text)?.text);
         }
-        if label == "Prepare seal" {
+        if matches!(label, "Prepare seal" | "Prepare Sigma pack") {
             let preview = self
-                .seal_rx
+                .confirmation_rx
                 .try_recv()
-                .map_err(|_| anyhow::anyhow!("signed seal preview was not delivered"))?;
-            let summary = seal_confirmation(&preview);
+                .map_err(|_| anyhow::anyhow!("confirmation preview was not delivered"))?;
             self.state.confirmation_option = 0;
-            self.state.confirmation = Some(Confirmation::Seal(Box::new(preview), summary));
+            self.state.confirmation = Some(preview);
         }
         if label == "Cloud objects" && self.capture_object_listing().is_err() {
             self.state.messages.push(

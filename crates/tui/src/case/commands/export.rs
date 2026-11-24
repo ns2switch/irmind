@@ -1,4 +1,4 @@
-use super::super::{Confirmation, confirmation_summary};
+use super::super::{Confirmation, confirmation_summary, seal_confirmation};
 use super::CaseRuntime;
 use anyhow::{Result, bail};
 use irmind_app::CaseId;
@@ -60,14 +60,17 @@ impl CaseRuntime<'_, '_, '_> {
             } else {
                 let workflow = self.workflow();
                 let id = self.id;
-                let sender = self.seal_tx.clone();
+                let sender = self.confirmation_tx.clone();
                 self.start_task("Prepare seal", move |cancel| {
                     let preview = workflow.prepare_seal(id, &cancel)?;
-                    sender.send(preview).map_err(|_| {
-                        irmind_app::AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
-                            irmind_app::AdapterStorageError::SealPreviewUIUnavailable,
-                        ))
-                    })?;
+                    let summary = seal_confirmation(&preview);
+                    sender
+                        .send(Confirmation::Seal(Box::new(preview), summary))
+                        .map_err(|_| {
+                            irmind_app::AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(
+                                irmind_app::AdapterStorageError::SealPreviewUIUnavailable,
+                            ))
+                        })?;
                     Ok("review the signed preview".into())
                 });
             }
