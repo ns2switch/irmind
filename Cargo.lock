@@ -2479,6 +2479,7 @@ dependencies = [
  "irmind-mod-parser-linux",
  "irmind-mod-parser-vpc-flow",
  "irmind-security",
+ "irmind-sigma",
  "irmind-testkit",
  "memchr",
  "parquet",
@@ -3538,14 +3539,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "irmind-mod-sigma"
-version = "0.1.0"
-dependencies = [
- "regex",
- "saphyr-parser",
-]
-
-[[package]]
 name = "irmind-mod-storage-object"
 version = "0.1.0"
 dependencies = [
@@ -3619,6 +3612,14 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "unicode-normalization",
+]
+
+[[package]]
+name = "irmind-sigma"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "saphyr-parser",
 ]
 
 [[package]]

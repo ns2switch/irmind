@@ -1,6 +1,6 @@
 #![no_main]
 
-use irmind_mod_sigma::{SigmaField, SigmaFieldKind, SigmaProgram, SigmaScalar, admit_rule};
+use irmind_sigma::{SigmaField, SigmaFieldKind, SigmaProgram, SigmaScalar, admit_rule};
 use libfuzzer_sys::fuzz_target;
 use std::collections::BTreeMap;
 

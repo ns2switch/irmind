@@ -1,4 +1,6 @@
 //! Load analyst-selected regular YAML files under a single bounded local root.
+#[cfg(feature = "sigma")]
+pub mod evaluation;
 pub mod field_table;
 use irmind_app::{
     AppError, CancellationToken,

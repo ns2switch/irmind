@@ -81,7 +81,7 @@ pub(super) const COMMANDS: &[Command] = &[
     },
     Command {
         name: "report",
-        description: "Generate evidence-linked report",
+        description: "Preview a report with evidence citations",
         shortcut: "",
         slash: true,
     },

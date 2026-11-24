@@ -12,7 +12,7 @@ export = ["dep:irmind-infra"]
 cargo-fuzz = true
 
 [dependencies]
-irmind-mod-sigma = { path = "../crates/modules/sigma", version = "0.1.0" }
+irmind-sigma = { path = "../crates/modules/sigma", version = "0.1.0" }
 irmind-mod-query-azure-log-analytics = { path = "../crates/modules/query-azure-log-analytics", version = "0.1.0" }
 irmind-mod-query-bigquery = { path = "../crates/modules/query-bigquery", version = "0.1.0" }
 irmind-mod-query-athena = { path = "../crates/modules/query-athena", version = "0.1.0" }

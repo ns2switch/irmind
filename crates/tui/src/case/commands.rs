@@ -556,6 +556,26 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         if self.source_query_command(prompt) {
             return Ok(true);
         }
+        if prompt == "/report preview" || prompt.starts_with("/report preview ") {
+            use irmind_app::ReportDocumentLanguage::{English, Spanish};
+            let language = match prompt {
+                "/report preview" | "/report preview en" => English,
+                "/report preview es" => Spanish,
+                _ => {
+                    self.state
+                        .messages
+                        .push("Usage: /report preview [en|es]".into());
+                    return Ok(true);
+                }
+            };
+            let io = self.io_ops;
+            let engine = self.engine;
+            let id = self.id;
+            self.start_task("Report preview", move |cancel| {
+                io.preview_cited_report(engine, id, language, &cancel)
+            });
+            return Ok(true);
+        }
         match prompt {
             "/help" => {
                 self.state.overlay_scroll = 0;
