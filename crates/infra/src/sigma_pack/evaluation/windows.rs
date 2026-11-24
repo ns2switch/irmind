@@ -1,5 +1,6 @@
 use super::*;
-use crate::sigma_pack::{field_table::ReviewedSigmaFieldTable, runtime::enrolled_field_table};
+use crate::sigma_pack::field_table::ReviewedSigmaFieldTable;
+use irmind_app::v10_proofs::SigmaFieldTableV1;
 use irmind_domain::{
     BoundedObservations, EventContextV1, EventHeaderV1, EventOrigin, EventText, EvidenceHash,
 };
@@ -10,6 +11,15 @@ const SYSMON: &str =
     include_str!("../../../../testkit/fixtures/mapping-evtx/protocol/sysmon.jsonl");
 const POWERSHELL: &str =
     include_str!("../../../../testkit/fixtures/mapping-evtx/protocol/powershell.jsonl");
+
+fn windows_table() -> ReviewedSigmaFieldTable {
+    ReviewedSigmaFieldTable::parse(&SigmaFieldTableV1 {
+        id: "windows-contract-fixtures".into(),
+        version: "v1".into(),
+        toml: include_str!("../windows-v1.toml").into(),
+    })
+    .unwrap()
+}
 
 fn raw_rows(fixture: &str) -> impl Iterator<Item = Value> + '_ {
     fixture.lines().filter_map(|line| {
@@ -92,7 +102,7 @@ fn match_count(variant: &SigmaSourceVariant, raw: &Value, rule: &str) -> usize {
 
 #[test]
 fn sigma_evtx_channel_and_provider_scoped_event_fields_match_exact_rows() {
-    let table = ReviewedSigmaFieldTable::parse(&enrolled_field_table()).unwrap();
+    let table = windows_table();
     for (fixture, service, id, selection) in [
         (
             SECURITY,
@@ -146,7 +156,7 @@ fn sigma_evtx_channel_and_provider_scoped_event_fields_match_exact_rows() {
 
 #[test]
 fn sigma_windows_without_an_enrolled_channel_skips_the_rule() {
-    let table = ReviewedSigmaFieldTable::parse(&enrolled_field_table()).unwrap();
+    let table = windows_table();
     let rule = b"title: Synthetic unknown channel\nlogsource: {product: windows, service: unreviewed}\ndetection: {selection: {EventID: '1'}, condition: selection}\n";
     for variant in table
         .variants

@@ -8,6 +8,7 @@ use super::{
 use crate::LocalStore;
 use irmind_app::{
     AppError, AuditEventKind, AuditLog, CancellationToken, Engine,
+    source_mapping::{MappingCatalog, MappingProvenance},
     v10_proofs::{
         PreparedSigmaExecution, SigmaCompiledRuleV1, SigmaCompiledRulesV1, SigmaCoverageV1,
         SigmaExecutionContext, SigmaExecutionSummary, SigmaFieldTableV1, SigmaFindingDraft,
@@ -53,8 +54,10 @@ impl LocalStore {
             |scope, operation| {
                 let admission = sigma_pack_operation(operation)?.ok_or_else(invalid)?;
                 let rules = self.read_signed_sigma_pack(&admission, cancel)?;
+                let catalog = self.parquet.mapping_catalog().ok_or_else(invalid)?;
                 let candidate = prepare(
                     scope,
+                    catalog,
                     &rules,
                     operation.hash,
                     &self.parquet.owned_case_path(case),
@@ -86,15 +89,16 @@ impl LocalStore {
 
 fn prepare(
     scope: SigmaExecutionContext<'_>,
+    catalog: &MappingCatalog,
     pack: &LocalSigmaPack,
     admission: [u8; 32],
     directory: &Path,
     time: Range<i64>,
     cancel: &CancellationToken,
 ) -> Result<PreparedSigmaExecution<RunObjects>, AppError> {
-    let table = enrolled_field_table();
-    let reviewed = ReviewedSigmaFieldTable::parse(&table)?;
-    let work = Workset::resolve(&scope, &reviewed)?;
+    let (table, reviewed) =
+        ReviewedSigmaFieldTable::materialize_native(enrolled_field_table(), catalog)?;
+    let work = Workset::resolve(&scope, &reviewed, catalog)?;
     let mut rules = pack
         .manifest
         .0
@@ -250,6 +254,11 @@ fn scan_matches<'a>(
             break;
         }
     }
+    sort_hits(&mut hit_rows);
+    Ok((hit_rows, status, scope.reserved - remaining))
+}
+
+fn sort_hits(hit_rows: &mut Vec<Hit<'_>>) {
     hit_rows.sort_unstable_by(
         |(rule, time, source, offset, row),
          (other_rule, other_time, other_source, other_offset, other_row)| {
@@ -274,7 +283,6 @@ fn scan_matches<'a>(
         },
     );
     hit_rows.dedup_by(|left, right| left.0 == right.0 && left.4 == right.4);
-    Ok((hit_rows, status, scope.reserved - remaining))
 }
 
 struct WorkSource {
@@ -295,9 +303,10 @@ impl Workset {
     fn resolve(
         scope: &SigmaExecutionContext<'_>,
         table: &ReviewedSigmaFieldTable,
+        catalog: &MappingCatalog,
     ) -> Result<Self, AppError> {
         let entries = scope.view.entries();
-        let (artifacts, chosen) = select_artifacts(entries, table)?;
+        let (artifacts, chosen) = select_artifacts(entries, table, catalog)?;
         let variants = artifacts
             .iter()
             .flat_map(|(_, _, variants)| variants.iter().copied())
@@ -362,6 +371,7 @@ type SelectedArtifacts = (Vec<WorkArtifact>, BTreeMap<String, V10ArtifactReferen
 fn select_artifacts(
     entries: &[irmind_app::SignedEntry],
     table: &ReviewedSigmaFieldTable,
+    catalog: &MappingCatalog,
 ) -> Result<SelectedArtifacts, AppError> {
     let active = irmind_app::artifact_catalog(entries)?
         .active
@@ -387,16 +397,24 @@ fn select_artifacts(
         let Some(first) = bindings.first() else {
             return Err(invalid());
         };
+        let Some(mapping) = first.mapping() else {
+            continue;
+        };
+        if !catalog.manifests().any(|manifest| {
+            manifest.identity() == mapping
+                && matches!(
+                    manifest.provenance(),
+                    MappingProvenance::NativeBuild { .. }
+                        | MappingProvenance::BundledDefinition { .. }
+                )
+        }) {
+            continue;
+        }
         let variants = table
             .variants
             .iter()
             .enumerate()
-            .filter(|(_, variant)| {
-                matches_binding(variant, first)
-                    && bindings
-                        .iter()
-                        .all(|binding| matches_binding(variant, binding))
-            })
+            .filter(|(_, variant)| matches_binding(variant, first))
             .map(|(index, _)| index)
             .collect::<Vec<_>>();
         if variants.is_empty() {
@@ -560,6 +578,14 @@ pub(super) fn enrolled_field_table() -> SigmaFieldTableV1 {
             include_str!("cloudtrail-v1.toml"),
             "\n",
             include_str!("windows-v1.toml"),
+            "\n",
+            include_str!("linux-v1.toml"),
+            "\n",
+            include_str!("network-v1.toml"),
+            "\n",
+            include_str!("cloud-identity-v1.toml"),
+            "\n",
+            include_str!("endpoint-v1.toml"),
         )
         .into(),
     }

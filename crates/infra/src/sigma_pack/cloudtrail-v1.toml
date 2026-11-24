@@ -9,7 +9,7 @@ dataset = "cloudtrail"
 
 [[variants.events]]
 column = "event.action"
-one_of = ["ConsoleLogin", "AssumeRole", "CreateAccessKey", "GetObject", "ListBuckets", "RunInstances", "PutBucketPolicy", "PutBucketAcl"]
+one_of = ["AddUserToGroup", "AssumeRole", "AssumeRoleWithSAML", "AssumeRoleWithWebIdentity", "AttachRolePolicy", "AttachUserPolicy", "AuthorizeSecurityGroupIngress", "ConsoleLogin", "CreateAccessKey", "CreateLoginProfile", "CreatePolicyVersion", "CreateUser", "DeleteAccessKey", "DeleteObject", "DeleteTrail", "DeleteUser", "DetachUserPolicy", "GetCallerIdentity", "GetObject", "ListBuckets", "PutBucketAcl", "PutBucketPolicy", "PutObject", "PutRolePolicy", "PutUserPolicy", "RunInstances", "SetDefaultPolicyVersion", "StartInstances", "StartLogging", "StopInstances", "StopLogging", "UpdateAccessKey", "UpdateLoginProfile", "UpdateTrail"]
 
 [[variants.fields]]
 name = "Outcome"
@@ -27,4 +27,64 @@ null_policy = "absent"
 name = "eventSource"
 path = ["eventSource"]
 value_type = "text"
+null_policy = "absent"
+
+[[variants.fields]]
+name = "sourceIPAddress"
+path = ["sourceIPAddress"]
+value_type = "text"
+null_policy = "absent"
+
+[[variants.fields]]
+name = "source.ip"
+column = "source.ip"
+value_type = "ip"
+null_policy = "absent"
+
+[[variants.fields]]
+name = "userIdentity.type"
+path = ["userIdentity", "type"]
+value_type = "text"
+null_policy = "absent"
+
+[[variants.fields]]
+name = "userIdentity.arn"
+path = ["userIdentity", "arn"]
+value_type = "text"
+null_policy = "absent"
+
+[[variants.fields]]
+name = "userIdentity.userName"
+path = ["userIdentity", "userName"]
+value_type = "text"
+null_policy = "absent"
+
+[[variants.fields]]
+name = "userIdentity.principalId"
+path = ["userIdentity", "principalId"]
+value_type = "text"
+null_policy = "absent"
+
+[[variants.fields]]
+name = "awsRegion"
+path = ["awsRegion"]
+value_type = "text"
+null_policy = "absent"
+
+[[variants.fields]]
+name = "recipientAccountId"
+path = ["recipientAccountId"]
+value_type = "text"
+null_policy = "absent"
+
+[[variants.fields]]
+name = "errorCode"
+path = ["errorCode"]
+value_type = "text"
+null_policy = "absent"
+
+[[variants.fields]]
+name = "readOnly"
+path = ["readOnly"]
+value_type = "boolean"
 null_policy = "absent"

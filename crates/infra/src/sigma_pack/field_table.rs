@@ -1,16 +1,16 @@
 //! Closed source bindings parsed from a hash-authenticated V10 Sigma table.
 use irmind_app::{AppError, v10_proofs::SigmaFieldTableV1};
 use irmind_domain::{CommonField, CommonFieldType};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ReviewedSigmaFieldTable {
     pub variants: Vec<SigmaSourceVariant>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SigmaSourceVariant {
     pub product: Option<String>,
@@ -26,7 +26,7 @@ pub struct SigmaSourceVariant {
     pub fields: Vec<SigmaFieldBinding>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SigmaEventFilter {
     pub column: Option<String>,
@@ -35,7 +35,7 @@ pub struct SigmaEventFilter {
     pub one_of: Option<Vec<SigmaLiteral>>,
 }
 
-#[derive(Clone, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Deserialize, Serialize, Eq, Ord, PartialEq, PartialOrd)]
 #[serde(untagged)]
 pub enum SigmaLiteral {
     Text(String),
@@ -43,7 +43,7 @@ pub enum SigmaLiteral {
     Boolean(bool),
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SigmaFieldBinding {
     pub name: String,
@@ -53,7 +53,7 @@ pub struct SigmaFieldBinding {
     pub null_policy: SigmaNullPolicy,
 }
 
-#[derive(Clone, Copy, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum SigmaBindingType {
     Text,
@@ -65,7 +65,7 @@ pub enum SigmaBindingType {
     IpList,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SigmaNullPolicy {
     Absent,
@@ -74,6 +74,54 @@ pub enum SigmaNullPolicy {
 
 impl ReviewedSigmaFieldTable {
     pub fn parse(object: &SigmaFieldTableV1) -> Result<Self, AppError> {
+        Self::read(object, false)
+    }
+
+    #[cfg(feature = "sigma")]
+    pub(super) fn materialize_native(
+        mut object: SigmaFieldTableV1,
+        catalog: &irmind_app::source_mapping::MappingCatalog,
+    ) -> Result<(SigmaFieldTableV1, Self), AppError> {
+        use irmind_app::source_mapping::MappingProvenance;
+        let mut table = Self::read(&object, true)?;
+        let mut changed = false;
+        let mut resolved = Vec::with_capacity(table.variants.len());
+        for mut variant in std::mem::take(&mut table.variants) {
+            let Some(recipe) = variant.mapping_version.strip_prefix('@') else {
+                resolved.push(variant);
+                continue;
+            };
+            changed = true;
+            let mut candidates = catalog.manifests().filter(|manifest| {
+                let identity = manifest.identity();
+                matches!(manifest.provenance(), MappingProvenance::NativeBuild { .. })
+                    && identity.id() == variant.mapping_id
+                    && identity
+                        .version()
+                        .strip_suffix(identity.implementation().as_str())
+                        == Some(recipe)
+            });
+            let Some(manifest) = candidates.next() else {
+                continue;
+            };
+            if candidates.next().is_some() {
+                return Err(invalid());
+            }
+            manifest
+                .identity()
+                .version()
+                .clone_into(&mut variant.mapping_version);
+            resolved.push(variant);
+        }
+        table.variants = resolved;
+        if changed {
+            object.toml = toml::to_string(&table).map_err(|_| invalid())?;
+        }
+        let validated = Self::parse(&object)?;
+        Ok((object, validated))
+    }
+
+    fn read(object: &SigmaFieldTableV1, allow_native_recipes: bool) -> Result<Self, AppError> {
         if object.toml.len() > 512 * 1024 {
             return Err(invalid());
         }
@@ -84,6 +132,9 @@ impl ReviewedSigmaFieldTable {
         let mut source_classes = BTreeMap::<_, Vec<&SigmaSourceVariant>>::new();
         for variant in &table.variants {
             variant.validate()?;
+            if !allow_native_recipes && variant.mapping_version.starts_with('@') {
+                return Err(invalid());
+            }
             let key = (
                 &variant.parser_id,
                 &variant.parser_version,
@@ -120,6 +171,10 @@ impl SigmaSourceVariant {
         !self.events.iter().any(|left| {
             other.events.iter().any(|right| {
                 left.column == right.column
+                    && !matches!(
+                        left.column.as_deref(),
+                        Some("event.category" | "event.type")
+                    )
                     && left.path == right.path
                     && !left
                         .values()
@@ -183,7 +238,10 @@ impl SigmaEventFilter {
     }
 
     fn validate(&self) -> Result<(), AppError> {
-        let bound_type = location(self.column.as_deref(), self.path.as_deref())?;
+        let bound_type = match (self.column.as_deref(), self.path.as_deref()) {
+            (Some("event.category" | "event.type"), None) => Some(SigmaBindingType::Text),
+            (column, path) => location(column, path)?,
+        };
         let values = match (&self.equals, &self.one_of) {
             (Some(value), None) => std::slice::from_ref(value),
             (None, Some(values)) if !values.is_empty() && values.len() <= 128 => values.as_slice(),
@@ -194,7 +252,12 @@ impl SigmaEventFilter {
         if values.iter().any(|value| {
             literal_kind(value) != actual
                 || !seen.insert(value)
-                || matches!(value, SigmaLiteral::Text(text) if !bounded_text(text, 512))
+                || matches!(value, SigmaLiteral::Text(text) if !bounded_text(text, 512)
+                || match self.column.as_deref() {
+                    Some("event.category") => irmind_domain::EventCategory::parse(text).is_err(),
+                    Some("event.type") => irmind_domain::EventType::parse(text).is_err(),
+                    _ => false,
+                })
         }) || bound_type.is_some_and(|expected| expected != actual)
         {
             return Err(invalid());

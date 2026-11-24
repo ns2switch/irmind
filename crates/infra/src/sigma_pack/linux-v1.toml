@@ -1,0 +1,235 @@
+[[variants]]
+product = "linux"
+service = "sshd"
+category = "authentication"
+parser_id = "parser-linux"
+parser_version = "linux-source-v1"
+mapping_id = "mapping-linux-sshd"
+mapping_version = "linux-sshd-tables-v1"
+dataset = "sshd"
+events = [
+  { column = "event.action", equals = "sshd" },
+  { column = "event.category", equals = "authentication" },
+]
+fields = [
+  { name = "Hostname", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "User", column = "user.name", value_type = "text", null_policy = "absent" },
+  { name = "TargetUser", column = "user.target.name", value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "Message", path = ["syslog", "msg"], value_type = "text", null_policy = "absent" },
+  { name = "Process", column = "process.name", value_type = "text", null_policy = "absent" },
+  { name = "PID", column = "process.pid", value_type = "integer", null_policy = "absent" },
+  { name = "SourceIP", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "SourcePort", column = "source.port", value_type = "integer", null_policy = "absent" },
+  { name = "Verb", path = ["sshd", "verb"], value_type = "text", null_policy = "absent" },
+  { name = "LoginUser", path = ["sshd", "user"], value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "linux"
+service = "sudo"
+category = "authentication"
+parser_id = "parser-linux"
+parser_version = "linux-source-v1"
+mapping_id = "mapping-linux-sudo"
+mapping_version = "linux-sudo-tables-v1"
+dataset = "sudo"
+events = [
+  { column = "event.action", equals = "sudo" },
+  { column = "event.category", equals = "authentication" },
+]
+fields = [
+  { name = "Hostname", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "User", column = "user.name", value_type = "text", null_policy = "absent" },
+  { name = "TargetUser", column = "user.target.name", value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "Message", path = ["syslog", "msg"], value_type = "text", null_policy = "absent" },
+  { name = "Process", column = "process.name", value_type = "text", null_policy = "absent" },
+  { name = "PID", column = "process.pid", value_type = "integer", null_policy = "absent" },
+  { name = "CommandLine", column = "process.command_line", value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "linux"
+service = "sudo"
+category = "process_creation"
+parser_id = "parser-linux"
+parser_version = "linux-source-v1"
+mapping_id = "mapping-linux-sudo"
+mapping_version = "linux-sudo-tables-v1"
+dataset = "sudo"
+events = [
+  { column = "event.action", equals = "sudo" },
+  { column = "event.category", equals = "process" },
+  { column = "event.type", equals = "start" },
+]
+fields = [
+  { name = "Hostname", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "User", column = "user.name", value_type = "text", null_policy = "absent" },
+  { name = "TargetUser", column = "user.target.name", value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "Message", path = ["syslog", "msg"], value_type = "text", null_policy = "absent" },
+  { name = "Process", column = "process.name", value_type = "text", null_policy = "absent" },
+  { name = "PID", column = "process.pid", value_type = "integer", null_policy = "absent" },
+  { name = "CommandLine", column = "process.command_line", value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "linux"
+service = "su"
+category = "authentication"
+parser_id = "parser-linux"
+parser_version = "linux-source-v1"
+mapping_id = "mapping-linux-su"
+mapping_version = "linux-su-tables-v1"
+dataset = "su"
+events = [
+  { column = "event.action", equals = "su" },
+  { column = "event.category", equals = "authentication" },
+]
+fields = [
+  { name = "Hostname", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "User", column = "user.name", value_type = "text", null_policy = "absent" },
+  { name = "TargetUser", column = "user.target.name", value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "Message", path = ["syslog", "msg"], value_type = "text", null_policy = "absent" },
+  { name = "Process", column = "process.name", value_type = "text", null_policy = "absent" },
+  { name = "PID", column = "process.pid", value_type = "integer", null_policy = "absent" },
+]
+
+[[variants]]
+product = "linux"
+service = "auditd"
+category = "process_creation"
+parser_id = "parser-linux"
+parser_version = "linux-source-v1"
+mapping_id = "mapping-linux-auditd"
+mapping_version = "@linux-auditd-v1-"
+dataset = "auditd"
+events = [
+  { column = "event.category", equals = "process" },
+]
+fields = [
+  { name = "Hostname", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "User", column = "user.id", value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "Syscall", column = "event.action", value_type = "text", null_policy = "absent" },
+  { name = "Serial", path = ["serial"], value_type = "text", null_policy = "absent" },
+  { name = "Node", path = ["node"], value_type = "text", null_policy = "absent" },
+  { name = "Image", column = "process.executable", value_type = "text", null_policy = "absent" },
+  { name = "ProcessId", column = "process.pid", value_type = "integer", null_policy = "absent" },
+  { name = "ParentProcessId", column = "process.parent.pid", value_type = "integer", null_policy = "absent" },
+]
+
+[[variants]]
+product = "linux"
+service = "auditd"
+category = "audit"
+parser_id = "parser-linux"
+parser_version = "linux-source-v1"
+mapping_id = "mapping-linux-auditd"
+mapping_version = "@linux-auditd-v1-"
+dataset = "auditd"
+events = [
+  { column = "event.category", equals = "api" },
+]
+fields = [
+  { name = "Hostname", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "User", column = "user.id", value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "Syscall", column = "event.action", value_type = "text", null_policy = "absent" },
+  { name = "Serial", path = ["serial"], value_type = "text", null_policy = "absent" },
+  { name = "Node", path = ["node"], value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "linux"
+service = "ecs"
+category = "authentication"
+parser_id = "parser-ecs"
+parser_version = "ecs-source-v1"
+mapping_id = "mapping-ecs"
+mapping_version = "@ecs-9.5-v1-"
+dataset = "ecs-linux"
+events = [
+  { column = "host.os.type", equals = "linux" },
+  { column = "event.category", equals = "authentication" },
+]
+fields = [
+  { name = "Hostname", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "User", column = "user.name", value_type = "text", null_policy = "absent" },
+  { name = "TargetUser", column = "user.target.name", value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "SourceIP", column = "source.ip", value_type = "ip", null_policy = "absent" },
+]
+
+[[variants]]
+product = "linux"
+service = "ecs"
+category = "process_creation"
+parser_id = "parser-ecs"
+parser_version = "ecs-source-v1"
+mapping_id = "mapping-ecs"
+mapping_version = "@ecs-9.5-v1-"
+dataset = "ecs-linux"
+events = [
+  { column = "host.os.type", equals = "linux" },
+  { column = "event.category", equals = "process" },
+  { column = "event.type", equals = "start" },
+]
+fields = [
+  { name = "Hostname", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "User", column = "user.name", value_type = "text", null_policy = "absent" },
+  { name = "TargetUser", column = "user.target.name", value_type = "text", null_policy = "absent" },
+  { name = "Image", column = "process.executable", value_type = "text", null_policy = "absent" },
+  { name = "ProcessId", column = "process.pid", value_type = "integer", null_policy = "absent" },
+  { name = "ParentProcessId", column = "process.parent.pid", value_type = "integer", null_policy = "absent" },
+  { name = "CommandLine", column = "process.command_line", value_type = "text", null_policy = "absent" },
+  { name = "ParentImage", column = "process.parent.executable", value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "linux"
+service = "ecs"
+category = "authentication"
+parser_id = "siem-elastic"
+parser_version = "elastic-source-v1"
+mapping_id = "mapping-elastic-ecs"
+mapping_version = "@ecs-9.5-v1-"
+dataset = "ecs-linux"
+events = [
+  { column = "host.os.type", equals = "linux" },
+  { column = "event.category", equals = "authentication" },
+]
+fields = [
+  { name = "Hostname", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "User", column = "user.name", value_type = "text", null_policy = "absent" },
+  { name = "TargetUser", column = "user.target.name", value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "SourceIP", column = "source.ip", value_type = "ip", null_policy = "absent" },
+]
+
+[[variants]]
+product = "linux"
+service = "ecs"
+category = "process_creation"
+parser_id = "siem-elastic"
+parser_version = "elastic-source-v1"
+mapping_id = "mapping-elastic-ecs"
+mapping_version = "@ecs-9.5-v1-"
+dataset = "ecs-linux"
+events = [
+  { column = "host.os.type", equals = "linux" },
+  { column = "event.category", equals = "process" },
+  { column = "event.type", equals = "start" },
+]
+fields = [
+  { name = "Hostname", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "User", column = "user.name", value_type = "text", null_policy = "absent" },
+  { name = "TargetUser", column = "user.target.name", value_type = "text", null_policy = "absent" },
+  { name = "Image", column = "process.executable", value_type = "text", null_policy = "absent" },
+  { name = "ProcessId", column = "process.pid", value_type = "integer", null_policy = "absent" },
+  { name = "ParentProcessId", column = "process.parent.pid", value_type = "integer", null_policy = "absent" },
+  { name = "CommandLine", column = "process.command_line", value_type = "text", null_policy = "absent" },
+  { name = "ParentImage", column = "process.parent.executable", value_type = "text", null_policy = "absent" },
+]

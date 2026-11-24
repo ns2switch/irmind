@@ -1,0 +1,263 @@
+[[variants]]
+product = "azure"
+service = "signinlogs"
+parser_id = "parser-entra"
+parser_version = "entra-source-v1"
+mapping_id = "mapping-entra-signin-table"
+mapping_version = "@entra-v1-"
+dataset = "entra-signin-table"
+events = [
+  { path = ["Type"], one_of = ["SigninLogs", "AADNonInteractiveUserSignInLogs", "AADServicePrincipalSignInLogs", "AADManagedIdentitySignInLogs"] },
+]
+fields = [
+  { name = "ResultType", path = ["ResultType"], value_type = "text", null_policy = "absent" },
+  { name = "IPAddress", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "UserPrincipalName", path = ["UserPrincipalName"], value_type = "text", null_policy = "absent" },
+  { name = "AppId", path = ["AppId"], value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "azure"
+service = "signinlogs"
+parser_id = "parser-entra"
+parser_version = "entra-source-v1"
+mapping_id = "mapping-entra-signin-resource"
+mapping_version = "@entra-v1-"
+dataset = "entra-signin-resource"
+events = [
+  { path = ["category"], one_of = ["SignInLogs", "NonInteractiveUserSignInLogs", "ServicePrincipalSignInLogs", "ManagedIdentitySignInLogs"] },
+]
+fields = [
+  { name = "ResultType", path = ["resultType"], value_type = "text", null_policy = "absent" },
+  { name = "IPAddress", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "UserPrincipalName", path = ["properties", "userPrincipalName"], value_type = "text", null_policy = "absent" },
+  { name = "AppId", path = ["properties", "appId"], value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "StatusErrorCode", path = ["properties", "status", "errorCode"], value_type = "integer", null_policy = "absent" },
+]
+
+[[variants]]
+product = "azure"
+service = "auditlogs"
+parser_id = "parser-entra"
+parser_version = "entra-source-v1"
+mapping_id = "mapping-entra-audit-table"
+mapping_version = "@entra-v1-"
+dataset = "entra-audit-table"
+events = [
+  { path = ["Type"], equals = "AuditLogs" },
+]
+fields = [
+  { name = "OperationName", path = ["OperationName"], value_type = "text", null_policy = "absent" },
+  { name = "ActivityDisplayName", path = ["ActivityDisplayName"], value_type = "text", null_policy = "absent" },
+  { name = "Result", path = ["Result"], value_type = "text", null_policy = "absent" },
+  { name = "InitiatedBy.user.userPrincipalName", path = ["InitiatedBy", "user", "userPrincipalName"], value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "azure"
+service = "auditlogs"
+parser_id = "parser-entra"
+parser_version = "entra-source-v1"
+mapping_id = "mapping-entra-audit-resource"
+mapping_version = "@entra-v1-"
+dataset = "entra-audit-resource"
+events = [
+  { path = ["category"], equals = "AuditLogs" },
+]
+fields = [
+  { name = "OperationName", path = ["operationName"], value_type = "text", null_policy = "absent" },
+  { name = "ActivityDisplayName", path = ["properties", "activityDisplayName"], value_type = "text", null_policy = "absent" },
+  { name = "Result", path = ["properties", "result"], value_type = "text", null_policy = "absent" },
+  { name = "InitiatedBy.user.userPrincipalName", path = ["properties", "initiatedBy", "user", "userPrincipalName"], value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "azure"
+service = "activitylogs"
+parser_id = "parser-entra"
+parser_version = "entra-source-v1"
+mapping_id = "mapping-azure-activity-table"
+mapping_version = "@entra-v1-"
+dataset = "azure-activity-table"
+events = [
+  { path = ["Type"], equals = "AzureActivity" },
+]
+fields = [
+  { name = "OperationNameValue", path = ["OperationNameValue"], value_type = "text", null_policy = "absent" },
+  { name = "ActivityStatusValue", path = ["ActivityStatusValue"], value_type = "text", null_policy = "absent" },
+  { name = "CallerIpAddress", path = ["CallerIpAddress"], value_type = "text", null_policy = "absent" },
+  { name = "Caller", path = ["Caller"], value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "m365"
+service = "audit"
+parser_id = "parser-m365"
+parser_version = "m365-source-v1"
+mapping_id = "mapping-m365"
+mapping_version = "@identity-v1-"
+dataset = "m365-audit"
+events = [
+  { column = "event.category", one_of = ["api", "authentication", "iam", "email", "file"] },
+]
+fields = [
+  { name = "Operation", path = ["Operation"], value_type = "text", null_policy = "absent" },
+  { name = "Workload", path = ["Workload"], value_type = "text", null_policy = "absent" },
+  { name = "UserId", path = ["UserId"], value_type = "text", null_policy = "absent" },
+  { name = "ClientIP", path = ["ClientIP"], value_type = "text", null_policy = "absent" },
+  { name = "ResultStatus", path = ["ResultStatus"], value_type = "text", null_policy = "absent" },
+  { name = "ObjectId", path = ["ObjectId"], value_type = "text", null_policy = "absent" },
+  { name = "SourceIP", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "m365"
+service = "exchange"
+parser_id = "parser-m365"
+parser_version = "m365-source-v1"
+mapping_id = "mapping-m365"
+mapping_version = "@identity-v1-"
+dataset = "m365-audit"
+events = [
+  { path = ["Workload"], equals = "Exchange" },
+]
+fields = [
+  { name = "Operation", path = ["Operation"], value_type = "text", null_policy = "absent" },
+  { name = "Workload", path = ["Workload"], value_type = "text", null_policy = "absent" },
+  { name = "UserId", path = ["UserId"], value_type = "text", null_policy = "absent" },
+  { name = "ClientIP", path = ["ClientIP"], value_type = "text", null_policy = "absent" },
+  { name = "ResultStatus", path = ["ResultStatus"], value_type = "text", null_policy = "absent" },
+  { name = "ObjectId", path = ["ObjectId"], value_type = "text", null_policy = "absent" },
+  { name = "SourceIP", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "okta"
+service = "okta"
+parser_id = "parser-okta"
+parser_version = "okta-source-v1"
+mapping_id = "mapping-okta"
+mapping_version = "@identity-v1-"
+dataset = "okta-system-log"
+events = [
+  { column = "event.category", one_of = ["api", "authentication", "iam", "session"] },
+]
+fields = [
+  { name = "eventType", path = ["eventType"], value_type = "text", null_policy = "absent" },
+  { name = "outcome.result", path = ["outcome", "result"], value_type = "text", null_policy = "absent" },
+  { name = "actor.alternateId", path = ["actor", "alternateId"], value_type = "text", null_policy = "absent" },
+  { name = "client.ipAddress", path = ["client", "ipAddress"], value_type = "text", null_policy = "absent" },
+  { name = "SourceIP", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "gcp"
+service = "gcp.audit"
+parser_id = "parser-gcp-audit"
+parser_version = "gcp-audit-source-v1"
+mapping_id = "mapping-gcp-audit"
+mapping_version = "gcp-audit-tables-v1"
+dataset = "gcp-audit"
+events = [
+  { path = ["protoPayload", "@type"], equals = "type.googleapis.com/google.cloud.audit.AuditLog" },
+]
+fields = [
+  { name = "protoPayload.methodName", path = ["protoPayload", "methodName"], value_type = "text", null_policy = "absent" },
+  { name = "protoPayload.serviceName", path = ["protoPayload", "serviceName"], value_type = "text", null_policy = "absent" },
+  { name = "protoPayload.authenticationInfo.principalEmail", path = ["protoPayload", "authenticationInfo", "principalEmail"], value_type = "text", null_policy = "absent" },
+  { name = "protoPayload.requestMetadata.callerIp", path = ["protoPayload", "requestMetadata", "callerIp"], value_type = "text", null_policy = "absent" },
+  { name = "protoPayload.status.code", path = ["protoPayload", "status", "code"], value_type = "integer", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "kubernetes"
+service = "audit"
+parser_id = "parser-kubernetes"
+parser_version = "kubernetes-source-v1"
+mapping_id = "mapping-kubernetes"
+mapping_version = "kubernetes-audit-tables-v1"
+dataset = "kubernetes-audit"
+events = [
+  { column = "event.action", one_of = ["create", "update", "patch", "delete", "deletecollection", "get", "list", "watch", "proxy", "connect", "impersonate"] },
+]
+fields = [
+  { name = "verb", column = "event.action", value_type = "text", null_policy = "absent" },
+  { name = "objectRef.resource", column = "orchestrator.resource.type", value_type = "text", null_policy = "absent" },
+  { name = "objectRef.namespace", column = "orchestrator.namespace", value_type = "text", null_policy = "absent" },
+  { name = "user.username", column = "user.name", value_type = "text", null_policy = "absent" },
+  { name = "responseStatus.code", column = "http.response.status_code", value_type = "integer", null_policy = "absent" },
+  { name = "PrimarySourceIP", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "stage", column = "irmind.kubernetes.stage", value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "kubernetes"
+service = "audit"
+parser_id = "parser-kubernetes"
+parser_version = "kubernetes-source-v1"
+mapping_id = "mapping-eks-audit"
+mapping_version = "kubernetes-audit-tables-v1"
+dataset = "eks-audit"
+events = [
+  { column = "event.action", one_of = ["create", "update", "patch", "delete", "deletecollection", "get", "list", "watch", "proxy", "connect", "impersonate"] },
+]
+fields = [
+  { name = "verb", column = "event.action", value_type = "text", null_policy = "absent" },
+  { name = "objectRef.resource", column = "orchestrator.resource.type", value_type = "text", null_policy = "absent" },
+  { name = "objectRef.namespace", column = "orchestrator.namespace", value_type = "text", null_policy = "absent" },
+  { name = "user.username", column = "user.name", value_type = "text", null_policy = "absent" },
+  { name = "responseStatus.code", column = "http.response.status_code", value_type = "integer", null_policy = "absent" },
+  { name = "PrimarySourceIP", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "stage", column = "irmind.kubernetes.stage", value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "kubernetes"
+service = "audit"
+parser_id = "parser-kubernetes"
+parser_version = "kubernetes-source-v1"
+mapping_id = "mapping-aks-audit"
+mapping_version = "kubernetes-audit-tables-v1"
+dataset = "aks-audit"
+events = [
+  { column = "event.action", one_of = ["create", "update", "patch", "delete", "deletecollection", "get", "list", "watch", "proxy", "connect", "impersonate"] },
+]
+fields = [
+  { name = "verb", column = "event.action", value_type = "text", null_policy = "absent" },
+  { name = "objectRef.resource", column = "orchestrator.resource.type", value_type = "text", null_policy = "absent" },
+  { name = "objectRef.namespace", column = "orchestrator.namespace", value_type = "text", null_policy = "absent" },
+  { name = "user.username", column = "user.name", value_type = "text", null_policy = "absent" },
+  { name = "responseStatus.code", column = "http.response.status_code", value_type = "integer", null_policy = "absent" },
+  { name = "PrimarySourceIP", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "stage", column = "irmind.kubernetes.stage", value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "kubernetes"
+service = "audit"
+parser_id = "parser-gcp-audit"
+parser_version = "gcp-audit-source-v1"
+mapping_id = "mapping-gke-audit"
+mapping_version = "@gke-paths-v1-"
+dataset = "gke-audit"
+events = [
+  { column = "event.category", equals = "api" },
+]
+fields = [
+  { name = "objectRef.resource", column = "orchestrator.resource.type", value_type = "text", null_policy = "absent" },
+  { name = "objectRef.namespace", column = "orchestrator.namespace", value_type = "text", null_policy = "absent" },
+  { name = "protoPayload.methodName", column = "event.action", value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+]

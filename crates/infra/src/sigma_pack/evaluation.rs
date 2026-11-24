@@ -1,7 +1,6 @@
 //! Evaluate admitted Sigma predicates on authenticated common and original fields.
 use super::field_table::{
-    SigmaBindingType, SigmaEventFilter, SigmaFieldBinding, SigmaLiteral, SigmaNullPolicy,
-    SigmaSourceVariant,
+    SigmaBindingType, SigmaEventFilter, SigmaLiteral, SigmaNullPolicy, SigmaSourceVariant,
 };
 use irmind_app::{
     AppError, CancellationToken,
@@ -10,13 +9,16 @@ use irmind_app::{
 use irmind_domain::{CommonEventV1, CommonField, CommonValue};
 use irmind_sigma::{RuleValue, SigmaField, SigmaFieldKind, SigmaProgram, SigmaScalar, admit_rule};
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 mod parquet_scan;
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod benchmark;
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod coverage_fixtures;
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod windows;
@@ -28,6 +30,7 @@ pub struct SigmaVariantPrograms<'a> {
     eligible: Vec<(SigmaRuleKeyV1, SigmaProgram)>,
     skipped: Vec<(SigmaRuleKeyV1, SigmaCoverageV1)>,
     needs_original: bool,
+    used_fields: BTreeSet<&'a str>,
 }
 
 pub struct SigmaEvaluation<'a> {
@@ -57,6 +60,7 @@ impl<'a> SigmaVariantPrograms<'a> {
             eligible: Vec::new(),
             skipped: Vec::new(),
             needs_original: variant.events.iter().any(|filter| filter.path.is_some()),
+            used_fields: BTreeSet::new(),
         };
         for (key, raw) in rules {
             if programs.eligible.len() + programs.skipped.len() == 4096
@@ -73,7 +77,11 @@ impl<'a> SigmaVariantPrograms<'a> {
             }
             match SigmaProgram::compile(&rule, &bindings) {
                 Ok(program) => {
-                    programs.needs_original |= rule_uses_original(&rule, variant);
+                    if let Some(RuleValue::Mapping(detection)) = rule.fields().get("detection") {
+                        for node in detection.values() {
+                            collect_fields(node, variant, &mut programs.used_fields);
+                        }
+                    }
                     programs.eligible.push((key, program));
                 }
                 Err(irmind_sigma::CompileError::MissingBinding) => {
@@ -86,6 +94,9 @@ impl<'a> SigmaVariantPrograms<'a> {
                     .push((key, SigmaCoverageV1::UnsupportedRule)),
             }
         }
+        programs.needs_original |= variant.fields.iter().any(|binding| {
+            binding.path.is_some() && programs.used_fields.contains(binding.name.as_str())
+        });
         Ok(programs)
     }
 
@@ -174,7 +185,12 @@ impl SigmaEvaluation<'_> {
                 return Ok(true);
             }
         }
-        let fields = project_fields(self.programs.variant, common, original)?;
+        let fields = project_fields(
+            self.programs.variant,
+            &self.programs.used_fields,
+            common,
+            original,
+        )?;
         for (index, (key, program)) in self.programs.eligible.iter().enumerate() {
             self.rules_evaluated[index] = true;
             match program.evaluate(
@@ -244,21 +260,27 @@ pub(super) fn covers(rule: &irmind_sigma::RuleDocument, variant: &SigmaSourceVar
     })
 }
 
-fn rule_uses_original(rule: &irmind_sigma::RuleDocument, variant: &SigmaSourceVariant) -> bool {
-    fn has_original(node: &RuleValue, fields: &[SigmaFieldBinding]) -> bool {
-        match node {
-            RuleValue::Mapping(map) => map.keys().any(|name| {
-                let base = name.split_once('|').map_or(name.as_str(), |(base, _)| base);
-                fields
-                    .iter()
-                    .any(|field| field.name == base && field.path.is_some())
-            }),
-            RuleValue::Sequence(items) => items.iter().any(|node| has_original(node, fields)),
-            _ => false,
+fn collect_fields<'a>(
+    node: &RuleValue,
+    variant: &'a SigmaSourceVariant,
+    used: &mut BTreeSet<&'a str>,
+) {
+    match node {
+        RuleValue::Mapping(fields) => {
+            for key in fields.keys() {
+                let name = key.split_once('|').map_or(key.as_str(), |(field, _)| field);
+                if let Some(binding) = variant.fields.iter().find(|binding| binding.name == name) {
+                    used.insert(binding.name.as_str());
+                }
+            }
         }
+        RuleValue::Sequence(items) => {
+            for node in items {
+                collect_fields(node, variant, used);
+            }
+        }
+        _ => {}
     }
-    matches!(rule.fields().get("detection"), Some(RuleValue::Mapping(map))
-        if map.values().any(|node| has_original(node, &variant.fields)))
 }
 
 fn event_matches(
@@ -266,6 +288,22 @@ fn event_matches(
     common: &CommonEventV1,
     original: Option<&Value>,
 ) -> Result<bool, AppError> {
+    use irmind_domain::{EventCategory, EventType};
+    match filter.column.as_deref() {
+        Some("event.category") => {
+            return Ok(filter.values().iter().any(|literal| {
+                matches!(literal, SigmaLiteral::Text(text) if EventCategory::parse(text)
+                .is_ok_and(|category| common.event().categories().contains(category)))
+            }));
+        }
+        Some("event.type") => {
+            return Ok(filter.values().iter().any(|literal| {
+                matches!(literal, SigmaLiteral::Text(text) if EventType::parse(text)
+                .is_ok_and(|event_type| common.event().types().contains(event_type)))
+            }));
+        }
+        _ => {}
+    }
     let value = if let Some(column) = &filter.column {
         project_common(common, column)?
     } else {
@@ -290,12 +328,14 @@ fn event_matches(
 
 fn project_fields<'a>(
     variant: &'a SigmaSourceVariant,
+    used: &BTreeSet<&str>,
     common: &'a CommonEventV1,
     original: Option<&'a Value>,
 ) -> Result<BTreeMap<&'a str, Projection<'a>>, AppError> {
     variant
         .fields
         .iter()
+        .filter(|binding| used.contains(binding.name.as_str()))
         .map(|binding| {
             let value = if let Some(column) = &binding.column {
                 project_common(common, column)?
