@@ -134,5 +134,11 @@ jobs:
           if [[ "$RUNNER_OS" == macOS ]]; then hash=(shasum -a 256); fi
           "${hash[@]}" "${names[@]}" LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md install.sh install.ps1 BUILD-ENVIRONMENT.json > SHA256SUMS
           "${hash[@]}" -c SHA256SUMS
+      - name: Open and verify a case with the distribution binary and Azure capture mappings
+        if: matrix.destination == 'linux-x86_64'
+        env:
+          IRMIND_RELEASE_BINARY: ${{ github.workspace }}/dist/irmind
+          CARGO_INCREMENTAL: 0
+        run: cargo test -p irmind --no-default-features --features keystore-file --profile ci --locked --test release_azure_capture_mapping -- --ignored
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with: {name: "${{ matrix.artifact }}", path: dist/, if-no-files-found: error}
