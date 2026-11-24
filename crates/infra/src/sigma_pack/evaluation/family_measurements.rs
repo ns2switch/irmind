@@ -338,7 +338,6 @@ fn measure_variant(
     rows: u64,
     file: &std::path::Path,
 ) -> u64 {
-    use irmind_app::encode_common_event;
     use std::{
         fs::File,
         time::{Duration, Instant},
@@ -348,33 +347,8 @@ fn measure_variant(
         .iter()
         .find(|binding| selector_value(variant, binding).is_none())
         .unwrap();
-    let mut incident = ProjectionInput::for_variant(variant);
-    let mut background = ProjectionInput::for_variant(variant);
-    incident.binding(binding, sample(binding, true));
-    background.binding(binding, sample(binding, false));
-    if variant.exact_cluster_field().is_none() {
-        for input in [&mut incident, &mut background] {
-            input
-                .original
-                .insert("synthetic_padding".into(), Value::from("x".repeat(4096)));
-        }
-    }
-    benchmark::write_fixture_rows(file, rows, |row| {
-        let input = if row == 0 { &incident } else { &background };
-        let row = input.row(variant, row);
-        (
-            encode_common_event(&row).unwrap(),
-            input.original(variant, &row),
-        )
-    });
+    write_family_fixture(variant, binding, rows, file);
     let taxonomy = condition(variant);
-    assert!(
-        variant
-            .fields
-            .iter()
-            .all(|field| field.name != UNMAPPED_TEST_FIELD),
-        "{taxonomy} declares the reserved benchmark negative-control field"
-    );
     let rules = measure_rules(&taxonomy, binding, count);
     let start = Instant::now();
     let plans = SigmaVariantPrograms::compile(
@@ -385,14 +359,7 @@ fn measure_variant(
     )
     .unwrap();
     let compile_seconds = start.elapsed().as_secs_f64();
-    let [(omitted, reason)] = plans.skipped() else {
-        panic!("{taxonomy} must omit only the synthetic negative control");
-    };
-    assert!(
-        omitted == &rules.last().unwrap().0 && *reason == SigmaCoverageV1::UnsupportedField,
-        "{taxonomy} omitted {} with reason {reason:?}",
-        omitted.id
-    );
+    let reason = assert_control_omission(variant, &taxonomy, &plans, &rules.last().unwrap().0);
     let start = Instant::now();
     let file_reader = File::open(file).unwrap();
     let bytes = file_reader.metadata().unwrap().len();
@@ -417,13 +384,8 @@ fn measure_variant(
     let scan_seconds = start.elapsed().as_secs_f64();
     assert_eq!(run.status(), SigmaRunStatusV1::Complete);
     assert_eq!(
-        (
-            true_positives,
-            false_positives,
-            run.rules_evaluated(),
-            plans.skipped().len()
-        ),
-        (1, 0, count - 1, 1),
+        (true_positives, false_positives, run.rules_evaluated()),
+        (1, 0, count - 1),
         "{taxonomy} {}",
         binding.name
     );
@@ -446,6 +408,59 @@ fn measure_variant(
     );
     std::fs::remove_file(file).unwrap();
     bytes
+}
+
+#[cfg(not(debug_assertions))]
+fn assert_control_omission(
+    variant: &SigmaSourceVariant,
+    taxonomy: &str,
+    plans: &SigmaVariantPrograms,
+    control: &SigmaRuleKeyV1,
+) -> SigmaCoverageV1 {
+    assert!(
+        variant
+            .fields
+            .iter()
+            .all(|field| field.name != UNMAPPED_TEST_FIELD),
+        "{taxonomy} declares the reserved benchmark negative-control field"
+    );
+    let expected = (control.clone(), SigmaCoverageV1::UnsupportedField);
+    assert_eq!(plans.skipped().len(), 1, "{taxonomy}");
+    assert!(
+        plans.skipped()[0] == expected,
+        "{taxonomy} must omit only the synthetic negative control"
+    );
+    plans.skipped()[0].1
+}
+
+#[cfg(not(debug_assertions))]
+fn write_family_fixture(
+    variant: &SigmaSourceVariant,
+    binding: &SigmaFieldBinding,
+    rows: u64,
+    file: &std::path::Path,
+) {
+    use irmind_app::encode_common_event;
+
+    let mut incident = ProjectionInput::for_variant(variant);
+    let mut background = ProjectionInput::for_variant(variant);
+    incident.binding(binding, sample(binding, true));
+    background.binding(binding, sample(binding, false));
+    if variant.exact_cluster_field().is_none() {
+        for input in [&mut incident, &mut background] {
+            input
+                .original
+                .insert("synthetic_padding".into(), Value::from("x".repeat(4096)));
+        }
+    }
+    benchmark::write_fixture_rows(file, rows, |row| {
+        let input = if row == 0 { &incident } else { &background };
+        let row = input.row(variant, row);
+        (
+            encode_common_event(&row).unwrap(),
+            input.original(variant, &row),
+        )
+    });
 }
 
 #[cfg(not(debug_assertions))]
