@@ -21,6 +21,9 @@ mod benchmark;
 mod coverage_fixtures;
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
+mod family_measurements;
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod windows;
 const MAX_RECORD_BYTES: usize = 64 * 1024;
 pub(super) const MAX_MATCHES: usize = 100_000;

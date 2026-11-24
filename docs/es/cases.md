@@ -22,7 +22,7 @@ mostrado para firmar la admisión. Si una ejecución usa el pack, la exportació
 V10 del caso incluye las reglas exactas admitidas.
 
 Ejecuta `/sigma run <SHA-256 del pack> <inicio UTC> <fin UTC>` desde un caso
-abierto. La tabla inicial cubre los eventos revisados de CloudTrail. IRMind
+abierto. La [guía de Sigma](sigma.md) detalla fuentes y campos admitidos. IRMind
 informa de las reglas omitidas y marca como parciales los análisis que alcanzan
 un límite de tiempo o trabajo. Cada coincidencia propone un hallazgo sin
 confirmar vinculado a una fila de evidencia. Revísalo y usa
