@@ -8,6 +8,8 @@ use super::{CaseFrame, Result, case_budget_usage, draw_case, escape_display};
 use cards::audit_card;
 use irmind_app::AuditEventKind;
 use menu::menu_text;
+#[cfg(test)]
+pub(super) use panels::parser_prompt_text;
 pub(crate) use panels::{approval_panel, entity_panel};
 use panels::{overlay_text, panel_text};
 
@@ -209,13 +211,38 @@ impl CaseRuntime<'_, '_, '_> {
         Ok(())
     }
 
-    fn active_overlay(&self) -> Result<Option<String>> {
+    pub(super) fn parser_prompt_body(
+        &self,
+        input: &str,
+        guide: bool,
+    ) -> Result<ratatui::layout::Rect> {
+        Ok(super::view::overlay_body(
+            self.terminal.size()?.into(),
+            input,
+            guide,
+            !self.state.instance_sources.is_empty(),
+        ))
+    }
+
+    pub(super) fn parser_prompt_page(&self) -> Result<usize> {
+        let input = self.engine.guard.screen(&self.state.input)?.text;
+        let body = self.parser_prompt_body(&input, self.demo_guide_text()?.is_some())?;
+        Ok(super::state::ParserPrompt::page_size(body.height))
+    }
+
+    fn active_overlay(&self, input: &str, guide: bool) -> Result<Option<String>> {
         let overlay = if self.state.confirm_exit == crate::ExitConfirmation::Pending {
             Some("Exit IRMind? Enter confirms; Esc cancels.".into())
         } else {
-            self.subagents
-                .overlay()
-                .or(overlay_text(&self.state, self.engine)?)
+            self.subagents.overlay().or(overlay_text(
+                &self.state,
+                self.engine,
+                if self.state.parser_prompt.is_some() {
+                    self.parser_prompt_body(input, guide)?
+                } else {
+                    ratatui::layout::Rect::ZERO
+                },
+            )?)
         };
         overlay
             .map(|text| self.engine.guard.screen(&text).map(|safe| safe.text))
@@ -238,7 +265,8 @@ impl CaseRuntime<'_, '_, '_> {
         } else {
             self.engine.guard.screen(&panel)?.text
         };
-        let overlay = self.active_overlay()?;
+        let guide = self.demo_guide_text()?;
+        let overlay = self.active_overlay(&shown_input, guide.is_some())?;
         let menu = menu_text(&self.state, self.modules)
             .map(|content| {
                 self.engine
@@ -247,7 +275,6 @@ impl CaseRuntime<'_, '_, '_> {
                     .map(|visible| visible.text)
             })
             .transpose()?;
-        let guide = self.demo_guide_text()?;
         self.resize_conversation(&shown_input, guide.is_some())?;
         self.state
             .conversation

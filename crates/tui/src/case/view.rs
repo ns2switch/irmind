@@ -85,13 +85,7 @@ where
             )).style(Style::default().fg(theme.text)), area);
             return;
         }
-        let sections = Layout::vertical([
-            Constraint::Min(3),
-            Constraint::Length(composer_height(view.input, area.width)),
-            Constraint::Length(1),
-            Constraint::Length(narration::height(area, view.guide.is_some())),
-        ])
-        .split(area);
+        let sections = case_rows(area, view.input, view.guide.is_some());
         if let Some(guide) = view.guide {
             if presentation_compact(area) {
                 narration::draw_compact(frame, guide, sections[3], view.guide_scroll, theme);
@@ -105,14 +99,42 @@ where
             draw_menu(frame, view, area, sections[1], theme);
         }
         draw_footer(frame, view, sections[2], theme);
-        let overlay_area = if view.status.starts_with("FULL INSTANCE SCOPE") {
-            Rect::new(area.x, area.y, area.width, sections[2].y.saturating_sub(area.y))
-        } else if view.guide.is_some() && presentation_compact(area) {
-            Rect::new(area.x, area.y, area.width, sections[3].y.saturating_sub(area.y))
-        } else if view.guide.is_some() { sections[0] } else { area };
+        let overlay_area = overlay_region(
+            area,
+            sections,
+            view.guide.is_some(),
+            view.status.starts_with("FULL INSTANCE SCOPE"),
+        );
         draw_overlay(frame, view, overlay_area, theme);
     })?;
     Ok(())
+}
+
+fn case_rows(area: Rect, input: &str, guide: bool) -> [Rect; 4] {
+    Layout::vertical([
+        Constraint::Min(3),
+        Constraint::Length(composer_height(input, area.width)),
+        Constraint::Length(1),
+        Constraint::Length(narration::height(area, guide)),
+    ])
+    .areas(area)
+}
+
+fn overlay_region(area: Rect, rows: [Rect; 4], guide: bool, full_scope: bool) -> Rect {
+    if full_scope {
+        Rect::new(area.x, area.y, area.width, rows[2].y.saturating_sub(area.y))
+    } else if guide && presentation_compact(area) {
+        Rect::new(area.x, area.y, area.width, rows[3].y.saturating_sub(area.y))
+    } else if guide {
+        rows[0]
+    } else {
+        area
+    }
+}
+
+pub(super) fn overlay_body(area: Rect, input: &str, guide: bool, full_scope: bool) -> Rect {
+    let region = overlay_region(area, case_rows(area, input, guide), guide, full_scope);
+    Block::bordered().inner(overlay_box(region, guide && presentation_compact(area)))
 }
 
 fn draw_guide(frame: &mut ratatui::Frame<'_>, guide: &str, area: Rect, theme: Theme) {
@@ -325,20 +347,31 @@ fn draw_menu(
     }
 }
 
+fn overlay_box(area: Rect, compact_guide: bool) -> Rect {
+    let margin = if compact_guide { 0 } else { 4 };
+    let width = area
+        .width
+        .saturating_sub(margin)
+        .clamp(1, 90)
+        .min(area.width);
+    let height = area
+        .height
+        .saturating_sub(margin)
+        .clamp(1, 20)
+        .min(area.height);
+    Rect::new(
+        area.x + (area.width - width) / 2,
+        area.y + (area.height - height) / 2,
+        width,
+        height,
+    )
+}
+
 fn draw_overlay(frame: &mut ratatui::Frame<'_>, view: &CaseFrame<'_>, area: Rect, theme: Theme) {
     if let Some(overlay) = view.overlay {
-        let margin = if view.guide.is_some() && presentation_compact(frame.area()) {
-            0
-        } else {
-            4
-        };
-        let width = area.width.saturating_sub(margin).clamp(1, 90);
-        let height = area.height.saturating_sub(margin).clamp(1, 20);
-        let box_area = Rect::new(
-            area.x + (area.width - width) / 2,
-            area.y + (area.height - height) / 2,
-            width,
-            height,
+        let box_area = overlay_box(
+            area,
+            view.guide.is_some() && presentation_compact(frame.area()),
         );
         frame.render_widget(Clear, box_area);
         frame.render_widget(

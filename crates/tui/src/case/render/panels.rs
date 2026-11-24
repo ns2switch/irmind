@@ -1,5 +1,5 @@
 use crate::case::command_registry;
-use crate::case::state::{CaseState, panel_findings_for};
+use crate::case::state::{CaseState, ParserPrompt, panel_findings_for};
 use crate::case::{Engine, Result, escape_display};
 use irmind_app::{ApprovalRequest, ApprovalSource, Finding};
 use std::collections::BTreeMap;
@@ -131,7 +131,11 @@ fn audit_panel(state: &CaseState) -> String {
     lines.join("\n")
 }
 
-pub(super) fn overlay_text(state: &CaseState, engine: &Engine<'_>) -> Result<Option<String>> {
+pub(super) fn overlay_text(
+    state: &CaseState,
+    engine: &Engine<'_>,
+    parser_body: ratatui::layout::Rect,
+) -> Result<Option<String>> {
     if let Some(help) = &state.help {
         return Ok(Some(engine.guard.screen(help)?.text));
     }
@@ -151,7 +155,10 @@ pub(super) fn overlay_text(state: &CaseState, engine: &Engine<'_>) -> Result<Opt
             .map_err(Into::into);
     }
     if let Some(prompt) = &state.parser_prompt {
-        return parser_prompt_text(prompt, engine).map(Some);
+        return parser_prompt_text(prompt, parser_body, |text| {
+            Ok(engine.guard.screen(text)?.text)
+        })
+        .map(Some);
     }
     if let Some(picker) = &state.picker {
         let mut lines = vec![
@@ -209,35 +216,99 @@ pub(super) fn overlay_text(state: &CaseState, engine: &Engine<'_>) -> Result<Opt
     Ok(None)
 }
 
-fn parser_prompt_text(
-    prompt: &crate::case::state::ParserPrompt,
-    engine: &Engine<'_>,
+pub(in crate::case) fn parser_prompt_text(
+    prompt: &ParserPrompt,
+    body: ratatui::layout::Rect,
+    screen: impl FnOnce(&str) -> Result<String>,
 ) -> Result<String> {
-    let mut lines = vec![
-        format!("Choose parser for {}", prompt.source),
-        "The format is ambiguous or has low confidence. Review the source before continuing."
-            .into(),
-    ];
-    lines.extend(
-        prompt
-            .candidates
-            .iter()
-            .enumerate()
-            .map(|(index, (name, confidence))| {
-                format!(
-                    "{} {}. {} · {}% confidence",
-                    if index == prompt.selected { '>' } else { ' ' },
-                    index + 1,
-                    name,
-                    confidence
-                )
-            }),
-    );
-    if let Some((id, _)) = prompt.candidates.get(prompt.selected)
-        && let Some(description) = prompt.descriptions.get(id)
-    {
-        lines.push(description.clone());
+    let page = ParserPrompt::page_size(body.height);
+    let end_limit = prompt.candidates.len();
+    let start = prompt
+        .selected
+        .saturating_sub(page / 2)
+        .min(end_limit.saturating_sub(page));
+    let end = start.saturating_add(page).min(end_limit);
+    let mut lines = Vec::new();
+    if body.height >= 7 {
+        lines.push(format!("Choose parser for {}", prompt.source));
+        lines.push(if end_limit == 0 {
+            "No parser candidates are available.".into()
+        } else if prompt.candidates[0].1 == 0 {
+            "Detection found no positive match. Choose only if you know the format.".into()
+        } else {
+            "Detection is ambiguous or has low confidence.".into()
+        });
+        lines.push(format!(
+            "{}{} options{}",
+            if start > 0 { "↑ more · " } else { "" },
+            end_limit,
+            if end < end_limit { " · ↓ more" } else { "" }
+        ));
     }
-    lines.push("↑/↓ choose · Enter confirm · Esc cancel".into());
-    Ok(engine.guard.screen(&lines.join("\n"))?.text)
+    for (offset, (name, confidence)) in prompt.candidates[start..end].iter().enumerate() {
+        let index = start + offset;
+        lines.push(format!(
+            "{} {}. {} · {}% confidence",
+            if index == prompt.selected { '>' } else { ' ' },
+            index + 1,
+            name,
+            confidence
+        ));
+    }
+    if body.height >= 7 {
+        lines.push(
+            prompt
+                .candidates
+                .get(prompt.selected)
+                .and_then(|(id, _)| prompt.descriptions.get(id))
+                .cloned()
+                .unwrap_or_default(),
+        );
+        lines.push(if prompt.invalid_number {
+            format!(
+                "No option {}. Enter a number from 1 to {end_limit}.",
+                prompt.typed_option
+            )
+        } else if prompt.typed_option.is_empty() {
+            "Type an option number or move with ↑/↓.".into()
+        } else {
+            format!("Option number: {}", prompt.typed_option)
+        });
+        lines.push("Home/End · PgUp/PgDn · Enter confirm · Esc cancel".into());
+    }
+    let text = lines
+        .iter()
+        .map(|line| escape_display(line).replace('\n', " "))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let screened = screen(&text)?;
+    Ok(screened
+        .split('\n')
+        .map(|line| single_row(line, usize::from(body.width)))
+        .collect::<Vec<_>>()
+        .join("\n"))
+}
+
+fn single_row(escaped: &str, width: usize) -> String {
+    use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+    if escaped.width() <= width {
+        return escaped.to_owned();
+    }
+    let mut remaining = width.saturating_sub(1);
+    let mut shortened = escaped
+        .chars()
+        .take_while(|ch| {
+            let columns = ch.width().unwrap_or(0);
+            if let Some(rest) = remaining.checked_sub(columns) {
+                remaining = rest;
+                true
+            } else {
+                false
+            }
+        })
+        .collect::<String>();
+    if width > 0 {
+        shortened.push('…');
+    }
+    shortened
 }

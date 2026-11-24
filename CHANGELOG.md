@@ -12,6 +12,8 @@ or re-ingest the verified originals in a new case.
   dependency manifest. Full reconstruction of v0.6.x cases requires the
   original IRMind executable. Subsequent dependency changes outside the
   production closure of a native mapper leave its identity intact.
+- Keep the selected parser visible in long ambiguity lists, sort candidates
+  by confidence, and show an error when a typed option does not exist.
 
 - Accept empty trailing SSE frames from OpenAI-compatible providers in model
   tests and conversations, account for repeated usage snapshots once, and
