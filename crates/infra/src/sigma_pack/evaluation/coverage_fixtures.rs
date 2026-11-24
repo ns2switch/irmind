@@ -530,12 +530,12 @@ fn sigma_kubernetes_requires_the_exact_resource_and_does_not_scalarize_source_ip
 
 #[test]
 fn sigma_endpoint_process_creation_requires_the_enrolled_platform_and_exact_paths() {
-    let reviewed = parse_table(include_str!("../endpoint-v1.toml"));
     const DEFENDER: &str =
         include_str!("../../../../testkit/fixtures/parser-defender/source/events.ndjson");
     const FDR: &str = include_str!("../../../../testkit/fixtures/parser-fdr/source/events.ndjson");
     const ESLOGGER: &str =
         include_str!("../../../../testkit/fixtures/parser-macos/source/endpoint.ndjson");
+    let reviewed = parse_table(include_str!("../endpoint-v1.toml"));
     for (dataset, source, predicate, field, accepted, rejected) in [
         (
             "defender-hunting-process",
