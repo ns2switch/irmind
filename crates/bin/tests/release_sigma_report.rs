@@ -70,7 +70,12 @@ fn release_binary_sigma_report_v10() {
     let finding = evaluate(&binary, &home, case, &pack, &cli);
     cli(&["confirm-finding", case, &finding]);
     publish(&binary, &home, case);
-    cli(&["verify", case]);
+    cli(&[
+        "verify",
+        case,
+        "--source-root",
+        scratch.path().to_str().unwrap(),
+    ]);
     cli(&["seal", case]);
 
     let export = output.join("sigma-report-v10.irmind");
@@ -188,8 +193,7 @@ fn evaluate(
     ))
     .unwrap();
     ui.expect("Sigma run complete").unwrap();
-    ui.send("/quit\r").unwrap();
-    ui.expect_exit().unwrap();
+    quit(&mut ui);
 
     let findings = cli(&["findings", case]);
     let proposals = findings
@@ -219,13 +223,18 @@ fn publish(binary: &Path, home: &Path, case: &str) {
     let mut ui = open_tui(binary, home, case);
     ui.send("/report save md en\r").unwrap();
     expect_result(&mut ui, "Signed report");
-    ui.send("/quit\r").unwrap();
-    ui.expect_exit().unwrap();
+    quit(&mut ui);
 
     let mut ui = open_tui(binary, home, case);
     ui.send("/report save pdf en\r").unwrap();
     expect_result(&mut ui, "Signed report");
+    quit(&mut ui);
+}
+
+fn quit(ui: &mut DemoSession) {
     ui.send("/quit\r").unwrap();
+    ui.expect("Exit IRMind? Enter confirms").unwrap();
+    ui.send("\r").unwrap();
     ui.expect_exit().unwrap();
 }
 
@@ -322,7 +331,17 @@ fn assert_report_objects(
     assert_eq!(document.len() as u64, report.rendered_length);
     if report.media == ReportMediaV1::Pdf {
         assert!(document.starts_with(b"%PDF-"));
+        assert!(
+            document
+                .windows(TITLE.len())
+                .any(|part| part == TITLE.as_bytes())
+        );
     } else {
-        assert!(String::from_utf8(document).unwrap().contains(TITLE));
+        let escaped_title = TITLE.replace('-', r"\-");
+        assert!(
+            String::from_utf8(document)
+                .unwrap()
+                .contains(&escaped_title)
+        );
     }
 }
