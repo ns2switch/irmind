@@ -16,6 +16,7 @@ pub struct ResolvedReportCoverage {
     unknown_sources: Vec<String>,
     skill_gaps: Vec<ResolvedReportSkillGap>,
     query_limits: Vec<EvidenceHash>,
+    partial_sigma: Vec<EvidenceHash>,
 }
 
 impl ResolvedReportCoverage {
@@ -28,6 +29,17 @@ impl ResolvedReportCoverage {
         let mut proof = ReportCoverageV2::default();
         let mut captures = BTreeSet::new();
         let mut query_limits = Vec::new();
+        let mut partial_sigma = Vec::new();
+        for entry in entries
+            .iter()
+            .filter(|entry| entry.kind == AuditEventKind::SigmaRunV1)
+        {
+            let run = crate::v10_proofs::sigma_execution(entry)?;
+            if run.status != crate::v10_proofs::SigmaRunStatusV1::Complete {
+                proof.partial_sigma_runs.push(audit_reference(entry));
+                partial_sigma.push(EvidenceHash::from_bytes(entry.hash));
+            }
+        }
         for entry in entries
             .iter()
             .filter(|entry| entry.kind == AuditEventKind::SourceQueryResultV1)
@@ -82,6 +94,7 @@ impl ResolvedReportCoverage {
             unknown_sources,
             skill_gaps,
             query_limits,
+            partial_sigma,
         })
     }
 
@@ -106,6 +119,11 @@ impl ResolvedReportCoverage {
                 self.query_limits
                     .iter()
                     .map(|receipt| ReportLimitation::QueryLimit { receipt }),
+            )
+            .chain(
+                self.partial_sigma
+                    .iter()
+                    .map(|receipt| ReportLimitation::PartialSigma { receipt }),
             )
             .collect()
     }

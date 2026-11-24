@@ -1,0 +1,30 @@
+[[variants]]
+product = "aws"
+service = "cloudtrail"
+parser_id = "parser-json"
+parser_version = "json-source-v1"
+mapping_id = "mapping-cloudtrail"
+mapping_version = "cloudtrail-tables-v1"
+dataset = "cloudtrail"
+
+[[variants.events]]
+column = "event.action"
+one_of = ["ConsoleLogin", "AssumeRole", "CreateAccessKey", "GetObject", "ListBuckets", "RunInstances", "PutBucketPolicy", "PutBucketAcl"]
+
+[[variants.fields]]
+name = "Outcome"
+column = "event.outcome"
+value_type = "text"
+null_policy = "absent"
+
+[[variants.fields]]
+name = "eventName"
+path = ["eventName"]
+value_type = "text"
+null_policy = "absent"
+
+[[variants.fields]]
+name = "eventSource"
+path = ["eventSource"]
+value_type = "text"
+null_policy = "absent"

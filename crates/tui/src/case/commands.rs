@@ -555,9 +555,13 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
     fn sigma_pack_command(&mut self, prompt: &str) -> bool {
         if prompt == "/sigma" || prompt == "/sigma inspect" {
             self.state.messages.push(
-                "Usage: /sigma inspect <directory> or /sigma import --license <id> <directory>"
+                "Use /sigma inspect <directory>, /sigma import --license <id> <directory>, or /sigma run <pack SHA-256> <start UTC> <end UTC>."
                     .into(),
             );
+            return true;
+        }
+        if let Some(rest) = prompt.strip_prefix("/sigma run ") {
+            self.sigma_run(rest);
             return true;
         }
         if let Some(rest) = prompt.strip_prefix("/sigma import ") {
@@ -573,6 +577,29 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             return true;
         }
         false
+    }
+
+    fn sigma_run(&mut self, arguments: &str) {
+        let parts = arguments.split_ascii_whitespace().collect::<Vec<_>>();
+        if let [digest, start, end] = parts.as_slice()
+            && let (Ok(start), Ok(end)) = (
+                irmind_app::IndexedTime::from_rfc3339(start, false),
+                irmind_app::IndexedTime::from_rfc3339(end, false),
+            )
+            && let Some(manifest) = irmind_app::v10_proofs::parse_sigma_manifest_digest(digest)
+        {
+            let io = self.io_ops;
+            let engine = self.engine;
+            let id = self.id;
+            let time = start.instant().unix_micros()..end.instant().unix_micros();
+            self.start_task("Run Sigma", move |cancel| {
+                io.run_sigma_pack(engine, id, manifest, time, &cancel)
+            });
+            return;
+        }
+        self.state
+            .messages
+            .push("Use /sigma run <pack SHA-256> <start UTC> <end UTC>".into());
     }
 
     fn sigma_import(&mut self, prompt: &str, rest: &str) {

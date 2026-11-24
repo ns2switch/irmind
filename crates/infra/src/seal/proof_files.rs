@@ -94,18 +94,29 @@ impl LocalStore {
         hash: [u8; 32],
         cancel: &CancellationToken,
     ) -> Result<(V10ProofDescriptor, File), AppError> {
+        self.open_addressed_v10_proof(case, V10ProofFamily::Report, kind, hash, cancel)
+    }
+
+    pub(super) fn open_addressed_v10_proof(
+        &self,
+        case: &CaseId,
+        family: V10ProofFamily,
+        kind: u8,
+        hash: [u8; 32],
+        cancel: &CancellationToken,
+    ) -> Result<(V10ProofDescriptor, File), AppError> {
         check_cancel(cancel)?;
         let case_dir = self.parquet.owned_case_path(case);
         ensure_directory(case_dir.parent().ok_or_else(invalid)?, false)?;
         ensure_directory(&case_dir, false)?;
-        let root = case_dir.join(namespace(V10ProofFamily::Report));
+        let root = case_dir.join(namespace(family));
         ensure_directory(&root, false)?;
         let name = format!("{}-{}.proof", kind, irmind_app::hex(&hash));
         let file =
             irmind_fs::open_regular_no_follow(&root, Path::new(&name)).map_err(|_| invalid())?;
         let bytes = file.metadata().map_err(|_| invalid())?.len();
-        let descriptor = V10ProofDescriptor::new(V10ProofFamily::Report, kind, hash, bytes)
-            .map_err(|_| invalid())?;
+        let descriptor =
+            V10ProofDescriptor::new(family, kind, hash, bytes).map_err(|_| invalid())?;
         Ok((descriptor, verify_open_object(file, descriptor, cancel)?))
     }
 

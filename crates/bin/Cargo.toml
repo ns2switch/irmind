@@ -7,6 +7,7 @@ license.workspace = true
 
 [features]
 default = [
+    "sigma",
     "query-azure-log-analytics",
     "query-bigquery",
     "query-athena",

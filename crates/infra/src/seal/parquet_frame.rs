@@ -8,8 +8,8 @@ use parquet::{
     errors::{ParquetError, Result as ParquetResult},
     file::reader::{ChunkReader, Length},
 };
-pub(super) use proof_rows::locate_v10_artifact_rows;
 pub use proof_rows::verify_v10_artifact_rows;
+pub(super) use proof_rows::{locate_v10_artifact_rows, verify_v10_sigma_rows};
 use std::{
     fs::File,
     io::{Read, Seek, SeekFrom, Take},

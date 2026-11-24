@@ -77,6 +77,28 @@ impl<'a> V10CheckpointView<'a> {
         self.entries
     }
 
+    /// Use the existing seal inventory commitment on just the active artifact
+    /// entries. Compacted parents remain in the case seal and outside this scan.
+    pub fn active_artifact_inventory(&self) -> Result<[u8; 32], AppError> {
+        let mut inventory = crate::SealInventoryBuilder::default();
+        for entry in self
+            .entries
+            .iter()
+            .filter(|entry| entry.kind == AuditEventKind::ParquetArtifactV3)
+        {
+            let artifact = ParquetArtifact::decode(entry.kind, &entry.payload)
+                .map_err(|_| AppError::InvalidChain(entry.seq))?;
+            if self.active_paths.contains(artifact.path()) {
+                inventory.accept(entry)?;
+            }
+        }
+        let inventory = inventory.commitment()?;
+        let mut bytes = [0; 32];
+        hex::decode_to_slice(inventory.sha256.as_str(), &mut bytes)
+            .map_err(|_| AppError::InvalidChain(0))?;
+        Ok(bytes)
+    }
+
     pub fn confirmed_finding(
         &self,
         confirmation: V10AuditReference,
