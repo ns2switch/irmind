@@ -180,7 +180,7 @@ impl LocalStore {
         use std::{io::Seek as _, path::Path};
         let archive = SigmaArchive::collect(self, case, entries, key, cancel)?;
         let root = self.parquet.owned_case_path(case);
-        let mut index = tempfile::tempfile_in(&root).map_err(super::storage)?;
+        let mut index = tempfile::tempfile_in(&self.lock_dir).map_err(super::storage)?;
         archive.write(&mut index, cancel)?;
         index.rewind().map_err(super::storage)?;
         let section = V10ObjectSection::scan(&mut index, V10ProofFamily::Sigma, cancel)?;
