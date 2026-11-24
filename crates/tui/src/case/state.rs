@@ -72,6 +72,7 @@ impl ParserPrompt {
         let last = self.candidates.len().saturating_sub(1);
         match key {
             KeyCode::Esc => return ParserPromptAction::Cancel,
+            KeyCode::Enter if self.invalid_number => return ParserPromptAction::Keep,
             KeyCode::Enter if self.typed_option.is_empty() => {
                 return self
                     .candidates
@@ -99,13 +100,15 @@ impl ParserPrompt {
                 return ParserPromptAction::Keep;
             }
             KeyCode::Char(ch) if ch.is_ascii_digit() => {
+                let max_digits = usize::MAX.ilog10() as usize + 1;
+                if self.typed_option.len() > max_digits {
+                    return ParserPromptAction::Keep;
+                }
                 if self.invalid_number {
                     self.typed_option.clear();
-                    self.invalid_number = false;
                 }
-                if self.typed_option.len() <= usize::MAX.ilog10() as usize {
-                    self.typed_option.push(ch);
-                }
+                self.typed_option.push(ch);
+                self.invalid_number = self.typed_option.len() > max_digits;
                 return ParserPromptAction::Keep;
             }
             KeyCode::Up => self.selected = self.selected.saturating_sub(1),
@@ -460,6 +463,14 @@ mod tests {
         assert!(
             matches!(prompt.update(KeyCode::Enter, 12), ParserPromptAction::Select(name) if name == "parser-json")
         );
+        prompt.typed_option = format!("{}1", "0".repeat(usize::MAX.ilog10() as usize));
+        prompt.update(KeyCode::Char('9'), 12);
+        prompt.update(KeyCode::Char('1'), 12);
+        assert!(prompt.invalid_number);
+        assert!(matches!(
+            prompt.update(KeyCode::Enter, 12),
+            ParserPromptAction::Keep
+        ));
         assert!(matches!(
             prompt.update(KeyCode::Esc, 12),
             ParserPromptAction::Cancel
