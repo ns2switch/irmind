@@ -245,47 +245,49 @@ fn sigma_cloudtrail_operation_and_principal_require_the_aws_cloudtrail_source() 
     }
 }
 
+const NETWORK_EXAMPLES: [(&str, &str, CommonField, &str); 6] = [
+    (
+        "zeek",
+        "dns",
+        CommonField::DnsQuestionName,
+        "{query: probe.example.test, 'id.orig_h|cidr': 203.0.113.0/24}",
+    ),
+    (
+        "zeek",
+        "http",
+        CommonField::UrlDomain,
+        "{host: probe.example.test, 'id.orig_h|cidr': 203.0.113.0/24}",
+    ),
+    (
+        "zeek",
+        "conn",
+        CommonField::NetworkTransport,
+        "{proto: tcp, 'id.orig_h|cidr': 203.0.113.0/24}",
+    ),
+    (
+        "suricata",
+        "dns",
+        CommonField::DnsQuestionName,
+        "{dns.rrname: probe.example.test, 'src_ip|cidr': 203.0.113.0/24}",
+    ),
+    (
+        "suricata",
+        "http",
+        CommonField::UrlDomain,
+        "{http.hostname: probe.example.test, 'src_ip|cidr': 203.0.113.0/24}",
+    ),
+    (
+        "suricata",
+        "flow",
+        CommonField::NetworkTransport,
+        "{Protocol: tcp, 'src_ip|cidr': 203.0.113.0/24}",
+    ),
+];
+
 #[test]
 fn sigma_network_separates_event_classes_and_source_destination_roles() {
     let reviewed = parse_table(include_str!("../network-v1.toml"));
-    for (product, service, field, condition) in [
-        (
-            "zeek",
-            "dns",
-            CommonField::DnsQuestionName,
-            "{query: probe.example.test, 'id.orig_h|cidr': 203.0.113.0/24}",
-        ),
-        (
-            "zeek",
-            "http",
-            CommonField::UrlDomain,
-            "{host: probe.example.test, 'id.orig_h|cidr': 203.0.113.0/24}",
-        ),
-        (
-            "zeek",
-            "conn",
-            CommonField::NetworkTransport,
-            "{proto: tcp, 'id.orig_h|cidr': 203.0.113.0/24}",
-        ),
-        (
-            "suricata",
-            "dns",
-            CommonField::DnsQuestionName,
-            "{dns.rrname: probe.example.test, 'src_ip|cidr': 203.0.113.0/24}",
-        ),
-        (
-            "suricata",
-            "http",
-            CommonField::UrlDomain,
-            "{http.hostname: probe.example.test, 'src_ip|cidr': 203.0.113.0/24}",
-        ),
-        (
-            "suricata",
-            "flow",
-            CommonField::NetworkTransport,
-            "{Protocol: tcp, 'src_ip|cidr': 203.0.113.0/24}",
-        ),
-    ] {
+    for (product, service, field, condition) in NETWORK_EXAMPLES {
         let variant = reviewed
             .variants
             .iter()
