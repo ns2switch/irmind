@@ -48,9 +48,21 @@ pub enum ReportLocator {
 pub enum ReportLimitation<'a> {
     UnavailableSource(&'a str),
     SourceAvailabilityUnknown(&'a str),
-    SkillCoverage { skill: &'a str, gap: &'a str },
-    QueryLimit { receipt: &'a EvidenceHash },
-    PartialSigma { receipt: &'a EvidenceHash },
+    SkillCoverage {
+        skill: &'a str,
+        gap: &'a str,
+    },
+    DelegatedSkillCoverage {
+        skill: &'a str,
+        gap: &'a str,
+        task_id: &'a [u8; 32],
+    },
+    QueryLimit {
+        receipt: &'a EvidenceHash,
+    },
+    PartialSigma {
+        receipt: &'a EvidenceHash,
+    },
 }
 
 impl ReportDocument<'_> {
@@ -234,6 +246,20 @@ impl Document {
             ReportLimitation::SkillCoverage { skill, gap } => format!(
                 "{} {} · {}",
                 language.text("Skill coverage gap", "Hueco de cobertura de la skill"),
+                self.literal(skill),
+                self.literal(gap),
+            ),
+            ReportLimitation::DelegatedSkillCoverage {
+                skill,
+                gap,
+                task_id,
+            } => format!(
+                "{} {} · {} · {}",
+                language.text(
+                    "Subagent skill coverage gap",
+                    "Hueco de cobertura de la skill del subagente"
+                ),
+                crate::hex(*task_id),
                 self.literal(skill),
                 self.literal(gap),
             ),

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     fs::File,
-    io::{Read, Write},
+    io::{Read, Seek as _, Write},
 };
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -94,7 +94,7 @@ impl LocalStore {
 pub(super) fn verify_artifact_frames(
     input: &mut File,
     expected: &BTreeMap<String, ArtifactFrame>,
-) -> Result<(), AppError> {
+) -> Result<BTreeMap<String, u64>, AppError> {
     let mut count = [0u8; 8];
     input.read_exact(&mut count).map_err(storage)?;
     if u64::from_be_bytes(count) != expected.len() as u64 {
@@ -102,6 +102,7 @@ pub(super) fn verify_artifact_frames(
             "derived-file count differs from signed inventory",
         ));
     }
+    let mut offsets = BTreeMap::new();
     for (path, artifact) in expected {
         let frame: ArtifactFrame = serde_json::from_slice(&read_frame(input)?).map_err(storage)?;
         if &frame.path != path || frame.sha256 != artifact.sha256 || frame.size != artifact.size {
@@ -109,6 +110,7 @@ pub(super) fn verify_artifact_frames(
                 "derived-file frame differs from signed inventory order or metadata",
             ));
         }
+        offsets.insert(path.clone(), input.stream_position().map_err(storage)?);
         if let Some(schema) = artifact.common_schema {
             super::parquet_frame::verify_common(
                 input,
@@ -122,5 +124,5 @@ pub(super) fn verify_artifact_frames(
             verify_raw(input, frame.size, &frame.sha256)?;
         }
     }
-    Ok(())
+    Ok(offsets)
 }

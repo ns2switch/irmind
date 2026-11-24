@@ -111,11 +111,16 @@ impl Engine<'_> {
     pub fn skill_services(&self) -> Option<&SkillServices> {
         self.skills.as_deref()
     }
-    pub(crate) fn verify_skill_receipts(
+    pub(crate) fn checked_skill_receipts(
         &self,
         entries: &[crate::SignedEntry],
         cancel: &crate::CancellationToken,
-    ) -> Result<(), AppError> {
+        track_report: bool,
+    ) -> Result<super::SkillReceiptVerifier, AppError> {
+        let mut checked = super::SkillReceiptVerifier::default();
+        if track_report {
+            checked.track_report_loads();
+        }
         if entries
             .iter()
             .any(|entry| entry.kind == crate::AuditEventKind::RetiredSkillSnapshot)
@@ -128,13 +133,12 @@ impl Engine<'_> {
                 crate::AuditEventKind::SkillSnapshotV2 | crate::AuditEventKind::SkillLoadV1
             ) || crate::subagents::is_subagent_kind(e.kind)
         }) {
-            return Ok(());
+            return Ok(checked);
         }
         let services = self
             .skills
             .as_ref()
             .ok_or(super::SkillServiceError::NotInstalled)?;
-        let mut checked = super::SkillReceiptVerifier::default();
         for entry in entries {
             checked.accept(entry, services.compiler.as_ref())?;
         }
@@ -178,7 +182,8 @@ impl Engine<'_> {
             &analyst,
             services.compiler.as_ref(),
         )?;
-        self.verify_subagent_receipts(entries, &mut checked, services, cancel)
+        self.verify_subagent_receipts(entries, &mut checked, services, cancel)?;
+        Ok(checked)
     }
     fn verify_subagent_receipts(
         &self,

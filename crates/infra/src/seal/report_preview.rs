@@ -4,8 +4,8 @@ use super::{
     storage, storage_reason,
 };
 use irmind_app::{
-    Engine, EntityDetails, ReportDocumentFormat, ReportDocumentLanguage, SignedEntry,
-    artifact_catalog,
+    Engine, EntityDetails, ReportDocumentFormat, ReportDocumentLanguage, ReportPublicationPlan,
+    SignedEntry, artifact_catalog,
     v10_proofs::{
         CaseCheckpointV1, ReportCitationsV1, V10ArtifactReference, V10AuditReference, V10Citation,
         V10FindingCitations, V10RowReference, V10SourceReference,
@@ -27,6 +27,49 @@ impl LocalStore {
         language: ReportDocumentLanguage,
         cancel: &CancellationToken,
     ) -> Result<CitedReportPreview, AppError> {
+        let (checkpoint, citations, confirmed_count) =
+            self.report_coordinates(engine, case, cancel)?;
+        let included = citations.0.len();
+        let rendered = engine.render_cited_findings(
+            case,
+            &checkpoint,
+            &citations,
+            language,
+            ReportDocumentFormat::Markdown,
+            |artifact, row| {
+                irmind_app::LargeCaseStore::verify_report_row(self, case, artifact, row, cancel)
+            },
+        )?;
+        Ok(CitedReportPreview {
+            markdown: String::from_utf8(rendered).map_err(storage)?,
+            omitted_findings: confirmed_count - included,
+        })
+    }
+
+    pub fn plan_cited_report(
+        &self,
+        engine: &Engine<'_>,
+        case: &CaseId,
+        language: ReportDocumentLanguage,
+        format: ReportDocumentFormat,
+        cancel: &CancellationToken,
+    ) -> Result<ReportPublicationPlan, AppError> {
+        let (checkpoint, citations, _) = self.report_coordinates(engine, case, cancel)?;
+        Ok(ReportPublicationPlan {
+            checkpoint,
+            citations,
+            analyst: None,
+            language,
+            format,
+        })
+    }
+
+    fn report_coordinates(
+        &self,
+        engine: &Engine<'_>,
+        case: &CaseId,
+        cancel: &CancellationToken,
+    ) -> Result<(CaseCheckpointV1, ReportCitationsV1, usize), AppError> {
         let (entries, findings) = engine.cited_report_inputs(case, cancel)?;
         let recent = entries.last().ok_or(AppError::InvalidChain(0))?;
         let checkpoint = CaseCheckpointV1 {
@@ -74,28 +117,7 @@ impl LocalStore {
                 })
             })
             .collect::<Vec<_>>();
-        let verified_rows = rows
-            .values()
-            .flat_map(|records| records.values().flatten().copied())
-            .collect::<BTreeSet<_>>();
-        let included = citations.len();
-        let rendered = engine.render_cited_findings(
-            case,
-            &checkpoint,
-            &ReportCitationsV1(citations),
-            language,
-            ReportDocumentFormat::Markdown,
-            |_, row| {
-                if !verified_rows.contains(&row) {
-                    return Err(AppError::InvalidChain(row.artifact.entry.sequence));
-                }
-                Ok(())
-            },
-        )?;
-        Ok(CitedReportPreview {
-            markdown: String::from_utf8(rendered).map_err(storage)?,
-            omitted_findings: confirmed_count - included,
-        })
+        Ok((checkpoint, ReportCitationsV1(citations), confirmed_count))
     }
 
     fn find_report_rows(

@@ -36,8 +36,7 @@ fn sigma_match_stays_out_of_cited_reports_until_analyst_confirms_the_exact_row()
         parser: &parser,
     };
     let cancel = CancellationToken::new();
-    let source_file = "aws.jsonl";
-    ingest_login_pair(&large, &case.id, root.path(), source_file, &cancel);
+    ingest_login_pair(&large, &case.id, root.path(), "aws.jsonl", &cancel);
     engine.verify(&case.id).unwrap();
     let row = scan(&store, &case.id, &cancel);
     let evidence = irmind_domain::EvidenceHash::from_bytes(row.source.evidence_sha256);
@@ -49,7 +48,7 @@ fn sigma_match_stays_out_of_cited_reports_until_analyst_confirms_the_exact_row()
             evidence.as_str(),
             EntityDetails::Timeline {
                 at: "2026-11-01T00:00:00Z".into(),
-                source: source_file.into(),
+                source: "aws.jsonl".into(),
                 record_index: Some(row.record.try_into().unwrap()),
             },
         )
@@ -98,6 +97,68 @@ fn sigma_match_stays_out_of_cited_reports_until_analyst_confirms_the_exact_row()
         ..row
     });
     assert!(render(&store, &engine, &case.id, &citations).is_err());
+    verify_signed_reports(engine, &store, &case.id, root.path(), &cancel);
+}
+
+fn verify_signed_reports(
+    engine: Engine<'_>,
+    store: &Arc<LocalStore>,
+    case: &CaseId,
+    root: &Path,
+    cancel: &CancellationToken,
+) {
+    use irmind_app::v10_proofs::{ReportAnalystSectionsV1, ReportCoverageV2};
+    let engine = engine.with_large_case_pipeline(store.clone(), Arc::new(json_source_parser()));
+    for (language, format) in [
+        (
+            ReportDocumentLanguage::English,
+            ReportDocumentFormat::Markdown,
+        ),
+        (ReportDocumentLanguage::Spanish, ReportDocumentFormat::Pdf),
+    ] {
+        let mut plan = store
+            .plan_cited_report(&engine, case, language, format, cancel)
+            .unwrap();
+        plan.analyst = Some(ReportAnalystSectionsV1([
+            "Synthetic scope".into(),
+            "Independently checked".into(),
+            String::new(),
+            String::new(),
+        ]));
+        let receipt = engine.publish_cited_report(case, plan, cancel).unwrap();
+        let coverage = store
+            .read_addressed_report_proof(case, 2, receipt.coverage, cancel)
+            .unwrap();
+        assert!(ReportCoverageV2::decode(&coverage).is_ok());
+        let rendered = store
+            .read_addressed_report_proof(case, 3, receipt.rendered_sha256, cancel)
+            .unwrap();
+        assert_eq!(sha256(&rendered), receipt.rendered_sha256);
+        if format == ReportDocumentFormat::Pdf {
+            assert!(rendered.starts_with(b"%PDF"));
+        } else {
+            assert!(String::from_utf8(rendered).unwrap().contains(FINDING));
+        }
+    }
+    engine.verify(case).unwrap();
+    engine.seal(case).unwrap();
+    let path = root.join("signed-report.irmind");
+    let key = irmind_app::export_case(&engine, store.as_ref(), case, &path, cancel).unwrap();
+    assert_eq!(
+        LocalExportVerifier
+            .verify_export_details(&path, Some(&key))
+            .unwrap()
+            .format_version,
+        10
+    );
+    let mut tampered = fs::read(&path).unwrap();
+    *tampered.last_mut().unwrap() ^= 1;
+    fs::write(&path, tampered).unwrap();
+    assert!(
+        LocalExportVerifier
+            .verify_export_details(&path, Some(&key))
+            .is_err()
+    );
 }
 
 fn ingest_login_pair(

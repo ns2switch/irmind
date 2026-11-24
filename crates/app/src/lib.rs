@@ -86,7 +86,8 @@ pub use fixed_errors::FixedAppError;
 mod report;
 pub use report::{
     ReportDocument, ReportDocumentFormat, ReportDocumentLanguage, ReportLimitation, ReportLocator,
-    ReportStatement,
+    ReportPublicationPlan, ReportStatement, ResolvedReportCoverage, report_object_keys,
+    report_publication, verify_report_history,
 };
 mod skills;
 pub use skills::{

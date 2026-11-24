@@ -1,10 +1,115 @@
 //! The V10 export ends with mandatory Sigma and report object counts.
 use super::{AppError, CancellationToken, storage, storage_reason};
 use irmind_app::v10_proofs::{V10ProofFamily, write_v10_object_section};
-use std::io::{Read, Write};
+use std::io::Read;
+#[cfg(test)]
+use std::io::Write;
 
+#[cfg(test)]
 const FAMILIES: [V10ProofFamily; 2] = [V10ProofFamily::Sigma, V10ProofFamily::Report];
 
+use super::{CaseId, LocalStore};
+use irmind_app::v10_proofs::{V10ObjectSection, V10ProofDescriptor};
+use irmind_app::{
+    SignedEntry, SkillReceiptVerifier, report_object_keys, report_publication,
+    verify_report_history,
+};
+use irmind_domain::AuditEventKind;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs::File,
+};
+
+pub(super) fn write(
+    store: &LocalStore,
+    case: &CaseId,
+    output: &mut File,
+    cancel: &CancellationToken,
+) -> Result<(), AppError> {
+    write_v10_object_section(
+        output,
+        V10ProofFamily::Sigma,
+        &[],
+        |_| Err::<std::io::Empty, _>(AppError::InvalidChain(0)),
+        cancel,
+    )?;
+    let family = V10ProofFamily::Report;
+    let mut objects = BTreeMap::new();
+    store.for_each_audit_entry(case, |entry| {
+        if entry.kind == AuditEventKind::ReportPublishedV1 {
+            let receipt = report_publication(&entry)?;
+            let mut descriptors = Vec::new();
+            for (kind, hash) in report_object_keys(&receipt) {
+                let descriptor = match objects.entry((kind, hash)) {
+                    std::collections::btree_map::Entry::Occupied(entry) => *entry.get(),
+                    std::collections::btree_map::Entry::Vacant(entry) => {
+                        let (descriptor, _) =
+                            store.open_addressed_report_proof(case, kind, hash, cancel)?;
+                        *entry.insert(descriptor)
+                    }
+                };
+                descriptors.push(descriptor);
+            }
+            if irmind_app::v10_proofs::v10_proof_commitment(family, &descriptors)
+                .map_err(|_| AppError::InvalidChain(entry.seq))?
+                != receipt.proof_set
+            {
+                return Err(AppError::InvalidChain(entry.seq));
+            }
+        }
+        Ok(())
+    })?;
+    let descriptors = objects.into_values().collect::<Vec<V10ProofDescriptor>>();
+    write_v10_object_section(
+        output,
+        family,
+        &descriptors,
+        |descriptor| store.open_v10_case_object(case, family, descriptor, cancel),
+        cancel,
+    )
+}
+
+pub(super) struct ReportVerification<'a> {
+    pub title: &'a str,
+    pub entries: &'a [SignedEntry],
+    pub evidence: &'a BTreeSet<String>,
+    pub skills: &'a SkillReceiptVerifier,
+    pub offsets: &'a BTreeMap<String, u64>,
+}
+
+pub(super) fn verify(
+    input: &mut File,
+    context: &ReportVerification<'_>,
+    cancel: &CancellationToken,
+) -> Result<(), AppError> {
+    if super::frames::read_u64(input)? != 0 {
+        return Err(AppError::InvalidChain(0));
+    }
+    let section = V10ObjectSection::scan(input, V10ProofFamily::Report, cancel)?;
+    if input.read(&mut [0]).map_err(storage)? != 0 {
+        return Err(storage_reason("export has trailing bytes"));
+    }
+    let mut objects = input.try_clone().map_err(storage)?;
+    let mut artifacts = input.try_clone().map_err(storage)?;
+    let referenced = verify_report_history(
+        context.title,
+        context.entries,
+        context.evidence,
+        Some((context.skills, &crate::TomlSkillCompiler)),
+        |kind, hash| section.body(&mut objects, (kind, hash), cancel),
+        |artifact, row| {
+            let offset = *context
+                .offsets
+                .get(artifact.path())
+                .ok_or(AppError::InvalidChain(row.artifact.entry.sequence))?;
+            crate::verify_v10_artifact_rows(&mut artifacts, offset, artifact, &[row], cancel)
+        },
+        cancel,
+    )?;
+    section.check_union(&referenced)
+}
+
+#[cfg(test)]
 pub(super) fn write_empty(
     output: &mut impl Write,
     cancel: &CancellationToken,
@@ -21,6 +126,7 @@ pub(super) fn write_empty(
     Ok(())
 }
 
+#[cfg(test)]
 pub(super) fn verify_empty(input: &mut impl Read) -> Result<(), AppError> {
     for _ in FAMILIES {
         let mut count = [0; 8];

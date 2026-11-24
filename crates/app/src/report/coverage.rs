@@ -1,0 +1,146 @@
+use super::ReportLimitation;
+use crate::{
+    AppError, AuditEventKind, CancellationToken, CaseId, Engine, SignedEntry, SkillCompiler,
+    SkillReceiptVerifier,
+    source_queries::SourceQueryResultV1,
+    v10_proofs::{
+        ReportCoverageV2, ReportSkillLoad, ResolvedReportSkillGap, V10AuditReference,
+        V10SourceAvailability, V10SourceReference,
+    },
+};
+use irmind_domain::{EvidenceHash, SourceManifestV2};
+use std::collections::BTreeSet;
+
+pub struct ResolvedReportCoverage {
+    pub proof: ReportCoverageV2,
+    unknown_sources: Vec<String>,
+    skill_gaps: Vec<ResolvedReportSkillGap>,
+    query_limits: Vec<EvidenceHash>,
+}
+
+impl ResolvedReportCoverage {
+    /// Collect coverage from the authenticated report prefix. The skill replay
+    /// has already validated its admission, catalog proofs and branch chunks.
+    pub fn resolve(
+        entries: &[SignedEntry],
+        skills: Option<(&SkillReceiptVerifier, &dyn SkillCompiler)>,
+    ) -> Result<Self, AppError> {
+        let mut proof = ReportCoverageV2::default();
+        let mut captures = BTreeSet::new();
+        let mut query_limits = Vec::new();
+        for entry in entries
+            .iter()
+            .filter(|entry| entry.kind == AuditEventKind::SourceQueryResultV1)
+        {
+            let result = SourceQueryResultV1::decode(entry.payload.as_bytes())?;
+            captures.insert(result.capture_identity().0.to_owned());
+            if result.limit_notice().is_some() {
+                proof.query_limits.push(audit_reference(entry));
+                query_limits.push(EvidenceHash::from_bytes(entry.hash));
+            }
+        }
+        let mut available_parsers = BTreeSet::new();
+        let mut unknown_sources = Vec::new();
+        for entry in entries
+            .iter()
+            .filter(|entry| entry.kind == AuditEventKind::SourceManifestV2)
+        {
+            let manifest = SourceManifestV2::decode(&entry.payload)
+                .map_err(|_| AppError::InvalidChain(entry.seq))?;
+            available_parsers.insert(manifest.parser_id);
+            let source = manifest.source;
+            if !source.copied && !captures.contains(source.sha256.as_str()) {
+                let mut hash = [0; 32];
+                hex::decode_to_slice(source.sha256.as_str(), &mut hash)
+                    .map_err(|_| AppError::InvalidChain(entry.seq))?;
+                proof.unavailable_sources.push((
+                    V10SourceReference {
+                        manifest: audit_reference(entry),
+                        evidence_sha256: hash,
+                    },
+                    V10SourceAvailability::Unknown,
+                ));
+                unknown_sources.push(source.source);
+            }
+        }
+
+        let skill_gaps = if let Some((replay, compiler)) = skills {
+            let through = entries.last().map_or(0, |entry| entry.seq);
+            replay.resolve_report_loads(compiler, through, &available_parsers)?
+        } else {
+            Vec::new()
+        };
+        for gap in &skill_gaps {
+            if let ReportSkillLoad::Main(load) = gap.load {
+                proof.skill_gaps.push((load, gap.index));
+            } else if let Some(reference) = gap.delegated_reference() {
+                proof.delegated_skill_gaps.push(reference);
+            }
+        }
+        Ok(Self {
+            proof,
+            unknown_sources,
+            skill_gaps,
+            query_limits,
+        })
+    }
+
+    pub(super) fn limitations(&self) -> Vec<ReportLimitation<'_>> {
+        self.unknown_sources
+            .iter()
+            .map(|source| ReportLimitation::SourceAvailabilityUnknown(source))
+            .chain(self.skill_gaps.iter().map(|gap| match &gap.load {
+                ReportSkillLoad::Main(_) => ReportLimitation::SkillCoverage {
+                    skill: &gap.skill,
+                    gap: &gap.text,
+                },
+                ReportSkillLoad::Delegated { task_id, .. } => {
+                    ReportLimitation::DelegatedSkillCoverage {
+                        skill: &gap.skill,
+                        gap: &gap.text,
+                        task_id,
+                    }
+                }
+            }))
+            .chain(
+                self.query_limits
+                    .iter()
+                    .map(|receipt| ReportLimitation::QueryLimit { receipt }),
+            )
+            .collect()
+    }
+}
+
+pub(crate) fn audit_reference(entry: &SignedEntry) -> V10AuditReference {
+    V10AuditReference {
+        sequence: entry.seq,
+        entry_sha256: entry.hash,
+    }
+}
+
+impl Engine<'_> {
+    pub fn report_coverage(
+        &self,
+        id: &CaseId,
+        cancel: &CancellationToken,
+    ) -> Result<ReportCoverageV2, AppError> {
+        let _lock = self.repo.lock_case(id)?;
+        self.verify_unlocked_cancelable(id, cancel)?;
+        let entries = self.audit_log.entries(id)?;
+        Ok(self.resolve_cited_report_coverage(&entries, cancel)?.proof)
+    }
+
+    pub(super) fn resolve_cited_report_coverage(
+        &self,
+        entries: &[SignedEntry],
+        cancel: &CancellationToken,
+    ) -> Result<ResolvedReportCoverage, AppError> {
+        let checked = self.checked_skill_receipts(entries, cancel, true)?;
+        ResolvedReportCoverage::resolve(
+            entries,
+            self.skills
+                .as_ref()
+                .map(|services| (&checked, services.compiler.as_ref())),
+        )
+    }
+}

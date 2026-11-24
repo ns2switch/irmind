@@ -264,6 +264,42 @@ pub trait LogParser: StreamingEventParser {
 /// The local adapter owns all paths and derived files. The application signs
 /// the returned manifests before any derived file is exposed to model tools.
 pub trait LargeCaseStore: Send + Sync {
+    fn commit_report_proofs(
+        &self,
+        _case: &CaseId,
+        _proofs: &[(crate::v10_proofs::V10ProofDescriptor, &[u8])],
+        _entry: &crate::SignedEntry,
+        _cancel: &CancellationToken,
+    ) -> Result<(), AppError> {
+        Err(AppError::Policy(
+            "Signed report storage is unavailable".into(),
+        ))
+    }
+
+    fn read_report_proof(
+        &self,
+        _case: &CaseId,
+        _kind: u8,
+        _digest: [u8; 32],
+        _cancel: &CancellationToken,
+    ) -> Result<Vec<u8>, AppError> {
+        Err(AppError::Policy(
+            "Signed report storage is unavailable".into(),
+        ))
+    }
+
+    fn verify_report_row(
+        &self,
+        _case: &CaseId,
+        _artifact: &ParquetArtifact,
+        _row: crate::v10_proofs::V10RowReference,
+        _cancel: &CancellationToken,
+    ) -> Result<(), AppError> {
+        Err(AppError::Policy(
+            "Signed report row verification is unavailable".into(),
+        ))
+    }
+
     fn prepare_mapped_ingest(
         &self,
         _request: crate::MappedIngestRequest<'_>,

@@ -200,6 +200,18 @@ pub trait WorkspaceIo: Send + Sync {
             "Sigma is unavailable in this workspace".into(),
         ))
     }
+    fn publish_cited_report(
+        &self,
+        _engine: &Engine<'_>,
+        _id: &irmind_app::CaseId,
+        _language: irmind_app::ReportDocumentLanguage,
+        _format: irmind_app::ReportDocumentFormat,
+        _cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, irmind_app::AppError> {
+        Err(irmind_app::AppError::Policy(
+            "Signed report publication is unavailable in this workspace".into(),
+        ))
+    }
     fn preview_cited_report(
         &self,
         _engine: &Engine<'_>,

@@ -190,6 +190,24 @@ impl WorkspaceIo for RootWorkspaceIo {
         ))
     }
 
+    fn publish_cited_report(
+        &self,
+        engine: &Engine<'_>,
+        id: &irmind_app::CaseId,
+        language: irmind_app::ReportDocumentLanguage,
+        format: irmind_app::ReportDocumentFormat,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, AppError> {
+        let plan = self
+            .store
+            .plan_cited_report(engine, id, language, format, cancel)?;
+        let receipt = engine.publish_cited_report(id, plan, cancel)?;
+        Ok(format!(
+            "Signed report · SHA-256 {}\nThe report is included in the sealed case export.",
+            irmind_app::hex(&receipt.rendered_sha256)
+        ))
+    }
+
     fn preview_cited_report(
         &self,
         engine: &Engine<'_>,

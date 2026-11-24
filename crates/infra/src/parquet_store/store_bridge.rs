@@ -4,6 +4,53 @@ use super::{
 };
 
 impl LargeCaseStore for crate::LocalStore {
+    fn commit_report_proofs(
+        &self,
+        case: &CaseId,
+        proofs: &[(irmind_app::v10_proofs::V10ProofDescriptor, &[u8])],
+        entry: &irmind_app::SignedEntry,
+        cancel: &CancellationToken,
+    ) -> Result<(), AppError> {
+        use irmind_app::AuditLog as _;
+        if entry.case_id != case.as_str() {
+            return Err(AppError::InvalidChain(entry.seq));
+        }
+        irmind_app::report_publication(entry)?;
+        self.prepare_v10_case_objects(
+            case,
+            irmind_app::v10_proofs::V10ProofFamily::Report,
+            proofs,
+            cancel,
+        )?
+        .append_with(cancel, || self.append(entry))
+    }
+
+    fn read_report_proof(
+        &self,
+        case: &CaseId,
+        kind: u8,
+        digest: [u8; 32],
+        cancel: &CancellationToken,
+    ) -> Result<Vec<u8>, AppError> {
+        self.read_addressed_report_proof(case, kind, digest, cancel)
+    }
+
+    fn verify_report_row(
+        &self,
+        case: &CaseId,
+        artifact: &ParquetArtifact,
+        row: irmind_app::v10_proofs::V10RowReference,
+        cancel: &CancellationToken,
+    ) -> Result<(), AppError> {
+        let root = self.parquet.owned_case_path(case);
+        let mut file = irmind_fs::open_regular_no_follow(&root, Path::new(artifact.path()))
+            .map_err(super::storage)?;
+        if file.metadata().map_err(super::storage)?.len() != artifact.size() {
+            return Err(AppError::InvalidChain(row.artifact.entry.sequence));
+        }
+        crate::verify_v10_artifact_rows(&mut file, 0, artifact, &[row], cancel)
+    }
+
     fn prepare_source_query_capture(
         &self,
         request: &irmind_app::MappedIngestRequest<'_>,

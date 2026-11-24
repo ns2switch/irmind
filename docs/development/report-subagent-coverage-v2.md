@@ -1,6 +1,6 @@
 # Subagent skill coverage in V10 reports
 
-**Status.** Proposed amendment to the report proof objects for v0.7.
+**Status.** Approved for the v0.7 report proof objects.
 
 [ReportCoverageV1](sigma-report-proof-objects.md#report-objects) references a
 skill load using the sequence and hash of an entry in the main case chain.

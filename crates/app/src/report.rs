@@ -3,10 +3,14 @@ use crate::{
 };
 use irmind_domain::SourceManifestV1;
 mod cited;
+mod coverage;
+pub use coverage::ResolvedReportCoverage;
 mod document;
 pub use document::*;
 mod entity_details;
 mod literal;
+mod publication;
+pub use publication::*;
 mod pdf;
 mod render;
 pub use entity_details::EntityDetails;
@@ -83,6 +87,78 @@ impl Finding {
                 .is_none_or(|details| details.valid_for(self, known_evidence))
             && (self.kind != FindingKind::Timeline || self.details.is_some())
     }
+}
+
+fn replay_findings(
+    entries: &[SignedEntry],
+    known_evidence: &std::collections::BTreeSet<String>,
+) -> Result<Vec<Finding>, AppError> {
+    let mut findings = BTreeMap::<String, Finding>::new();
+    for entry in entries {
+        match entry.kind {
+            AuditEventKind::FindingProposed => {
+                let finding: Finding = serde_json::from_str(&entry.payload)
+                    .map_err(|_| AppError::InvalidChain(entry.seq))?;
+                if !matches!(entry.origin.as_str(), "analyst" | "model")
+                    || (entry.origin == "analyst" && entry.actor != Actor::Analyst)
+                    || finding.confirmed
+                    || finding.dismissed
+                    || uuid::Uuid::parse_str(&finding.id).is_err()
+                    || finding.value.trim().is_empty()
+                    || finding.value.len() > 2_000
+                    || finding.value.contains('\0')
+                    || entry.evidence.as_deref() != Some(finding.evidence_hash.as_str())
+                    || !finding.valid_for(known_evidence)
+                    || findings.insert(finding.id.clone(), finding).is_some()
+                {
+                    return Err(AppError::InvalidChain(entry.seq));
+                }
+            }
+            AuditEventKind::FindingConfirmed => {
+                let finding = findings
+                    .get_mut(&entry.payload)
+                    .ok_or(AppError::InvalidChain(entry.seq))?;
+                if entry.actor != Actor::Analyst
+                    || finding.confirmed
+                    || finding.dismissed
+                    || entry.evidence.is_some()
+                {
+                    return Err(AppError::InvalidChain(entry.seq));
+                }
+                finding.confirmed = true;
+            }
+            AuditEventKind::FindingDismissed => {
+                let event: FindingDismissal = serde_json::from_str(&entry.payload)
+                    .map_err(|_| AppError::InvalidChain(entry.seq))?;
+                let finding = findings
+                    .get_mut(&event.id)
+                    .ok_or(AppError::InvalidChain(entry.seq))?;
+                if entry.actor != Actor::Analyst
+                    || finding.confirmed
+                    || finding.dismissed
+                    || entry.evidence.is_some()
+                    || event.reason.trim().is_empty()
+                    || event.reason.len() > 500
+                {
+                    return Err(AppError::InvalidChain(entry.seq));
+                }
+                finding.dismissed = true;
+            }
+            _ => {}
+        }
+    }
+    let notices = crate::source_queries::result_limit_notices(entries)?;
+    let limited = notices
+        .iter()
+        .map(crate::source_queries::SourceQueryLimitNotice::capture_sha256)
+        .collect::<std::collections::BTreeSet<_>>();
+    for finding in findings.values_mut() {
+        finding.source_query_limited = limited.contains(finding.evidence_hash.as_str())
+            || matches!(&finding.details, Some(EntityDetails::Hypothesis { supporting_evidence, refuting_evidence })
+                if supporting_evidence.iter().chain(refuting_evidence)
+                    .any(|hash| limited.contains(hash.as_str())));
+    }
+    Ok(findings.into_values().collect())
 }
 
 impl Engine<'_> {
@@ -261,72 +337,7 @@ impl Engine<'_> {
         entries: &[SignedEntry],
     ) -> Result<Vec<Finding>, AppError> {
         let known_evidence = self.known_evidence(id, entries)?;
-        let mut findings = BTreeMap::<String, Finding>::new();
-        for entry in entries {
-            match entry.kind {
-                AuditEventKind::FindingProposed => {
-                    let finding: Finding = serde_json::from_str(&entry.payload)
-                        .map_err(|_| AppError::InvalidChain(entry.seq))?;
-                    if !matches!(entry.origin.as_str(), "analyst" | "model")
-                        || (entry.origin == "analyst" && entry.actor != Actor::Analyst)
-                        || finding.confirmed
-                        || finding.dismissed
-                        || uuid::Uuid::parse_str(&finding.id).is_err()
-                        || finding.value.trim().is_empty()
-                        || finding.value.len() > 2_000
-                        || finding.value.contains('\0')
-                        || entry.evidence.as_deref() != Some(finding.evidence_hash.as_str())
-                        || !finding.valid_for(&known_evidence)
-                        || findings.insert(finding.id.clone(), finding).is_some()
-                    {
-                        return Err(AppError::InvalidChain(entry.seq));
-                    }
-                }
-                AuditEventKind::FindingConfirmed => {
-                    let finding = findings
-                        .get_mut(&entry.payload)
-                        .ok_or(AppError::InvalidChain(entry.seq))?;
-                    if entry.actor != Actor::Analyst
-                        || finding.confirmed
-                        || finding.dismissed
-                        || entry.evidence.is_some()
-                    {
-                        return Err(AppError::InvalidChain(entry.seq));
-                    }
-                    finding.confirmed = true;
-                }
-                AuditEventKind::FindingDismissed => {
-                    let event: FindingDismissal = serde_json::from_str(&entry.payload)
-                        .map_err(|_| AppError::InvalidChain(entry.seq))?;
-                    let finding = findings
-                        .get_mut(&event.id)
-                        .ok_or(AppError::InvalidChain(entry.seq))?;
-                    if entry.actor != Actor::Analyst
-                        || finding.confirmed
-                        || finding.dismissed
-                        || entry.evidence.is_some()
-                        || event.reason.trim().is_empty()
-                        || event.reason.len() > 500
-                    {
-                        return Err(AppError::InvalidChain(entry.seq));
-                    }
-                    finding.dismissed = true;
-                }
-                _ => {}
-            }
-        }
-        let notices = crate::source_queries::result_limit_notices(entries)?;
-        let limited = notices
-            .iter()
-            .map(crate::source_queries::SourceQueryLimitNotice::capture_sha256)
-            .collect::<std::collections::BTreeSet<_>>();
-        for finding in findings.values_mut() {
-            finding.source_query_limited = limited.contains(finding.evidence_hash.as_str())
-                || matches!(&finding.details, Some(EntityDetails::Hypothesis { supporting_evidence, refuting_evidence })
-                    if supporting_evidence.iter().chain(refuting_evidence)
-                        .any(|hash| limited.contains(hash.as_str())));
-        }
-        Ok(findings.into_values().collect())
+        replay_findings(entries, &known_evidence)
     }
 
     fn known_evidence(
