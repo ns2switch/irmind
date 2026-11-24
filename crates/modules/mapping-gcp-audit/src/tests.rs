@@ -270,3 +270,35 @@ fn another_service_cannot_turn_a_project_principal_into_a_kubernetes_user() {
     );
     assert!(interpreter.map(&source).is_err());
 }
+
+#[test]
+fn gke_unavailable_status_keeps_the_audit_event_and_does_not_infer_an_outcome() {
+    let mapper = GkeMapping::new().unwrap();
+    for (code, reason) in [
+        (json!("7"), "unexpected_type"),
+        (Value::Null, "unexpected_type"),
+        (json!(17), "overflow"),
+        (json!(-1), "overflow"),
+    ] {
+        let mut input: Value = serde_json::from_slice(GKE).unwrap();
+        input["protoPayload"]["status"]["code"] = code;
+        let source = decode(&input, true);
+        let output = mapper.map(&source).unwrap();
+        let record = output.record();
+        assert_eq!(record.common.origin(), source.origin());
+        assert_eq!(record.common.event().outcome(), EventOutcome::Unknown);
+        assert!(
+            record
+                .common
+                .event()
+                .categories()
+                .contains(EventCategory::Api)
+        );
+        let retained: Value = serde_json::from_str(&record.indexed.record.text).unwrap();
+        assert_eq!(
+            retained["unavailable"],
+            json!({"protoPayload.status.code": reason})
+        );
+        assert_eq!(retained["original"], json!({}));
+    }
+}

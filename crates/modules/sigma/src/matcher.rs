@@ -19,6 +19,7 @@ pub enum SigmaFieldKind {
     TextList,
     IntegerList,
     IpList,
+    PairList,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -35,6 +36,7 @@ pub enum SigmaField<'a> {
     Absent,
     Single(SigmaScalar<'a>),
     List(&'a [SigmaScalar<'a>]),
+    Pairs(&'a [(&'a str, &'a str)]),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -74,6 +76,7 @@ enum Predicate {
     Integer(IntegerComparison, i64),
     Pattern(Regex, u64),
     Network(Network),
+    Pair { name: String, value: String },
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -183,6 +186,8 @@ impl FieldTest {
                     return Err(EvaluationError::FieldTypeMismatch);
                 }
             }
+            SigmaField::Pairs(pairs)
+                if self.kind == SigmaFieldKind::PairList && pairs.len() <= 128 => {}
             SigmaField::List(values) if values.len() > 1024 => {
                 return Err(EvaluationError::OversizedInput);
             }
@@ -209,6 +214,18 @@ impl Predicate {
             SigmaField::List(values) => {
                 for value in *values {
                     if self.scalar(*value, units)? {
+                        return Ok(true);
+                    }
+                }
+                Ok(false)
+            }
+            SigmaField::Pairs(items) => {
+                let Self::Pair { name, value } = self else {
+                    return Err(EvaluationError::FieldTypeMismatch);
+                };
+                for &(actual_name, actual_value) in *items {
+                    charge(units, 1 + (actual_name.len() + actual_value.len()) as u64)?;
+                    if actual_name == name && actual_value == value {
                         return Ok(true);
                     }
                 }
@@ -280,6 +297,35 @@ fn compile_test(
     let name = parts.next().ok_or(CompileError::MissingBinding)?;
     let kind = *bindings.get(name).ok_or(CompileError::MissingBinding)?;
     let modifiers = parts.collect::<Vec<_>>();
+    if kind == SigmaFieldKind::PairList {
+        if !modifiers.is_empty() {
+            return Err(CompileError::UnsupportedModifier);
+        }
+        let RuleValue::Mapping(pair) = value else {
+            return Err(CompileError::WrongType);
+        };
+        if pair.len() != 2 {
+            return Err(CompileError::WrongType);
+        }
+        let (Some(RuleValue::Text(name)), Some(RuleValue::Text(value))) =
+            (pair.get("Name"), pair.get("Value"))
+        else {
+            return Err(CompileError::WrongType);
+        };
+        if name.is_empty() || name.len() > 512 || value.len() > 4096 {
+            return Err(CompileError::Limit);
+        }
+        *remaining = remaining.checked_sub(1).ok_or(CompileError::Limit)?;
+        return Ok(FieldTest {
+            name: key.into(),
+            kind,
+            predicates: vec![Predicate::Pair {
+                name: name.clone(),
+                value: value.clone(),
+            }],
+            all: false,
+        });
+    }
     let values = match value {
         RuleValue::Sequence(values) if !values.is_empty() => values.as_slice(),
         RuleValue::Sequence(_) => return Err(CompileError::InvalidSelection),

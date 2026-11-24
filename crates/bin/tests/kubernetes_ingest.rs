@@ -12,6 +12,9 @@ mod entra;
 mod managed;
 #[path = "kubernetes_ingest/originals.rs"]
 mod originals;
+#[cfg(feature = "sigma")]
+#[path = "kubernetes_ingest/sigma.rs"]
+mod sigma;
 use ed25519_dalek::{Signer as _, SigningKey};
 use irmind_app::{
     AppError, AuditLog, CancellationToken, CryptoPorts, Engine, EnginePorts, EvidenceGraph,

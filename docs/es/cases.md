@@ -22,10 +22,18 @@ mostrado para firmar la admisión. Si una ejecución usa el pack, la exportació
 V10 del caso incluye las reglas exactas admitidas.
 
 Ejecuta `/sigma run <SHA-256 del pack> <inicio UTC> <fin UTC>` desde un caso
-abierto. La tabla inicial cubre los eventos revisados de CloudTrail. IRMind
-informa de las reglas omitidas y marca como parciales los análisis que alcanzan
-un límite de tiempo o trabajo. Cada coincidencia propone un hallazgo sin
-confirmar vinculado a una fila de evidencia. Revísalo y usa
+abierto. La tabla de v0.7 cubre los canales revisados de Windows EVTX Security,
+Sysmon y PowerShell, la autenticación de Linux, auditd y ECS mapeado, AWS CloudTrail
+y los eventos DNS, HTTP y de conexión de Zeek y Suricata. También cubre los inicios
+de sesión y la auditoría de Entra ID, Azure Activity, Microsoft 365, Okta, la
+auditoría de GCP y Kubernetes y las clases revisadas de procesos y eventos
+relacionados de Defender, CrowdStrike FDR y eslogger. La cobertura depende del
+logsource, los campos y la versión exacta del mapeo. IRMind informa de las reglas
+omitidas, las ejecuciones parciales y cuántas filas por fuente tienen campos
+exactos no disponibles. Una fila es indeterminada para una regla cuando falta
+un campo exacto que necesita. Esto puede indicar manipulación de la fuente.
+Revisa el original íntegro. El informe explica la limitación y cita la
+ejecución firmada. Cada coincidencia propone un hallazgo sin confirmar vinculado a una fila de evidencia. Revísalo y usa
 `/confirm <id del hallazgo>` antes de publicar el informe.
 
 ## Publicar un informe firmado

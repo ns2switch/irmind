@@ -1,0 +1,157 @@
+[[variants]]
+product = "zeek"
+service = "dns"
+category = "dns_query"
+parser_id = "parser-zeek"
+parser_version = "zeek-source-v1"
+mapping_id = "mapping-zeek"
+mapping_version = "@network-semantic-v1-"
+dataset = "zeek-dns"
+events = [{ column = "event.action", equals = "dns" }]
+fields = [
+  { name = "Protocol", column = "network.transport", value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "id.orig_h", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "id.resp_h", column = "destination.ip", value_type = "ip", null_policy = "absent" },
+  { name = "id.orig_p", column = "source.port", value_type = "integer", null_policy = "absent" },
+  { name = "id.resp_p", column = "destination.port", value_type = "integer", null_policy = "absent" },
+  { name = "proto", column = "network.transport", value_type = "text", null_policy = "absent" },
+  { name = "query", column = "dns.question.name", value_type = "text", null_policy = "absent" },
+  { name = "qtype_name", column = "dns.question.type", value_type = "text", null_policy = "absent" },
+  { name = "rcode_name", column = "dns.response_code", value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "zeek"
+service = "http"
+category = "webserver"
+parser_id = "parser-zeek"
+parser_version = "zeek-source-v1"
+mapping_id = "mapping-zeek"
+mapping_version = "@network-semantic-v1-"
+dataset = "zeek-http"
+events = [{ column = "event.action", equals = "http" }]
+fields = [
+  { name = "Protocol", column = "network.transport", value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "id.orig_h", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "id.resp_h", column = "destination.ip", value_type = "ip", null_policy = "absent" },
+  { name = "id.orig_p", column = "source.port", value_type = "integer", null_policy = "absent" },
+  { name = "id.resp_p", column = "destination.port", value_type = "integer", null_policy = "absent" },
+  { name = "proto", column = "network.transport", value_type = "text", null_policy = "absent" },
+  { name = "host", column = "url.domain", value_type = "text", null_policy = "absent" },
+  { name = "uri", column = "url.original", value_type = "text", null_policy = "absent" },
+  { name = "method", column = "http.request.method", value_type = "text", null_policy = "absent" },
+  { name = "status_code", column = "http.response.status_code", value_type = "integer", null_policy = "absent" },
+  { name = "user_agent", column = "user_agent.original", value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "zeek"
+service = "conn"
+category = "network_connection"
+parser_id = "parser-zeek"
+parser_version = "zeek-source-v1"
+mapping_id = "mapping-zeek"
+mapping_version = "@network-semantic-v1-"
+dataset = "zeek-conn"
+events = [{ column = "event.action", equals = "conn" }]
+fields = [
+  { name = "Protocol", column = "network.transport", value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "id.orig_h", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "id.resp_h", column = "destination.ip", value_type = "ip", null_policy = "absent" },
+  { name = "id.orig_p", column = "source.port", value_type = "integer", null_policy = "absent" },
+  { name = "id.resp_p", column = "destination.port", value_type = "integer", null_policy = "absent" },
+  { name = "proto", column = "network.transport", value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "suricata"
+service = "dns"
+category = "dns_query"
+parser_id = "parser-suricata"
+parser_version = "suricata-source-v1"
+mapping_id = "mapping-suricata"
+mapping_version = "@network-semantic-v1-"
+dataset = "suricata-dns"
+events = [{ column = "event.action", equals = "dns" }]
+fields = [
+  { name = "Protocol", column = "network.transport", value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "src_ip", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "dest_ip", column = "destination.ip", value_type = "ip", null_policy = "absent" },
+  { name = "src_port", column = "source.port", value_type = "integer", null_policy = "absent" },
+  { name = "dest_port", column = "destination.port", value_type = "integer", null_policy = "absent" },
+  { name = "event_type", path = ["event_type"], value_type = "text", null_policy = "absent" },
+  { name = "dns.rrname", column = "dns.question.name", value_type = "text", null_policy = "absent" },
+  { name = "dns.rrtype", column = "dns.question.type", value_type = "text", null_policy = "absent" },
+  { name = "dns.rcode", column = "dns.response_code", value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "suricata"
+service = "http"
+category = "webserver"
+parser_id = "parser-suricata"
+parser_version = "suricata-source-v1"
+mapping_id = "mapping-suricata"
+mapping_version = "@network-semantic-v1-"
+dataset = "suricata-http"
+events = [{ column = "event.action", equals = "http" }]
+fields = [
+  { name = "Protocol", column = "network.transport", value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "src_ip", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "dest_ip", column = "destination.ip", value_type = "ip", null_policy = "absent" },
+  { name = "src_port", column = "source.port", value_type = "integer", null_policy = "absent" },
+  { name = "dest_port", column = "destination.port", value_type = "integer", null_policy = "absent" },
+  { name = "event_type", path = ["event_type"], value_type = "text", null_policy = "absent" },
+  { name = "http.hostname", column = "url.domain", value_type = "text", null_policy = "absent" },
+  { name = "http.url", column = "url.original", value_type = "text", null_policy = "absent" },
+  { name = "http.http_method", column = "http.request.method", value_type = "text", null_policy = "absent" },
+  { name = "http.status", column = "http.response.status_code", value_type = "integer", null_policy = "absent" },
+  { name = "http.http_user_agent", column = "user_agent.original", value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "suricata"
+service = "flow"
+category = "network_connection"
+parser_id = "parser-suricata"
+parser_version = "suricata-source-v1"
+mapping_id = "mapping-suricata"
+mapping_version = "@network-semantic-v1-"
+dataset = "suricata-flow"
+events = [{ column = "event.action", equals = "flow" }]
+fields = [
+  { name = "Protocol", column = "network.transport", value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "src_ip", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "dest_ip", column = "destination.ip", value_type = "ip", null_policy = "absent" },
+  { name = "src_port", column = "source.port", value_type = "integer", null_policy = "absent" },
+  { name = "dest_port", column = "destination.port", value_type = "integer", null_policy = "absent" },
+  { name = "event_type", path = ["event_type"], value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "suricata"
+service = "alert"
+category = "ids"
+parser_id = "parser-suricata"
+parser_version = "suricata-source-v1"
+mapping_id = "mapping-suricata"
+mapping_version = "@network-semantic-v1-"
+dataset = "suricata-alert"
+events = [{ column = "event.action", equals = "alert" }]
+fields = [
+  { name = "Protocol", column = "network.transport", value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "src_ip", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "dest_ip", column = "destination.ip", value_type = "ip", null_policy = "absent" },
+  { name = "src_port", column = "source.port", value_type = "integer", null_policy = "absent" },
+  { name = "dest_port", column = "destination.port", value_type = "integer", null_policy = "absent" },
+  { name = "event_type", path = ["event_type"], value_type = "text", null_policy = "absent" },
+  { name = "alert.signature", path = ["alert", "signature"], value_type = "text", null_policy = "absent" },
+  { name = "alert.signature_id", path = ["alert", "signature_id"], value_type = "integer", null_policy = "absent" },
+]

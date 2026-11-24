@@ -1,33 +1,34 @@
 //! Execute a reviewed field table over the active, signed case artifacts.
 use super::{
     LocalSigmaPack,
-    evaluation::SigmaVariantPrograms,
+    evaluation::{MAX_MATCHES, SigmaVariantPrograms, covers},
     field_table::{ReviewedSigmaFieldTable, SigmaSourceVariant},
     invalid,
 };
 use crate::LocalStore;
 use irmind_app::{
     AppError, AuditEventKind, AuditLog, CancellationToken, Engine,
+    source_mapping::{MappingCatalog, MappingProvenance},
     v10_proofs::{
         PreparedSigmaExecution, SigmaCompiledRuleV1, SigmaCompiledRulesV1, SigmaCoverageV1,
         SigmaExecutionContext, SigmaExecutionSummary, SigmaFieldTableV1, SigmaFindingDraft,
-        SigmaMatchV1, SigmaRuleCoverageV1, SigmaRuleKeyV1, SigmaRunResultsV1, SigmaRunV1,
-        SigmaSourceScopeV1, V10ArtifactReference, V10AuditReference, V10ProofDescriptor,
-        V10ProofFamily, V10RowReference, V10SourceReference, sigma_pack_operation,
-        v10_proof_commitment,
+        SigmaMatchV1, SigmaRuleCoverageV1, SigmaRuleKeyV1, SigmaRunResultsV1, SigmaRunResultsV2,
+        SigmaRunV1, SigmaSourceScopeV1, V10ArtifactReference, V10AuditReference,
+        V10ProofDescriptor, V10ProofFamily, V10RowReference, V10SourceReference,
+        sigma_pack_operation, v10_proof_commitment,
     },
 };
-use irmind_domain::{ArtifactSchemaV2, CaseId, ParquetArtifact, SourceManifestV2};
+use irmind_domain::{
+    ArtifactSchemaV2, CaseId, MappingBindingV1, ParquetArtifact, SourceManifestV2,
+};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     ops::Range,
     path::Path,
     time::{Duration, Instant},
 };
 
-use irmind_app::v10_proofs::SigmaRunStatusV1;
-
-const EVALUATOR: &str = "irmind-sigma-evaluator-v1";
+use irmind_app::v10_proofs::{SIGMA_EVALUATOR_V2, SigmaRunStatusV1};
 type RunObjects = Vec<(V10ProofDescriptor, Vec<u8>)>;
 
 impl LocalStore {
@@ -51,8 +52,10 @@ impl LocalStore {
             |scope, operation| {
                 let admission = sigma_pack_operation(operation)?.ok_or_else(invalid)?;
                 let rules = self.read_signed_sigma_pack(&admission, cancel)?;
+                let catalog = self.parquet.mapping_catalog().ok_or_else(invalid)?;
                 let candidate = prepare(
                     scope,
+                    catalog,
                     &rules,
                     operation.hash,
                     &self.parquet.owned_case_path(case),
@@ -84,16 +87,16 @@ impl LocalStore {
 
 fn prepare(
     scope: SigmaExecutionContext<'_>,
+    catalog: &MappingCatalog,
     pack: &LocalSigmaPack,
     admission: [u8; 32],
     directory: &Path,
     time: Range<i64>,
     cancel: &CancellationToken,
 ) -> Result<PreparedSigmaExecution<RunObjects>, AppError> {
-    let table = cloudtrail_table();
-    let reviewed = ReviewedSigmaFieldTable::parse(&table)?;
-    let variant = reviewed.variants.first().ok_or_else(invalid)?;
-    let work = Workset::resolve(&scope, variant)?;
+    let (table, reviewed) =
+        ReviewedSigmaFieldTable::materialize_native(enrolled_field_table(), catalog)?;
+    let work = Workset::resolve(&scope, &reviewed, catalog)?;
     let mut rules = pack
         .manifest
         .0
@@ -102,18 +105,85 @@ fn prepare(
         .map(|(file, bytes)| (file.rule.clone(), bytes.as_slice()))
         .collect::<Vec<_>>();
     rules.sort_unstable_by(|a, b| a.0.cmp(&b.0));
-    let programs = SigmaVariantPrograms::compile(variant, rules.iter().cloned())?;
-    let (compiled, mut results) = rule_objects(&programs, &rules);
-    let (hit_rows, status, used_units) =
-        scan_matches(&scope, &work, &programs, directory, &time, cancel)?;
+    let (compiled, mut results) = rule_objects(&reviewed, &work.variants, &rules, cancel)?;
+    let ScanOutcome {
+        hits: hit_rows,
+        status,
+        used_units,
+        unavailable_by_source,
+        indeterminate_by_rule,
+    } = scan_matches(
+        &scope, &work, &reviewed, &compiled, &rules, directory, &time, cancel,
+    )?;
+    let skipped_rules = results
+        .coverage
+        .iter()
+        .filter(|rule| rule.status != SigmaCoverageV1::Eligible)
+        .count();
+    let findings = materialize_findings(scope.view.entries(), &rules, hit_rows, &mut results)?;
+    let source_counts = unavailable_by_source
+        .iter()
+        .map(|(source, count)| {
+            work.sources
+                .get(source.as_str())
+                .map(|signed| (signed.reference, *count))
+                .ok_or_else(invalid)
+        })
+        .collect::<Result<BTreeMap<_, _>, _>>()?;
+    let indeterminate_by_rule = indeterminate_by_rule.into_iter().collect::<Vec<_>>();
+    let v2 = SigmaRunResultsV2 {
+        results,
+        unavailable_by_source: source_counts.into_iter().collect(),
+        indeterminate_by_rule: indeterminate_by_rule.clone(),
+    };
+    let material = run_objects(&table, &work.scope(), &compiled, &v2)?;
+    let descriptors = material
+        .iter()
+        .map(|(descriptor, _)| *descriptor)
+        .collect::<Vec<_>>();
+    let proof_set =
+        v10_proof_commitment(V10ProofFamily::Sigma, &descriptors).map_err(|_| invalid())?;
+    let receipt = SigmaRunV1 {
+        checkpoint: scope.checkpoint,
+        pack_admission: admission,
+        artifact_inventory: scope.view.active_artifact_inventory()?,
+        selected_sources: descriptors[1].hash(),
+        start_utc_micros: time.start,
+        end_utc_micros: time.end,
+        compiled_rules: descriptors[2].hash(),
+        field_table: descriptors[0].hash(),
+        evaluator: SIGMA_EVALUATOR_V2.into(),
+        reserved_units: scope.reserved,
+        used_units,
+        status,
+        matched_rows: findings.len() as u64,
+        result_manifest: descriptors[3].hash(),
+        proof_set,
+    };
+    Ok(PreparedSigmaExecution {
+        receipt,
+        material,
+        findings,
+        skipped_rules,
+        unavailable_by_source: work.named_gap_counts(unavailable_by_source)?,
+        indeterminate_by_rule,
+    })
+}
+
+fn materialize_findings(
+    entries: &[irmind_app::SignedEntry],
+    rules: &[(SigmaRuleKeyV1, &[u8])],
+    hit_rows: Vec<Hit<'_>>,
+    results: &mut SigmaRunResultsV1,
+) -> Result<Vec<SigmaFindingDraft>, AppError> {
     let titles = hit_rows
         .iter()
         .map(|(rule, ..)| rule)
         .collect::<std::collections::BTreeSet<_>>()
         .into_iter()
-        .map(|rule| title_for(rule, &rules).map(|title| (rule.clone(), title)))
+        .map(|rule| title_for(rule, rules).map(|title| (rule.clone(), title)))
         .collect::<Result<BTreeMap<_, _>, _>>()?;
-    let inherited = irmind_app::v10_proofs::sigma_query_limits(scope.view.entries())?;
+    let inherited = irmind_app::v10_proofs::sigma_query_limits(entries)?;
     let mut findings = Vec::with_capacity(hit_rows.len());
     for (rule, when, source, _, row) in hit_rows {
         let title = titles.get(&rule).ok_or_else(invalid)?.clone();
@@ -128,35 +198,7 @@ fn prepare(
             at: when.to_rfc3339(),
         });
     }
-    let material = run_objects(&table, &work.scope(), &compiled, &results)?;
-    let descriptors = material
-        .iter()
-        .map(|(descriptor, _)| *descriptor)
-        .collect::<Vec<_>>();
-    let receipt = SigmaRunV1 {
-        checkpoint: scope.checkpoint,
-        pack_admission: admission,
-        artifact_inventory: scope.view.active_artifact_inventory()?,
-        selected_sources: descriptors[1].hash(),
-        start_utc_micros: time.start,
-        end_utc_micros: time.end,
-        compiled_rules: descriptors[2].hash(),
-        field_table: descriptors[0].hash(),
-        evaluator: EVALUATOR.into(),
-        reserved_units: scope.reserved,
-        used_units,
-        status,
-        matched_rows: findings.len() as u64,
-        result_manifest: descriptors[3].hash(),
-        proof_set: v10_proof_commitment(V10ProofFamily::Sigma, &descriptors)
-            .map_err(|_| invalid())?,
-    };
-    Ok(PreparedSigmaExecution {
-        receipt,
-        material,
-        findings,
-        skipped_rules: programs.skipped().len(),
-    })
+    Ok(findings)
 }
 
 type Hit<'a> = (
@@ -167,48 +209,138 @@ type Hit<'a> = (
     V10RowReference,
 );
 
+struct ScanOutcome<'a> {
+    hits: Vec<Hit<'a>>,
+    status: SigmaRunStatusV1,
+    used_units: u64,
+    unavailable_by_source: BTreeMap<irmind_domain::EvidenceHash, u64>,
+    indeterminate_by_rule: BTreeMap<SigmaRuleKeyV1, u64>,
+}
+
+#[allow(clippy::too_many_arguments)]
 fn scan_matches<'a>(
     scope: &SigmaExecutionContext<'_>,
     work: &'a Workset,
-    programs: &SigmaVariantPrograms<'_>,
+    table: &ReviewedSigmaFieldTable,
+    compiled: &SigmaCompiledRulesV1,
+    rules: &[(SigmaRuleKeyV1, &[u8])],
     directory: &Path,
     time: &Range<i64>,
     cancel: &CancellationToken,
-) -> Result<(Vec<Hit<'a>>, SigmaRunStatusV1, u64), AppError> {
-    let mut scan = programs.start(scope.reserved);
+) -> Result<ScanOutcome<'a>, AppError> {
     let mut hit_rows = Vec::new();
     let deadline = Instant::now() + Duration::from_secs(15);
-    for (locator, artifact) in &work.artifacts {
-        let mut file = irmind_fs::open_regular_no_follow(directory, Path::new(artifact.path()))
-            .map_err(|_| invalid())?;
-        crate::verify_v10_artifact_rows(&mut file, 0, artifact, &[], cancel)?;
-        scan.scan_authenticated(
-            file,
-            time.clone(),
-            deadline,
-            cancel,
-            |physical_row, event, key| {
-                let origin = event.origin();
-                let signed = work
-                    .sources
-                    .get(origin.source().as_str())
-                    .ok_or_else(invalid)?;
-                let when = event.timestamp().ok_or_else(invalid)?;
-                let row = V10RowReference {
-                    artifact: *locator,
-                    source: signed.reference,
-                    record: origin.record(),
-                    physical_row,
-                };
-                scope.view.row_artifact(row)?;
-                hit_rows.push((key.clone(), when, signed, origin.offset(), row));
-                Ok(())
-            },
-        )?;
-        if scan.status() != irmind_app::v10_proofs::SigmaRunStatusV1::Complete {
+    let mut status = SigmaRunStatusV1::Complete;
+    let mut remaining = scope.reserved;
+    let mut unavailable_by_source = BTreeMap::new();
+    let mut indeterminate_by_rule = BTreeMap::new();
+    for &index in &work.variants {
+        let rules = rules
+            .iter()
+            .zip(&compiled.0)
+            .filter(|(_, rule)| rule.variants.binary_search(&(index as u64)).is_ok())
+            .map(|(raw, _)| raw.clone())
+            .collect::<Vec<_>>();
+        if rules.is_empty() && table.variants[index].exact_cluster_field().is_none() {
+            continue;
+        }
+        if cancel.is_cancelled() {
+            status = SigmaRunStatusV1::Cancelled;
+            break;
+        }
+        if Instant::now() >= deadline {
+            status = SigmaRunStatusV1::TimeLimit;
+            break;
+        }
+        let programs = SigmaVariantPrograms::compile(&table.variants[index], rules)?;
+        let mut scan = programs.start_with_match_limit(remaining, MAX_MATCHES - hit_rows.len());
+        for (locator, artifact, variants) in &work.artifacts {
+            if !variants.contains(&index) {
+                continue;
+            }
+            let mut file = irmind_fs::open_regular_no_follow(directory, Path::new(artifact.path()))
+                .map_err(|_| invalid())?;
+            crate::verify_v10_artifact_rows(&mut file, 0, artifact, &[], cancel)?;
+            scan.scan_authenticated(
+                file,
+                time.clone(),
+                deadline,
+                cancel,
+                |physical_row, event, key| {
+                    hit_rows.push(resolve_hit(
+                        scope,
+                        work,
+                        *locator,
+                        physical_row,
+                        event,
+                        key,
+                    )?);
+                    Ok(())
+                },
+            )?;
+            if scan.status() != SigmaRunStatusV1::Complete {
+                break;
+            }
+        }
+        remaining = remaining
+            .checked_sub(scan.used_units())
+            .ok_or_else(invalid)?;
+        status = scan.status();
+        add_counts(&mut unavailable_by_source, scan.unavailable_by_source)?;
+        add_counts(&mut indeterminate_by_rule, scan.indeterminate_by_rule)?;
+        if status != SigmaRunStatusV1::Complete {
             break;
         }
     }
+    sort_hits(&mut hit_rows);
+    if status == SigmaRunStatusV1::Complete && !indeterminate_by_rule.is_empty() {
+        status = SigmaRunStatusV1::ExactFieldsUnavailable;
+    }
+    Ok(ScanOutcome {
+        hits: hit_rows,
+        status,
+        used_units: scope.reserved - remaining,
+        unavailable_by_source,
+        indeterminate_by_rule,
+    })
+}
+
+fn resolve_hit<'a>(
+    scope: &SigmaExecutionContext<'_>,
+    work: &'a Workset,
+    artifact: V10ArtifactReference,
+    physical_row: u64,
+    event: &irmind_domain::CommonEventV1,
+    key: &SigmaRuleKeyV1,
+) -> Result<Hit<'a>, AppError> {
+    let origin = event.origin();
+    let signed = work
+        .sources
+        .get(origin.source().as_str())
+        .ok_or_else(invalid)?;
+    let when = event.timestamp().ok_or_else(invalid)?;
+    let row = V10RowReference {
+        artifact,
+        source: signed.reference,
+        record: origin.record(),
+        physical_row,
+    };
+    scope.view.row_artifact(row)?;
+    Ok((key.clone(), when, signed, origin.offset(), row))
+}
+
+fn add_counts<K: Ord>(
+    totals: &mut BTreeMap<K, u64>,
+    counts: BTreeMap<K, u64>,
+) -> Result<(), AppError> {
+    for (key, count) in counts {
+        let total = totals.entry(key).or_default();
+        *total = total.checked_add(count).ok_or_else(invalid)?;
+    }
+    Ok(())
+}
+
+fn sort_hits(hit_rows: &mut Vec<Hit<'_>>) {
     hit_rows.sort_unstable_by(
         |(rule, time, source, offset, row),
          (other_rule, other_time, other_source, other_offset, other_row)| {
@@ -232,7 +364,7 @@ fn scan_matches<'a>(
             })
         },
     );
-    Ok((hit_rows, scan.status(), scan.used_units()))
+    hit_rows.dedup_by(|left, right| left.0 == right.0 && left.4 == right.4);
 }
 
 struct WorkSource {
@@ -241,18 +373,26 @@ struct WorkSource {
     hash: String,
 }
 
+type WorkArtifact = (V10ArtifactReference, ParquetArtifact, Vec<usize>);
+
 struct Workset {
-    artifacts: Vec<(V10ArtifactReference, ParquetArtifact)>,
+    artifacts: Vec<WorkArtifact>,
+    variants: BTreeSet<usize>,
     sources: BTreeMap<String, WorkSource>,
 }
 
 impl Workset {
     fn resolve(
         scope: &SigmaExecutionContext<'_>,
-        variant: &SigmaSourceVariant,
+        table: &ReviewedSigmaFieldTable,
+        catalog: &MappingCatalog,
     ) -> Result<Self, AppError> {
         let entries = scope.view.entries();
-        let (artifacts, chosen) = select_artifacts(entries, variant)?;
+        let (artifacts, chosen) = select_artifacts(entries, table, catalog)?;
+        let variants = artifacts
+            .iter()
+            .flat_map(|(_, _, variants)| variants.iter().copied())
+            .collect();
         let mut sources = BTreeMap::new();
         for entry in entries
             .iter()
@@ -285,12 +425,31 @@ impl Workset {
                 return Err(invalid());
             }
         }
-        if sources.is_empty() || sources.len() != chosen.len() {
+        if sources.len() != chosen.len() {
             return Err(AppError::Policy(
-                "No signed event artifacts match the installed Sigma field table".into(),
+                "Sigma source scope does not resolve to the signed original manifests".into(),
             ));
         }
-        Ok(Self { artifacts, sources })
+        Ok(Self {
+            artifacts,
+            variants,
+            sources,
+        })
+    }
+
+    fn named_gap_counts(
+        &self,
+        counts: BTreeMap<irmind_domain::EvidenceHash, u64>,
+    ) -> Result<Vec<(String, u64)>, AppError> {
+        counts
+            .into_iter()
+            .map(|(source, count)| {
+                self.sources
+                    .get(source.as_str())
+                    .map(|signed| (signed.name.clone(), count))
+                    .ok_or_else(invalid)
+            })
+            .collect()
     }
 
     fn scope(&self) -> SigmaSourceScopeV1 {
@@ -304,14 +463,12 @@ impl Workset {
     }
 }
 
-type SelectedArtifacts = (
-    Vec<(V10ArtifactReference, ParquetArtifact)>,
-    BTreeMap<String, V10ArtifactReference>,
-);
+type SelectedArtifacts = (Vec<WorkArtifact>, BTreeMap<String, V10ArtifactReference>);
 
 fn select_artifacts(
     entries: &[irmind_app::SignedEntry],
-    variant: &SigmaSourceVariant,
+    table: &ReviewedSigmaFieldTable,
+    catalog: &MappingCatalog,
 ) -> Result<SelectedArtifacts, AppError> {
     let active = irmind_app::artifact_catalog(entries)?
         .active
@@ -337,12 +494,27 @@ fn select_artifacts(
         let Some(first) = bindings.first() else {
             return Err(invalid());
         };
-        if first.decoder().id() != variant.parser_id
-            || first.decoder().version() != variant.parser_version
-            || first.mapping().is_none_or(|mapping| {
-                mapping.id() != variant.mapping_id || mapping.version() != variant.mapping_version
-            })
-        {
+        let Some(mapping) = first.mapping() else {
+            continue;
+        };
+        if !catalog.manifests().any(|manifest| {
+            manifest.identity() == mapping
+                && matches!(
+                    manifest.provenance(),
+                    MappingProvenance::NativeBuild { .. }
+                        | MappingProvenance::BundledDefinition { .. }
+                )
+        }) {
+            continue;
+        }
+        let variants = table
+            .variants
+            .iter()
+            .enumerate()
+            .filter(|(_, variant)| matches_binding(variant, first))
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+        if variants.is_empty() {
             continue;
         }
         let locator = V10ArtifactReference {
@@ -355,9 +527,17 @@ fn select_artifacts(
         for binding in bindings {
             chosen.insert(binding.input().source().as_str().to_owned(), locator);
         }
-        artifacts.push((locator, artifact));
+        artifacts.push((locator, artifact, variants));
     }
     Ok((artifacts, chosen))
+}
+
+fn matches_binding(variant: &SigmaSourceVariant, binding: &MappingBindingV1) -> bool {
+    binding.decoder().id() == variant.parser_id
+        && binding.decoder().version() == variant.parser_version
+        && binding.mapping().is_some_and(|mapping| {
+            mapping.id() == variant.mapping_id && mapping.version() == variant.mapping_version
+        })
 }
 
 fn digest(text: &str) -> Result<[u8; 32], AppError> {
@@ -367,49 +547,89 @@ fn digest(text: &str) -> Result<[u8; 32], AppError> {
 }
 
 fn rule_objects(
-    programs: &SigmaVariantPrograms<'_>,
+    table: &ReviewedSigmaFieldTable,
+    available: &BTreeSet<usize>,
     rules: &[(SigmaRuleKeyV1, &[u8])],
-) -> (SigmaCompiledRulesV1, SigmaRunResultsV1) {
-    let skipped = programs
-        .skipped()
-        .iter()
-        .map(|(key, status)| (key, *status))
-        .collect::<BTreeMap<_, _>>();
-    let compiled = rules
-        .iter()
-        .map(|(rule, _)| SigmaCompiledRuleV1 {
-            rule: rule.clone(),
-            variants: if skipped.contains_key(rule) {
-                vec![]
-            } else {
-                vec![0]
-            },
-        })
-        .collect();
-    let coverage = rules
-        .iter()
-        .map(|(rule, _)| {
-            let status = skipped
-                .get(rule)
-                .copied()
-                .unwrap_or(SigmaCoverageV1::Eligible);
-            SigmaRuleCoverageV1 {
-                rule: rule.clone(),
-                status,
-                detail: (status != SigmaCoverageV1::Eligible).then(|| {
-                    "Rule does not match the reviewed CloudTrail selectors or supported fields"
-                        .into()
-                }),
+    cancel: &CancellationToken,
+) -> Result<(SigmaCompiledRulesV1, SigmaRunResultsV1), AppError> {
+    let mut variants_by_rule = vec![Vec::new(); rules.len()];
+    let mut failures = vec![None; rules.len()];
+    for &index in available {
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
+        let programs =
+            SigmaVariantPrograms::compile(&table.variants[index], rules.iter().cloned())?;
+        let skipped = programs
+            .skipped()
+            .iter()
+            .map(|(key, status)| (key, *status))
+            .collect::<BTreeMap<_, _>>();
+        for (position, (key, _)) in rules.iter().enumerate() {
+            match skipped.get(key) {
+                None => variants_by_rule[position].push(index as u64),
+                Some(SigmaCoverageV1::UnsupportedLogsource) => {}
+                Some(status) => {
+                    if *status == SigmaCoverageV1::UnsupportedField || failures[position].is_none()
+                    {
+                        failures[position] = Some(*status);
+                    }
+                }
             }
-        })
-        .collect();
-    (
+        }
+    }
+    let mut compiled = Vec::with_capacity(rules.len());
+    let mut coverage = Vec::with_capacity(rules.len());
+    for (((rule, raw), mut variants), failure) in rules.iter().zip(variants_by_rule).zip(failures) {
+        let status = if let Some(status) = failure {
+            variants.clear();
+            status
+        } else if variants.is_empty() {
+            let document = irmind_sigma::admit_rule(raw).map_err(|_| invalid())?;
+            if table
+                .variants
+                .iter()
+                .any(|variant| covers(&document, variant))
+            {
+                SigmaCoverageV1::UnavailableSource
+            } else {
+                SigmaCoverageV1::UnsupportedLogsource
+            }
+        } else {
+            SigmaCoverageV1::Eligible
+        };
+        let detail = match status {
+            SigmaCoverageV1::Eligible => None,
+            SigmaCoverageV1::UnsupportedLogsource => {
+                Some("No reviewed variant matches the rule logsource")
+            }
+            SigmaCoverageV1::UnsupportedField => {
+                Some("A matching source class lacks an exact binding for a rule field")
+            }
+            SigmaCoverageV1::UnavailableSource => {
+                Some("No signed event artifact matches the rule's reviewed source classes")
+            }
+            SigmaCoverageV1::UnsupportedRule => {
+                Some("A matching source class does not support the rule's modifiers or condition")
+            }
+        };
+        compiled.push(SigmaCompiledRuleV1 {
+            rule: rule.clone(),
+            variants,
+        });
+        coverage.push(SigmaRuleCoverageV1 {
+            rule: rule.clone(),
+            status,
+            detail: detail.map(str::to_owned),
+        });
+    }
+    Ok((
         SigmaCompiledRulesV1(compiled),
         SigmaRunResultsV1 {
             coverage,
             matches: Vec::new(),
         },
-    )
+    ))
 }
 
 fn title_for(key: &SigmaRuleKeyV1, rules: &[(SigmaRuleKeyV1, &[u8])]) -> Result<String, AppError> {
@@ -427,7 +647,7 @@ fn run_objects(
     table: &SigmaFieldTableV1,
     scope: &SigmaSourceScopeV1,
     compiled: &SigmaCompiledRulesV1,
-    results: &SigmaRunResultsV1,
+    results: &SigmaRunResultsV2,
 ) -> Result<RunObjects, AppError> {
     [
         table.encode(),
@@ -447,10 +667,66 @@ fn run_objects(
     .collect()
 }
 
-fn cloudtrail_table() -> SigmaFieldTableV1 {
+pub(super) fn enrolled_field_table() -> SigmaFieldTableV1 {
     SigmaFieldTableV1 {
-        id: "irmind-sigma-cloudtrail".into(),
-        version: "v1".into(),
-        toml: include_str!("cloudtrail-v1.toml").into(),
+        id: "irmind-sigma-source-coverage".into(),
+        version: "v2".into(),
+        toml: concat!(
+            include_str!("cloudtrail-v1.toml"),
+            "\n",
+            include_str!("windows-v1.toml"),
+            "\n",
+            include_str!("linux-v1.toml"),
+            "\n",
+            include_str!("network-v1.toml"),
+            "\n",
+            include_str!("cloud-identity-v1.toml"),
+            "\n",
+            include_str!("endpoint-v1.toml"),
+        )
+        .into(),
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn signed_sigma_plan_requires_every_matching_source_binding() {
+        let mut table = SigmaFieldTableV1 {
+            toml: include_str!("cloudtrail-v1.toml").into(),
+            ..enrolled_field_table()
+        };
+        let other = table
+            .toml
+            .replace("dataset = \"cloudtrail\"", "dataset = \"other-dataset\"")
+            .replace("service = \"cloudtrail\"", "service = \"other\"")
+            .replace("name = \"Outcome\"", "name = \"OtherOutcome\"");
+        table.toml.push_str(&other);
+        let reviewed = ReviewedSigmaFieldTable::parse(&table).unwrap();
+        let rule = "title: Synthetic coverage test\nlogsource: {product: aws}\ndetection: {selection: {Outcome: failure}, condition: selection}\n";
+        let rules = [(
+            SigmaRuleKeyV1 {
+                id: "synthetic-coverage".into(),
+                sha256: irmind_app::sha256(rule.as_bytes()),
+            },
+            rule.as_bytes(),
+        )];
+        let cancel = CancellationToken::new();
+        for (available, status, expected) in [
+            (BTreeSet::from([0]), SigmaCoverageV1::Eligible, vec![0]),
+            (
+                BTreeSet::from([0, 1]),
+                SigmaCoverageV1::UnsupportedField,
+                vec![],
+            ),
+            (BTreeSet::new(), SigmaCoverageV1::UnavailableSource, vec![]),
+        ] {
+            let (compiled, results) = rule_objects(&reviewed, &available, &rules, &cancel).unwrap();
+            assert_eq!(compiled.0[0].variants, expected);
+            assert_eq!(results.coverage[0].status, status);
+        }
     }
 }

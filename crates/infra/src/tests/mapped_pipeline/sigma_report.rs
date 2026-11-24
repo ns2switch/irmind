@@ -339,6 +339,8 @@ fn sigma_case_row_proofs(
             rule: rule.clone(),
             variants: vec![0],
         }]),
+        unavailable_by_source: vec![],
+        indeterminate_by_rule: vec![],
         results: SigmaRunResultsV1 {
             coverage: vec![SigmaRuleCoverageV1 {
                 rule: rule.clone(),
@@ -372,7 +374,7 @@ fn sigma_case_row_proofs(
         end_utc_micros: i64::MAX,
         compiled_rules: descriptors[2].hash(),
         field_table: descriptors[0].hash(),
-        evaluator: "synthetic-sigma-evaluator".into(),
+        evaluator: "irmind-sigma-evaluator-v1".into(),
         reserved_units: 1024,
         used_units: 8,
         status: SigmaRunStatusV1::Complete,

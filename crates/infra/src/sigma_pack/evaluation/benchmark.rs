@@ -57,6 +57,35 @@ fn event(record: u64, action: &str, code: &str) -> CommonEventV1 {
 }
 
 fn fixture_file(path: &std::path::Path, records: u64) {
+    let padding = "x".repeat(4096);
+    write_fixture_rows(path, records, |record| {
+        let action = if record == INCIDENT_RECORD {
+            "signal"
+        } else {
+            "background"
+        };
+        let code = if record % 32 == 0 {
+            "audit"
+        } else {
+            "unrelated"
+        };
+        let original_name = if matches!(record, INCIDENT_RECORD | NEGATIVE_CONTROL) {
+            "legacy-signal"
+        } else {
+            "legacy-background"
+        };
+        (
+            encode_common_event(&event(record, action, code)).unwrap(),
+            format!(r#"{{"LegacyEvent":"{original_name}","padding":"{padding}"}}"#),
+        )
+    });
+}
+
+pub(super) fn write_fixture_rows(
+    path: &std::path::Path,
+    records: u64,
+    mut projected: impl FnMut(u64) -> (String, String),
+) {
     let file = OpenOptions::new()
         .create_new(true)
         .write(true)
@@ -68,31 +97,10 @@ fn fixture_file(path: &std::path::Path, records: u64) {
         .set_max_row_group_row_count(Some(1024))
         .build();
     let mut writer = None;
-    let padding = "x".repeat(4096);
     for begin in (0..records).step_by(1024) {
-        let mut common = Vec::new();
-        let mut original = Vec::new();
-        for record in begin..(begin + 1024).min(records) {
-            let action = if record == INCIDENT_RECORD {
-                "signal"
-            } else {
-                "background"
-            };
-            let code = if record % 32 == 0 {
-                "audit"
-            } else {
-                "unrelated"
-            };
-            let original_name = if matches!(record, INCIDENT_RECORD | NEGATIVE_CONTROL) {
-                "legacy-signal"
-            } else {
-                "legacy-background"
-            };
-            common.push(encode_common_event(&event(record, action, code)).unwrap());
-            original.push(format!(
-                r#"{{"LegacyEvent":"{original_name}","padding":"{padding}"}}"#
-            ));
-        }
+        let (common, original): (Vec<_>, Vec<_>) = (begin..(begin + 1024).min(records))
+            .map(&mut projected)
+            .unzip();
         let batch = RecordBatch::try_from_iter([
             (
                 "common_payload",
@@ -235,7 +243,7 @@ fn lane(file: &std::path::Path, original: bool, count: u64) {
     )
     .unwrap();
     let seconds = start.elapsed().as_secs_f64();
-    assert!(run.status() == SigmaRunStatusV1::Complete);
+    assert_eq!(run.status(), SigmaRunStatusV1::Complete);
     let name = if original { "original" } else { "common" };
     let truth = std::collections::BTreeSet::from([(format!("{name}-0000"), INCIDENT_RECORD)]);
     let false_matches = actual
@@ -266,7 +274,7 @@ fn lane(file: &std::path::Path, original: bool, count: u64) {
         usize::try_from(count.saturating_sub(950)).unwrap()
     );
     println!(
-        "fields={name} rules={count} compiled={} evaluated={} skipped={} compile_s={:.3} scan_s={seconds:.3} read_bytes={} tp={true_positives} fp={false_positives} fn={false_negatives} units={}",
+        "evaluator=irmind-sigma-evaluator-v2 fields={name} rules={count} compiled={} evaluated={} skipped={} compile_s={:.3} scan_s={seconds:.3} read_bytes={} tp={true_positives} fp={false_positives} fn={false_negatives} units={}",
         programs.eligible(),
         run.rules_evaluated(),
         programs.skipped().len(),

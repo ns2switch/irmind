@@ -44,6 +44,11 @@ impl V10SigmaRunObjects {
         for source in &self.selected_sources.0 {
             view.source(*source)?;
         }
+        for &(source, count) in &self.unavailable_by_source {
+            if count > view.records_for_source(source)? {
+                return Err(invalid());
+            }
+        }
         let inherited = sigma_query_limits(view.entries())?;
         for matched in &self.results.matches {
             let evidence = EvidenceHash::from_bytes(matched.row.source.evidence_sha256);
@@ -95,11 +100,15 @@ pub struct PreparedSigmaExecution<T> {
     pub findings: Vec<SigmaFindingDraft>,
     pub material: T,
     pub skipped_rules: usize,
+    pub unavailable_by_source: Vec<(String, u64)>,
+    pub indeterminate_by_rule: Vec<(super::SigmaRuleKeyV1, u64)>,
 }
 
 pub struct SigmaExecutionSummary {
     pub receipt: SigmaRunV1,
     pub skipped_rules: usize,
+    pub unavailable_by_source: Vec<(String, u64)>,
+    pub indeterminate_by_rule: Vec<(super::SigmaRuleKeyV1, u64)>,
 }
 
 pub struct SigmaExecutionContext<'a> {
@@ -194,6 +203,8 @@ impl crate::Engine<'_> {
         Ok(SigmaExecutionSummary {
             receipt,
             skipped_rules: candidate.skipped_rules,
+            unavailable_by_source: candidate.unavailable_by_source,
+            indeterminate_by_rule: candidate.indeterminate_by_rule,
         })
     }
 

@@ -1,6 +1,6 @@
 interpreter = "irmind-mapping-tables-v2"
 id = "mapping-kubernetes"
-version = "kubernetes-audit-tables-v1"
+version = "kubernetes-audit-tables-v2"
 target_schema = "irmind-common-event-v1"
 source_contract = "irmind-source-record-v1"
 parser = "parser-kubernetes"
