@@ -10,6 +10,7 @@ mod evidence_fs;
 mod graph_port;
 mod parquet_store;
 mod seal;
+pub mod sigma_pack;
 mod signing;
 mod skill_package;
 mod skill_store;
@@ -67,7 +68,10 @@ struct HeldCaseFile {
 }
 impl CaseLock for HeldCaseFile {}
 
-pub use seal::{LocalExportVerifier, verify_export, verify_export_expected};
+pub use seal::V10PreparedObjects;
+pub use seal::{
+    LocalExportVerifier, verify_export, verify_export_expected, verify_v10_artifact_rows,
+};
 #[cfg(test)]
 pub(crate) use signing::LocalSigner;
 use signing::verify_signature;

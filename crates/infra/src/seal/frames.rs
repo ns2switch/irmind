@@ -1,5 +1,5 @@
 use super::export_current::MAX_FRAME_BYTES;
-use super::{AppError, hex, storage, storage_reason};
+use super::{AppError, CancellationToken, hex, storage, storage_reason};
 use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io::Read;
@@ -29,10 +29,22 @@ pub(super) fn read_hash(input: &mut File) -> Result<String, AppError> {
 }
 
 pub(super) fn verify_raw(input: &mut File, size: u64, expected: &str) -> Result<(), AppError> {
+    verify_raw_with_cancel(input, size, expected, None)
+}
+
+pub(super) fn verify_raw_with_cancel(
+    input: &mut File,
+    size: u64,
+    expected: &str,
+    cancel: Option<&CancellationToken>,
+) -> Result<(), AppError> {
     let mut left = size;
     let mut hasher = Sha256::new();
     let mut chunk = vec![0u8; 1024 * 1024];
     while left > 0 {
+        if cancel.is_some_and(CancellationToken::is_cancelled) {
+            return Err(AppError::Cancelled);
+        }
         let count = usize::try_from(left.min(chunk.len() as u64)).map_err(storage)?;
         input.read_exact(&mut chunk[..count]).map_err(storage)?;
         hasher.update(&chunk[..count]);

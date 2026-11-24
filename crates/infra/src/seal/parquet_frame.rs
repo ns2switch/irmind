@@ -1,5 +1,6 @@
 //! Validate a hash-authenticated Parquet frame without extracting its contents.
 use super::{AppError, storage, storage_reason};
+mod proof_rows;
 use bytes::Bytes;
 use irmind_domain::ArtifactSchemaV2;
 use parquet::{
@@ -7,6 +8,7 @@ use parquet::{
     errors::{ParquetError, Result as ParquetResult},
     file::reader::{ChunkReader, Length},
 };
+pub use proof_rows::verify_v10_artifact_rows;
 use std::{
     fs::File,
     io::{Read, Seek, SeekFrom, Take},

@@ -1,17 +1,31 @@
 //! The V10 export ends with mandatory Sigma and report object counts.
-use super::{AppError, storage, storage_reason};
+use super::{AppError, CancellationToken, storage, storage_reason};
+use irmind_app::v10_proofs::{V10ProofFamily, write_v10_object_section};
 use std::io::{Read, Write};
 
-pub(super) fn write_empty(output: &mut impl Write) -> Result<(), AppError> {
-    output.write_all(&0u64.to_be_bytes()).map_err(storage)?;
-    output.write_all(&0u64.to_be_bytes()).map_err(storage)
+const FAMILIES: [V10ProofFamily; 2] = [V10ProofFamily::Sigma, V10ProofFamily::Report];
+
+pub(super) fn write_empty(
+    output: &mut impl Write,
+    cancel: &CancellationToken,
+) -> Result<(), AppError> {
+    for family in FAMILIES {
+        write_v10_object_section(
+            output,
+            family,
+            &[],
+            |_| Err::<std::io::Empty, _>(AppError::InvalidChain(0)),
+            cancel,
+        )?;
+    }
+    Ok(())
 }
 
 pub(super) fn verify_empty(input: &mut impl Read) -> Result<(), AppError> {
-    for _ in 0..2 {
+    for _ in FAMILIES {
         let mut count = [0; 8];
         input.read_exact(&mut count).map_err(storage)?;
-        if u64::from_be_bytes(count) != 0 {
+        if count != [0; 8] {
             return Err(AppError::InvalidChain(0));
         }
     }
@@ -27,7 +41,7 @@ mod tests {
     use super::super::export_current::{HeaderV10, write_header};
     use super::super::{CaseSeal, hex, sha256};
     use super::*;
-    use std::io::{Seek, SeekFrom};
+    use std::io::{Seek as _, SeekFrom};
 
     #[test]
     fn export_v10_wire_matches_independent_header_and_count_vectors() {
@@ -60,7 +74,8 @@ mod tests {
         assert_eq!(hex(&sha256(&bytes)), vector["sha256"]);
 
         bytes.clear();
-        write_empty(&mut bytes).unwrap();
+        let cancel = CancellationToken::new();
+        write_empty(&mut bytes, &cancel).unwrap();
         let vector = &vectors["export_v10_empty_sigma_and_report_counts"];
         assert_eq!(hex(&bytes), vector["bytes_hex"]);
         assert_eq!(hex(&sha256(&bytes)), vector["sha256"]);

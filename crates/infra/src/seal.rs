@@ -14,10 +14,13 @@ mod frames;
 mod local;
 mod mapping_proofs;
 mod parquet_frame;
+mod proof_files;
+pub use proof_files::V10PreparedObjects;
 mod read;
 mod skill_proofs;
 mod subagent_branches;
 mod verify_current;
 pub use export::{LocalExportVerifier, verify_export, verify_export_expected};
+pub use parquet_frame::verify_v10_artifact_rows;
 #[cfg(test)]
 pub(crate) use verify_current::verify_export_with_catalog;
