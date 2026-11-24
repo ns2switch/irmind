@@ -14,6 +14,8 @@ IRMind evaluates a bounded subset of Sigma detection rules over the authenticate
 
 A run can skip rules whose logsource or fields lack an exact binding. A rule must resolve its fields in every applicable enrolled class in the case. A scan is partial if it stops early or encounters indeterminate rows. An empty result from a partial scan or from an omitted source leaves the corresponding activity undetermined.
 
+Of the 3,302 files in the pinned SigmaHQ r2026-07-01 release, 3,301 passed pack admission and 1,022 compiled for all applicable classes in the reviewed field table. See the [counts and rejection reasons by family](development/benchmarks/sigmahq-v070-admission.md).
+
 ## Source coverage and field names
 
 Use the indicated `product` and `service` as Sigma logsource selectors. Category selectors narrow the listed source classes. Field names in the third column are case-sensitive. Text and numeric values follow the listed binding types.

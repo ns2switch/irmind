@@ -14,6 +14,8 @@ IRMind evalúa un subconjunto acotado de reglas Sigma sobre los artefactos Parqu
 
 Se omiten las reglas cuyo logsource o campos no tienen correspondencia exacta. Una regla debe resolver sus campos en todas las clases inscritas que le apliquen dentro del caso. Un análisis queda como parcial si se detiene antes de terminar o encuentra filas indeterminadas. Sin coincidencias en una ejecución parcial o en una fuente omitida, la actividad correspondiente queda sin determinar.
 
+En la release fijada de SigmaHQ r2026-07-01, 3.301 de 3.302 ficheros pasaron la admisión y 1.022 compilaron para todas las clases aplicables de la tabla revisada. Consulta los [recuentos y motivos de rechazo por familia](../development/benchmarks/sigmahq-v070-admission.md).
+
 ## Cobertura y campos por fuente
 
 Usa el `product` y `service` indicados en el logsource de Sigma. El selector de categoría acota las clases indicadas. Los nombres de campo distinguen mayúsculas y minúsculas. Respeta el tipo de cada valor.
