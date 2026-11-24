@@ -2,9 +2,11 @@
 use super::{
     ReportAnalystSectionsV1, ReportCitationsV1, ReportCoverageV2, ReportPublishedV1,
     SigmaCompiledRulesV1, SigmaCoverageV1, SigmaFieldTableV1, SigmaPackAdmissionV1,
-    SigmaPackManifestV1, SigmaRunResultsV1, SigmaRunV1, SigmaSourceScopeV1, V10ObjectSection,
+    SigmaPackManifestV1, SigmaRunResultsV1, SigmaRunV1, SigmaSourceScopeV1, V10ArtifactReference,
+    V10CheckpointView, V10ObjectSection, V10RowReference,
 };
-use crate::{AppError, CancellationToken};
+use crate::{AppError, CancellationToken, SignedEntry};
+use irmind_domain::ParquetArtifact;
 use std::{
     collections::{BTreeMap, BTreeSet},
     io::{Read, Seek},
@@ -17,6 +19,51 @@ pub struct V10SigmaRunObjects {
     pub selected_sources: SigmaSourceScopeV1,
     pub compiled_rules: SigmaCompiledRulesV1,
     pub results: SigmaRunResultsV1,
+}
+
+impl V10SigmaRunObjects {
+    /// Resolve both coordinates against the authenticated case checkpoint.
+    /// Check each artifact once even if several rules matched the same row.
+    pub fn verify_case_rows(
+        &self,
+        entries: &[SignedEntry],
+        receipt: &SigmaRunV1,
+        mut verify_rows: impl FnMut(&ParquetArtifact, &[V10RowReference]) -> Result<(), AppError>,
+        cancel: &CancellationToken,
+    ) -> Result<(), AppError> {
+        let view = V10CheckpointView::resolve(entries, &receipt.checkpoint)?;
+        for source in &self.selected_sources.0 {
+            view.source(*source)?;
+        }
+        let mut active_bindings = BTreeSet::new();
+        let mut artifacts = BTreeMap::<V10ArtifactReference, BTreeMap<u64, V10RowReference>>::new();
+        for matched in &self.results.matches {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            let row = matched.row;
+            if self.selected_sources.0.binary_search(&row.source).is_err() {
+                return Err(AppError::InvalidChain(row.source.manifest.sequence));
+            }
+            if active_bindings.insert((row.artifact, row.source)) {
+                view.row_artifact(row)?;
+            }
+            if artifacts
+                .entry(row.artifact)
+                .or_default()
+                .insert(row.physical_row, row)
+                .is_some_and(|previous| previous != row)
+            {
+                return Err(AppError::InvalidChain(row.artifact.entry.sequence));
+            }
+        }
+        for rows in artifacts.into_values() {
+            let rows = rows.into_values().collect::<Vec<_>>();
+            let first = *rows.first().ok_or_else(invalid)?;
+            verify_rows(&view.row_artifact(first)?, &rows)?;
+        }
+        Ok(())
+    }
 }
 
 pub fn read_v10_sigma_admission(
