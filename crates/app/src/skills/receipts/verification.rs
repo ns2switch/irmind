@@ -14,8 +14,75 @@ pub struct SkillReceiptVerifier {
     snapshot_sequences: BTreeMap<SkillSnapshotId, u64>,
     task_parents: BTreeMap<String, String>,
     catalog_verified: BTreeSet<SkillSnapshotId>,
+    report_loads: Option<Vec<(crate::v10_proofs::ReportSkillLoad, SkillSnapshotId)>>,
 }
 impl SkillReceiptVerifier {
+    pub fn track_report_loads(&mut self) {
+        self.report_loads.get_or_insert_with(Vec::new);
+    }
+
+    pub(crate) fn tracks_report_loads(&self) -> bool {
+        self.report_loads.is_some()
+    }
+
+    pub(crate) fn record_report_load(
+        &mut self,
+        reference: crate::v10_proofs::ReportSkillLoad,
+        load: &SkillLoadV1,
+    ) -> Result<(), AppError> {
+        if let Some(loads) = &mut self.report_loads
+            && load.result() == SkillLoadResult::Loaded
+        {
+            loads.push((reference, load.snapshot()?));
+        }
+        Ok(())
+    }
+
+    pub fn resolve_report_loads(
+        &self,
+        compiler: &dyn SkillCompiler,
+        through: u64,
+        sources: &BTreeSet<String>,
+    ) -> Result<Vec<crate::v10_proofs::ResolvedReportSkillGap>, AppError> {
+        use crate::v10_proofs::ResolvedReportSkillGap;
+        let mut declarations = BTreeMap::new();
+        let mut gaps = Vec::new();
+        let mut bytes_left: usize = 64 * 1024 * 1024;
+        for (load, snapshot) in self.report_loads.as_ref().ok_or_else(invalid)? {
+            if load.main_sequence() > through {
+                continue;
+            }
+            let declared = match declarations.entry(snapshot) {
+                std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
+                std::collections::btree_map::Entry::Vacant(entry) => {
+                    let skill = self
+                        .snapshots
+                        .get(snapshot)
+                        .ok_or_else(invalid)?
+                        .compile(compiler)?;
+                    entry.insert(crate::v10_proofs::report_skill_declarations(
+                        &skill, sources,
+                    )?)
+                }
+            };
+            for (index, gap) in declared.1.iter().enumerate() {
+                if let Some(text) = gap {
+                    bytes_left = bytes_left
+                        .checked_sub(120 + declared.0.len() + text.len())
+                        .ok_or_else(invalid)?;
+                    gaps.push(ResolvedReportSkillGap {
+                        load: *load,
+                        index: index as u64,
+                        skill: declared.0.clone(),
+                        text: text.clone(),
+                    });
+                }
+            }
+        }
+        gaps.sort_unstable_by_key(ResolvedReportSkillGap::key);
+        Ok(gaps)
+    }
+
     pub(crate) fn read_budget_for_turn(
         &self,
         turn: &str,
@@ -137,6 +204,15 @@ impl SkillReceiptVerifier {
                     return Err(invalid());
                 }
                 self.load(&load, load.turn())?;
+                self.record_report_load(
+                    crate::v10_proofs::ReportSkillLoad::Main(
+                        crate::v10_proofs::V10AuditReference {
+                            sequence: entry.seq,
+                            entry_sha256: entry.hash,
+                        },
+                    ),
+                    &load,
+                )?;
             }
             _ => {}
         }

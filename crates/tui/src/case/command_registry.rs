@@ -31,7 +31,7 @@ impl Command {
             "skills" => " [install catalog:<name>[@tag] | update <name>]",
             "settings" => " [model|connectors|keystore|preferences|limits]",
             "subagents" => " [cancel <task>|recover]",
-            "report" => " [preview [en|es]]",
+            "report" => " [preview [en|es] | save <md|pdf> [en|es]]",
             "sigma" => " inspect <directory>",
             "open" => " <case title or ID>",
             "case" => " delete [case title or ID]",

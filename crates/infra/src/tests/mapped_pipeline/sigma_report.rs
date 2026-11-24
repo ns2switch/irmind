@@ -3,9 +3,9 @@ use crate::sigma_pack::{evaluation::SigmaVariantPrograms, field_table::ReviewedS
 use irmind_app::{
     EntityDetails, FindingKind, ReportDocumentFormat, ReportDocumentLanguage,
     v10_proofs::{
-        CaseCheckpointV1, ReportCitationsV1, SigmaFieldTableV1, SigmaRuleKeyV1,
+        CaseCheckpointV1, ReportCitationsV1, SigmaFieldTableV1, SigmaRuleKeyV1, SigmaRunV1,
         V10ArtifactReference, V10AuditReference, V10CheckpointView, V10Citation,
-        V10FindingCitations, V10RowReference, V10SourceReference,
+        V10FindingCitations, V10RowReference, V10SigmaRunObjects, V10SourceReference,
     },
 };
 use irmind_domain::{ArtifactSchemaV2, SourceManifestV2};
@@ -36,8 +36,7 @@ fn sigma_match_stays_out_of_cited_reports_until_analyst_confirms_the_exact_row()
         parser: &parser,
     };
     let cancel = CancellationToken::new();
-    let source_file = "aws.jsonl";
-    ingest_login_pair(&large, &case.id, root.path(), source_file, &cancel);
+    ingest_login_pair(&large, &case.id, root.path(), "aws.jsonl", &cancel);
     engine.verify(&case.id).unwrap();
     let row = scan(&store, &case.id, &cancel);
     let evidence = irmind_domain::EvidenceHash::from_bytes(row.source.evidence_sha256);
@@ -49,7 +48,7 @@ fn sigma_match_stays_out_of_cited_reports_until_analyst_confirms_the_exact_row()
             evidence.as_str(),
             EntityDetails::Timeline {
                 at: "2026-11-01T00:00:00Z".into(),
-                source: source_file.into(),
+                source: "aws.jsonl".into(),
                 record_index: Some(row.record.try_into().unwrap()),
             },
         )
@@ -98,6 +97,68 @@ fn sigma_match_stays_out_of_cited_reports_until_analyst_confirms_the_exact_row()
         ..row
     });
     assert!(render(&store, &engine, &case.id, &citations).is_err());
+    verify_signed_reports(engine, &store, &case.id, root.path(), &cancel);
+}
+
+fn verify_signed_reports(
+    engine: Engine<'_>,
+    store: &Arc<LocalStore>,
+    case: &CaseId,
+    root: &Path,
+    cancel: &CancellationToken,
+) {
+    use irmind_app::v10_proofs::{ReportAnalystSectionsV1, ReportCoverageV2};
+    let engine = engine.with_large_case_pipeline(store.clone(), Arc::new(json_source_parser()));
+    for (language, format) in [
+        (
+            ReportDocumentLanguage::English,
+            ReportDocumentFormat::Markdown,
+        ),
+        (ReportDocumentLanguage::Spanish, ReportDocumentFormat::Pdf),
+    ] {
+        let mut plan = store
+            .plan_cited_report(&engine, case, language, format, cancel)
+            .unwrap();
+        plan.analyst = Some(ReportAnalystSectionsV1([
+            "Synthetic scope".into(),
+            "Independently checked".into(),
+            String::new(),
+            String::new(),
+        ]));
+        let receipt = engine.publish_cited_report(case, plan, cancel).unwrap();
+        let coverage = store
+            .read_addressed_report_proof(case, 2, receipt.coverage, cancel)
+            .unwrap();
+        assert!(ReportCoverageV2::decode(&coverage).is_ok());
+        let rendered = store
+            .read_addressed_report_proof(case, 3, receipt.rendered_sha256, cancel)
+            .unwrap();
+        assert_eq!(sha256(&rendered), receipt.rendered_sha256);
+        if format == ReportDocumentFormat::Pdf {
+            assert!(rendered.starts_with(b"%PDF"));
+        } else {
+            assert!(String::from_utf8(rendered).unwrap().contains(FINDING));
+        }
+    }
+    engine.verify(case).unwrap();
+    engine.seal(case).unwrap();
+    let path = root.join("signed-report.irmind");
+    let key = irmind_app::export_case(&engine, store.as_ref(), case, &path, cancel).unwrap();
+    assert_eq!(
+        LocalExportVerifier
+            .verify_export_details(&path, Some(&key))
+            .unwrap()
+            .format_version,
+        10
+    );
+    let mut tampered = fs::read(&path).unwrap();
+    *tampered.last_mut().unwrap() ^= 1;
+    fs::write(&path, tampered).unwrap();
+    assert!(
+        LocalExportVerifier
+            .verify_export_details(&path, Some(&key))
+            .is_err()
+    );
 }
 
 fn ingest_login_pair(
@@ -204,7 +265,8 @@ fn scan(store: &LocalStore, case: &CaseId, cancel: &CancellationToken) -> V10Row
         sha256: sha256(rule),
     };
     let programs =
-        SigmaVariantPrograms::compile(&table.variants[0], [(key, rule.as_slice())]).unwrap();
+        SigmaVariantPrograms::compile(&table.variants[0], [(key.clone(), rule.as_slice())])
+            .unwrap();
     let mut evaluation = programs.start(10_000);
     let mut matches = Vec::new();
     evaluation
@@ -226,11 +288,152 @@ fn scan(store: &LocalStore, case: &CaseId, cancel: &CancellationToken) -> V10Row
         )
         .unwrap();
     assert_eq!(matches.len(), 1);
+    verify_sigma_case_references(&entries, &base, matches[0], key, &root, cancel);
     matches[0]
 }
 
+fn verify_sigma_case_references(
+    entries: &[SignedEntry],
+    checkpoint: &CaseCheckpointV1,
+    row: V10RowReference,
+    rule: SigmaRuleKeyV1,
+    root: &Path,
+    cancel: &CancellationToken,
+) {
+    let (mut receipt, mut objects) = sigma_case_row_proofs(checkpoint, row, rule, cancel);
+    let verify = |objects: &V10SigmaRunObjects, receipt: &SigmaRunV1| {
+        objects.verify_case_rows(
+            entries,
+            receipt,
+            |artifact, rows| {
+                let mut file =
+                    irmind_fs::open_regular_no_follow(root, Path::new(artifact.path())).unwrap();
+                crate::verify_v10_artifact_rows(&mut file, 0, artifact, rows, cancel)
+            },
+            cancel,
+        )
+    };
+    verify(&objects, &receipt).unwrap();
+    receipt.checkpoint.entry_hash[0] ^= 1;
+    assert!(verify(&objects, &receipt).is_err());
+    receipt.checkpoint.entry_hash[0] ^= 1;
+    objects.results.matches[0].row.physical_row += 1;
+    assert!(verify(&objects, &receipt).is_err());
+}
+
+fn sigma_case_row_proofs(
+    checkpoint: &CaseCheckpointV1,
+    row: V10RowReference,
+    rule: SigmaRuleKeyV1,
+    cancel: &CancellationToken,
+) -> (SigmaRunV1, V10SigmaRunObjects) {
+    use irmind_app::v10_proofs::{
+        SigmaCompiledRuleV1, SigmaCompiledRulesV1, SigmaCoverageV1, SigmaMatchV1,
+        SigmaRuleCoverageV1, SigmaRunResultsV1, SigmaRunStatusV1, SigmaSourceScopeV1,
+        V10ProofDescriptor, V10ProofFamily, v10_proof_commitment,
+    };
+    let objects = V10SigmaRunObjects {
+        field_table: cloudtrail_definition(),
+        selected_sources: SigmaSourceScopeV1(vec![row.source]),
+        compiled_rules: SigmaCompiledRulesV1(vec![SigmaCompiledRuleV1 {
+            rule: rule.clone(),
+            variants: vec![0],
+        }]),
+        results: SigmaRunResultsV1 {
+            coverage: vec![SigmaRuleCoverageV1 {
+                rule: rule.clone(),
+                status: SigmaCoverageV1::Eligible,
+                detail: None,
+            }],
+            matches: vec![SigmaMatchV1 {
+                rule: rule.clone(),
+                row,
+                query_limit: None,
+            }],
+        },
+    };
+    let family = V10ProofFamily::Sigma;
+    let bodies = [
+        (2, objects.field_table.encode().unwrap()),
+        (3, objects.selected_sources.encode().unwrap()),
+        (4, objects.compiled_rules.encode().unwrap()),
+        (5, objects.results.encode().unwrap()),
+    ];
+    let descriptors = std::array::from_fn::<_, 4, _>(|index| {
+        let (kind, bytes) = &bodies[index];
+        V10ProofDescriptor::from_body(family, *kind, bytes).unwrap()
+    });
+    let receipt = SigmaRunV1 {
+        checkpoint: checkpoint.clone(),
+        pack_admission: [0; 32],
+        artifact_inventory: [0; 32],
+        selected_sources: descriptors[1].hash(),
+        start_utc_micros: 0,
+        end_utc_micros: i64::MAX,
+        compiled_rules: descriptors[2].hash(),
+        field_table: descriptors[0].hash(),
+        evaluator: "synthetic-sigma-evaluator".into(),
+        reserved_units: 1024,
+        used_units: 8,
+        status: SigmaRunStatusV1::Complete,
+        matched_rows: 1,
+        result_manifest: descriptors[3].hash(),
+        proof_set: v10_proof_commitment(family, &descriptors).unwrap(),
+    };
+    let checked = load_sigma_case_row_proofs(&receipt, &bodies, &descriptors, rule, cancel);
+    (receipt, checked)
+}
+
+fn load_sigma_case_row_proofs(
+    receipt: &SigmaRunV1,
+    bodies: &[(u8, Vec<u8>); 4],
+    descriptors: &[irmind_app::v10_proofs::V10ProofDescriptor; 4],
+    rule: SigmaRuleKeyV1,
+    cancel: &CancellationToken,
+) -> V10SigmaRunObjects {
+    use irmind_app::v10_proofs::{
+        SigmaPackManifestV1, SigmaPackRuleV1, V10ObjectSection, V10ProofFamily, read_v10_sigma_run,
+        write_v10_object_section,
+    };
+    let family = V10ProofFamily::Sigma;
+    let mut section = Vec::new();
+    write_v10_object_section(
+        &mut section,
+        family,
+        descriptors,
+        |descriptor| Ok(bodies[usize::from(descriptor.kind() - 2)].1.as_slice()),
+        cancel,
+    )
+    .unwrap();
+    let mut section = std::io::Cursor::new(section);
+    let section_index = V10ObjectSection::scan(&mut section, family, cancel).unwrap();
+    let mut referenced = std::collections::BTreeSet::new();
+    let admitted = SigmaPackManifestV1(vec![SigmaPackRuleV1 {
+        path: "login.yml".into(),
+        rule,
+        version: None,
+        author: None,
+        size: 1,
+    }]);
+    let checked = read_v10_sigma_run(
+        &section_index,
+        &mut section,
+        receipt,
+        &admitted,
+        &mut referenced,
+        cancel,
+    )
+    .unwrap();
+    section_index.check_union(&referenced).unwrap();
+    checked
+}
+
 fn cloudtrail_table() -> ReviewedSigmaFieldTable {
-    ReviewedSigmaFieldTable::parse(&SigmaFieldTableV1 {
+    ReviewedSigmaFieldTable::parse(&cloudtrail_definition()).unwrap()
+}
+
+fn cloudtrail_definition() -> SigmaFieldTableV1 {
+    SigmaFieldTableV1 {
         id: "synthetic-cloudtrail".into(),
         version: "1".into(),
         toml: r#"
@@ -252,8 +455,7 @@ value_type = "text"
 null_policy = "absent"
 "#
         .into(),
-    })
-    .unwrap()
+    }
 }
 
 fn digest(value: &str) -> [u8; 32] {

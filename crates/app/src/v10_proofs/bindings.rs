@@ -1,10 +1,12 @@
 //! Bind the decoded proof bodies to their signed receipt before resolving material.
 use super::{
-    ReportAnalystSectionsV1, ReportCitationsV1, ReportCoverageV1, ReportPublishedV1,
+    ReportAnalystSectionsV1, ReportCitationsV1, ReportCoverageV2, ReportPublishedV1,
     SigmaCompiledRulesV1, SigmaCoverageV1, SigmaFieldTableV1, SigmaPackAdmissionV1,
-    SigmaPackManifestV1, SigmaRunResultsV1, SigmaRunV1, SigmaSourceScopeV1, V10ObjectSection,
+    SigmaPackManifestV1, SigmaRunResultsV1, SigmaRunV1, SigmaSourceScopeV1, V10ArtifactReference,
+    V10CheckpointView, V10ObjectSection, V10RowReference,
 };
-use crate::{AppError, CancellationToken};
+use crate::{AppError, CancellationToken, SignedEntry};
+use irmind_domain::ParquetArtifact;
 use std::{
     collections::{BTreeMap, BTreeSet},
     io::{Read, Seek},
@@ -17,6 +19,51 @@ pub struct V10SigmaRunObjects {
     pub selected_sources: SigmaSourceScopeV1,
     pub compiled_rules: SigmaCompiledRulesV1,
     pub results: SigmaRunResultsV1,
+}
+
+impl V10SigmaRunObjects {
+    /// Resolve both coordinates against the authenticated case checkpoint.
+    /// Check each artifact once even if several rules matched the same row.
+    pub fn verify_case_rows(
+        &self,
+        entries: &[SignedEntry],
+        receipt: &SigmaRunV1,
+        mut verify_rows: impl FnMut(&ParquetArtifact, &[V10RowReference]) -> Result<(), AppError>,
+        cancel: &CancellationToken,
+    ) -> Result<(), AppError> {
+        let view = V10CheckpointView::resolve(entries, &receipt.checkpoint)?;
+        for source in &self.selected_sources.0 {
+            view.source(*source)?;
+        }
+        let mut active_bindings = BTreeSet::new();
+        let mut artifacts = BTreeMap::<V10ArtifactReference, BTreeMap<u64, V10RowReference>>::new();
+        for matched in &self.results.matches {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            let row = matched.row;
+            if self.selected_sources.0.binary_search(&row.source).is_err() {
+                return Err(AppError::InvalidChain(row.source.manifest.sequence));
+            }
+            if active_bindings.insert((row.artifact, row.source)) {
+                view.row_artifact(row)?;
+            }
+            if artifacts
+                .entry(row.artifact)
+                .or_default()
+                .insert(row.physical_row, row)
+                .is_some_and(|previous| previous != row)
+            {
+                return Err(AppError::InvalidChain(row.artifact.entry.sequence));
+            }
+        }
+        for rows in artifacts.into_values() {
+            let rows = rows.into_values().collect::<Vec<_>>();
+            let first = *rows.first().ok_or_else(invalid)?;
+            verify_rows(&view.row_artifact(first)?, &rows)?;
+        }
+        Ok(())
+    }
 }
 
 pub fn read_v10_sigma_admission(
@@ -118,14 +165,14 @@ pub fn read_v10_sigma_run(
 pub struct V10ReportObjects {
     pub citations: ReportCitationsV1,
     pub analyst_sections: Option<ReportAnalystSectionsV1>,
-    pub coverage: ReportCoverageV1,
+    pub coverage: ReportCoverageV2,
 }
 
 pub fn read_v10_report(
     section: &V10ObjectSection,
     reader: &mut (impl Read + Seek),
     receipt: &ReportPublishedV1,
-    expected_coverage: &ReportCoverageV1,
+    expected_coverage: &ReportCoverageV2,
     referenced: &mut BTreeSet<ProofKey>,
     cancel: &CancellationToken,
 ) -> Result<V10ReportObjects, AppError> {
@@ -152,7 +199,7 @@ pub fn read_v10_report(
                     .map_err(|_| invalid())
             })
             .transpose()?,
-        coverage: ReportCoverageV1::decode(&section.body(reader, (2, receipt.coverage), cancel)?)
+        coverage: ReportCoverageV2::decode(&section.body(reader, (2, receipt.coverage), cancel)?)
             .map_err(|_| invalid())?,
     };
     if &report.coverage != expected_coverage {
@@ -170,54 +217,44 @@ fn invalid() -> AppError {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use crate::v10_proofs::{V10ProofDescriptor, V10ProofFamily, v10_proof_commitment};
+    use crate::v10_proofs::V10ProofFamily;
     use std::io::Cursor;
 
     #[test]
-    fn binding_rejects_a_valid_commitment_to_incomplete_coverage() {
-        let fixture = super::super::report_objects::tests::object;
-        let mut receipt =
-            ReportPublishedV1::decode(&super::super::tests::vector("report_published_v1")).unwrap();
-        let coverage = fixture("reject_omitted_partial_coverage");
-        let citations = fixture("report_citations");
-        let rendered = fixture("report_rendered");
-        let objects = [(&citations, 0), (&coverage, 2), (&rendered, 3)];
-        let family = V10ProofFamily::Report;
-        let descriptors = objects
-            .iter()
-            .map(|(body, kind)| V10ProofDescriptor::from_body(family, *kind, body).unwrap())
-            .collect::<Vec<_>>();
-        let mut raw = (descriptors.len() as u64).to_be_bytes().to_vec();
-        for (descriptor, (body, _)) in descriptors.iter().zip(objects) {
-            raw.extend_from_slice(&descriptor.encode());
-            raw.extend_from_slice(body);
-        }
-
-        receipt.proof_set = v10_proof_commitment(family, &descriptors).unwrap();
-        receipt.citations = descriptors[0].hash();
-        receipt.analyst_sections = None;
-        receipt.coverage = descriptors[1].hash();
-        receipt.rendered_sha256 = descriptors[2].hash();
-        receipt.rendered_length = descriptors[2].size();
-        let mut input = Cursor::new(raw);
+    fn v10_report_binds_exact_v2_coverage_and_object_union() {
+        let vector = super::super::report_objects::tests::coverage_vector;
+        let encoded = vector("report_published_v1_with_coverage_v2");
+        let receipt = ReportPublishedV1::decode(&crate::hex(&encoded)).unwrap();
+        assert_eq!(receipt.encode().unwrap(), crate::hex(&encoded));
+        let mut input = Cursor::new(vector("report_section_v10_with_coverage_v2"));
         let cancel = CancellationToken::new();
-        let section = V10ObjectSection::scan(&mut input, family, &cancel).unwrap();
-        let mut refs = BTreeSet::new();
-        let expected = ReportCoverageV1::decode(&fixture("report_coverage")).unwrap();
+        let section = V10ObjectSection::scan(&mut input, V10ProofFamily::Report, &cancel).unwrap();
+        let expected =
+            ReportCoverageV2::decode(&vector("report_coverage_v2_two_tasks_same_local_sequence"))
+                .unwrap();
+        let mut referenced = BTreeSet::new();
+        read_v10_report(
+            &section,
+            &mut input,
+            &receipt,
+            &expected,
+            &mut referenced,
+            &cancel,
+        )
+        .unwrap();
+        section.check_union(&referenced).unwrap();
+
+        let omitted = ReportCoverageV2::decode(&vector("reject_omitted_branch_gap")).unwrap();
         assert!(
             read_v10_report(
-                &section, &mut input, &receipt, &expected, &mut refs, &cancel
+                &section,
+                &mut input,
+                &receipt,
+                &omitted,
+                &mut BTreeSet::new(),
+                &cancel
             )
             .is_err()
         );
-        assert!(refs.is_empty());
-        let expected = ReportCoverageV1::decode(&coverage).unwrap();
-        assert!(
-            read_v10_report(
-                &section, &mut input, &receipt, &expected, &mut refs, &cancel
-            )
-            .is_ok()
-        );
-        section.check_union(&refs).unwrap();
     }
 }

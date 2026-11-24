@@ -206,7 +206,7 @@ impl LocalStore {
             cancel,
         )?;
         write_stored_query_capture_section(&mut out, queries.captures(), self, id, cancel)?;
-        super::extensions::write_empty(&mut out, cancel)?;
+        super::extensions::write(self, id, &mut out, cancel)?;
         out.sync_all().map_err(storage)?;
         Ok(header.seal.analyst_key_fingerprint.clone())
     }

@@ -8,7 +8,7 @@ use irmind_app::{ExportVerification, SignedEntry, SignedOperation, Verifier};
 use irmind_domain::{Actor, AuditEventKind, SourceManifestV2};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Seek as _, SeekFrom};
 
 const MAX_AUDIT_ENTRIES: u64 = 5_000_000;
 const MAX_SOURCE_MANIFESTS: usize = 1_000_000;
@@ -48,6 +48,7 @@ fn verify_open_export_with_catalog(
     if count == 0 || count > MAX_AUDIT_ENTRIES {
         return Err(storage_reason("invalid audit entry count"));
     }
+    let audit_start = input.stream_position().map_err(storage)?;
     let mut chain = ChainState::new();
     for index in 0..count {
         let entry: SignedEntry =
@@ -75,9 +76,7 @@ fn verify_open_export_with_catalog(
             &header.seal.public_key,
         )?;
     }
-    {
-        super::artifact_frames::verify_artifact_frames(&mut input, &chain.artifacts)?;
-    }
+    let offsets = super::artifact_frames::verify_artifact_frames(&mut input, &chain.artifacts)?;
     verify_methodology_tail(&mut input, &mut chain, &header, catalog)?;
     let journal = irmind_app::source_queries::SourceQueryJournal::replay(
         &chain.metadata_entries,
@@ -91,7 +90,18 @@ fn verify_open_export_with_catalog(
     journal.verify_source_links(&chain.metadata_entries)?;
     let captures = journal.captures().collect::<Vec<_>>();
     irmind_app::source_queries::read_query_capture_section(&mut input, &captures, &cancel)?;
-    super::extensions::verify_empty(&mut input)?;
+    let report_entries = chain.read_report_history(&mut input, &id, audit_start, count, &cancel)?;
+    super::extensions::verify(
+        &mut input,
+        &super::extensions::ReportVerification {
+            title: &header.title,
+            entries: &report_entries,
+            evidence: &chain.copied_evidence,
+            skills: &chain.skills,
+            offsets: &offsets,
+        },
+        &cancel,
+    )?;
     let mut result = v10_result(
         fingerprint,
         usize::try_from(count).map_err(storage)?,
@@ -261,6 +271,7 @@ fn verify_evidence_blobs(input: &mut File, chain: &mut ChainState) -> Result<(),
     {
         return Err(AppError::InvalidChain(last.seq));
     }
+    chain.copied_evidence = evidence_hashes;
     Ok(())
 }
 
@@ -310,6 +321,8 @@ struct ChainState {
     query_hashes: BTreeSet<String>,
     last: Option<SignedEntry>,
     referenced_evidence: BTreeSet<String>,
+    copied_evidence: BTreeSet<String>,
+    report_checkpoints: BTreeSet<u64>,
     sources: BTreeMap<(String, u64), usize>,
     source_hashes: BTreeSet<String>,
     artifact_paths: BTreeSet<String>,
@@ -319,8 +332,10 @@ struct ChainState {
 
 impl ChainState {
     fn new() -> Self {
+        let mut skills = irmind_app::SkillReceiptVerifier::default();
+        skills.track_report_loads();
         Self {
-            skills: irmind_app::SkillReceiptVerifier::default(),
+            skills,
             subagents: None,
             mapping_installations: BTreeMap::new(),
             catalog: irmind_app::ArtifactCatalogBuilder::default(),
@@ -334,6 +349,8 @@ impl ChainState {
             query_hashes: BTreeSet::new(),
             last: None,
             referenced_evidence: BTreeSet::new(),
+            copied_evidence: BTreeSet::new(),
+            report_checkpoints: BTreeSet::new(),
             sources: BTreeMap::new(),
             source_hashes: BTreeSet::new(),
             artifact_paths: BTreeSet::new(),
@@ -387,12 +404,77 @@ impl ChainState {
         super::mapping_proofs::collect(&entry, &mut self.mapping_installations)?;
         self.skills.accept(&entry, &crate::TomlSkillCompiler)?;
         self.accept_metadata(&entry)?;
+        if entry.kind == AuditEventKind::ReportPublishedV1 {
+            self.report_checkpoints
+                .insert(irmind_app::report_publication(&entry)?.checkpoint.sequence);
+        }
         if let Some(hash) = &entry.evidence {
             self.referenced_evidence.insert(hash.clone());
         }
         self.previous = entry.hash;
         self.last = Some(entry);
         Ok(())
+    }
+
+    fn read_report_history(
+        &self,
+        input: &mut File,
+        case: &CaseId,
+        start: u64,
+        count: u64,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<Vec<SignedEntry>, AppError> {
+        if self.report_checkpoints.is_empty() {
+            return Ok(Vec::new());
+        }
+        let resume = input.stream_position().map_err(storage)?;
+        input.seek(SeekFrom::Start(start)).map_err(storage)?;
+        let mut history = Vec::new();
+        let mut previous = [0; 32];
+        // Reauthenticate the streamed ledger against the sealed tip. Keep only
+        // provenance and claims needed to resolve report checkpoints.
+        for index in 0..count {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
+            let entry: SignedEntry =
+                serde_json::from_slice(&read_frame(input)?).map_err(storage)?;
+            if entry.case_id != case.as_str()
+                || entry.seq != index + 1
+                || entry.prev != previous
+                || sha256(&entry.canonical()) != entry.hash
+                || self.verifier.trusted_public_key(&entry.actor)? != entry.public_key
+            {
+                return Err(AppError::InvalidChain(entry.seq));
+            }
+            self.verifier
+                .verify(&entry.public_key, &entry.hash, &entry.sig)
+                .map_err(|_| AppError::InvalidChain(entry.seq))?;
+            previous = entry.hash;
+            if self.report_checkpoints.contains(&entry.seq)
+                || entry.kind.is_mapped_custody()
+                || matches!(
+                    entry.kind,
+                    AuditEventKind::ReportPublishedV1
+                        | AuditEventKind::SourceManifestV2
+                        | AuditEventKind::SourceQueryResultV1
+                        | AuditEventKind::FindingProposed
+                        | AuditEventKind::FindingConfirmed
+                        | AuditEventKind::FindingDismissed
+                )
+            {
+                history.push(entry);
+            }
+        }
+        if self
+            .last
+            .as_ref()
+            .is_none_or(|entry| entry.hash != previous)
+        {
+            return Err(AppError::InvalidChain(count));
+        }
+        input.seek(SeekFrom::Start(resume)).map_err(storage)?;
+        Ok(history)
     }
 
     fn accept_metadata(&mut self, entry: &SignedEntry) -> Result<(), AppError> {
@@ -524,7 +606,6 @@ impl ChainState {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use std::io::Seek as _;
 
     #[test]
     fn oversized_export_is_rejected_before_parsing() {

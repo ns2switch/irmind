@@ -570,6 +570,51 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         false
     }
 
+    fn report_command(&mut self, prompt: &str) -> bool {
+        use irmind_app::{
+            ReportDocumentFormat::{Markdown, Pdf},
+            ReportDocumentLanguage::{English, Spanish},
+        };
+        let mut words = prompt.split_whitespace();
+        if words.next() != Some("/report") {
+            return false;
+        }
+        let action = words.next();
+        let first = words.next();
+        let second = words.next();
+        let io = self.io_ops;
+        let engine = self.engine;
+        let id = self.id;
+        match (action, first, second, words.next()) {
+            (None | Some("preview"), None | Some("en" | "es"), None, None) => {
+                let language = if first == Some("es") {
+                    Spanish
+                } else {
+                    English
+                };
+                self.start_task("Report preview", move |cancel| {
+                    io.preview_cited_report(engine, id, language, &cancel)
+                });
+            }
+            (Some("save"), Some(format @ ("md" | "pdf")), None | Some("en" | "es"), None) => {
+                let language = if second == Some("es") {
+                    Spanish
+                } else {
+                    English
+                };
+                let format = if format == "pdf" { Pdf } else { Markdown };
+                self.start_task("Publish report", move |cancel| {
+                    io.publish_cited_report(engine, id, language, format, &cancel)
+                });
+            }
+            _ => self
+                .state
+                .messages
+                .push("Use /report preview [en|es] or /report save <md|pdf> [en|es]".into()),
+        }
+        true
+    }
+
     fn case_command(&mut self, prompt: &str) -> Result<bool> {
         if self.source_query_command(prompt) {
             return Ok(true);
@@ -577,24 +622,7 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         if self.sigma_pack_command(prompt) {
             return Ok(true);
         }
-        if prompt == "/report preview" || prompt.starts_with("/report preview ") {
-            use irmind_app::ReportDocumentLanguage::{English, Spanish};
-            let language = match prompt {
-                "/report preview" | "/report preview en" => English,
-                "/report preview es" => Spanish,
-                _ => {
-                    self.state
-                        .messages
-                        .push("Usage: /report preview [en|es]".into());
-                    return Ok(true);
-                }
-            };
-            let io = self.io_ops;
-            let engine = self.engine;
-            let id = self.id;
-            self.start_task("Report preview", move |cancel| {
-                io.preview_cited_report(engine, id, language, &cancel)
-            });
+        if self.report_command(prompt) {
             return Ok(true);
         }
         match prompt {
@@ -633,10 +661,6 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             "/iocs" => self.state.tab = 5,
             "/hypotheses" => self.state.tab = 6,
             "/techniques" => self.state.tab = 7,
-            "/report" => match self.engine.report(self.id) {
-                Ok(report) => self.state.messages.push(report),
-                Err(error) => self.state.messages.push(format!("Report error: {error}")),
-            },
             "/graph" => match self.engine.graph.graph_summary(self.id) {
                 Ok(summary) => self.state.result_cards.push(("Evidence graph", summary)),
                 Err(error) => self.state.messages.push(format!("Graph error: {error}")),
