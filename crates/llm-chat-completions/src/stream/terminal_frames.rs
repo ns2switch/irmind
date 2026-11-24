@@ -107,21 +107,25 @@ fn rejects_effective_output_and_conflicting_reasons_after_finish() {
 
 #[test]
 fn content_filter_reports_the_provider_stop_and_omits_its_delta() {
-    let wire = wire(&[
-        json!({"choices":[{"index":0,"delta":{"content":"filtered"},"finish_reason":"content_filter"}]}),
-    ]);
-    let error = parse(wire.as_bytes()).err().unwrap();
-    assert!(matches!(
-        error,
-        AppError::Fixed(FixedAppError::AdapterModel(
-            AdapterModelError::ProviderContentFiltered
-        ))
-    ));
-    assert!(error.to_string().contains("content filter"));
-    assert!(
-        TextPreview::default()
-            .push(wire.as_bytes())
-            .unwrap()
-            .is_empty()
-    );
+    for choice in [
+        json!({"index":0,"delta":{"content":"filtered"},"finish_reason":"content_filter"}),
+        json!({"index":0,"delta":null,"finish_reason":"content_filter"}),
+        json!({"index":0,"finish_reason":"content_filter"}),
+    ] {
+        let wire = wire(&[json!({"choices":[choice]})]);
+        let error = parse(wire.as_bytes()).err().unwrap();
+        assert!(matches!(
+            error,
+            AppError::Fixed(FixedAppError::AdapterModel(
+                AdapterModelError::ProviderContentFiltered
+            ))
+        ));
+        assert!(error.to_string().contains("content filter"));
+        assert!(
+            TextPreview::default()
+                .push(wire.as_bytes())
+                .unwrap()
+                .is_empty()
+        );
+    }
 }

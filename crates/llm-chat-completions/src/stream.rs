@@ -218,6 +218,11 @@ impl StreamState {
             }
             return Ok(());
         }
+        let finish_reason = choice
+            .get("finish_reason")
+            .and_then(Value::as_str)
+            .map(FinishReason::parse)
+            .transpose()?;
         let delta = choice.get("delta").and_then(Value::as_object).ok_or({
             AppError::Fixed(irmind_app::FixedAppError::AdapterModel(
                 irmind_app::AdapterModelError::MissingProviderDelta,
@@ -231,9 +236,7 @@ impl StreamState {
                 self.apply_tool_delta(call)?;
             }
         }
-        if let Some(reason) = choice.get("finish_reason").and_then(Value::as_str) {
-            self.finish_reason = Some(FinishReason::parse(reason)?);
-        }
+        self.finish_reason = finish_reason;
         Ok(())
     }
 
