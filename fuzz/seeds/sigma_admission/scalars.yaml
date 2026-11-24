@@ -1,0 +1,4 @@
+title: Synthetic Sigma input
+logsource: {product: windows}
+detection: {selection: {Image|endswith: test.exe}, condition: selection}
+metadata: [null, true, "", "123", 0x22, 0o22, 2.5, .Inf]

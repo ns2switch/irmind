@@ -39,6 +39,9 @@ print(",".join(next(target for target in targets if target["name"] == sys.argv[1
     fuzz:export)
       CARGO_PROFILE_RELEASE_OPT_LEVEL=0 cargo +nightly fuzz run "$name" --target x86_64-unknown-linux-gnu --features export --sanitizer none -- -max_total_time="$seconds" -rss_limit_mb=2048 -verbosity=0
       ;;
+    fuzz:sigma_admission)
+      cargo +nightly fuzz run "$name" --target x86_64-unknown-linux-gnu --sanitizer address -- -max_total_time="$seconds" -rss_limit_mb=2048 -max_len=65537 -verbosity=0
+      ;;
     helpers/evtx/fuzz:evtx_decode)
       cargo +nightly fuzz run "$name" --target x86_64-unknown-linux-gnu --fuzz-dir "$registry" --sanitizer address -- -max_total_time="$seconds" -rss_limit_mb=1024 -timeout=30 -max_len=131072
       ;;
