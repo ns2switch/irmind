@@ -222,6 +222,7 @@ impl WorkspaceIo for RootWorkspaceIo {
         cancel: &irmind_app::CancellationToken,
     ) -> Result<String, AppError> {
         use irmind_app::v10_proofs::SigmaRunStatusV1;
+        use std::fmt::Write as _;
         let summary = self.store.run_sigma(engine, case, manifest, time, cancel)?;
         let run = summary.receipt;
         let status = match run.status {
@@ -230,11 +231,26 @@ impl WorkspaceIo for RootWorkspaceIo {
             SigmaRunStatusV1::WorkLimit => "partial (work limit)",
             SigmaRunStatusV1::OversizedInput => "partial (oversized input)",
             SigmaRunStatusV1::Cancelled => "partial (cancelled)",
+            SigmaRunStatusV1::ExactFieldsUnavailable => "partial (exact fields unavailable)",
         };
-        Ok(format!(
+        let mut text = format!(
             "Sigma run {status} · {} unconfirmed matches · {} skipped rules · {} work units",
             run.matched_rows, summary.skipped_rules, run.used_units
-        ))
+        );
+        if !summary.unavailable_by_source.is_empty() {
+            text.push_str("\nExamined rows with unavailable exact fields by source. This may indicate source manipulation. Inspect the original evidence.");
+            for (source, count) in summary.unavailable_by_source {
+                let source = cli::terminal_safe_path(Path::new(&source));
+                let _ = write!(text, "\n  {source}: {count}");
+            }
+        }
+        if !summary.indeterminate_by_rule.is_empty() {
+            text.push_str("\nIndeterminate rows are rows Sigma could not evaluate for that rule because an exact field was unavailable.");
+            for (rule, count) in summary.indeterminate_by_rule {
+                let _ = write!(text, "\n  {}: {count}", rule.id);
+            }
+        }
+        Ok(text)
     }
 
     fn publish_cited_report(

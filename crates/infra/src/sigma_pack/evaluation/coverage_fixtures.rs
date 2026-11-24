@@ -12,7 +12,12 @@ pub(super) fn parse_table(toml: &str) -> ReviewedSigmaFieldTable {
     ReviewedSigmaFieldTable::parse(&SigmaFieldTableV1 {
         id: "synthetic-sigma-bindings".into(),
         version: "v1".into(),
-        toml: toml.replace("mapping_version = \"@", "mapping_version = \"synthetic-"),
+        toml: toml
+            .replace(
+                "mapping_version = \"@gke-paths-v2-",
+                "mapping_version = \"gke-paths-v2-synthetic-",
+            )
+            .replace("mapping_version = \"@", "mapping_version = \"synthetic-"),
     })
     .unwrap()
 }
@@ -492,18 +497,27 @@ fn sigma_kubernetes_requires_the_exact_resource_and_does_not_scalarize_source_ip
                 ),
             ],
         );
+        let exact = variant.exact_cluster_field().unwrap();
+        let fields = irmind_app::source_mapping::SourceValue::Object(BTreeMap::new());
+        let retained = cluster_audit::encode(&row, &fields, exact).unwrap();
         assert_eq!(
             evaluate(
                 variant,
                 taxonomy,
                 "{objectRef.resource: secrets, objectRef.namespace: synthetic-ns}",
                 &row,
-                None
+                Some(&retained)
             ),
             (1, None)
         );
         assert_eq!(
-            evaluate(variant, taxonomy, "{objectRef.resource: pods}", &row, None),
+            evaluate(
+                variant,
+                taxonomy,
+                "{objectRef.resource: pods}",
+                &row,
+                Some(&retained)
+            ),
             (0, None)
         );
         assert_eq!(
@@ -512,9 +526,13 @@ fn sigma_kubernetes_requires_the_exact_resource_and_does_not_scalarize_source_ip
                 taxonomy,
                 "{'sourceIPs|cidr': 203.0.113.0/24}",
                 &row,
-                None
+                Some(&retained)
             ),
-            (0, Some(SigmaCoverageV1::UnsupportedField))
+            if matches!(exact, AuditExactField::GkeStatus) {
+                (0, Some(SigmaCoverageV1::UnsupportedField))
+            } else {
+                (0, None)
+            }
         );
         assert_eq!(
             evaluate(
@@ -522,7 +540,7 @@ fn sigma_kubernetes_requires_the_exact_resource_and_does_not_scalarize_source_ip
                 "{product: kubernetes, service: unreviewed}",
                 "{objectRef.resource: secrets}",
                 &row,
-                None
+                Some(&retained)
             ),
             (0, Some(SigmaCoverageV1::UnsupportedLogsource))
         );

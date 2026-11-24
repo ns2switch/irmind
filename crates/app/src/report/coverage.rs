@@ -16,7 +16,7 @@ pub struct ResolvedReportCoverage {
     unknown_sources: Vec<String>,
     skill_gaps: Vec<ResolvedReportSkillGap>,
     query_limits: Vec<EvidenceHash>,
-    partial_sigma: Vec<EvidenceHash>,
+    partial_sigma: Vec<(EvidenceHash, Option<bool>)>,
 }
 
 impl ResolvedReportCoverage {
@@ -37,7 +37,13 @@ impl ResolvedReportCoverage {
             let run = crate::v10_proofs::sigma_execution(entry)?;
             if run.status != crate::v10_proofs::SigmaRunStatusV1::Complete {
                 proof.partial_sigma_runs.push(audit_reference(entry));
-                partial_sigma.push(EvidenceHash::from_bytes(entry.hash));
+                let v2 = run.evaluator == crate::v10_proofs::SIGMA_EVALUATOR_V2;
+                let stopped_early =
+                    run.status != crate::v10_proofs::SigmaRunStatusV1::ExactFieldsUnavailable;
+                partial_sigma.push((
+                    EvidenceHash::from_bytes(entry.hash),
+                    v2.then_some(stopped_early),
+                ));
             }
         }
         for entry in entries
@@ -123,7 +129,13 @@ impl ResolvedReportCoverage {
             .chain(
                 self.partial_sigma
                     .iter()
-                    .map(|receipt| ReportLimitation::PartialSigma { receipt }),
+                    .map(|(receipt, stopped_early)| match stopped_early {
+                        Some(stopped_early) => ReportLimitation::IndeterminateSigma {
+                            receipt,
+                            stopped_early: *stopped_early,
+                        },
+                        None => ReportLimitation::PartialSigma { receipt },
+                    }),
             )
             .collect()
     }

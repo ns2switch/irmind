@@ -121,6 +121,19 @@ impl<'a> V10CheckpointView<'a> {
         Ok(manifest)
     }
 
+    pub(super) fn records_for_source(
+        &self,
+        reference: V10SourceReference,
+    ) -> Result<u64, AppError> {
+        let manifest = self.source(reference)?;
+        self.source_sets
+            .values()
+            .filter(|set| set.validate_manifest(&manifest).is_ok())
+            .map(irmind_domain::SourceRecordSetV1::records)
+            .max()
+            .ok_or(AppError::InvalidChain(reference.manifest.sequence))
+    }
+
     pub fn artifact(
         &self,
         source: V10SourceReference,

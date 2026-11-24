@@ -12,10 +12,10 @@ use irmind_app::{
     v10_proofs::{
         PreparedSigmaExecution, SigmaCompiledRuleV1, SigmaCompiledRulesV1, SigmaCoverageV1,
         SigmaExecutionContext, SigmaExecutionSummary, SigmaFieldTableV1, SigmaFindingDraft,
-        SigmaMatchV1, SigmaRuleCoverageV1, SigmaRuleKeyV1, SigmaRunResultsV1, SigmaRunV1,
-        SigmaSourceScopeV1, V10ArtifactReference, V10AuditReference, V10ProofDescriptor,
-        V10ProofFamily, V10RowReference, V10SourceReference, sigma_pack_operation,
-        v10_proof_commitment,
+        SigmaMatchV1, SigmaRuleCoverageV1, SigmaRuleKeyV1, SigmaRunResultsV1, SigmaRunResultsV2,
+        SigmaRunV1, SigmaSourceScopeV1, V10ArtifactReference, V10AuditReference,
+        V10ProofDescriptor, V10ProofFamily, V10RowReference, V10SourceReference,
+        sigma_pack_operation, v10_proof_commitment,
     },
 };
 use irmind_domain::{
@@ -28,9 +28,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use irmind_app::v10_proofs::SigmaRunStatusV1;
-
-const EVALUATOR: &str = "irmind-sigma-evaluator-v1";
+use irmind_app::v10_proofs::{SIGMA_EVALUATOR_V2, SigmaRunStatusV1};
 type RunObjects = Vec<(V10ProofDescriptor, Vec<u8>)>;
 
 impl LocalStore {
@@ -108,7 +106,13 @@ fn prepare(
         .collect::<Vec<_>>();
     rules.sort_unstable_by(|a, b| a.0.cmp(&b.0));
     let (compiled, mut results) = rule_objects(&reviewed, &work.variants, &rules, cancel)?;
-    let (hit_rows, status, used_units) = scan_matches(
+    let ScanOutcome {
+        hits: hit_rows,
+        status,
+        used_units,
+        unavailable_by_source,
+        indeterminate_by_rule,
+    } = scan_matches(
         &scope, &work, &reviewed, &compiled, &rules, directory, &time, cancel,
     )?;
     let skipped_rules = results
@@ -116,14 +120,70 @@ fn prepare(
         .iter()
         .filter(|rule| rule.status != SigmaCoverageV1::Eligible)
         .count();
+    let findings = materialize_findings(scope.view.entries(), &rules, hit_rows, &mut results)?;
+    let source_counts = unavailable_by_source
+        .iter()
+        .map(|(source, count)| {
+            work.sources
+                .get(source.as_str())
+                .map(|signed| (signed.reference, *count))
+                .ok_or_else(invalid)
+        })
+        .collect::<Result<BTreeMap<_, _>, _>>()?;
+    let indeterminate_by_rule = indeterminate_by_rule.into_iter().collect::<Vec<_>>();
+    let v2 = SigmaRunResultsV2 {
+        results,
+        unavailable_by_source: source_counts.into_iter().collect(),
+        indeterminate_by_rule: indeterminate_by_rule.clone(),
+    };
+    let material = run_objects(&table, &work.scope(), &compiled, &v2)?;
+    let descriptors = material
+        .iter()
+        .map(|(descriptor, _)| *descriptor)
+        .collect::<Vec<_>>();
+    let proof_set =
+        v10_proof_commitment(V10ProofFamily::Sigma, &descriptors).map_err(|_| invalid())?;
+    let receipt = SigmaRunV1 {
+        checkpoint: scope.checkpoint,
+        pack_admission: admission,
+        artifact_inventory: scope.view.active_artifact_inventory()?,
+        selected_sources: descriptors[1].hash(),
+        start_utc_micros: time.start,
+        end_utc_micros: time.end,
+        compiled_rules: descriptors[2].hash(),
+        field_table: descriptors[0].hash(),
+        evaluator: SIGMA_EVALUATOR_V2.into(),
+        reserved_units: scope.reserved,
+        used_units,
+        status,
+        matched_rows: findings.len() as u64,
+        result_manifest: descriptors[3].hash(),
+        proof_set,
+    };
+    Ok(PreparedSigmaExecution {
+        receipt,
+        material,
+        findings,
+        skipped_rules,
+        unavailable_by_source: work.named_gap_counts(unavailable_by_source)?,
+        indeterminate_by_rule,
+    })
+}
+
+fn materialize_findings(
+    entries: &[irmind_app::SignedEntry],
+    rules: &[(SigmaRuleKeyV1, &[u8])],
+    hit_rows: Vec<Hit<'_>>,
+    results: &mut SigmaRunResultsV1,
+) -> Result<Vec<SigmaFindingDraft>, AppError> {
     let titles = hit_rows
         .iter()
         .map(|(rule, ..)| rule)
         .collect::<std::collections::BTreeSet<_>>()
         .into_iter()
-        .map(|rule| title_for(rule, &rules).map(|title| (rule.clone(), title)))
+        .map(|rule| title_for(rule, rules).map(|title| (rule.clone(), title)))
         .collect::<Result<BTreeMap<_, _>, _>>()?;
-    let inherited = irmind_app::v10_proofs::sigma_query_limits(scope.view.entries())?;
+    let inherited = irmind_app::v10_proofs::sigma_query_limits(entries)?;
     let mut findings = Vec::with_capacity(hit_rows.len());
     for (rule, when, source, _, row) in hit_rows {
         let title = titles.get(&rule).ok_or_else(invalid)?.clone();
@@ -138,35 +198,7 @@ fn prepare(
             at: when.to_rfc3339(),
         });
     }
-    let material = run_objects(&table, &work.scope(), &compiled, &results)?;
-    let descriptors = material
-        .iter()
-        .map(|(descriptor, _)| *descriptor)
-        .collect::<Vec<_>>();
-    let receipt = SigmaRunV1 {
-        checkpoint: scope.checkpoint,
-        pack_admission: admission,
-        artifact_inventory: scope.view.active_artifact_inventory()?,
-        selected_sources: descriptors[1].hash(),
-        start_utc_micros: time.start,
-        end_utc_micros: time.end,
-        compiled_rules: descriptors[2].hash(),
-        field_table: descriptors[0].hash(),
-        evaluator: EVALUATOR.into(),
-        reserved_units: scope.reserved,
-        used_units,
-        status,
-        matched_rows: findings.len() as u64,
-        result_manifest: descriptors[3].hash(),
-        proof_set: v10_proof_commitment(V10ProofFamily::Sigma, &descriptors)
-            .map_err(|_| invalid())?,
-    };
-    Ok(PreparedSigmaExecution {
-        receipt,
-        material,
-        findings,
-        skipped_rules,
-    })
+    Ok(findings)
 }
 
 type Hit<'a> = (
@@ -176,6 +208,14 @@ type Hit<'a> = (
     Option<u64>,
     V10RowReference,
 );
+
+struct ScanOutcome<'a> {
+    hits: Vec<Hit<'a>>,
+    status: SigmaRunStatusV1,
+    used_units: u64,
+    unavailable_by_source: BTreeMap<irmind_domain::EvidenceHash, u64>,
+    indeterminate_by_rule: BTreeMap<SigmaRuleKeyV1, u64>,
+}
 
 #[allow(clippy::too_many_arguments)]
 fn scan_matches<'a>(
@@ -187,11 +227,13 @@ fn scan_matches<'a>(
     directory: &Path,
     time: &Range<i64>,
     cancel: &CancellationToken,
-) -> Result<(Vec<Hit<'a>>, SigmaRunStatusV1, u64), AppError> {
+) -> Result<ScanOutcome<'a>, AppError> {
     let mut hit_rows = Vec::new();
     let deadline = Instant::now() + Duration::from_secs(15);
     let mut status = SigmaRunStatusV1::Complete;
     let mut remaining = scope.reserved;
+    let mut unavailable_by_source = BTreeMap::new();
+    let mut indeterminate_by_rule = BTreeMap::new();
     for &index in &work.variants {
         let rules = rules
             .iter()
@@ -199,7 +241,7 @@ fn scan_matches<'a>(
             .filter(|(_, rule)| rule.variants.binary_search(&(index as u64)).is_ok())
             .map(|(raw, _)| raw.clone())
             .collect::<Vec<_>>();
-        if rules.is_empty() {
+        if rules.is_empty() && table.variants[index].exact_cluster_field().is_none() {
             continue;
         }
         if cancel.is_cancelled() {
@@ -225,20 +267,14 @@ fn scan_matches<'a>(
                 deadline,
                 cancel,
                 |physical_row, event, key| {
-                    let origin = event.origin();
-                    let signed = work
-                        .sources
-                        .get(origin.source().as_str())
-                        .ok_or_else(invalid)?;
-                    let when = event.timestamp().ok_or_else(invalid)?;
-                    let row = V10RowReference {
-                        artifact: *locator,
-                        source: signed.reference,
-                        record: origin.record(),
+                    hit_rows.push(resolve_hit(
+                        scope,
+                        work,
+                        *locator,
                         physical_row,
-                    };
-                    scope.view.row_artifact(row)?;
-                    hit_rows.push((key.clone(), when, signed, origin.offset(), row));
+                        event,
+                        key,
+                    )?);
                     Ok(())
                 },
             )?;
@@ -250,12 +286,58 @@ fn scan_matches<'a>(
             .checked_sub(scan.used_units())
             .ok_or_else(invalid)?;
         status = scan.status();
+        add_counts(&mut unavailable_by_source, scan.unavailable_by_source)?;
+        add_counts(&mut indeterminate_by_rule, scan.indeterminate_by_rule)?;
         if status != SigmaRunStatusV1::Complete {
             break;
         }
     }
     sort_hits(&mut hit_rows);
-    Ok((hit_rows, status, scope.reserved - remaining))
+    if status == SigmaRunStatusV1::Complete && !indeterminate_by_rule.is_empty() {
+        status = SigmaRunStatusV1::ExactFieldsUnavailable;
+    }
+    Ok(ScanOutcome {
+        hits: hit_rows,
+        status,
+        used_units: scope.reserved - remaining,
+        unavailable_by_source,
+        indeterminate_by_rule,
+    })
+}
+
+fn resolve_hit<'a>(
+    scope: &SigmaExecutionContext<'_>,
+    work: &'a Workset,
+    artifact: V10ArtifactReference,
+    physical_row: u64,
+    event: &irmind_domain::CommonEventV1,
+    key: &SigmaRuleKeyV1,
+) -> Result<Hit<'a>, AppError> {
+    let origin = event.origin();
+    let signed = work
+        .sources
+        .get(origin.source().as_str())
+        .ok_or_else(invalid)?;
+    let when = event.timestamp().ok_or_else(invalid)?;
+    let row = V10RowReference {
+        artifact,
+        source: signed.reference,
+        record: origin.record(),
+        physical_row,
+    };
+    scope.view.row_artifact(row)?;
+    Ok((key.clone(), when, signed, origin.offset(), row))
+}
+
+fn add_counts<K: Ord>(
+    totals: &mut BTreeMap<K, u64>,
+    counts: BTreeMap<K, u64>,
+) -> Result<(), AppError> {
+    for (key, count) in counts {
+        let total = totals.entry(key).or_default();
+        *total = total.checked_add(count).ok_or_else(invalid)?;
+    }
+    Ok(())
 }
 
 fn sort_hits(hit_rows: &mut Vec<Hit<'_>>) {
@@ -353,6 +435,21 @@ impl Workset {
             variants,
             sources,
         })
+    }
+
+    fn named_gap_counts(
+        &self,
+        counts: BTreeMap<irmind_domain::EvidenceHash, u64>,
+    ) -> Result<Vec<(String, u64)>, AppError> {
+        counts
+            .into_iter()
+            .map(|(source, count)| {
+                self.sources
+                    .get(source.as_str())
+                    .map(|signed| (signed.name.clone(), count))
+                    .ok_or_else(invalid)
+            })
+            .collect()
     }
 
     fn scope(&self) -> SigmaSourceScopeV1 {
@@ -550,7 +647,7 @@ fn run_objects(
     table: &SigmaFieldTableV1,
     scope: &SigmaSourceScopeV1,
     compiled: &SigmaCompiledRulesV1,
-    results: &SigmaRunResultsV1,
+    results: &SigmaRunResultsV2,
 ) -> Result<RunObjects, AppError> {
     [
         table.encode(),
@@ -573,7 +670,7 @@ fn run_objects(
 pub(super) fn enrolled_field_table() -> SigmaFieldTableV1 {
     SigmaFieldTableV1 {
         id: "irmind-sigma-source-coverage".into(),
-        version: "v1".into(),
+        version: "v2".into(),
         toml: concat!(
             include_str!("cloudtrail-v1.toml"),
             "\n",

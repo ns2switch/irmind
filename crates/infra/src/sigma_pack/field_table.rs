@@ -51,6 +51,18 @@ pub struct SigmaFieldBinding {
     pub path: Option<Vec<String>>,
     pub value_type: SigmaBindingType,
     pub null_policy: SigmaNullPolicy,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conversion: Option<SigmaConversion>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub basename_path: Option<Vec<String>>,
+}
+
+#[derive(Clone, Copy, Deserialize, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum SigmaConversion {
+    EvtxEventId,
+    EvtxLogonType,
+    DefenderFullPath,
 }
 
 #[derive(Clone, Copy, Deserialize, Serialize, Eq, PartialEq)]
@@ -63,6 +75,7 @@ pub enum SigmaBindingType {
     TextList,
     IntegerList,
     IpList,
+    PairList,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -154,6 +167,26 @@ impl ReviewedSigmaFieldTable {
 }
 
 impl SigmaSourceVariant {
+    #[cfg(feature = "sigma")]
+    pub(super) fn exact_cluster_field(&self) -> Option<irmind_app::cluster_audit::AuditExactField> {
+        use irmind_app::cluster_audit::AuditExactField;
+        let field = match self.mapping_id.as_str() {
+            "mapping-kubernetes" if self.mapping_version == "kubernetes-audit-tables-v2" => {
+                AuditExactField::SourceIps
+            }
+            "mapping-eks-audit" | "mapping-aks-audit"
+                if self.mapping_version == "kubernetes-audit-tables-v2" =>
+            {
+                AuditExactField::WrappedSourceIps
+            }
+            "mapping-gke-audit" if self.mapping_version.starts_with("gke-paths-v2-") => {
+                AuditExactField::GkeStatus
+            }
+            _ => return None,
+        };
+        Some(field)
+    }
+
     fn overlaps(&self, other: &Self) -> bool {
         let taxonomy = [
             (&self.product, &other.product),
@@ -224,6 +257,65 @@ impl SigmaSourceVariant {
             if column_kind.is_some_and(|expected| expected != field.value_type) {
                 return Err(invalid());
             }
+            field.validate_projection(self)?;
+        }
+        Ok(())
+    }
+}
+
+impl SigmaFieldBinding {
+    fn validate_projection(&self, variant: &SigmaSourceVariant) -> Result<(), AppError> {
+        let path_is = |path: &[&str]| {
+            self.path
+                .as_deref()
+                .is_some_and(|actual| actual.iter().map(String::as_str).eq(path.iter().copied()))
+        };
+        let admitted = match self.conversion {
+            None if self.value_type == SigmaBindingType::PairList => {
+                variant.mapping_id == "mapping-m365"
+                    && variant.service.as_deref() == Some("exchange")
+                    && path_is(&["Parameters"])
+            }
+            None => true,
+            Some(SigmaConversion::EvtxEventId) => {
+                variant.parser_id == "parser-evtx"
+                    && variant.channel.is_some()
+                    && self.value_type == SigmaBindingType::Integer
+                    && path_is(&["Event", "System", "EventID"])
+            }
+            Some(SigmaConversion::EvtxLogonType) => {
+                variant.parser_id == "parser-evtx"
+                    && variant.channel.is_some()
+                    && self.value_type == SigmaBindingType::Integer
+                    && path_is(&["Event", "EventData", "LogonType"])
+            }
+            Some(SigmaConversion::DefenderFullPath) => {
+                let admitted_paths = [
+                    ("FolderPath", "FileName"),
+                    ("InitiatingProcessFolderPath", "InitiatingProcessFileName"),
+                ];
+                variant.parser_id == "parser-defender"
+                    && self.value_type == SigmaBindingType::Text
+                    && admitted_paths.into_iter().any(|(path, basename)| {
+                        let basename_is = |expected: &[&str]| {
+                            self.basename_path.as_deref().is_some_and(|actual| {
+                                actual
+                                    .iter()
+                                    .map(String::as_str)
+                                    .eq(expected.iter().copied())
+                            })
+                        };
+                        (path_is(&[path]) && basename_is(&[basename]))
+                            || (path_is(&["properties", path])
+                                && basename_is(&["properties", basename]))
+                    })
+            }
+        };
+        if !admitted
+            || (self.basename_path.is_some()
+                != (self.conversion == Some(SigmaConversion::DefenderFullPath)))
+        {
+            return Err(invalid());
         }
         Ok(())
     }
@@ -369,6 +461,25 @@ mod tests {
                 .variants[1]
                 .mapping_version,
             expected
+        );
+    }
+
+    #[test]
+    fn parses_the_exact_fields_in_the_approved_table_vector() {
+        let bundle: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../testkit/fixtures/contracts/sigma_exact_source_fields.json"
+        ))
+        .unwrap();
+        let bytes =
+            hex::decode(bundle["field_table_wire_v1"]["bytes_hex"].as_str().unwrap()).unwrap();
+        let object = SigmaFieldTableV1::decode(&bytes).unwrap();
+        assert_eq!(object.encode().unwrap(), bytes);
+        assert_eq!(
+            ReviewedSigmaFieldTable::parse(&object)
+                .unwrap()
+                .variants
+                .len(),
+            7
         );
     }
 

@@ -1,6 +1,6 @@
 //! Exercise every declared binding and measure the enrolled Parquet projections.
 use super::{coverage_fixtures::*, *};
-use crate::sigma_pack::field_table::{ReviewedSigmaFieldTable, SigmaFieldBinding};
+use crate::sigma_pack::field_table::{ReviewedSigmaFieldTable, SigmaConversion, SigmaFieldBinding};
 use irmind_domain::{
     BoundedObservations, CategorySet, EventCategory, EventContextV1, EventHeaderV1, EventKind,
     EventOrigin, EventOutcome, EventText, EventTextList, EventType, EventTypeSet, EvidenceHash,
@@ -105,6 +105,15 @@ impl ProjectionInput {
 
     fn binding(&mut self, binding: &SigmaFieldBinding, selected: Value) {
         if let Some(path) = &binding.path {
+            if let Some(basename_path) = &binding.basename_path {
+                let basename = selected
+                    .as_str()
+                    .unwrap()
+                    .rsplit(['\\', '/'])
+                    .next()
+                    .unwrap();
+                self.insert_path(basename_path, Value::from(basename));
+            }
             self.insert_path(path, selected);
         } else {
             self.set_column(binding.column.as_deref().unwrap(), &selected);
@@ -151,8 +160,20 @@ impl ProjectionInput {
         .unwrap()
     }
 
-    fn original(&self) -> String {
-        serde_json::to_string(&self.original).unwrap()
+    fn original(&self, variant: &SigmaSourceVariant, row: &CommonEventV1) -> String {
+        if variant.exact_cluster_field().is_none() {
+            return serde_json::to_string(&self.original).unwrap();
+        }
+        let common = irmind_app::encode_common_event(row).unwrap();
+        let original = self
+            .original
+            .get("original")
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({}));
+        let format = cluster_audit::FORMAT;
+        format!(
+            r#"{{"common":{common},"format":"{format}","original":{original},"unavailable":{{}}}}"#
+        )
     }
 }
 
@@ -162,7 +183,22 @@ fn sample(binding: &SigmaFieldBinding, hit: bool) -> Value {
     } else {
         "synthetic-background"
     };
-    let number = if hit { 402 } else { 403 };
+    if matches!(binding.conversion, Some(SigmaConversion::DefenderFullPath)) {
+        return Value::from(format!("C:\\Synthetic\\{text}.exe"));
+    }
+    if matches!(
+        binding.conversion,
+        Some(SigmaConversion::EvtxEventId | SigmaConversion::EvtxLogonType)
+    ) {
+        return Value::from(if hit { "7" } else { "8" });
+    }
+    let number = if binding.name == "protoPayload.status.code" {
+        if hit { 7 } else { 8 }
+    } else if hit {
+        402
+    } else {
+        403
+    };
     let ip = if hit { "203.0.113.17" } else { "192.0.2.19" };
     match (binding.column.as_deref(), binding.value_type) {
         (Some("event.outcome"), _) => Value::from(if hit { "failure" } else { "success" }),
@@ -173,6 +209,9 @@ fn sample(binding: &SigmaFieldBinding, hit: bool) -> Value {
         (_, SigmaBindingType::TextList) => serde_json::json!([text]),
         (_, SigmaBindingType::IntegerList) => serde_json::json!([number]),
         (_, SigmaBindingType::IpList) => serde_json::json!([ip]),
+        (_, SigmaBindingType::PairList) => {
+            serde_json::json!([{ "Name": "Synthetic", "Value": text }])
+        }
     }
 }
 
@@ -186,6 +225,20 @@ fn condition(variant: &SigmaSourceVariant) -> String {
     .filter_map(|(key, value)| value.as_ref().map(|value| format!("{key}: {value}")))
     .collect::<Vec<_>>();
     format!("{{{}}}", clauses.join(", "))
+}
+
+fn binding_selection(binding: &SigmaFieldBinding, value: &Value) -> String {
+    if matches!(
+        binding.conversion,
+        Some(SigmaConversion::EvtxEventId | SigmaConversion::EvtxLogonType)
+    ) {
+        return format!(
+            r#"{{"{}": {}}}"#,
+            binding.name,
+            value.as_str().unwrap().parse::<u16>().unwrap()
+        );
+    }
+    selection(&binding.name, value)
 }
 
 fn selection(name: &str, value: &Value) -> String {
@@ -224,9 +277,9 @@ fn sigma_every_enrolled_binding_matches_and_rejects_a_negative_control() {
             let value = selector_value(variant, binding).unwrap_or_else(|| sample(binding, true));
             source.binding(binding, value.clone());
             let row = source.row(variant, 0);
-            let raw = source.original();
-            let positive = selection(&binding.name, &value);
-            let negative = selection(&binding.name, &sample(binding, false));
+            let raw = source.original(variant, &row);
+            let positive = binding_selection(binding, &value);
+            let negative = binding_selection(binding, &sample(binding, false));
             assert_eq!(
                 evaluate(variant, &taxonomy, &positive, &row, Some(&raw)),
                 (1, None),
@@ -251,7 +304,12 @@ fn sigma_every_enrolled_binding_matches_and_rejects_a_negative_control() {
 fn sigma_reviewed_families_2000_rules_on_one_gib_parquet() {
     let table = all_variants();
     let families = table.variants.len() as u64;
-    let rows = (1024 * 1024 * 1024u64).div_ceil(families * 4096);
+    let padded = table
+        .variants
+        .iter()
+        .filter(|variant| variant.exact_cluster_field().is_none())
+        .count() as u64;
+    let rows = (1024 * 1024 * 1024u64).div_ceil(padded * 4096);
     let directory = tempfile::tempdir().unwrap();
     let mut remaining = 2000;
     let mut corpus_bytes = 0;
@@ -277,6 +335,7 @@ fn measure_variant(
     rows: u64,
     file: &std::path::Path,
 ) -> u64 {
+    use irmind_app::encode_common_event;
     use std::{
         fs::File,
         time::{Duration, Instant},
@@ -286,7 +345,25 @@ fn measure_variant(
         .iter()
         .find(|binding| selector_value(variant, binding).is_none())
         .unwrap();
-    write_variant_fixture(variant, binding, rows, file);
+    let mut incident = ProjectionInput::for_variant(variant);
+    let mut background = ProjectionInput::for_variant(variant);
+    incident.binding(binding, sample(binding, true));
+    background.binding(binding, sample(binding, false));
+    if variant.exact_cluster_field().is_none() {
+        for input in [&mut incident, &mut background] {
+            input
+                .original
+                .insert("synthetic_padding".into(), Value::from("x".repeat(4096)));
+        }
+    }
+    benchmark::write_fixture_rows(file, rows, |row| {
+        let input = if row == 0 { &incident } else { &background };
+        let row = input.row(variant, row);
+        (
+            encode_common_event(&row).unwrap(),
+            input.original(variant, &row),
+        )
+    });
     let taxonomy = condition(variant);
     let rules = measure_rules(&taxonomy, binding, count);
     let start = Instant::now();
@@ -320,7 +397,7 @@ fn measure_variant(
     )
     .unwrap();
     let scan_seconds = start.elapsed().as_secs_f64();
-    assert!(run.status() == SigmaRunStatusV1::Complete);
+    assert_eq!(run.status(), SigmaRunStatusV1::Complete);
     assert_eq!(
         (
             true_positives,
@@ -354,32 +431,6 @@ fn measure_variant(
 }
 
 #[cfg(not(debug_assertions))]
-fn write_variant_fixture(
-    variant: &SigmaSourceVariant,
-    binding: &SigmaFieldBinding,
-    rows: u64,
-    file: &std::path::Path,
-) {
-    use irmind_app::encode_common_event;
-    let mut incident = ProjectionInput::for_variant(variant);
-    let mut background = ProjectionInput::for_variant(variant);
-    incident.binding(binding, sample(binding, true));
-    background.binding(binding, sample(binding, false));
-    for input in [&mut incident, &mut background] {
-        input
-            .original
-            .insert("synthetic_padding".into(), Value::from("x".repeat(4096)));
-    }
-    benchmark::write_fixture_rows(file, rows, |row| {
-        let input = if row == 0 { &incident } else { &background };
-        (
-            encode_common_event(&input.row(variant, row)).unwrap(),
-            input.original(),
-        )
-    });
-}
-
-#[cfg(not(debug_assertions))]
 fn measure_rules(
     taxonomy: &str,
     binding: &SigmaFieldBinding,
@@ -388,7 +439,9 @@ fn measure_rules(
     (0..count).map(|index| {
         let name = if index + 1 == count { "unsupported" } else { binding.name.as_str() };
         let predicate = if index == 0 {
-            selection(name, &sample(binding, true))
+            binding_selection(binding, &sample(binding, true))
+        } else if name == binding.name && binding.value_type == SigmaBindingType::PairList {
+            format!(r#"{{"{name}": {{"Name": "Synthetic", "Value": "unmatched-{index}"}}}}"#)
         } else {
             format!(r#"{{"{name}|exists": false}}"#)
         };
