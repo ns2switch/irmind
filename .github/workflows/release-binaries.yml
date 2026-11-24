@@ -159,14 +159,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@766a42937d994bd78bb4591385445c188ccb3f09 # 1.97.1
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: {name: irmind-linux, path: release-binary}
-      - name: Create and check a signed Sigma case with the Linux release executable
+      - name: Create signed CloudTrail and Sysmon cases with the Linux release executable
         env:
           IRMIND_RELEASE_BINARY: ${{ github.workspace }}/release-binary/irmind
           IRMIND_RELEASE_SIGMA_OUTPUT: ${{ github.workspace }}/portable-sigma
           CARGO_INCREMENTAL: 0
         run: |
           (cd release-binary && sha256sum --check SHA256SUMS)
-          chmod +x "$IRMIND_RELEASE_BINARY"
+          chmod +x "$IRMIND_RELEASE_BINARY" release-binary/irmind-evtx
           "$IRMIND_RELEASE_BINARY" --version
           cargo test -p irmind --no-default-features --features keystore-file --profile ci --locked --test release_sigma_report -- --ignored
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -196,7 +196,7 @@ jobs:
         with: {name: '${{ matrix.artifact }}', path: release-binary}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with: {name: release-sigma-report-v10, path: portable-sigma}
-      - name: Verify the Linux export with this platform's release executable
+      - name: Verify the Linux exports with this platform's release executable
         shell: bash
         env:
           RELEASE_EXECUTABLE: release-binary/${{ matrix.binary }}
