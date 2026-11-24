@@ -546,7 +546,7 @@ fn parser_prompt_hides_zero_confidence_unless_no_positive_candidates_exist() {
             ("csv".into(), 50),
             ("json".into(), 78),
         ],
-        Default::default(),
+        std::collections::BTreeMap::new(),
     );
     let shown = render_parser_prompt(&mut terminal, &prompt, body);
     assert!(shown.contains("> 1. json"));
@@ -555,7 +555,7 @@ fn parser_prompt_hides_zero_confidence_unless_no_positive_candidates_exist() {
     let prompt = ParserPrompt::new(
         "synthetic".into(),
         vec![("unknown".into(), 0)],
-        Default::default(),
+        std::collections::BTreeMap::new(),
     );
     let shown = render_parser_prompt(&mut terminal, &prompt, body);
     assert!(shown.contains("Detection found no positive match"));
