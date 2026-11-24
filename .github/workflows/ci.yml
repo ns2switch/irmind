@@ -26,7 +26,7 @@ on:
         type: boolean
         default: false
       release_binary_reproducibility:
-        description: Run only the five native reproducibility jobs used by the release
+        description: Build the five reproducible release packages and test the portable Sigma case
         type: boolean
         default: false
 permissions:
