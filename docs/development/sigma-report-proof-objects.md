@@ -3,7 +3,8 @@
 This document specifies the object bodies referenced by the approved
 [V10 receipts and header vectors](https://github.com/ns2switch/irmind/pull/389).
 It uses the approved kinds, framing, domain-separated commitments and counts.
-The body schemas below are pending approval.
+The body schemas are approved. New report publications use
+[ReportCoverageV2](report-subagent-coverage-v2.md) for kind 2.
 
 ## Primitives
 
