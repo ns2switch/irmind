@@ -274,33 +274,7 @@ fn report_coverage_resolves_the_same_skill_load_position_in_two_signed_branches(
     for gap in &hits {
         assert_report_gap_load(&store, &history, &entries, gap, &cancel);
     }
-    assert_eq!(
-        irmind_app::v10_proofs::ReportCoverageV2::decode(&coverage.encode().unwrap()).unwrap(),
-        coverage
-    );
-    let plan = store
-        .plan_cited_report(
-            &engine,
-            &history.case,
-            irmind_app::ReportDocumentLanguage::English,
-            irmind_app::ReportDocumentFormat::Markdown,
-            &cancel,
-        )
-        .unwrap();
-    let receipt = engine
-        .publish_cited_report(&history.case, plan, &cancel)
-        .unwrap();
-    let stored = store
-        .read_addressed_report_proof(&history.case, 2, receipt.coverage, &cancel)
-        .unwrap();
-    assert_eq!(
-        irmind_app::v10_proofs::ReportCoverageV2::decode(&stored).unwrap(),
-        coverage
-    );
-    let rendered = store
-        .read_addressed_report_proof(&history.case, 3, receipt.rendered_sha256, &cancel)
-        .unwrap();
-    let rendered = String::from_utf8(rendered).unwrap();
+    let rendered = publish_delegated_report(&engine, &store, &history.case, &coverage, &cancel);
     for gap in hits {
         assert!(rendered.contains(&hex(&gap.task_id)));
     }
@@ -309,6 +283,40 @@ fn report_coverage_resolves_the_same_skill_load_position_in_two_signed_branches(
     let path = root.path().join("delegated-report.irmind");
     CaseExporter::export_case(store.as_ref(), &history.case, &path, &cancel).unwrap();
     verify_export_expected(&path, Some(&hex(&sha256(&history.analyst.public_key())))).unwrap();
+}
+
+fn publish_delegated_report(
+    engine: &Engine<'_>,
+    store: &LocalStore,
+    case: &CaseId,
+    coverage: &irmind_app::v10_proofs::ReportCoverageV2,
+    cancel: &CancellationToken,
+) -> String {
+    assert_eq!(
+        irmind_app::v10_proofs::ReportCoverageV2::decode(&coverage.encode().unwrap()).unwrap(),
+        *coverage
+    );
+    let plan = store
+        .plan_cited_report(
+            engine,
+            case,
+            irmind_app::ReportDocumentLanguage::English,
+            irmind_app::ReportDocumentFormat::Markdown,
+            cancel,
+        )
+        .unwrap();
+    let receipt = engine.publish_cited_report(case, plan, cancel).unwrap();
+    let stored = store
+        .read_addressed_report_proof(case, 2, receipt.coverage, cancel)
+        .unwrap();
+    assert_eq!(
+        irmind_app::v10_proofs::ReportCoverageV2::decode(&stored).unwrap(),
+        *coverage
+    );
+    let rendered = store
+        .read_addressed_report_proof(case, 3, receipt.rendered_sha256, cancel)
+        .unwrap();
+    String::from_utf8(rendered).unwrap()
 }
 
 fn assert_report_gap_load(
