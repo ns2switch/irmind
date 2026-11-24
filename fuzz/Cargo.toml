@@ -387,3 +387,11 @@ path = "fuzz_targets/sigma_admission.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "sigma_field_table"
+path = "fuzz_targets/sigma_field_table.rs"
+required-features = ["export"]
+test = false
+doc = false
+bench = false
