@@ -13,6 +13,10 @@ or re-ingest the verified originals in a new case.
   original IRMind executable. Subsequent dependency changes outside the
   production closure of a native mapper leave its identity intact.
 
+- Accept empty trailing SSE frames from OpenAI-compatible providers in model
+  tests and conversations, account for repeated usage snapshots once, and
+  explain when the provider's content filter blocks a response.
+
 ## 0.6.2 — Reproducible macOS binaries and build toolchain records
 
 - Reproduce the macOS main executable across clean checkouts on Intel and
