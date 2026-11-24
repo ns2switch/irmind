@@ -277,7 +277,10 @@ fn assert_package(bytes: &[u8], finding: &str) {
     assert_eq!(runs.len(), 1);
     let run = SigmaRunV1::decode(runs[0]).unwrap();
     assert_eq!(run.matched_rows, 1);
-    assert!(run.status == irmind_app::v10_proofs::SigmaRunStatusV1::Complete);
+    assert_eq!(
+        run.status,
+        irmind_app::v10_proofs::SigmaRunStatusV1::Complete
+    );
     assert_ne!(run.pack_admission, [0; 32]);
     let results = SigmaRunResultsV1::decode(&object(bytes, 5, &run.result_manifest)).unwrap();
     assert_eq!(results.matches.len(), 1);
