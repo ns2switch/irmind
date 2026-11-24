@@ -5,6 +5,10 @@ on:
       signing_rehearsal:
         type: boolean
         default: false
+    outputs:
+      portable_sigma_verified:
+        description: The packaged Linux export passed macOS and Windows verification
+        value: ${{ jobs.require_sigma_report_case.outputs.verified }}
 
 permissions:
   contents: read
@@ -193,3 +197,13 @@ jobs:
           fi
           "$RELEASE_EXECUTABLE" --version
           python -B .github/scripts/verify_release_sigma_report.py "$RELEASE_EXECUTABLE" portable-sigma
+
+  require_sigma_report_case:
+    needs: [create_sigma_report_case, verify_sigma_report_case]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    outputs:
+      verified: ${{ steps.complete.outputs.verified }}
+    steps:
+      - id: complete
+        run: echo 'verified=true' >> "$GITHUB_OUTPUT"
