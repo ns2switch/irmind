@@ -167,6 +167,7 @@ impl ReviewedSigmaFieldTable {
 }
 
 impl SigmaSourceVariant {
+    #[cfg(feature = "sigma")]
     pub(super) fn exact_cluster_field(&self) -> Option<irmind_app::cluster_audit::AuditExactField> {
         use irmind_app::cluster_audit::AuditExactField;
         let field = match self.mapping_id.as_str() {
