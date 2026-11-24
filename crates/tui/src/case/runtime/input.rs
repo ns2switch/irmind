@@ -515,7 +515,12 @@ impl CaseRuntime<'_, '_, '_> {
         let Some(mut prompt) = self.state.parser_prompt.take() else {
             return Ok(());
         };
-        match prompt.update(code) {
+        let page = if matches!(code, KeyCode::PageUp | KeyCode::PageDown) {
+            self.parser_prompt_page()?
+        } else {
+            1
+        };
+        match prompt.update(code, page) {
             crate::case::state::ParserPromptAction::Cancel => {
                 self.state.pending_ingest = None;
                 self.engine

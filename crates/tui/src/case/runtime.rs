@@ -225,10 +225,10 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                     source_name,
                     candidates,
                 } => {
-                    self.state.parser_prompt = Some(super::state::ParserPrompt {
-                        source: source_name.clone(),
-                        candidates: candidates.clone(),
-                        descriptions: candidates
+                    self.state.parser_prompt = Some(super::state::ParserPrompt::new(
+                        source_name.clone(),
+                        candidates.clone(),
+                        candidates
                             .iter()
                             .filter_map(|(id, _)| {
                                 self.io_ops
@@ -237,9 +237,7 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                                     .map(|parser| (id.clone(), parser.description().to_owned()))
                             })
                             .collect(),
-                        selected: 0,
-                        typed_option: String::new(),
-                    });
+                    ));
                     Some("Choose a parser and press Enter, or Esc to cancel.")
                 }
                 _ => None,
