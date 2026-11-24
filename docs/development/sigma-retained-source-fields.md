@@ -45,8 +45,8 @@ order. Byte or count overflow uses `overflow`. An ill-formed IP uses
 Preserve source ordering and spelling when the entire array is valid.
 For GKE status, use `unexpected_type` for a present non-integer, including
 null, and for a non-object ancestor on the exact path. Use `overflow` for
-an integer outside 0 through 2,147,483,647. The retained gRPC code stays
-distinct from native Kubernetes HTTP status.
+an integer outside the 0 through 16 range used by the GKE outcome mapping.
+The retained gRPC code stays distinct from native Kubernetes HTTP status.
 
 The canonical common object retains its existing 65,536-byte bound. The
 new envelope alone may add up to 2,048 bytes of bounded metadata, for a
