@@ -240,7 +240,7 @@ fn evaluate(
     ui.expect("Sign Sigma pack admission").unwrap();
     ui.send("2\r").unwrap();
     ui.expect("Sigma pack admitted").unwrap();
-    ui.send(format!("/sigma run {digest} {}\r", scenario.time_range,))
+    ui.send(format!("/sigma run {digest} {}\r", scenario.time_range))
         .unwrap();
     ui.expect("Sigma run complete").unwrap();
     quit(&mut ui);
