@@ -18,6 +18,8 @@ Of the 3,302 files in the pinned SigmaHQ r2026-07-01 release, 3,301 passed pack 
 
 The [v0.7.3 table-only audit](development/benchmarks/sigmahq-v073-reviewed-fields.md) compiled 1,159 of the same 3,302 rules with the V2 evaluator. The audit records the effect of each block separately.
 
+The [V3 cloud and macOS audit](development/benchmarks/sigmahq-v073-cloud-bindings.md) measures the expanded table in five cumulative runs. The bindings use explicit retained provider fields. Fields requiring a different representation are documented separately in the [projection proposal](development/sigma-structured-original-paths-proposal.md).
+
 ## Source coverage and field names
 
 Use the indicated `product` and `service` as Sigma logsource selectors. Category selectors narrow the listed source classes. Field names in the third column are case-sensitive. Text and numeric values follow the listed binding types.

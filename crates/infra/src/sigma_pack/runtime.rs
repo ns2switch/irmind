@@ -670,7 +670,7 @@ fn run_objects(
 pub(super) fn enrolled_field_table() -> SigmaFieldTableV1 {
     SigmaFieldTableV1 {
         id: "irmind-sigma-source-coverage".into(),
-        version: "v3".into(),
+        version: "v4".into(),
         toml: concat!(
             include_str!("cloudtrail-v1.toml"),
             "\n",

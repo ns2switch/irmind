@@ -18,6 +18,8 @@ En la release fijada de SigmaHQ r2026-07-01, 3.301 de 3.302 ficheros pasaron la 
 
 La [auditoría de tablas de v0.7.3](../development/benchmarks/sigmahq-v073-reviewed-fields.md) compiló 1.159 de las mismas 3.302 reglas con el evaluador V2. La auditoría recoge el efecto de cada bloque por separado.
 
+La [auditoría V3 de nube y macOS](../development/benchmarks/sigmahq-v073-cloud-bindings.md) mide la tabla ampliada en cinco ejecuciones acumuladas. Las correspondencias usan campos explícitos conservados de cada proveedor. Los campos que requieren otra representación se recogen en la [propuesta de proyección](../development/sigma-structured-original-paths-proposal.md).
+
 ## Cobertura y campos por fuente
 
 Usa el `product` y `service` indicados en el logsource de Sigma. El selector de categoría acota las clases indicadas. Los nombres de campo distinguen mayúsculas y minúsculas. Respeta el tipo de cada valor.
