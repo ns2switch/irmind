@@ -82,15 +82,134 @@ impl SigmaPackageInstallationV1 {
         Ok(receipt)
     }
 
-    fn validate(&self) -> Result<()> {
-        if (!self.active && self.previous_installation.is_none())
-            || !valid_sigma_package_identity(&self.name, &self.version)
-            || self.license.chars().any(char::is_control)
+    /// Check a transition against the preceding authenticated operation for this
+    /// name. Replay must include deactivated installations.
+    pub fn validate_successor(&self, previous: Option<(&Self, Digest)>) -> Result<()> {
+        self.validate()?;
+        let Some((old, hash)) = previous else {
+            return if self.previous_installation.is_none() && self.active {
+                Ok(())
+            } else {
+                Err(INVALID)
+            };
+        };
+        if self.previous_installation != Some(hash)
+            || self.name != old.name
+            || std::mem::discriminant(&self.origin) != std::mem::discriminant(&old.origin)
+            || crate::catalog::older_or_unknown(&self.version, &old.version)
+        {
+            return Err(INVALID);
+        }
+        if self.version == old.version
+            && (self.metadata != old.metadata
+                || self.manifest != old.manifest
+                || self.asset != old.asset
+                || self.license != old.license)
+        {
+            return Err(INVALID);
+        }
+        if !self.active && (!old.active || self.version != old.version || self.origin != old.origin)
         {
             return Err(INVALID);
         }
         Ok(())
     }
+
+    fn validate(&self) -> Result<()> {
+        if (!self.active && self.previous_installation.is_none())
+            || !valid_sigma_package_identity(&self.name, &self.version)
+            || !valid_sigma_license_expression(&self.license)
+        {
+            return Err(INVALID);
+        }
+        Ok(())
+    }
+}
+
+/// Validate bounded SPDX expression syntax. Catalog review checks the
+/// declarations and distribution rights against the actual rule sources.
+pub fn valid_sigma_license_expression(expression: &str) -> bool {
+    enum Expected {
+        License,
+        Operator { may_add_exception: bool },
+        Exception,
+    }
+    fn identifier(token: &str) -> bool {
+        !matches!(
+            token,
+            "AND" | "OR" | "WITH" | "NONE" | "NOASSERTION" | "DRL-1.1"
+        ) && token
+            .as_bytes()
+            .first()
+            .is_some_and(u8::is_ascii_alphanumeric)
+            && token
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-'))
+    }
+
+    fn license_identifier(token: &str) -> bool {
+        if let Some(rest) = token.strip_prefix("DocumentRef-") {
+            return rest
+                .split_once(":LicenseRef-")
+                .is_some_and(|(document, license)| identifier(document) && identifier(license));
+        }
+        identifier(token)
+    }
+
+    if expression == "DRL-1.1" {
+        return true;
+    }
+    if !(1..=4096).contains(&expression.len()) || !expression.is_ascii() {
+        return false;
+    }
+
+    let mut rest = expression;
+    let mut depth = 0;
+    let mut expected = Expected::License;
+    while !rest.is_empty() {
+        rest = rest.trim_start_matches(' ');
+        let Some(first) = rest.as_bytes().first() else {
+            break;
+        };
+        let length = if matches!(first, b'(' | b')') {
+            1
+        } else {
+            rest.find([' ', '(', ')']).unwrap_or(rest.len())
+        };
+        let (token, tail) = rest.split_at(length);
+        rest = tail;
+        expected = match (expected, token) {
+            (Expected::License, "(") if depth < 16 => {
+                depth += 1;
+                Expected::License
+            }
+            (Expected::License, token)
+                if license_identifier(token.strip_suffix('+').unwrap_or(token)) =>
+            {
+                Expected::Operator {
+                    may_add_exception: !token.ends_with('+'),
+                }
+            }
+            (Expected::Operator { .. }, "AND" | "OR") => Expected::License,
+            (
+                Expected::Operator {
+                    may_add_exception: true,
+                },
+                "WITH",
+            ) => Expected::Exception,
+            (Expected::Exception, token) if identifier(token) => Expected::Operator {
+                may_add_exception: false,
+            },
+            (Expected::Operator { .. }, ")") if depth > 0 => {
+                depth -= 1;
+                Expected::Operator {
+                    may_add_exception: false,
+                }
+            }
+            _ => return false,
+        };
+    }
+    depth == 0 && matches!(expected, Expected::Operator { .. })
 }
 
 pub fn valid_sigma_package_identity(name: &str, version: &str) -> bool {
@@ -175,10 +294,201 @@ impl SigmaCaseRunAdmissionV1 {
     }
 }
 
+/// Authenticate the exact kind-6 object against the operation hash in a
+/// signed case admission and the Analyst identity verified for that case.
+pub fn verify_sigma_installation_proof(
+    body: &[u8],
+    expected_operation: Digest,
+    verifier: &dyn crate::Verifier,
+) -> std::result::Result<SigmaPackageInstallationV1, crate::AppError> {
+    use crate::{Actor, AppError, GLOBAL_OPERATION_SCOPE, SignedOperation};
+    let decode_error = || AppError::InvalidChain(0);
+    if body.len() > 32 * 1024 {
+        return Err(decode_error());
+    }
+    let entry: SignedOperation = serde_json::from_slice(body).map_err(|_| decode_error())?;
+    let invalid = || AppError::InvalidChain(entry.seq);
+    if serde_json::to_vec(&entry).map_err(|_| invalid())? != body
+        || entry.case_id != GLOBAL_OPERATION_SCOPE
+        || entry.actor != Actor::Analyst
+        || entry.seq == 0
+        || entry.sig.len() != 64
+        || entry.public_key.len() != 32
+        || entry.hash != expected_operation
+        || crate::sha256(&entry.canonical()) != entry.hash
+        || verifier.trusted_public_key(&Actor::Analyst)? != entry.public_key
+    {
+        return Err(invalid());
+    }
+    verifier
+        .verify(&entry.public_key, &entry.hash, &entry.sig)
+        .map_err(|_| invalid())?;
+    let receipt = decode_sigma_installation_operation(&entry)?;
+    if !receipt.active {
+        return Err(invalid());
+    }
+    Ok(receipt)
+}
+
+pub fn decode_sigma_installation_operation(
+    entry: &crate::SignedOperation,
+) -> std::result::Result<SigmaPackageInstallationV1, crate::AppError> {
+    let invalid = || crate::AppError::InvalidChain(entry.seq);
+    if entry.operation.len() > 16 * 1024 {
+        return Err(invalid());
+    }
+    let raw = hex::decode(&entry.operation).map_err(|_| invalid())?;
+    if crate::hex(&raw) != entry.operation {
+        return Err(invalid());
+    }
+    SigmaPackageInstallationV1::decode(&raw).map_err(|_| invalid())
+}
+
+impl crate::Engine<'_> {
+    /// Read the latest operation after authenticating the complete global chain.
+    pub fn local_sigma_package_operation(
+        &self,
+        name: &str,
+    ) -> std::result::Result<Option<crate::SignedOperation>, crate::AppError> {
+        use crate::AppError;
+
+        let entries = self.audit_log.global_operations()?;
+        self.verify_global_operation_entries(&entries)?;
+        let prefix = crate::hex(INSTALLATION);
+        let mut previous: Option<(SigmaPackageInstallationV1, crate::SignedOperation)> = None;
+        for entry in entries {
+            if !entry.operation.starts_with(&prefix) {
+                continue;
+            }
+            let invalid = || AppError::InvalidChain(entry.seq);
+            let receipt = decode_sigma_installation_operation(&entry)?;
+            if receipt.name == name {
+                receipt
+                    .validate_successor(
+                        previous
+                            .as_ref()
+                            .map(|(old, operation)| (old, operation.hash)),
+                    )
+                    .map_err(|_| invalid())?;
+                previous = Some((receipt, entry));
+            }
+        }
+        Ok(previous.map(|(_, operation)| operation))
+    }
+
+    /// Commit a local installation or deactivation only after the caller has
+    /// staged and checked the exact approved bytes. The global lock covers the
+    /// preview check, signing and durable publication.
+    pub fn commit_local_sigma_package<T>(
+        &self,
+        receipt: &SigmaPackageInstallationV1,
+        publish: impl FnOnce(
+            &crate::SignedOperation,
+            &dyn Fn() -> std::result::Result<(), crate::AppError>,
+        ) -> std::result::Result<T, crate::AppError>,
+    ) -> std::result::Result<T, crate::AppError> {
+        use crate::AppError;
+        self.require_attended_analyst("install or deactivate Sigma package")?;
+        if receipt.origin != SigmaPackageOriginV1::Local {
+            return Err(AppError::Policy(
+                "Catalog installation requires a verified catalog preview".into(),
+            ));
+        }
+        let _lock = self.audit_log.lock_global_operations()?;
+        let previous = self.local_sigma_package_operation(&receipt.name)?;
+        if let Some(old) = &previous {
+            let old_receipt = decode_sigma_installation_operation(old)?;
+            receipt.validate_successor(Some((&old_receipt, old.hash)))
+        } else {
+            receipt.validate_successor(None)
+        }
+        .map_err(|_| {
+            AppError::Policy(
+                "Sigma package preview is stale or would roll back or replace a committed version"
+                    .into(),
+            )
+        })?;
+        let body = receipt
+            .encode()
+            .map_err(|_| AppError::Policy("Invalid Sigma package installation receipt".into()))?;
+        let signed = self.sign_global_operation_unlocked(crate::hex(&body))?;
+        publish(&signed, &|| self.audit_log.append_global_operation(&signed))
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn package_license_expression_rejects_invalid_structure() {
+        for expression in [
+            "DRL-1.1",
+            "MIT OR (Apache-2.0 AND BSD-3-Clause)",
+            "GPL-2.0-only WITH Classpath-exception-2.0",
+            "DocumentRef-package:LicenseRef-Local",
+        ] {
+            assert!(valid_sigma_license_expression(expression), "{expression}");
+        }
+        for expression in [
+            "",
+            "MIT OR",
+            "(MIT AND Apache-2.0",
+            "AND MIT",
+            "MIT Apache-2.0",
+            "MIT WITH WITH Apache-2.0",
+            "MIT\nOR Apache-2.0",
+            "DRL-1.1 OR MIT",
+        ] {
+            assert!(!valid_sigma_license_expression(expression), "{expression}");
+        }
+    }
+
+    #[test]
+    fn deactivation_preserves_the_version_floor_and_the_exact_package() {
+        let vectors: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../docs/development/sigma-package-vectors/wire.json"
+        ))
+        .unwrap();
+        let raw =
+            hex::decode(vectors["local_installation"]["bytes_hex"].as_str().unwrap()).unwrap();
+        let first = SigmaPackageInstallationV1::decode(&raw).unwrap();
+        let first_hash = crate::sha256(b"synthetic signed installation");
+        assert!(first.validate_successor(None).is_ok());
+
+        let mut removed = first.clone();
+        removed.active = false;
+        removed.previous_installation = Some(first_hash);
+        assert!(
+            removed
+                .validate_successor(Some((&first, first_hash)))
+                .is_ok()
+        );
+        let removal_hash = crate::sha256(b"synthetic signed removal");
+        let mut candidate = removed.clone();
+        candidate.active = true;
+        candidate.previous_installation = Some(removal_hash);
+        assert!(
+            candidate
+                .validate_successor(Some((&removed, removal_hash)))
+                .is_ok()
+        );
+
+        candidate.version = "0.9.0".into();
+        assert!(
+            candidate
+                .validate_successor(Some((&removed, removal_hash)))
+                .is_err()
+        );
+        candidate.version.clone_from(&removed.version);
+        candidate.asset[0] ^= 1;
+        assert!(
+            candidate
+                .validate_successor(Some((&removed, removal_hash)))
+                .is_err()
+        );
+    }
 
     #[test]
     fn approved_package_receipts_round_trip() {

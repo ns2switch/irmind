@@ -97,6 +97,24 @@ impl Ed25519CatalogIndexVerifier {
         )
     }
 
+    #[cfg(feature = "sigma")]
+    pub fn verify_sigma_proof(
+        &self,
+        proof: &[u8],
+        expected_digest: [u8; 32],
+        expected_tag: &str,
+    ) -> Result<irmind_app::catalog::SigmaCatalogIndex, CatalogError> {
+        irmind_app::catalog::SigmaCatalogIndex::authenticate_proof(
+            proof,
+            expected_digest,
+            expected_tag,
+            self.keys,
+            &crate::LocalVerifier {
+                trusted: std::collections::BTreeMap::new(),
+            },
+        )
+    }
+
     pub fn available(&self) -> bool {
         !self.keys.is_empty()
     }

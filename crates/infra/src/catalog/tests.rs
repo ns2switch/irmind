@@ -368,6 +368,25 @@ fn approved_sigma_catalog_vector_authenticates_in_its_own_domain() {
     let signature = read("sigma_index_signature");
     let authenticated = verifier.verify_sigma(&index, &signature, "v1.0.0").unwrap();
     assert_eq!(authenticated.proof(), body("v10_object_7"));
+    let proof = authenticated.proof();
+    let digest = irmind_app::sha256(proof);
+    let reopened = verifier
+        .verify_sigma_proof(proof, digest, "v1.0.0")
+        .unwrap();
+    assert!(reopened.check_release_history([&authenticated]).is_ok());
+    assert!(
+        verifier
+            .verify_sigma_proof(proof, [0; 32], "v1.0.0")
+            .is_err()
+    );
+    let mut changed_proof = proof.to_vec();
+    changed_proof.push(0);
+    assert!(
+        verifier
+            .verify_sigma_proof(&changed_proof, irmind_app::sha256(&changed_proof), "v1.0.0")
+            .is_err()
+    );
+
     assert_eq!(authenticated.sequence(), 1);
     let package = body("package");
     let cancel = irmind_app::CancellationToken::new();
@@ -405,5 +424,37 @@ fn approved_sigma_catalog_vector_authenticates_in_its_own_domain() {
         verifier
             .verify(&raw, &FrozenCatalogRelease::new("v1.0.0").unwrap())
             .is_err()
+    );
+}
+
+#[cfg(feature = "sigma")]
+#[test]
+fn approved_sigma_installation_proof_checks_the_analyst_and_operation_digest() {
+    use irmind_app::v10_proofs::verify_sigma_installation_proof;
+    use irmind_domain::Actor;
+
+    let vectors: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../docs/development/sigma-package-vectors/wire.json"
+    ))
+    .unwrap();
+    let raw = hex::decode(vectors["v10_object_6"]["bytes_hex"].as_str().unwrap()).unwrap();
+    let entry: irmind_app::SignedOperation = serde_json::from_slice(&raw).unwrap();
+    let verifier = crate::LocalVerifier {
+        trusted: std::collections::BTreeMap::new(),
+    }
+    .with_trusted_key(&Actor::Analyst, &entry.public_key)
+    .unwrap();
+    let receipt = verify_sigma_installation_proof(&raw, entry.hash, &verifier).unwrap();
+    assert_eq!(receipt.name, "synthetic");
+    assert!(verify_sigma_installation_proof(&raw, [0; 32], &verifier).is_err());
+    let mut altered = entry.clone();
+    altered.sig[0] ^= 1;
+    assert!(
+        verify_sigma_installation_proof(
+            &serde_json::to_vec(&altered).unwrap(),
+            entry.hash,
+            &verifier
+        )
+        .is_err()
     );
 }

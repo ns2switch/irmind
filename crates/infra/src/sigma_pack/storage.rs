@@ -9,6 +9,8 @@ use irmind_app::{
         write_v10_object_section,
     },
 };
+mod installation;
+
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs::{self, File},

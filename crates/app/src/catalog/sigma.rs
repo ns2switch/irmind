@@ -1,6 +1,9 @@
 //! Sigma authentication shares release keys with skills and uses a distinct domain.
 use super::{CATALOG_REPOSITORY, CatalogDigest, CatalogError, limits, schema::asset_name, version};
-use crate::{Verifier, v10_proofs::valid_sigma_package_identity};
+use crate::{
+    Verifier,
+    v10_proofs::{valid_sigma_license_expression, valid_sigma_package_identity},
+};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -101,6 +104,52 @@ impl SigmaCatalogIndex {
         Ok(Self { index, proof })
     }
 
+    /// Verify a retained kind-7 object against a signed proof commitment.
+    pub fn authenticate_proof(
+        proof: &[u8],
+        expected_digest: [u8; 32],
+        expected_tag: &str,
+        release_keys: &[[u8; 32]],
+        verifier: &dyn Verifier,
+    ) -> Result<Self, CatalogError> {
+        if proof.len() > PROOF.len() + 8 + super::MAX_CATALOG_INDEX_BYTES + 64
+            || crate::sha256(proof) != expected_digest
+        {
+            return Err(CatalogError::InvalidData);
+        }
+        let body = proof.strip_prefix(PROOF).ok_or(CatalogError::InvalidData)?;
+        let (size, body) = body
+            .split_first_chunk::<8>()
+            .ok_or(CatalogError::InvalidData)?;
+        let length =
+            usize::try_from(u64::from_be_bytes(*size)).map_err(|_| CatalogError::InvalidData)?;
+        let (index, signature) = body
+            .split_at_checked(length)
+            .ok_or(CatalogError::InvalidData)?;
+        Self::authenticate(index, signature, expected_tag, release_keys, verifier)
+    }
+
+    /// Check against every uniquely authenticated earlier release retained by
+    /// the global installation history, including releases with no active packs.
+    pub fn check_release_history<'a>(
+        &self,
+        history: impl IntoIterator<Item = &'a Self>,
+    ) -> Result<(), CatalogError> {
+        let mut high = 0;
+        for previous in history {
+            high = high.max(previous.sequence());
+            if (self.tag() == previous.tag() || self.sequence() == previous.sequence())
+                && self.proof != previous.proof
+            {
+                return Err(CatalogError::ReleaseMismatch);
+            }
+        }
+        if self.sequence() < high {
+            return Err(CatalogError::ReleaseMismatch);
+        }
+        Ok(())
+    }
+
     pub fn proof(&self) -> &[u8] {
         &self.proof
     }
@@ -152,8 +201,7 @@ impl SigmaCatalogEntry {
     fn validate(&self) -> Result<&str, CatalogError> {
         if !valid_sigma_package_identity(&self.name, &self.version)
             || super::version::Version::parse(&self.minimum_irmind_version).is_err()
-            || !(1..=4096).contains(&self.license.len())
-            || self.license.chars().any(char::is_control)
+            || !valid_sigma_license_expression(&self.license)
             || self.coverage.len() > 128
             || self.coverage.windows(2).any(|pair| pair[0] >= pair[1])
             || self.coverage.iter().any(|fields| {

@@ -119,8 +119,7 @@ fn frame<'a>(body: &mut &'a [u8], limit: usize) -> Result<&'a [u8], AppError> {
 fn valid_metadata(metadata: &SigmaPackageMetadata) -> bool {
     metadata.format_version == 1
         && irmind_app::v10_proofs::valid_sigma_package_identity(&metadata.name, &metadata.version)
-        && !metadata.license.is_empty()
-        && !metadata.license.chars().any(char::is_control)
+        && irmind_app::v10_proofs::valid_sigma_license_expression(&metadata.license)
         && metadata.attribution.len() <= 4096
         && !metadata.attribution.chars().any(char::is_control)
 }
