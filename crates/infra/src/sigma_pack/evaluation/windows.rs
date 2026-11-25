@@ -181,3 +181,71 @@ fn sigma_windows_without_an_enrolled_channel_skips_the_rule() {
         );
     }
 }
+
+#[test]
+fn sigma_sysmon_image_load_and_registry_require_the_reviewed_event_shape() {
+    let table = windows_table();
+    let source = raw_rows(SYSMON).next().unwrap();
+    for (class, event_id, event_type, field, selection) in [
+        (
+            "image_load",
+            "7",
+            "ImageLoad",
+            "ImageLoaded",
+            "'ImageLoaded|endswith': 'synthetic.dll'",
+        ),
+        (
+            "registry_add",
+            "12",
+            "CreateKey",
+            "TargetObject",
+            "'TargetObject|endswith': 'synthetic.dll'",
+        ),
+        (
+            "registry_delete",
+            "12",
+            "DeleteKey",
+            "TargetObject",
+            "'TargetObject|endswith': 'synthetic.dll'",
+        ),
+        (
+            "registry_rename",
+            "14",
+            "RenameKey",
+            "NewName",
+            "'NewName|endswith': 'synthetic.dll'",
+        ),
+    ] {
+        let variant = table
+            .variants
+            .iter()
+            .find(|variant| {
+                variant.service.as_deref() == Some("sysmon")
+                    && variant.category.as_deref() == Some(class)
+            })
+            .unwrap();
+        let rule = format!(
+            "title: Synthetic Sysmon class\nlogsource: {{product: windows, category: {class}}}\ndetection: {{selection: {{{selection}}}, condition: selection}}\n"
+        );
+        let mut row = source.clone();
+        row["Event"]["System"]["EventID"] = event_id.into();
+        row["Event"]["EventData"][field] = r"C:\Synthetic\synthetic.dll".into();
+        row["Event"]["EventData"]["EventType"] = event_type.into();
+        assert_eq!(match_count(variant, &row, &rule), 1, "{class}");
+
+        let mut wrong_event = row.clone();
+        if event_id == "12" {
+            wrong_event["Event"]["EventData"]["EventType"] = if event_type == "CreateKey" {
+                "DeleteKey".into()
+            } else {
+                "CreateKey".into()
+            };
+        } else {
+            wrong_event["Event"]["System"]["EventID"] = "13".into();
+        }
+        assert_eq!(match_count(variant, &wrong_event, &rule), 0, "{class}");
+
+        row["Event"]["System"]["Provider"]["#attributes"]["Name"] = "Other".into();
+        assert_eq!(match_count(variant, &row, &rule), 0, "{class}");
+    }
+}
