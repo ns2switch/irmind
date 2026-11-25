@@ -155,3 +155,62 @@ fields = [
   { name = "alert.signature", path = ["alert", "signature"], value_type = "text", null_policy = "absent" },
   { name = "alert.signature_id", path = ["alert", "signature_id"], value_type = "integer", null_policy = "absent" },
 ]
+
+# W3C field names are explicit. The query token is retained separately by IIS.
+[[variants]]
+product = "windows"
+service = "iis"
+category = "webserver"
+parser_id = "parser-iis-w3c"
+parser_version = "iis-w3c-source-v1"
+mapping_id = "mapping-iis-w3c"
+mapping_version = "iis-w3c-tables-v1"
+dataset = "iis-w3c"
+events = [{ column = "event.category", equals = "web" }, { column = "event.type", equals = "access" }]
+fields = [
+  { name = "cs-method", column = "http.request.method", value_type = "text", null_policy = "absent" },
+  { name = "cs-uri-stem", column = "url.path", value_type = "text", null_policy = "absent" },
+  { name = "cs-uri-query", column = "url.query", value_type = "text", null_policy = "absent" },
+  { name = "sc-status", column = "http.response.status_code", value_type = "integer", null_policy = "absent" },
+  { name = "cs-user-agent", column = "user_agent.original", value_type = "text", null_policy = "absent" },
+  { name = "cs-username", column = "user.name", value_type = "text", null_policy = "absent" },
+  { name = "cs-host", column = "url.domain", value_type = "text", null_policy = "absent" },
+  { name = "cs-referer", path = ["cs(Referer)"], value_type = "text", null_policy = "absent" },
+  { name = "cs-content-type", path = ["cs(Content-Type)"], value_type = "text", null_policy = "absent" },
+  { name = "c-ip", column = "source.ip", value_type = "ip", null_policy = "absent" },
+]
+
+[[variants]]
+product = "aws"
+service = "route53"
+category = "dns"
+parser_id = "parser-route53"
+parser_version = "route53-source-v1"
+mapping_id = "mapping-route53"
+mapping_version = "route53-tables-v1"
+dataset = "route53-resolver"
+events = [{ column = "event.category", equals = "network" }, { column = "event.type", equals = "protocol" }]
+fields = [
+  { name = "query", path = ["query_name"], value_type = "text", null_policy = "absent" },
+  { name = "record_type", path = ["query_type"], value_type = "text", null_policy = "absent" },
+  { name = "rcode", column = "dns.response_code", value_type = "text", null_policy = "absent" },
+  { name = "source.ip", column = "source.ip", value_type = "ip", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "dns-debug"
+category = "dns"
+parser_id = "parser-windows-dns"
+parser_version = "windows-dns-source-v1"
+mapping_id = "mapping-windows-dns"
+mapping_version = "windows-dns-tables-v1"
+dataset = "windows-dns-debug"
+events = [{ column = "event.category", equals = "network" }, { column = "event.type", equals = "protocol" }]
+fields = [
+  { name = "query", path = ["query_name"], value_type = "text", null_policy = "absent" },
+  { name = "record_type", path = ["query_type"], value_type = "text", null_policy = "absent" },
+  { name = "rcode", column = "dns.response_code", value_type = "text", null_policy = "absent" },
+  { name = "source.ip", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "destination.ip", column = "destination.ip", value_type = "ip", null_policy = "absent" },
+]

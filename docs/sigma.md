@@ -16,6 +16,8 @@ A run can skip rules whose logsource or fields lack an exact binding. A rule mus
 
 Of the 3,302 files in the pinned SigmaHQ r2026-07-01 release, 3,301 passed pack admission and 1,022 compiled for all applicable classes in the reviewed field table. See the [counts and rejection reasons by family](development/benchmarks/sigmahq-v070-admission.md).
 
+The [v0.7.3 table-only audit](development/benchmarks/sigmahq-v073-reviewed-fields.md) compiled 1,159 of the same 3,302 rules with the V2 evaluator. The audit records the effect of each block separately.
+
 ## Source coverage and field names
 
 Use the indicated `product` and `service` as Sigma logsource selectors. Category selectors narrow the listed source classes. Field names in the third column are case-sensitive. Text and numeric values follow the listed binding types.
@@ -23,13 +25,16 @@ Use the indicated `product` and `service` as Sigma logsource selectors. Category
 | Product and service | Enrolled events | Field examples |
 | --- | --- | --- |
 | `windows/security` | Security channel and the enrolled audit event IDs; category `process_creation` for 4688 | `EventID` and `LogonType` (integers), `Channel`, `Computer`, `SubjectUserName`, `TargetUserName`, `IpAddress`, `SourceIp` (IP); 4688 also `Image`, `ParentImage`, `CommandLine` |
-| `windows/sysmon` | Microsoft-Windows-Sysmon/Operational, IDs 1, 3, 11, 13, 22 | `Image`, `CommandLine`, `ParentImage` and `ProcessGuid` for process creation; `SourceIp`, `DestinationIp`, `TargetFilename`, `TargetObject` and `QueryName` in their respective event classes |
+| `windows/sysmon` | Microsoft-Windows-Sysmon/Operational, IDs 1, 3, 11, 22 | `Image`, `CommandLine`, `ParentImage`, `ProcessGuid`, `OriginalFileName`, `Hashes` and `IntegrityLevel` for process creation; `SourceIp`, `DestinationIp`, `TargetFilename` and `QueryName` in their respective event classes |
+| `windows/sysmon` | Image load ID 7 and registry IDs 12–14 | `ImageLoaded`, `OriginalFileName`, `Signed` and `SignatureStatus` for image load. `TargetObject`, `EventType`, `Details` or `NewName` as supplied by the specific registry class |
 | `windows/powershell` | Microsoft-Windows-PowerShell/Operational, 4103 module logging and 4104 script block logging | `EventID` (integer), `Payload`, `ContextInfo`, `ScriptBlockText`, `ScriptBlockId`, `Path` by class |
 | `linux/sshd`, `linux/sudo`, `linux/su` | Mapped auth.log or secure authentication; sudo process starts | `Outcome`, `Hostname`, `User`, `TargetUser`, `Message`, `Process`, `PID`; SSH also `Verb`, `LoginUser`, `SourceIP`, `SourcePort` |
 | `linux/auditd`, `linux/ecs` | Grouped auditd records and Linux ECS authentication or process starts, including Elastic ECS | `Syscall`, `Serial` and `Node` in auditd; typed `Image` and `ProcessId` in process classes; ECS authentication also `SourceIP` and `Outcome` |
-| `aws/cloudtrail` | Operations in the reviewed CloudTrail table | `eventName`, `eventSource`, `sourceIPAddress` (original text), `source.ip` (IP), `awsRegion`, `recipientAccountId`, `userIdentity.principalId`, `userIdentity.arn`, `errorCode`, `readOnly`, `Outcome` |
+| `aws/cloudtrail` | Operations in the reviewed CloudTrail table | `eventName`, `eventSource`, `sourceIPAddress` (original text), `source.ip` (IP), `awsRegion`, `recipientAccountId`, `userIdentity.principalId`, `userIdentity.arn`, `errorCode`, `readOnly`, `Outcome`, `requestParameters.userName`, `requestParameters.roleArn`, `requestParameters.policyArn`, `responseElements.ConsoleLogin` |
 | `zeek/dns`, `zeek/http`, `zeek/conn` | JSON and TSV DNS, HTTP and connections | `id.orig_h`, `id.resp_h`, `id.orig_p`, `id.resp_p`, `proto`, `query`, `qtype_name`, `rcode_name`, `host`, `uri`, `method`, `status_code` by class |
 | `suricata/dns`, `suricata/http`, `suricata/flow`, `suricata/alert` | EVE DNS, HTTP, flow and alert | `src_ip`, `dest_ip`, `src_port`, `dest_port`, `event_type`, `dns.rrname`, `http.hostname`, `http.status`, `alert.signature`, `alert.signature_id` by class |
+| `windows/iis` | IIS W3C, `webserver` | `cs-method`, `cs-uri-stem`, `cs-uri-query`, `sc-status`, `cs-user-agent`, `cs-username`, `cs-host`, `cs-referer`, `cs-content-type`, `c-ip` |
+| `aws/route53`, `windows/dns-debug` | Route 53 Resolver and Windows DNS debug, `dns` | `query`, `record_type`, `rcode`, `source.ip`, plus `destination.ip` for Windows DNS debug |
 | `azure/signinlogs`, `azure/auditlogs`, `azure/activitylogs` | Entra sign-in and audit exports, AzureActivity table | `ResultType` (text), `IPAddress` (IP), `UserPrincipalName`, `AppId`, `OperationName`, `Result`, `InitiatedBy.user.userPrincipalName`, `OperationNameValue`, `ActivityStatusValue`, `CallerIpAddress` by layout |
 | `m365/audit`, `m365/exchange` | Unified Audit Log and explicit Exchange workload | `Operation`, `Workload`, `UserId`, `ClientIP`, `ObjectId`, `ResultStatus`, `Outcome`; Exchange also supports `Parameters` |
 | `okta/okta` | Okta System Log | `eventType`, `outcome.result`, `actor.alternateId`, `client.ipAddress`, `SourceIP`, `Outcome` |
