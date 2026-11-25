@@ -189,11 +189,11 @@ impl LocalStore {
             &section,
             entries,
             &archive.operations,
-            |artifact, rows, time| {
+            |artifact, rows, time, predicate| {
                 let mut file = irmind_fs::open_regular_no_follow(&root, Path::new(artifact.path()))
                     .map_err(super::storage)?;
                 super::parquet_frame::verify_v10_sigma_rows(
-                    &mut file, 0, artifact, rows, time, cancel,
+                    &mut file, 0, artifact, rows, time, predicate, cancel,
                 )
             },
             cancel,

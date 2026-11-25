@@ -8,6 +8,7 @@ fuzz_target!(|input: &[u8]| {
     let Ok(rule) = admit_rule(input) else {
         return;
     };
+    let _ = SigmaProgram::validate_rule(&rule);
     let bindings = BTreeMap::from([
         ("Image".into(), SigmaFieldKind::Text),
         ("CommandLine".into(), SigmaFieldKind::Text),

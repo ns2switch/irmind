@@ -91,7 +91,7 @@ pub(super) fn verify(
         &sigma,
         context.entries,
         context.sigma_admissions,
-        |artifact, rows, time| {
+        |artifact, rows, time, predicate| {
             let offset = *context
                 .offsets
                 .get(artifact.path())
@@ -102,17 +102,27 @@ pub(super) fn verify(
                 artifact,
                 rows,
                 time,
+                predicate,
                 cancel,
             )
         },
         cancel,
     )?;
+    let mut report_objects = input.try_clone().map_err(storage)?;
     let referenced = verify_report_history(
         context.title,
         context.entries,
         context.evidence,
         Some((context.skills, &crate::TomlSkillCompiler)),
-        |kind, hash| section.body(&mut objects, (kind, hash), cancel),
+        (
+            |kind, hash| section.body(&mut report_objects, (kind, hash), cancel),
+            |kind, hash| {
+                crate::sigma_pack::sigma_proof_read(
+                    kind,
+                    sigma.body(&mut objects, (kind, hash), cancel)?,
+                )
+            },
+        ),
         |artifact, row| {
             let offset = *context
                 .offsets
@@ -125,6 +135,13 @@ pub(super) fn verify(
     section.check_union(&referenced)
 }
 
+pub(super) type SigmaRowPredicate<'a> = dyn FnMut(
+        irmind_app::v10_proofs::V10RowReference,
+        &irmind_domain::CommonEventV1,
+        &str,
+    ) -> Result<(), AppError>
+    + 'a;
+
 pub(super) fn verify_sigma(
     objects: &mut (impl Read + Seek),
     section: &V10ObjectSection,
@@ -134,12 +151,18 @@ pub(super) fn verify_sigma(
         &ParquetArtifact,
         &[irmind_app::v10_proofs::V10RowReference],
         &std::ops::Range<i64>,
+        Option<&mut SigmaRowPredicate<'_>>,
     ) -> Result<(), AppError>,
     cancel: &CancellationToken,
 ) -> Result<(), AppError> {
     irmind_app::v10_proofs::sigma_remaining_work(entries)?;
     let mut referenced = BTreeSet::new();
     let mut admissions = BTreeSet::new();
+    #[cfg(feature = "sigma")]
+    let (deadline, mut units) = (
+        std::time::Instant::now() + std::time::Duration::from_mins(1),
+        4_000_000_000u64,
+    );
     for entry in entries
         .iter()
         .filter(|entry| entry.kind == AuditEventKind::SigmaRunV1)
@@ -164,20 +187,101 @@ pub(super) fn verify_sigma(
             return Err(AppError::InvalidChain(entry.seq));
         }
         materials.verify_execution_scope(&run, operation, entries)?;
-        materials.verify_case_rows(
-            entries,
-            &run,
-            |artifact, rows| {
-                verify_rows(artifact, rows, &(run.start_utc_micros..run.end_utc_micros))
-            },
-            cancel,
-        )?;
+        #[cfg(feature = "sigma")]
+        if materials.class_plan.is_some() {
+            units = verify_sigma_v3(
+                &run,
+                &materials,
+                &table,
+                &pack,
+                section,
+                objects,
+                entries,
+                deadline,
+                units,
+                cancel,
+                &mut verify_rows,
+            )?;
+        }
+        #[cfg(not(feature = "sigma"))]
+        if materials.class_plan.is_some() {
+            return Err(AppError::Policy(
+                "Sigma V3 verification requires a build with the Sigma evaluator".into(),
+            ));
+        }
+        if materials.class_plan.is_none() {
+            let time = run.start_utc_micros..run.end_utc_micros;
+            materials.verify_case_rows(
+                entries,
+                &run,
+                |artifact, rows| verify_rows(artifact, rows, &time, None),
+                cancel,
+            )?;
+        }
         admissions.insert(run.pack_admission);
     }
     if admissions.len() != operations.len() {
         return Err(AppError::InvalidChain(0));
     }
     section.check_union(&referenced)
+}
+
+#[cfg(feature = "sigma")]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the verifier binds one run to the same bounded readers and authenticated prefix"
+)]
+fn verify_sigma_v3(
+    run: &irmind_app::v10_proofs::SigmaRunV1,
+    materials: &irmind_app::v10_proofs::V10SigmaRunObjects,
+    table: &crate::sigma_pack::field_table::ReviewedSigmaFieldTable,
+    pack: &irmind_app::v10_proofs::SigmaPackManifestV1,
+    section: &V10ObjectSection,
+    objects: &mut (impl Read + Seek),
+    entries: &[SignedEntry],
+    deadline: std::time::Instant,
+    units: u64,
+    cancel: &CancellationToken,
+    verify_rows: &mut impl FnMut(
+        &ParquetArtifact,
+        &[irmind_app::v10_proofs::V10RowReference],
+        &std::ops::Range<i64>,
+        Option<&mut SigmaRowPredicate<'_>>,
+    ) -> Result<(), AppError>,
+) -> Result<u64, AppError> {
+    let time = run.start_utc_micros..run.end_utc_micros;
+    let mut bodies = pack
+        .0
+        .iter()
+        .map(|object| {
+            Ok((
+                object.rule.clone(),
+                section.body(objects, (1, object.rule.sha256), cancel)?,
+            ))
+        })
+        .collect::<Result<Vec<_>, AppError>>()?;
+    bodies.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+    let rules = bodies
+        .iter()
+        .map(|(key, body)| (key.clone(), body.as_slice()))
+        .collect::<Vec<_>>();
+    crate::sigma_pack::verify_class_plan(run, materials, table, entries, &rules, deadline, cancel)?;
+    let mut check =
+        crate::sigma_pack::SigmaMatchCheck::new(table, materials, &rules, deadline, units, cancel);
+    materials.verify_case_rows(
+        entries,
+        run,
+        |artifact, rows| {
+            verify_rows(
+                artifact,
+                rows,
+                &time,
+                Some(&mut |row, common, original| check.check(artifact, row, common, original)),
+            )
+        },
+        cancel,
+    )?;
+    check.finish()
 }
 
 #[cfg(test)]

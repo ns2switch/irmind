@@ -38,20 +38,63 @@ pub(super) fn verify_raw_with_cancel(
     expected: &str,
     cancel: Option<&CancellationToken>,
 ) -> Result<(), AppError> {
+    verify_raw_guarded(input, size, expected, || {
+        if cancel.is_some_and(CancellationToken::is_cancelled) {
+            Err(AppError::Cancelled)
+        } else {
+            Ok(())
+        }
+    })
+}
+
+pub(super) fn verify_raw_guarded(
+    input: &mut File,
+    size: u64,
+    expected: &str,
+    mut check: impl FnMut() -> Result<(), AppError>,
+) -> Result<(), AppError> {
     let mut left = size;
     let mut hasher = Sha256::new();
     let mut chunk = vec![0u8; 1024 * 1024];
     while left > 0 {
-        if cancel.is_some_and(CancellationToken::is_cancelled) {
-            return Err(AppError::Cancelled);
-        }
+        check()?;
         let count = usize::try_from(left.min(chunk.len() as u64)).map_err(storage)?;
         input.read_exact(&mut chunk[..count]).map_err(storage)?;
         hasher.update(&chunk[..count]);
         left -= count as u64;
     }
+    check()?;
     if hex(&hasher.finalize()) != expected {
         return Err(AppError::EvidenceMismatch(expected.into()));
     }
     Ok(())
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::*;
+    use std::io::{Seek, Write};
+
+    #[test]
+    fn verification_stops_between_hash_chunks() {
+        let bytes = vec![0x53; 2 * 1024 * 1024];
+        let expected = hex(&Sha256::digest(&bytes));
+        let mut file = tempfile::tempfile().unwrap();
+        file.write_all(&bytes).unwrap();
+        file.rewind().unwrap();
+        let mut checks = 0;
+        let stopped = verify_raw_guarded(&mut file, bytes.len() as u64, &expected, || {
+            checks += 1;
+            if checks == 2 {
+                Err(AppError::Cancelled)
+            } else {
+                Ok(())
+            }
+        });
+        assert!(matches!(stopped, Err(AppError::Cancelled)));
+        assert_eq!(file.stream_position().unwrap(), 1024 * 1024);
+        file.rewind().unwrap();
+        verify_raw(&mut file, bytes.len() as u64, &expected).unwrap();
+    }
 }

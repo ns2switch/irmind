@@ -88,3 +88,51 @@ name = "readOnly"
 path = ["readOnly"]
 value_type = "boolean"
 null_policy = "absent"
+
+[[variants.fields]]
+name = "userAgent"
+path = ["userAgent"]
+value_type = "text"
+null_policy = "absent"
+
+[[variants.fields]]
+name = "errorMessage"
+path = ["errorMessage"]
+value_type = "text"
+null_policy = "absent"
+
+[[variants.fields]]
+name = "eventType"
+path = ["eventType"]
+value_type = "text"
+null_policy = "absent"
+
+[[variants.fields]]
+name = "requestParameters.userName"
+path = ["requestParameters", "userName"]
+value_type = "text"
+null_policy = "absent"
+
+[[variants.fields]]
+name = "requestParameters.roleArn"
+path = ["requestParameters", "roleArn"]
+value_type = "text"
+null_policy = "absent"
+
+[[variants.fields]]
+name = "requestParameters.policyArn"
+path = ["requestParameters", "policyArn"]
+value_type = "text"
+null_policy = "absent"
+
+[[variants.fields]]
+name = "responseElements.ConsoleLogin"
+path = ["responseElements", "ConsoleLogin"]
+value_type = "text"
+null_policy = "absent"
+
+[[variants.fields]]
+name = "additionalEventData.MFAUsed"
+path = ["additionalEventData", "MFAUsed"]
+value_type = "text"
+null_policy = "absent"

@@ -100,6 +100,8 @@ pub struct PreparedSigmaExecution<T> {
     pub findings: Vec<SigmaFindingDraft>,
     pub material: T,
     pub skipped_rules: usize,
+    pub class_coverage: super::SigmaClassCoverage,
+    pub skipped_classes: Vec<(String, usize, usize)>,
     pub unavailable_by_source: Vec<(String, u64)>,
     pub indeterminate_by_rule: Vec<(super::SigmaRuleKeyV1, u64)>,
 }
@@ -107,6 +109,8 @@ pub struct PreparedSigmaExecution<T> {
 pub struct SigmaExecutionSummary {
     pub receipt: SigmaRunV1,
     pub skipped_rules: usize,
+    pub class_coverage: super::SigmaClassCoverage,
+    pub skipped_classes: Vec<(String, usize, usize)>,
     pub unavailable_by_source: Vec<(String, u64)>,
     pub indeterminate_by_rule: Vec<(super::SigmaRuleKeyV1, u64)>,
 }
@@ -203,6 +207,8 @@ impl crate::Engine<'_> {
         Ok(SigmaExecutionSummary {
             receipt,
             skipped_rules: candidate.skipped_rules,
+            class_coverage: candidate.class_coverage,
+            skipped_classes: candidate.skipped_classes,
             unavailable_by_source: candidate.unavailable_by_source,
             indeterminate_by_rule: candidate.indeterminate_by_rule,
         })

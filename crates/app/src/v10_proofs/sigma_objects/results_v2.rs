@@ -14,14 +14,19 @@ pub struct SigmaRunResultsV2 {
 impl SigmaRunResultsV2 {
     pub fn decode(body: &[u8]) -> Result<Self> {
         let mut wire = Wire::object(body, RESULTS)?;
-        let results = SigmaRunResultsV1::read_lists(&mut wire)?;
+        let result = Self::read_lists(&mut wire)?;
+        wire.finish()?;
+        Ok(result)
+    }
+
+    pub(super) fn read_lists(wire: &mut Wire<'_>) -> Result<Self> {
+        let results = SigmaRunResultsV1::read_lists(wire)?;
         let unavailable_by_source = wire.list(80, |wire| {
             Ok((V10SourceReference::read(wire)?, wire.u64()?))
         })?;
         let indeterminate_by_rule = wire.bounded_list(MAX_RULES, 45, |wire| {
             Ok((SigmaRuleKeyV1::read(wire)?, wire.u64()?))
         })?;
-        wire.finish()?;
         let result = Self {
             results,
             unavailable_by_source,
@@ -32,23 +37,28 @@ impl SigmaRunResultsV2 {
     }
 
     pub fn encode(&self) -> Result<Vec<u8>> {
-        self.validate()?;
         let mut out = RESULTS.to_vec();
-        self.results.write_lists(&mut out)?;
-        put_count(&mut out, self.unavailable_by_source.len())?;
+        self.write_lists(&mut out)?;
+        Ok(out)
+    }
+
+    pub(super) fn write_lists(&self, out: &mut Vec<u8>) -> Result<()> {
+        self.validate()?;
+        self.results.write_lists(out)?;
+        put_count(out, self.unavailable_by_source.len())?;
         for (source, count) in &self.unavailable_by_source {
-            source.write(&mut out)?;
+            source.write(out)?;
             out.extend_from_slice(&count.to_be_bytes());
             check_size(out.len())?;
         }
-        put_count(&mut out, self.indeterminate_by_rule.len())?;
+        put_count(out, self.indeterminate_by_rule.len())?;
         for (rule, count) in &self.indeterminate_by_rule {
-            rule.write(&mut out)?;
+            rule.write(out)?;
             out.extend_from_slice(&count.to_be_bytes());
             check_size(out.len())?;
         }
         check_size(out.len())?;
-        Ok(out)
+        Ok(())
     }
 
     fn validate(&self) -> Result<()> {

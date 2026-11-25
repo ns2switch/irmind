@@ -483,3 +483,151 @@ fn measure_rules(
         (key, bytes)
     }).collect()
 }
+
+#[test]
+#[cfg(not(debug_assertions))]
+#[ignore = "paired release measurement over at least one GiB of synthetic Parquet"]
+#[expect(
+    clippy::too_many_lines,
+    reason = "keep the paired fixture and the exact positive assertions together"
+)]
+fn sigma_v2_v3_mixed_classes_2000_rules() {
+    use crate::sigma_pack::{plan, runtime};
+    use irmind_app::encode_common_event;
+    use std::{
+        fs::File,
+        time::{Duration, Instant},
+    };
+
+    let table = all_variants();
+    let mut selected = BTreeMap::new();
+    for mapping in ["mapping-evtx-sysmon", "mapping-defender", "mapping-fdr"] {
+        let (index, variant) = table
+            .variants
+            .iter()
+            .enumerate()
+            .find(|(_, v)| {
+                v.mapping_id == mapping && v.category.as_deref() == Some("process_creation")
+            })
+            .unwrap();
+        selected.insert(index, variant);
+    }
+    let directory = tempfile::tempdir().unwrap();
+    let padding = "x".repeat(4096);
+    let mut paths = BTreeMap::new();
+    let mut corpus_bytes = 0;
+    for (&ordinal, variant) in &selected {
+        let path = directory.path().join(format!("{ordinal}.parquet"));
+        let mut positive = ProjectionInput::for_variant(variant);
+        let mut negative = ProjectionInput::for_variant(variant);
+        for binding in variant
+            .fields
+            .iter()
+            .filter(|binding| matches!(binding.name.as_str(), "Image" | "ParentImage"))
+        {
+            positive.binding(binding, sample(binding, true));
+            negative.binding(binding, sample(binding, false));
+        }
+        benchmark::write_padded_fixture_rows(&path, 90_000, Some(&padding), |row| {
+            let input = if row == 0 { &positive } else { &negative };
+            let event = input.row(variant, row);
+            (
+                encode_common_event(&event).unwrap(),
+                input.original(variant, &event),
+            )
+        });
+        corpus_bytes += std::fs::metadata(&path).unwrap().len();
+        paths.insert(ordinal, path);
+    }
+    assert!(corpus_bytes >= 1024 * 1024 * 1024);
+
+    let rules = (0..2000).map(|position| {
+        let selection = match position {
+            0 => "{'Image|contains': synthetic-match}",
+            1 => "{'ParentImage|contains': synthetic-match}",
+            2..64 => "{'Image|exists': false}",
+            _ => "{UnusedSyntheticField: true}",
+        };
+        let body = format!("title: Synthetic mixed-class rule {position}\nlogsource: {{product: windows, category: process_creation}}\ndetection: {{selection: {selection}, condition: selection}}\n");
+        (SigmaRuleKeyV1 { id: format!("mixed-{position:04}"), sha256: irmind_app::sha256(body.as_bytes()) }, body)
+    }).collect::<Vec<_>>();
+    let rules = rules
+        .iter()
+        .map(|(key, body)| (key.clone(), body.as_bytes()))
+        .collect::<Vec<_>>();
+    let available = selected.keys().copied().collect();
+    let cancel = CancellationToken::new();
+    let desired = std::env::var("IRMIND_SIGMA_BENCH_EVALUATOR").unwrap_or_default();
+    for version in ["v2", "v3"] {
+        if !desired.is_empty() && desired != version {
+            continue;
+        }
+        let started = Instant::now();
+        let (compiled, coverage) = if version == "v2" {
+            let (compiled, _) = runtime::rule_objects(&table, &available, &rules, &cancel).unwrap();
+            (compiled, None)
+        } else {
+            let (matrix, compiled, _) = plan::compile(
+                &table,
+                &available,
+                &rules,
+                started + Duration::from_secs(15),
+                &cancel,
+            )
+            .unwrap();
+            (compiled, Some(matrix.coverage()))
+        };
+        let planning = started.elapsed().as_secs_f64();
+        let started = Instant::now();
+        let mut hits = BTreeSet::new();
+        let mut remaining = 1_000_000_000;
+        for (&ordinal, variant) in &selected {
+            let programs = SigmaVariantPrograms::compile(
+                variant,
+                rules
+                    .iter()
+                    .zip(&compiled.0)
+                    .filter(|(_, rule)| rule.variants.contains(&(ordinal as u64)))
+                    .map(|(rule, _)| rule.clone()),
+            )
+            .unwrap();
+            let mut evaluation = programs.start(remaining);
+            evaluation
+                .scan_authenticated(
+                    File::open(&paths[&ordinal]).unwrap(),
+                    0..i64::MAX,
+                    started + Duration::from_secs(15),
+                    &cancel,
+                    |physical, _, key| {
+                        assert!(hits.insert((ordinal, key.id.clone(), physical)));
+                        Ok(())
+                    },
+                )
+                .unwrap();
+            assert_eq!(evaluation.status(), SigmaRunStatusV1::Complete);
+            remaining -= evaluation.used_units();
+        }
+        let elapsed = started.elapsed().as_secs_f64();
+        let expected = selected
+            .iter()
+            .flat_map(|(&ordinal, variant)| {
+                let mut expected = vec![(ordinal, "mixed-0000".into(), 0)];
+                if version == "v3" && variant.mapping_id != "mapping-fdr" {
+                    expected.push((ordinal, "mixed-0001".into(), 0));
+                }
+                expected
+            })
+            .collect::<BTreeSet<_>>();
+        assert_eq!(hits, expected);
+        let pairs: usize = compiled.0.iter().map(|rule| rule.variants.len()).sum();
+        let eligible = compiled
+            .0
+            .iter()
+            .filter(|rule| !rule.variants.is_empty())
+            .count();
+        println!(
+            "evaluator={version} rules=2000 eligible_rules={eligible} eligible_pairs={pairs} bytes={corpus_bytes} planning_s={planning:.6} scan_s={elapsed:.6} tp={} fp=0 remaining_work={remaining} coverage={coverage:?}",
+            hits.len()
+        );
+    }
+}

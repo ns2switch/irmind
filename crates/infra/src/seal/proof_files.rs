@@ -127,12 +127,27 @@ impl LocalStore {
         hash: [u8; 32],
         cancel: &CancellationToken,
     ) -> Result<Vec<u8>, AppError> {
-        let (descriptor, file) = self.open_addressed_report_proof(case, kind, hash, cancel)?;
-        let mut data = Vec::new();
-        file.take(descriptor.size())
-            .read_to_end(&mut data)
-            .map_err(|_| invalid())?;
-        if data.len() as u64 != descriptor.size() {
+        self.read_addressed_v10_proof(case, V10ProofFamily::Report, kind, hash, cancel)
+    }
+
+    pub(crate) fn read_addressed_v10_proof(
+        &self,
+        case: &CaseId,
+        family: V10ProofFamily,
+        kind: u8,
+        hash: [u8; 32],
+        cancel: &CancellationToken,
+    ) -> Result<Vec<u8>, AppError> {
+        let (descriptor, mut file) =
+            self.open_addressed_v10_proof(case, family, kind, hash, cancel)?;
+        let len = usize::try_from(descriptor.size()).map_err(|_| invalid())?;
+        let mut data = vec![0; len];
+        for block in data.chunks_mut(64 * 1024) {
+            check_cancel(cancel)?;
+            file.read_exact(block).map_err(|_| invalid())?;
+        }
+        check_cancel(cancel)?;
+        if irmind_app::sha256(&data) != hash {
             return Err(invalid());
         }
         Ok(data)

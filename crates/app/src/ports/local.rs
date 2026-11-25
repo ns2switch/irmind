@@ -297,6 +297,18 @@ pub trait LargeCaseStore: Send + Sync {
         ))
     }
 
+    fn read_sigma_proof(
+        &self,
+        _case: &CaseId,
+        _kind: u8,
+        _digest: [u8; 32],
+        _cancel: &CancellationToken,
+    ) -> Result<crate::v10_proofs::SigmaProofRead, AppError> {
+        Err(AppError::Policy(
+            "Sigma proof storage is unavailable".into(),
+        ))
+    }
+
     fn verify_sigma_executions(
         &self,
         _case: &CaseId,

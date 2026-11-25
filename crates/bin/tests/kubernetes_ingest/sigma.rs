@@ -1,7 +1,7 @@
 use super::*;
 use irmind_app::{
     ExportVerifier, ReportDocumentFormat, ReportDocumentLanguage, sha256,
-    v10_proofs::{SIGMA_EVALUATOR_V2, SigmaRunStatusV1},
+    v10_proofs::{SIGMA_EVALUATOR_V3, SigmaRunStatusV1},
 };
 use serde_json::{Value, json};
 
@@ -59,7 +59,7 @@ fn forwarded_list_overflow_stays_in_custody_and_warns_in_the_signed_report() {
     let result = store
         .run_sigma(&engine, &case.id, digest, time, &cancel)
         .unwrap();
-    assert_eq!(result.receipt.evaluator, SIGMA_EVALUATOR_V2);
+    assert_eq!(result.receipt.evaluator, SIGMA_EVALUATOR_V3);
     assert_eq!(
         result.receipt.status,
         SigmaRunStatusV1::ExactFieldsUnavailable

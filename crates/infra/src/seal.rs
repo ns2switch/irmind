@@ -26,6 +26,8 @@ mod skill_proofs;
 mod subagent_branches;
 mod verify_current;
 pub use export::{LocalExportVerifier, verify_export, verify_export_expected};
+#[cfg(feature = "sigma")]
+pub(crate) use parquet_frame::verify_sigma_scan_artifact;
 pub use parquet_frame::verify_v10_artifact_rows;
 #[cfg(test)]
 pub(crate) use verify_current::verify_export_with_catalog;
