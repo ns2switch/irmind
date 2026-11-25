@@ -626,3 +626,47 @@ fn sigma_endpoint_process_creation_requires_the_enrolled_platform_and_exact_path
         );
     }
 }
+
+#[test]
+fn sigma_cloudtrail_reads_nested_leaves_without_searching_the_parent_object() {
+    let reviewed = parse_table(include_str!("../cloudtrail-v1.toml"));
+    let variant = &reviewed.variants[0];
+    let row = synthetic_row(
+        variant,
+        EventHeaderV1::default()
+            .with_action("ConsoleLogin")
+            .unwrap(),
+        [],
+    );
+    let taxonomy = "{product: aws, service: cloudtrail}";
+    let selection = "{responseElements.ConsoleLogin: Failure, requestParameters.userName: alice}";
+    for (original, hits) in [
+        (
+            r#"{"responseElements":{"ConsoleLogin":"Failure"},"requestParameters":{"userName":"alice"}}"#,
+            1,
+        ),
+        (
+            r#"{"responseElements":{"ConsoleLogin":"Success"},"requestParameters":{"userName":"alice","other":"Failure"}}"#,
+            0,
+        ),
+        (
+            r#"{"responseElements":null,"requestParameters":{"userName":"alice"}}"#,
+            0,
+        ),
+    ] {
+        assert_eq!(
+            evaluate(variant, taxonomy, selection, &row, Some(original)),
+            (hits, None)
+        );
+    }
+    assert_eq!(
+        evaluate(
+            variant,
+            taxonomy,
+            "{'requestParameters|contains': alice}",
+            &row,
+            Some(r#"{"requestParameters":{"userName":"alice"}}"#)
+        ),
+        (0, Some(SigmaCoverageV1::UnsupportedField))
+    );
+}

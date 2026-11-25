@@ -419,6 +419,20 @@ fields = [
   { name = "User", path = ["Event", "EventData", "User"], value_type = "text", null_policy = "absent" },
   { name = "ProcessGuid", path = ["Event", "EventData", "ProcessGuid"], value_type = "text", null_policy = "absent" },
   { name = "ParentProcessGuid", path = ["Event", "EventData", "ParentProcessGuid"], value_type = "text", null_policy = "absent" },
+  { name = "OriginalFileName", path = ["Event", "EventData", "OriginalFileName"], value_type = "text", null_policy = "absent" },
+  { name = "Description", path = ["Event", "EventData", "Description"], value_type = "text", null_policy = "absent" },
+  { name = "Product", path = ["Event", "EventData", "Product"], value_type = "text", null_policy = "absent" },
+  { name = "Company", path = ["Event", "EventData", "Company"], value_type = "text", null_policy = "absent" },
+  { name = "FileVersion", path = ["Event", "EventData", "FileVersion"], value_type = "text", null_policy = "absent" },
+  { name = "Hashes", path = ["Event", "EventData", "Hashes"], value_type = "text", null_policy = "absent" },
+  { name = "IntegrityLevel", path = ["Event", "EventData", "IntegrityLevel"], value_type = "text", null_policy = "absent" },
+  { name = "CurrentDirectory", path = ["Event", "EventData", "CurrentDirectory"], value_type = "text", null_policy = "absent" },
+  { name = "ParentUser", path = ["Event", "EventData", "ParentUser"], value_type = "text", null_policy = "absent" },
+  { name = "LogonId", path = ["Event", "EventData", "LogonId"], value_type = "text", null_policy = "absent" },
+  { name = "LogonGuid", path = ["Event", "EventData", "LogonGuid"], value_type = "text", null_policy = "absent" },
+  { name = "TerminalSessionId", path = ["Event", "EventData", "TerminalSessionId"], value_type = "text", null_policy = "absent" },
+  { name = "ProcessId", path = ["Event", "EventData", "ProcessId"], value_type = "text", null_policy = "absent" },
+  { name = "ParentProcessId", path = ["Event", "EventData", "ParentProcessId"], value_type = "text", null_policy = "absent" },
 ]
 
 [[variants]]
@@ -486,6 +500,120 @@ fields = [
   { name = "Image", column = "process.executable", value_type = "text", null_policy = "absent" },
   { name = "TargetObject", path = ["Event", "EventData", "TargetObject"], value_type = "text", null_policy = "absent" },
   { name = "Details", path = ["Event", "EventData", "Details"], value_type = "text", null_policy = "absent" },
+  { name = "EventType", path = ["Event", "EventData", "EventType"], value_type = "text", null_policy = "absent" },
+  { name = "User", path = ["Event", "EventData", "User"], value_type = "text", null_policy = "absent" },
+  { name = "ProcessGuid", path = ["Event", "EventData", "ProcessGuid"], value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "sysmon"
+category = "image_load"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-sysmon"
+mapping_version = "evtx-sysmon-tables-v1"
+channel = "Microsoft-Windows-Sysmon/Operational"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Microsoft-Windows-Sysmon/Operational" },
+  { path = ["Event", "System", "Provider", "#attributes", "Name"], equals = "Microsoft-Windows-Sysmon" },
+  { path = ["Event", "System", "EventID"], equals = "7" },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "Image", path = ["Event", "EventData", "Image"], value_type = "text", null_policy = "absent" },
+  { name = "ImageLoaded", path = ["Event", "EventData", "ImageLoaded"], value_type = "text", null_policy = "absent" },
+  { name = "OriginalFileName", path = ["Event", "EventData", "OriginalFileName"], value_type = "text", null_policy = "absent" },
+  { name = "Description", path = ["Event", "EventData", "Description"], value_type = "text", null_policy = "absent" },
+  { name = "Product", path = ["Event", "EventData", "Product"], value_type = "text", null_policy = "absent" },
+  { name = "Company", path = ["Event", "EventData", "Company"], value_type = "text", null_policy = "absent" },
+  { name = "FileVersion", path = ["Event", "EventData", "FileVersion"], value_type = "text", null_policy = "absent" },
+  { name = "Hashes", path = ["Event", "EventData", "Hashes"], value_type = "text", null_policy = "absent" },
+  { name = "Signed", path = ["Event", "EventData", "Signed"], value_type = "text", null_policy = "absent" },
+  { name = "Signature", path = ["Event", "EventData", "Signature"], value_type = "text", null_policy = "absent" },
+  { name = "SignatureStatus", path = ["Event", "EventData", "SignatureStatus"], value_type = "text", null_policy = "absent" },
+  { name = "User", path = ["Event", "EventData", "User"], value_type = "text", null_policy = "absent" },
+  { name = "ProcessGuid", path = ["Event", "EventData", "ProcessGuid"], value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "sysmon"
+category = "registry_add"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-sysmon"
+mapping_version = "evtx-sysmon-tables-v1"
+channel = "Microsoft-Windows-Sysmon/Operational"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Microsoft-Windows-Sysmon/Operational" },
+  { path = ["Event", "System", "Provider", "#attributes", "Name"], equals = "Microsoft-Windows-Sysmon" },
+  { path = ["Event", "System", "EventID"], equals = "12" },
+  { path = ["Event", "EventData", "EventType"], one_of = ["CreateKey", "CreateValue"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "Image", path = ["Event", "EventData", "Image"], value_type = "text", null_policy = "absent" },
+  { name = "TargetObject", path = ["Event", "EventData", "TargetObject"], value_type = "text", null_policy = "absent" },
+  { name = "EventType", path = ["Event", "EventData", "EventType"], value_type = "text", null_policy = "absent" },
+  { name = "User", path = ["Event", "EventData", "User"], value_type = "text", null_policy = "absent" },
+  { name = "ProcessGuid", path = ["Event", "EventData", "ProcessGuid"], value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "sysmon"
+category = "registry_delete"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-sysmon"
+mapping_version = "evtx-sysmon-tables-v1"
+channel = "Microsoft-Windows-Sysmon/Operational"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Microsoft-Windows-Sysmon/Operational" },
+  { path = ["Event", "System", "Provider", "#attributes", "Name"], equals = "Microsoft-Windows-Sysmon" },
+  { path = ["Event", "System", "EventID"], equals = "12" },
+  { path = ["Event", "EventData", "EventType"], one_of = ["DeleteKey", "DeleteValue"] },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "Image", path = ["Event", "EventData", "Image"], value_type = "text", null_policy = "absent" },
+  { name = "TargetObject", path = ["Event", "EventData", "TargetObject"], value_type = "text", null_policy = "absent" },
+  { name = "EventType", path = ["Event", "EventData", "EventType"], value_type = "text", null_policy = "absent" },
+  { name = "User", path = ["Event", "EventData", "User"], value_type = "text", null_policy = "absent" },
+  { name = "ProcessGuid", path = ["Event", "EventData", "ProcessGuid"], value_type = "text", null_policy = "absent" },
+]
+
+[[variants]]
+product = "windows"
+service = "sysmon"
+category = "registry_rename"
+parser_id = "parser-evtx"
+parser_version = "evtx-source-v1"
+mapping_id = "mapping-evtx-sysmon"
+mapping_version = "evtx-sysmon-tables-v1"
+channel = "Microsoft-Windows-Sysmon/Operational"
+events = [
+  { path = ["Event", "System", "Channel"], equals = "Microsoft-Windows-Sysmon/Operational" },
+  { path = ["Event", "System", "Provider", "#attributes", "Name"], equals = "Microsoft-Windows-Sysmon" },
+  { path = ["Event", "System", "EventID"], equals = "14" },
+]
+fields = [
+  { name = "EventID", path = ["Event", "System", "EventID"], value_type = "integer", conversion = "evtx_event_id", null_policy = "absent" },
+  { name = "Channel", path = ["Event", "System", "Channel"], value_type = "text", null_policy = "absent" },
+  { name = "Computer", column = "host.name", value_type = "text", null_policy = "absent" },
+  { name = "Image", path = ["Event", "EventData", "Image"], value_type = "text", null_policy = "absent" },
+  { name = "TargetObject", path = ["Event", "EventData", "TargetObject"], value_type = "text", null_policy = "absent" },
+  { name = "EventType", path = ["Event", "EventData", "EventType"], value_type = "text", null_policy = "absent" },
+  { name = "User", path = ["Event", "EventData", "User"], value_type = "text", null_policy = "absent" },
+  { name = "ProcessGuid", path = ["Event", "EventData", "ProcessGuid"], value_type = "text", null_policy = "absent" },
+  { name = "NewName", path = ["Event", "EventData", "NewName"], value_type = "text", null_policy = "absent" },
 ]
 
 [[variants]]
