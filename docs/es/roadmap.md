@@ -1,4 +1,4 @@
-Traducción de docs/development/roadmap.md en el commit df9a8bff2dfb803a6ce692b9ad5713f540b45057; si hay diferencias, prevalece la versión en inglés.
+Traducción de docs/development/roadmap.md en el commit 49d3419a622da753aa38efa0f6b0454b27e9b015; si hay diferencias, prevalece la versión en inglés.
 
 # Hoja de ruta
 
@@ -6,14 +6,45 @@ IRMind es un asistente agéntico de terminal para respuesta a incidentes y anál
 
 Esta página es para quienes contribuyen o evalúan el proyecto. Expresa intenciones, sin comprometer fechas. La [versión inglesa](../development/roadmap.md) prevalece y el [modelo de seguridad](security-model.md) explica los límites actuales.
 
-Política anterior a 1.0: las versiones menores pueden cambiar formatos sin migración. V3 es el único formato de v0.3; las notas de compatibilidad de versiones publicadas describen solo aquellas versiones históricas.
+Según la política anterior a 1.0, una versión menor puede cambiar los formatos
+de caso, exportación y definiciones sin migración. Conserva el ejecutable que
+creó el caso o reingiere los originales verificados.
 
-Preparación del lanzamiento: [validación real](real-validation.md), [evaluación de modelos](hunteval-model-benchmark.md) y [firma nativa](native-signing.md). Son procedimientos, no validaciones reales ya completadas.
+## Entregado
 
-## Entregado hasta v0.5.x
+El [CHANGELOG](../../CHANGELOG.md) recoge las versiones publicadas y los cambios
+de formato. Esta sección resume las capacidades incluidas en esas versiones.
 
-El [registro de cambios](../../CHANGELOG.md) detalla versiones y formatos. Estas
-son capacidades entregadas, no afirmaciones de validación con incidentes reales.
+### v0.7.x
+
+- Las identidades de mapeo nativo usan el manifiesto V2 de dependencias de
+  producción. Los cambios en dependencias ajenas al cierre del mapeo mantienen
+  su identidad. [Diseño de identidad](../development/native-mapping-build-identity.md).
+- Sigma local evalúa reglas acotadas sobre Parquet autenticado sin usar un
+  modelo. Cada ejecución firmada conserva las correspondencias de campos,
+  las filas exactas y la cobertura. [Guía de Sigma](sigma.md).
+- Los informes firmados en Markdown y PDF citan la evidencia de los hallazgos
+  confirmados por el analista y documentan las limitaciones. El marcador de
+  caso 6 y el export V10 incluyen las pruebas de Sigma e informes.
+  [Casos y exportaciones](cases.md).
+- Las entregas CloudTrail en gzip se detectan por contenido. Se ingieren los
+  logs y se identifican y omiten los digests de integridad con un aviso.
+  [Cobertura de parsers](parsers.md).
+
+### v0.6.x
+
+- Consultas en origen con presupuesto para CloudTrail en Athena, Cloud Audit
+  Logs en BigQuery y las tablas admitidas del plan Analytics de Azure Log
+  Analytics. Vienen desactivadas por defecto. Las capturas firmadas se guardan
+  como evidencia derivada para el análisis local. Los tres adaptadores se
+  probaron con simuladores.
+  [Diseño](source-queries-design.md) · [Contrato de formato](source-queries-format-contract.md).
+- Compilaciones reproducibles del ejecutable principal y del auxiliar aislado
+  EVTX en los cinco destinos de release. El fichero firmado
+  `BUILD-ENVIRONMENT.json` registra las versiones exactas de las herramientas
+  usadas en cada destino. [Guía de reproducibilidad](reproducible-builds.md).
+
+### Entregado hasta v0.5.x
 
 - Casos en terminal, conversaciones protegidas, herramientas sujetas a política,
   custodia firmada, consultas Parquet acotadas, instaladores verificados y demo
@@ -48,66 +79,59 @@ son capacidades entregadas, no afirmaciones de validación con incidentes reales
 - Borrado lógico firmado de casos sin sellar y barra de estado declarativa con
   prioridades integrados para v0.5.2. El borrado conserva lápidas, respeta bloqueos
   y recupera interrupciones; no garantiza eliminación física segura.
-
 - La versión 0.5.3 añade contabilidad de caché del proveedor, marcadores del
   prefijo confiable de Anthropic, recuperación explícita de planes protegida entre
   procesos y paquetes macOS Intel. Mantiene el nonce por turno y el cargo de todos
-  los tokens. Las demás propuestas de contexto quedan para después del lanzamiento.
+  los tokens. La versión 0.5.4 añade paquetes Homebrew verificados y la
+  verificación de la firma del catálogo.
 
 Skills e hijos no amplían permisos ni alcance, los hijos no aprueban, y datos
 externos o del modelo nunca pasan a system confiable. Ningún modelo ni conector
 se activa por defecto. Los diseños históricos no prometen compatibilidad del
 binario actual.
 
-## v0.5.x: estabilización y preparación para evaluación
-
-- Medir la reutilización real de caché con la primera contabilidad. Mantener el
-  nonce por turno y el cargo de todos los tokens; aplazar las demás propuestas
-  de contexto hasta después del lanzamiento. Sin precalentamiento ni cambios
-  automáticos de ruta.
-- Ensayar la [validación real](real-validation.md) con Elasticsearch local, TLS,
-  CA y modelo local. Registrar resultados, fallos y tiempos observados; no
-  sustituye la validación del analista con su modelo y conector.
-- Repetir PTY bajo carga con sincronización por eventos: arranque, presentación,
-  expansión y borrado.
-- Publicar Homebrew verificado. Mantener macOS Intel nativo y Linux aarch64,
-  instaladores, Sigstore con identidad de tag, provenance y SBOM. AUR, Nix,
-  winget y Scoop quedan abiertos a empaquetadores comunitarios.
-- Activar Developer ID, hardened runtime y notarización preparados solo tras
-  aportar el entorno protegido y aprobar la activación. La firma Authenticode de
-  Windows sigue pendiente; se reevaluará SignPath Foundation tras el lanzamiento
-  público, junto a opciones de pago. Elegir proveedor y activar corresponde al
-  mantenedor; Sigstore no sustituye la firma nativa ni la reputación del SO.
-- Registrar los pasos pendientes de H5, un conector en un entorno real y EVTX
-  experimental en Windows 11. No deducirlos de pruebas sintéticas scripted.
-- Medir y mejorar estrés, consultas de entidades densas y disco de co-observación
-  sin alterar límites de consulta ni controles para mejorar una cifra.
-
 ## Lanzamiento público
 
-Publicar un artículo, un vídeo de demostración con datos sintéticos, publicaciones comunitarias y un catálogo inicial de skills. El lanzamiento público es el siguiente hito tras estabilizar v0.5.x. Publicar
-solo afirmaciones medidas: firma nativa, validaciones del analista y catálogo
-son elementos explícitos de la lista, no garantías implícitas.
+Publicar el artículo de presentación, un vídeo de la demo con datos sintéticos
+y publicaciones para la comunidad. Comunicar la validación observada y
+documentar las comprobaciones pendientes. [Registro manual](manual-validation.md).
 
-## v0.6: consultas en origen
+## v0.7.x: cobertura de Sigma, paquetes de reglas e ingesta
 
-Consultas estructuradas y con presupuesto para CloudTrail en Athena, Cloud
-Audit Logs en BigQuery y las tablas admitidas de Azure Log Analytics en el
-plan Analytics. El resultado se firma y se conserva como evidencia derivada
-para el análisis local. Las consultas desde subagentes, la reverificación
-de originales en la nube se prevén para v0.8. Los demás conjuntos de datos y
-proveedores quedan para más adelante. Consulta el [diseño](source-queries-design.md) y el
-[contrato de implementación](source-queries-format-contract.md).
+1. Ampliar la cobertura de Sigma. Empezar por la compilación por clase de
+   fuente y ampliar después las correspondencias revisadas para campos de
+   Sysmon, `image_load` y `registry`, tablas de nube con `requestParameters` y
+   `responseElements`, y los `logsource` de webserver y DNS. Medir por familia
+   la admisión y la compilación exacta con la misma release de SigmaHQ fijada
+   por hash. [Línea base de SigmaHQ](../development/benchmarks/sigmahq-v070-admission.md).
+2. Diseñar paquetes de reglas Sigma instalables con el mismo modelo de
+   instalación explícita de las skills. Antes de implementar, aprobar un
+   contrato que compare el uso del catálogo y la clave de irmind-skills con un
+   catálogo separado y una clave propia generada por el mantenedor.
 
-## v0.7: identidades de mapeo, detección e informes
-
-- Acotar las identidades de mapeo nativo a sus dependencias de producción para
-  conservar la reconstrucción cuando cambien dependencias ajenas al mapeo.
-  [Diseño](../development/native-mapping-build-identity.md).
-- Ejecutar reglas Sigma sobre Parquet local sin LLM.
-- Generar informes firmados en Markdown y PDF a partir de hallazgos
-  confirmados con citas.
-- Diseñar los hooks locales firmados, el cliente MCP y la API del motor para v0.8.
+   - Firmar el índice del catálogo, fijar las versiones por hash y rechazar
+     retrocesos de versión.
+   - Ofrecer `/sigma list`, `/sigma info`, `/sigma install`, `/sigma update` y
+     `/sigma remove`. Mostrar en `/sigma info` la cobertura del paquete frente
+     a las fuentes del caso y, al actualizar, las diferencias antes de firmar.
+   - Instalar explícitamente desde el catálogo o un fichero local, con las
+     mismas reglas de verificación, vista previa y admisión firmada por el
+     analista que `/skills install`. Quitar un paquete instalado conserva las
+     pruebas ya referenciadas en ejecuciones firmadas.
+   - La instalación no concede permisos ni ejecuta reglas. Cada ejecución
+     pasa por la admisión firmada del caso y la política. Las skills pueden
+     recomendar un paquete bajo esa misma política.
+   - Referenciar las releases de SigmaHQ por URL oficial y SHA-256, con
+     atribución a Detection Rule License (DRL) 1.1. El catálogo no redistribuye
+     las reglas de SigmaHQ. Los paquetes de la comunidad declaran su licencia.
+   - Validar en la CI del catálogo la admisión, compilación, licencia y
+     cobertura de fuentes de cada paquete.
+3. Verificar la cadena de digests de CloudTrail como prueba de integridad
+   de los logs. [#428](https://github.com/ns2switch/irmind/issues/428).
+4. Perfilar la ingesta de FDR, Unified Log y eslogger y diseñar una
+   normalización compacta para DNS debug de Windows e IIS W3C de gran tamaño.
+   [Perfil de ingesta #344](https://github.com/ns2switch/irmind/issues/344) ·
+   [Almacenamiento compacto #355](https://github.com/ns2switch/irmind/issues/355).
 
 ## v0.8: extensibilidad, API del motor y validación
 
@@ -115,18 +139,62 @@ proveedores quedan para más adelante. Consulta el [diseño](source-queries-desi
   incluido un script de la barra de estado admitido expresamente por el analista.
 - Ofrecer un cliente MCP opcional y desactivado por defecto. Cada herramienta
   declara su riesgo, pasa por la política y devuelve contenido no confiable.
-- Ofrecer un protocolo del motor versionado para `serve` por stdio,
-  socket Unix o named pipe de Windows. El cliente solicita la aprobación, el
-  analista confirma e IRMind firma. TCP queda desactivado por defecto.
+- Ofrecer un protocolo del motor versionado para `serve` por stdio, socket Unix
+  o named pipe de Windows. El cliente solicita la aprobación, el analista
+  confirma dentro de IRMind e IRMind firma. TCP queda desactivado por defecto.
+  [Diseños de extensibilidad](https://github.com/ns2switch/irmind/pull/391).
 - Añadir consultas en origen para subagentes y reverificación remota de los
   objetos originales en la nube.
 - Evaluar IRMind como sistema completo con HuntEval y publicar las mediciones
-  comparativas de los modelos.
+  comparativas de los modelos. [#95](https://github.com/ns2switch/irmind/issues/95).
+- Validación del mantenedor: ejecutar consultas en origen contra Athena,
+  BigQuery y Azure Log Analytics, validar Elastic con TLS y una CA propia y
+  comprobar la ingesta aislada de EVTX en Windows 11. Registrar las pruebas de
+  H5 pendientes para citas de hash, `/verify` y verificación del export.
+  [Procedimiento de validación](real-validation.md) ·
+  [Registro manual](manual-validation.md) ·
+  [Elastic #63](https://github.com/ns2switch/irmind/issues/63) ·
+  [Windows 11 #189](https://github.com/ns2switch/irmind/issues/189) ·
+  [H5 #340](https://github.com/ns2switch/irmind/issues/340).
+
+## v0.9: evidencia nativa de Windows, detección e intercambio
+
+- Añadir decodificadores nativos aislados para el registro de Windows, `$MFT`,
+  Prefetch, LNK, Amcache y SRUM.
+- Añadir escaneo local con YARA y admisión y evaluación acotadas de reglas,
+  siguiendo el modelo de Sigma.
+- Exportar líneas temporales con citas verificables para Timesketch y en CSV
+  de super timeline compatible con plaso. Exportar indicadores de compromiso
+  (IOC) con procedencia en formatos STIX y MISP.
+- Ampliar Sigma local a reglas de correlación.
+- Ingerir salidas de Volatility 3. [#158](https://github.com/ns2switch/irmind/issues/158).
+- Decidir cuándo estabilizar los formatos firmados y cuánto tiempo mantener
+  las versiones de parsers.
+
+## Decisiones abiertas
+
+- Decidir si se admiten imágenes de disco (E01 o raw) y definir, si procede,
+  las operaciones admitidas y su modelo de custodia.
+- Definir el trabajo entre varios analistas, incluido el traspaso del caso,
+  un segundo firmante y la revisión.
+
+## Trabajo sin versión asignada
+
+- Planificar el trabajo aplazado sobre coste de contexto y medir la reutilización
+  de caché con proveedores reales tras el lanzamiento.
+  [Diseño de coste de contexto](../development/context-cost-design.md).
+- Configurar Apple Developer ID y aprobar la notarización. Elegir proveedor
+  para Authenticode en Windows y reevaluar SignPath Foundation tras el
+  lanzamiento. [Firma nativa](native-signing.md).
+- Seguir midiendo el estrés de ingesta, las consultas de entidades densas y el
+  almacenamiento de co-observaciones con los límites vigentes.
+  [Benchmarks](../development/benchmarks.md). La comunidad puede contribuir
+  con otros formatos de paquete.
 
 ## Criterios para 1.0
 
 - Formatos firmados estables para casos, manifiestos, skills, subagentes y protocolo del motor, con migraciones probadas.
-- Decidir la retención de versiones de parsers y la compatibilidad estable al estabilizar los formatos, previsiblemente en v0.6–v0.7 y antes de 1.0. Hasta entonces, una versión menor puede cambiar los formatos de casos, exportaciones y definiciones sin migración: conserva el ejecutable creador o reingiere los originales verificados.
+- Confirmar antes de 1.0 la decisión de v0.9 sobre retención de versiones de parsers y compatibilidad estable. Hasta entonces, una versión menor puede cambiar los formatos de casos, exportaciones y definiciones sin migración: conserva el ejecutable creador o reingiere los originales verificados.
 - Revisión externa de seguridad.
 - Al menos tres conectores validados en entornos reales de pruebas.
 - Binarios de release firmados en Linux, macOS y Windows.
