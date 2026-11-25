@@ -1,4 +1,4 @@
-Traducción de README.md en el commit 275b58f924f17965487b1d384b2cc051400713a7; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit d8554a9e9b191f3f0d934608fed23c023f730d59; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — investigaciones en terminal con registro firmado
 
