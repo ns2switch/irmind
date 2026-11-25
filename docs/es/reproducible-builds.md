@@ -25,6 +25,28 @@ y su [registro de compilación](https://github.com/ns2switch/irmind/actions/runs
 El inventario firmado y el comando de compilación por pares se incorporan en
 v0.6.2.
 
+## Ensayar la publicación antes de crear el tag
+
+En GitHub Actions, abre **Rust CI**, selecciona **Run workflow** y elige
+la rama candidata. Activa `release_dry_run`.
+
+Antes de crear el tag, comprueba que el job `release` terminó correctamente
+sobre el mismo árbol Git que se etiquetará. El job descarga los cinco paquetes
+de distribución y el manifiesto de mapeos nativos, prepara los ficheros,
+genera los SBOM y las attestations, y firma y verifica los paquetes con
+Sigstore. El artefacto `signed-release-dry-run` contiene el resultado
+verificado. Si cambia el árbol, repite el ensayo.
+`release_binary_reproducibility` comprueba la reproducibilidad de los
+binarios y los casos portables de Sigma. No ejecuta el empaquetado final.
+
+| Paso o job omitido en el ensayo completo | Motivo |
+| --- | --- |
+| Crear o actualizar la release de GitHub y añadir su política de firma | Estos pasos escriben en la release pública y requieren un push del tag. |
+| `native_macos` | La firma Developer ID está desactivada. Su activación requiere un despliegue protegido desde un tag y las credenciales de Apple. |
+| `verify_install_linux`, `verify_install_macos`, `verify_install_windows` | Usan la URL pública de descarga y la identidad de firma del tag. El ensayo ejecuta las pruebas de instaladores sin conexión en la matriz y prueba los ficheros firmados de prueba con `rehearse_install_windows`. |
+| `update_homebrew` | El tap usa una release publicada y necesita la aprobación del entorno protegido `release`. |
+| `release_profile` y sus pruebas de rendimiento y reproducibilidad | Son experimentos manuales separados. El ensayo sí comprueba la reproducibilidad en los cinco destinos. |
+
 ## Entradas de la compilación
 
 Usa un equipo o una máquina virtual con la arquitectura del destino, Git y

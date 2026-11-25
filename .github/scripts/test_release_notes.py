@@ -51,7 +51,7 @@ class ReleaseNotesTests(unittest.TestCase):
         workflow = (Path(__file__).parents[1] / "workflows/ci.yml").read_text(encoding="utf-8")
         step = workflow.split("      - name: Add the public code signing policy to release notes\n", 1)[1]
         step = step.split("      - name:", 1)[0]
-        self.assertIn("if: startsWith(github.ref, 'refs/tags/v')", step)
+        self.assertIn("if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')", step)
         self.assertIn('gh release view "$GITHUB_REF_NAME" --json body --jq .body', step)
         self.assertIn("python3 .github/scripts/release_notes.py", step)
         self.assertIn('gh release edit "$GITHUB_REF_NAME" --notes-file', step)
