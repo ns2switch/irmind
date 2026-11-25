@@ -4,16 +4,44 @@ IRMind is an agentic terminal assistant for incident response and digital forens
 
 [Español](../es/roadmap.md)
 
-Launch preparation: [real-service validation](real-validation.md), [model evaluation](hunteval-model-benchmark.md) and [native signing setup](native-signing.md). These guides are procedures, not completed field validations.
+The roadmap tracks planned work. Read the [security model](../security-model.md)
+before connecting a service. Under the pre-1.0 policy, minor releases may change
+case, export and definition formats without migration. Keep the creating
+executable or re-ingest the verified originals.
 
-This page is for contributors and evaluators. It describes intentions, not release commitments. Read the [security model](../security-model.md) before connecting a service.
+## Delivered
 
-Current pre-1.0 policy: minor versions may break formats without migration. V3 is the sole artifact layout in v0.3; compatibility statements in delivered-release sections describe those historical releases only.
+The [CHANGELOG](../../CHANGELOG.md) records published releases and format
+changes. The entries below describe capabilities shipped in those releases.
 
-## Delivered through v0.5.x
+### v0.7.x
 
-See the [changelog](../../CHANGELOG.md) for exact releases and format changes.
-The following describes delivered capabilities, not field-validation claims.
+- Native mapping identities use the V2 production dependency manifest.
+  Dependency updates outside a mapping's build closure leave its identity
+  unchanged. [Mapping identity design](native-mapping-build-identity.md).
+- Local Sigma evaluates bounded rules on authenticated Parquet without a model.
+  Signed runs retain the field bindings, exact row matches and coverage.
+  [Sigma guide](../sigma.md).
+- Signed Markdown and PDF reports cite evidence for analyst-confirmed findings
+  and record limitations. Case marker 6 and export V10 carry the Sigma and
+  report proofs. [Cases and exports](../cases.md).
+- CloudTrail gzip deliveries are detected by content. Mixed deliveries retain
+  the logs as evidence and identify and skip integrity digests with a notice.
+  [Parser coverage](../parsers.md).
+
+### v0.6.x
+
+- Budgeted source-side queries for CloudTrail in Athena, Cloud Audit Logs in
+  BigQuery and supported Azure Log Analytics tables on the Analytics plan.
+  Queries are disabled by default. Signed captures become derived evidence for
+  local analysis. The three adapters were exercised against simulators.
+  [Design](source-queries-design.md) · [Format contract](source-queries-format-contract.md).
+- Reproducible release builds for the main executable and the isolated EVTX
+  helper on all five release targets. The signed `BUILD-ENVIRONMENT.json`
+  records the exact toolchain versions used for each target.
+  [Reproduction guide](../reproducible-builds.md).
+
+### Delivered through v0.5.x
 
 - Terminal cases, guarded conversations, policy-gated tools, signed custody,
   bounded Parquet queries, verified installers and an offline synthetic demo.
@@ -47,68 +75,57 @@ The following describes delivered capabilities, not field-validation claims.
 - Signed logical deletion of unsealed cases and a declarative, prioritized status
   bar are integrated for v0.5.2. Deletion retains signed tombstones, honors process
   locks and recovers interrupted cleanup; it is not secure physical erasure.
-
 - Version 0.5.3 adds provider-reported cache accounting, trusted Anthropic prefix
   markers, explicit interprocess-safe plan recovery and macOS Intel packages.
-  Fresh per-turn nonces and full logical token charging are unchanged. Later
-  context-cost proposals remain deferred until after launch.
+  It retains per-turn nonces and charges every logical token. Version 0.5.4
+  adds verified Homebrew packages and catalog signature verification.
 
 Skills never grant tools or scope, children never approve, and external/model
 content never enters trusted system instructions. No model or connector is
 enabled by default. Historical release designs explain old decisions; they are
 not compatibility promises for the current executable.
 
-## v0.5.x: Evaluation readiness and stabilization
-
-- Measure real provider cache reuse with the first accounting increment. Keep fresh
-  per-turn nonces and charge every logical token; defer later context-cost changes
-  until after launch. No speculative warm-up or automatic routing changes.
-- Rehearse the [real-service procedure](real-validation.md) with local Elasticsearch,
-  TLS/CA verification and a local model. Record actual outcomes, errors and timings;
-  this does not replace the analyst's real-model/connector validation.
-- Exercise PTY interactions repeatedly under load with event-based synchronization,
-  including first run, demo presentation, expansion and deletion.
-- Publish verified Homebrew packaging. Maintain native macOS Intel and Linux
-  aarch64, signed installers, exact-tag Sigstore verification, provenance and SBOM.
-  AUR, Nix, winget and Scoop remain open to community maintainers.
-- Activate prepared Developer ID/hardened-runtime signing and notarization only
-  after the maintainer provisions the protected release environment and approves
-  activation. Windows Authenticode signing remains pending; SignPath Foundation
-  may be reevaluated after the public launch, alongside paid-service options.
-  Provider selection and activation remain maintainer tasks; Sigstore does not
-  replace native OS signing or reputation.
-- Record the remaining H5 procedure details and a connector against a real test
-  environment, and confirm experimental EVTX behavior on Windows 11. Do not infer
-  these observations from scripted synthetic tests.
-- Track stress ingestion, dense-entity queries and co-observation disk use as
-  measured performance work; never change query/security limits to improve a score.
-
 ## Public launch
 
-Publish an article, a synthetic-data demo video, community posts, and an initial community skills catalog.
+Publish the introduction, a synthetic-data demo video and community posts.
+Report the validation that has been observed and document the remaining
+checks. [Manual validation record](manual-validation.md).
 
-The public launch is the next milestone after v0.5.x stabilization. Publish only
-measured validation claims; native signing, analyst validations and the catalog
-remain explicit checklist items, not implied guarantees.
+## v0.7.x: Sigma coverage, rule packages and ingestion
 
-## v0.6: Source-side queries
+1. Extend Sigma coverage. Start with compilation by source class, then broaden
+   the reviewed bindings for Sysmon fields, `image_load` and `registry`, cloud
+   tables with `requestParameters` and `responseElements`, and webserver and DNS
+   logsources. Measure admission and exact compilation by family against the
+   same hash-pinned SigmaHQ release.
+   [SigmaHQ admission baseline](benchmarks/sigmahq-v070-admission.md).
+2. Design installable Sigma rule packages with the same explicit installation
+   model as forensic skills. The contract requires approval before
+   implementation and will compare using the existing irmind-skills catalog
+   and signing key with using a separate catalog and maintainer-generated key.
 
-Run structured, budgeted CloudTrail queries in Athena, Cloud Audit Logs in
-BigQuery and queries on supported Azure Log Analytics tables in the Analytics
-plan. Sign the result and retain it as derived evidence for local analysis.
-Source-side queries in subagents and remote re-verification of cloud originals
-are planned for v0.8. Additional datasets and providers are follow-up work.
-See the [source query design](source-queries-design.md) and
-[implementation contract](source-queries-format-contract.md).
-
-## v0.7: Mapping identities, detection, and reports
-
-- Scope native mapping identities to their production dependencies so unrelated
-  lockfile updates leave reconstruction identities stable.
-  [Design](native-mapping-build-identity.md).
-- Execute Sigma rules over local Parquet without an LLM.
-- Produce signed Markdown and PDF reports from confirmed findings with citations.
-- Design signed local hooks, the MCP client, and the engine API for v0.8.
+   - Sign the catalog index, pin versions by hash and reject version rollbacks.
+   - Provide `/sigma list`, `/sigma info`, `/sigma install`, `/sigma update` and
+     `/sigma remove`. Show the package's coverage against case sources in
+     `/sigma info` and present the differences before signing an update.
+   - Support explicit installation from the catalog or a local file with
+     the same verification, preview and signed analyst admission rules as
+     `/skills install`. Retain any proofs already referenced by a signed run
+     when removing an installed package.
+   - Installing a package grants no permissions and runs no rules. Each
+     execution goes through signed admission for the case and remains subject
+     to policy. Skills may recommend a package under the same policy.
+   - Reference SigmaHQ releases by official URL and SHA-256 with Detection Rule
+     License (DRL) 1.1 attribution. Keep SigmaHQ rule bytes out of the catalog.
+     Require a declared license for community packs.
+   - Validate every catalog package for admission, compilation, license and
+     source coverage in CI.
+3. Verify the CloudTrail digest chain as evidence of log integrity.
+   [#428](https://github.com/ns2switch/irmind/issues/428).
+4. Profile FDR, Unified Log and eslogger ingestion and design compact
+   normalization for large Windows DNS debug and IIS W3C files.
+   [Ingestion profiling #344](https://github.com/ns2switch/irmind/issues/344) ·
+   [Compact storage #355](https://github.com/ns2switch/irmind/issues/355).
 
 ## v0.8: Extensibility, engine API, and validation
 
@@ -118,18 +135,58 @@ See the [source query design](source-queries-design.md) and
   risk, passes through policy, and returns untrusted content.
 - Provide a versioned engine protocol for `serve` over stdio, a Unix
   socket, or a Windows named pipe. A client requests approval, the analyst
-  confirms, and IRMind signs. TCP stays disabled by default.
+  confirms inside IRMind, and IRMind signs. TCP stays disabled by default.
+  [Extensibility designs](https://github.com/ns2switch/irmind/pull/391).
 - Add source-side queries for subagents and remote re-verification of original
   cloud objects.
 - Evaluate IRMind as a complete deployment through HuntEval and publish the
-  measured model benchmark.
+  measured model benchmark. [#95](https://github.com/ns2switch/irmind/issues/95).
+- Maintainer validation: run real source queries with Athena, BigQuery and
+  Azure Log Analytics, validate Elastic over TLS with a private CA, and check
+  isolated EVTX ingestion on Windows 11. Record outstanding H5 checks for hash
+  citations, `/verify` and export verification.
+  [Real-service procedure](real-validation.md) ·
+  [Manual validation record](manual-validation.md) ·
+  [Elastic #63](https://github.com/ns2switch/irmind/issues/63) ·
+  [Windows 11 #189](https://github.com/ns2switch/irmind/issues/189) ·
+  [H5 #340](https://github.com/ns2switch/irmind/issues/340).
+
+## v0.9: Native Windows evidence, detection and interchange
+
+- Add isolated native decoders for Windows registry hives, `$MFT`, Prefetch,
+  LNK, Amcache and SRUM.
+- Add local YARA scanning with bounded rule admission and execution, following
+  the Sigma admission model.
+- Export timelines with verifiable evidence citations for Timesketch and
+  plaso-compatible super-timeline CSV. Export indicators of compromise (IOCs)
+  with provenance in STIX and MISP formats.
+- Extend local Sigma to correlation rules.
+- Ingest Volatility 3 outputs. [#158](https://github.com/ns2switch/irmind/issues/158).
+- Decide when signed formats stabilize and how long to retain parser versions.
+
+## Open decisions
+
+- Decide whether to accept disk images (E01 or raw) and, if so, define the
+  supported operations and custody model.
+- Define multi-analyst work, including case handoff, a second signer and review.
+
+## Work without a release assignment
+
+- Schedule the deferred context-cost work and measure cache reuse with real
+  providers after launch. [Context cost design](context-cost-design.md).
+- Provision Apple Developer ID and approve notarization. Select a Windows
+  Authenticode provider and reevaluate SignPath Foundation after launch.
+  [Native signing setup](native-signing.md).
+- Keep measuring stress ingestion, dense-entity queries and co-observation
+  storage with the existing limits. [Benchmarks](benchmarks.md). Community
+  maintainers can contribute additional package formats.
 
 ## 1.0 criteria
 
 Stabilize signed formats, validate connectors, sign binaries, and complete external security review.
 
 - Stable signed formats for cases, manifests, skills, subagent records, and the engine protocol, with tested migrations.
-- Decide parser-version retention and stable-format compatibility when formats stabilize, expected around v0.6–v0.7, before 1.0. Until then, minor releases may break case, export and definition formats without migration; keep the creating executable or re-ingest verified originals.
+- Confirm the v0.9 decision on parser-version retention and stable-format compatibility before 1.0. Until then, minor releases may break case, export and definition formats without migration; keep the creating executable or re-ingest verified originals.
 - An external security review.
 - At least three connectors validated against real test environments.
 - Signed release binaries on Linux, macOS, and Windows.
