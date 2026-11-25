@@ -68,6 +68,15 @@ class MacOSReleaseTests(unittest.TestCase):
         self.assertIn('subject-path: |\n            release/*SBOM.spdx.json\n            release/BUILD-ENVIRONMENT.json', release)
         self.assertIn('release/* --clobber', release)
 
+    def test_release_downloads_the_mapping_manifest_before_packaging(self):
+        release = WORKFLOW.read_text().split('  release:\n', 1)[1].split('  post_release:', 1)[0]
+        before, _ = release.split('      - name: Assemble the build environment inventory', 1)
+        self.assertRegex(
+            before,
+            r'(?m)^      - uses: actions/download-artifact@[^\n]+\n'
+            r'        with: \{name: native-mapping-build-inputs, path: artifacts/native-mapping-build-inputs\}$',
+        )
+
     def test_windows_rehearsal_runs_with_the_verified_release_helper(self):
         build = BINARIES.read_text()
         witness = build.split('      - name: Measure the released Windows helper', 1)[1]
