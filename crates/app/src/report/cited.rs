@@ -46,7 +46,7 @@ impl Engine<'_> {
         let view = V10CheckpointView::resolve(&entries, checkpoint)?;
         let findings = self.findings_unlocked(id, view.entries())?;
         let coverage =
-            self.resolve_cited_report_coverage(view.entries(), &CancellationToken::new())?;
+            self.resolve_cited_report_coverage(id, view.entries(), &CancellationToken::new())?;
         CitedReportMaterial {
             title: &case.title,
             checkpoint,

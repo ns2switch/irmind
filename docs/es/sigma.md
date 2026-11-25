@@ -12,11 +12,13 @@ IRMind evalúa un subconjunto acotado de reglas Sigma sobre los artefactos Parqu
 4. Revisa los hallazgos propuestos y las referencias a sus filas. Confirma cada hallazgo con `/confirm <id-hallazgo>` antes de publicar el informe.
 5. Ejecuta `/verify` para verificar el caso y el material firmado de Sigma. Sella el caso antes de exportarlo en V10. El destinatario puede verificar el paquete con la huella esperada de la clave del analista.
 
-Se omiten las reglas cuyo logsource o campos no tienen correspondencia exacta. Una regla debe resolver sus campos en todas las clases inscritas que le apliquen dentro del caso. Un análisis queda como parcial si se detiene antes de terminar o encuentra filas indeterminadas. Sin coincidencias en una ejecución parcial o en una fuente omitida, la actividad correspondiente queda sin determinar.
+Sigma compila la regla completa para cada clase de fuente aplicable y la ejecuta donde todos los campos tienen correspondencia exacta. La ejecución firmada registra los pares de regla y clase omitidos, y distingue los huecos de cobertura de las filas indeterminadas y los escaneos interrumpidos. Un resultado vacío deja sin determinar la actividad de las clases omitidas.
 
 En la release fijada de SigmaHQ r2026-07-01, 3.301 de 3.302 ficheros pasaron la admisión y 1.022 compilaron para todas las clases aplicables de la tabla revisada. Consulta los [recuentos y motivos de rechazo por familia](../development/benchmarks/sigmahq-v070-admission.md).
 
 La [auditoría de tablas de v0.7.3](../development/benchmarks/sigmahq-v073-reviewed-fields.md) compiló 1.159 de las mismas 3.302 reglas con el evaluador V2. La auditoría recoge el efecto de cada bloque por separado.
+
+Consulta la [comparación de admisión y ejecución entre V2 y V3](../development/benchmarks/sigma-v073-source-classes.md) sobre la misma tabla revisada.
 
 ## Cobertura y campos por fuente
 

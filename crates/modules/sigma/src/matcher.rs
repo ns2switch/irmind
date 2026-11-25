@@ -4,7 +4,10 @@ use crate::{
     condition::{Condition, ConditionError},
 };
 use regex::{Regex, RegexBuilder};
-use std::{collections::BTreeMap, net::IpAddr};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    net::IpAddr,
+};
 
 const MAX_ALTERNATIVES: usize = 256;
 const MAX_PATTERN: usize = 4096;
@@ -94,54 +97,42 @@ impl SigmaProgram {
         rule: &RuleDocument,
         bindings: &BTreeMap<String, SigmaFieldKind>,
     ) -> Result<Self, CompileError> {
-        let Some(RuleValue::Mapping(detection)) = rule.fields().get("detection") else {
-            return Err(CompileError::InvalidSelection);
-        };
-        let mut remaining = MAX_ALTERNATIVES;
-        let mut names = Vec::new();
-        let mut selections = Vec::new();
-        for (name, value) in detection {
-            if name == "condition" {
-                continue;
-            }
-            let maps = match value {
-                RuleValue::Mapping(_) => std::slice::from_ref(value),
-                RuleValue::Sequence(maps) if !maps.is_empty() => maps.as_slice(),
-                _ => return Err(CompileError::InvalidSelection),
-            };
-            let mut group = Vec::with_capacity(maps.len());
-            for map in maps {
-                let RuleValue::Mapping(fields) = map else {
-                    return Err(CompileError::InvalidSelection);
-                };
-                if fields.is_empty() {
-                    return Err(CompileError::InvalidSelection);
-                }
-                let tests = fields
-                    .iter()
-                    .map(|(name, value)| compile_test(name, value, bindings, &mut remaining))
-                    .collect::<Result<Vec<_>, _>>()?;
-                group.push(tests);
-            }
-            names.push(name.as_str());
-            selections.push(group);
-        }
-        let expressions = match detection.get("condition") {
-            Some(RuleValue::Text(expression)) => vec![expression.as_str()],
-            Some(RuleValue::Sequence(items)) => items
-                .iter()
-                .map(|value| match value {
-                    RuleValue::Text(text) => Ok(text.as_str()),
-                    _ => Err(CompileError::InvalidSelection),
-                })
-                .collect::<Result<Vec<_>, _>>()?,
-            _ => return Err(CompileError::InvalidSelection),
-        };
-        let condition = Condition::compile(expressions, &names).map_err(CompileError::Condition)?;
+        let (condition, selections) = parse_detection(rule, |key, value, remaining| {
+            let name = key.split('|').next().ok_or(CompileError::MissingBinding)?;
+            let kind = *bindings.get(name).ok_or(CompileError::MissingBinding)?;
+            compile_test(key, value, kind, remaining)
+        })?;
         Ok(Self {
             condition,
             selections,
         })
+    }
+
+    /// Check the complete rule independently of any particular source class.
+    pub fn validate_rule(rule: &RuleDocument) -> Result<BTreeSet<&str>, CompileError> {
+        use SigmaFieldKind::{Boolean, Integer, Ip, PairList, Text};
+        let mut fields = BTreeSet::new();
+        parse_detection(rule, |key, value, remaining| {
+            let name = key.split_once('|').map_or(key, |(name, _)| name);
+            if name.is_empty() {
+                return Err(CompileError::InvalidSelection);
+            }
+            fields.insert(name);
+            let mut failure = CompileError::WrongType;
+            for kind in [Text, Integer, Boolean, Ip, PairList] {
+                let mut trial = *remaining;
+                match compile_test(key, value, kind, &mut trial) {
+                    Ok(_) => {
+                        *remaining = trial;
+                        return Ok(());
+                    }
+                    Err(error) if !matches!(error, CompileError::WrongType) => failure = error,
+                    Err(_) => {}
+                }
+            }
+            Err(failure)
+        })?;
+        Ok(fields)
     }
 
     /// Charge a rule-wide mutable counter supplied by the caller. Return failures
@@ -287,15 +278,67 @@ fn value_matches(kind: SigmaFieldKind, value: SigmaScalar<'_>, list: bool) -> bo
     )
 }
 
+type Selections<T> = Vec<Vec<Vec<T>>>;
+
+fn parse_detection<'a, T>(
+    rule: &'a RuleDocument,
+    mut field: impl FnMut(&'a str, &'a RuleValue, &mut usize) -> Result<T, CompileError>,
+) -> Result<(Condition, Selections<T>), CompileError> {
+    let Some(RuleValue::Mapping(detection)) = rule.fields().get("detection") else {
+        return Err(CompileError::InvalidSelection);
+    };
+    let mut remaining = MAX_ALTERNATIVES;
+    let mut names = Vec::new();
+    let mut selections = Vec::new();
+    for (name, value) in detection {
+        if name == "condition" {
+            continue;
+        }
+        let maps = match value {
+            RuleValue::Mapping(_) => std::slice::from_ref(value),
+            RuleValue::Sequence(maps) if !maps.is_empty() => maps.as_slice(),
+            _ => return Err(CompileError::InvalidSelection),
+        };
+        let mut group = Vec::with_capacity(maps.len());
+        for map in maps {
+            let RuleValue::Mapping(fields) = map else {
+                return Err(CompileError::InvalidSelection);
+            };
+            if fields.is_empty() {
+                return Err(CompileError::InvalidSelection);
+            }
+            let tests = fields
+                .iter()
+                .map(|(name, value)| field(name, value, &mut remaining))
+                .collect::<Result<Vec<_>, _>>()?;
+            group.push(tests);
+        }
+        names.push(name.as_str());
+        selections.push(group);
+    }
+    let expressions = match detection.get("condition") {
+        Some(RuleValue::Text(expression)) => vec![expression.as_str()],
+        Some(RuleValue::Sequence(items)) => items
+            .iter()
+            .map(|value| match value {
+                RuleValue::Text(text) => Ok(text.as_str()),
+                _ => Err(CompileError::InvalidSelection),
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+        _ => return Err(CompileError::InvalidSelection),
+    };
+    let condition = Condition::compile(expressions, &names).map_err(CompileError::Condition)?;
+    Ok((condition, selections))
+}
+
 fn compile_test(
     key: &str,
     value: &RuleValue,
-    bindings: &BTreeMap<String, SigmaFieldKind>,
+    kind: SigmaFieldKind,
     remaining: &mut usize,
 ) -> Result<FieldTest, CompileError> {
     let mut parts = key.split('|');
     let name = parts.next().ok_or(CompileError::MissingBinding)?;
-    let kind = *bindings.get(name).ok_or(CompileError::MissingBinding)?;
     let modifiers = parts.collect::<Vec<_>>();
     if kind == SigmaFieldKind::PairList {
         if !modifiers.is_empty() {

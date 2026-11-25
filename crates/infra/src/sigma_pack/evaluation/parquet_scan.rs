@@ -92,7 +92,11 @@ impl SigmaEvaluation<'_> {
         Ok(())
     }
 
-    fn stop(&mut self, deadline: Instant, cancel: &CancellationToken) -> bool {
+    pub(in crate::sigma_pack) fn stop(
+        &mut self,
+        deadline: Instant,
+        cancel: &CancellationToken,
+    ) -> bool {
         if cancel.is_cancelled() {
             self.status = SigmaRunStatusV1::Cancelled;
             true

@@ -11,7 +11,9 @@ const TABLE: &[u8] = b"irmind-sigma-field-table-v1\0";
 const SCOPE: &[u8] = b"irmind-sigma-source-scope-v1\0";
 const COMPILED: &[u8] = b"irmind-sigma-compiled-rules-v1\0";
 mod results_v2;
+mod results_v3;
 pub use results_v2::SigmaRunResultsV2;
+pub use results_v3::*;
 
 const RESULTS: &[u8] = b"irmind-sigma-run-results-v1\0";
 const MAX_RULES: usize = 4096;

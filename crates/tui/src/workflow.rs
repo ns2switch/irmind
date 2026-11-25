@@ -139,6 +139,42 @@ impl CaseWorkflow<'_, '_> {
                 notices.release_mappings
             );
         }
+        for run in &notices.sigma_runs {
+            let counts = &run.coverage;
+            let _ = write!(
+                message,
+                "\nSigma {} · source-class plan · {} rules with all, {} with some, {} with no eligible classes · {} eligible and {} skipped pairs",
+                run.receipt.as_str(),
+                counts.all_rules,
+                counts.some_rules,
+                counts.no_rules,
+                counts.eligible_pairs,
+                counts.skipped_pairs,
+            );
+            for (class, missing, incompatible) in &run.skipped_classes {
+                let _ = write!(
+                    message,
+                    "\n  {class} · {missing} missing bindings, {incompatible} incompatible types"
+                );
+            }
+            if counts.skipped_pairs != 0 || counts.no_rules != 0 {
+                message.push_str(
+                    "\nActivity covered by skipped rules or source classes remains undetermined.",
+                );
+            }
+            if run.unavailable_rows != 0 {
+                let _ = write!(
+                    message,
+                    "\n  {} rows with unavailable exact fields · {} rules with indeterminate rows. Unexpected values may indicate source manipulation.",
+                    run.unavailable_rows, run.indeterminate_rules
+                );
+            }
+            if run.stopped_early {
+                message.push_str(
+                    "\nThe Sigma scan stopped early. The source-class counts describe the plan.",
+                );
+            }
+        }
         for notice in &notices.query_limits {
             let _ = write!(
                 message,

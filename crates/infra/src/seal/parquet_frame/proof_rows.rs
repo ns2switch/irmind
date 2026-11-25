@@ -1,4 +1,5 @@
 //! Read only the provenance columns at the authenticated physical row offsets.
+use super::super::extensions::SigmaRowPredicate;
 use super::{AppError, FrameReader, storage, storage_reason};
 use arrow_array::{Array, RecordBatch, StringArray, UInt64Array};
 use irmind_app::{
@@ -30,7 +31,19 @@ pub fn verify_v10_artifact_rows(
     references: &[V10RowReference],
     cancel: &CancellationToken,
 ) -> Result<(), AppError> {
-    verify_artifact(file, offset, artifact, references, None, cancel)
+    verify_artifact(file, offset, artifact, references, None, None, cancel)
+}
+
+#[cfg(feature = "sigma")]
+pub(crate) fn verify_sigma_scan_artifact(
+    file: &mut File,
+    artifact: &ParquetArtifact,
+    check: impl FnMut() -> Result<(), AppError>,
+) -> Result<(), AppError> {
+    let ParquetArtifact::V3(envelope) = artifact;
+    let core = envelope.core();
+    seek_event_artifact(file, 0, core.size, core.schema)?;
+    super::super::frames::verify_raw_guarded(file, core.size, core.sha256.as_str(), check)
 }
 
 pub(in crate::seal) fn verify_v10_sigma_rows(
@@ -39,9 +52,18 @@ pub(in crate::seal) fn verify_v10_sigma_rows(
     artifact: &ParquetArtifact,
     references: &[V10RowReference],
     time: &Range<i64>,
+    predicate: Option<&mut SigmaRowPredicate<'_>>,
     cancel: &CancellationToken,
 ) -> Result<(), AppError> {
-    verify_artifact(file, offset, artifact, references, Some(time), cancel)
+    verify_artifact(
+        file,
+        offset,
+        artifact,
+        references,
+        Some(time),
+        predicate,
+        cancel,
+    )
 }
 
 fn verify_artifact(
@@ -50,23 +72,17 @@ fn verify_artifact(
     artifact: &ParquetArtifact,
     references: &[V10RowReference],
     time: Option<&Range<i64>>,
+    predicate: Option<&mut SigmaRowPredicate<'_>>,
     cancel: &CancellationToken,
 ) -> Result<(), AppError> {
     let ParquetArtifact::V3(envelope) = artifact;
     let core = envelope.core();
-    if core.schema != ArtifactSchemaV2::CommonEvents
-        || references.iter().any(|reference| {
-            irmind_domain::EvidenceHash::from_bytes(reference.artifact.artifact_sha256)
-                != core.sha256
-        })
-    {
+    if references.iter().any(|reference| {
+        irmind_domain::EvidenceHash::from_bytes(reference.artifact.artifact_sha256) != core.sha256
+    }) {
         return Err(invalid());
     }
-    let end = offset.checked_add(core.size).ok_or_else(invalid)?;
-    if end > file.metadata().map_err(storage)?.len() {
-        return Err(invalid());
-    }
-    file.seek(SeekFrom::Start(offset)).map_err(storage)?;
+    let end = seek_event_artifact(file, offset, core.size, core.schema)?;
     super::super::frames::verify_raw_with_cancel(
         file,
         core.size,
@@ -78,9 +94,30 @@ fn verify_artifact(
         start: offset,
         size: core.size,
     };
-    let result = verify_rows(reader, envelope.pipeline().rows(), references, time, cancel);
+    let result = verify_rows(
+        reader,
+        envelope.pipeline().rows(),
+        references,
+        time,
+        predicate,
+        cancel,
+    );
     file.seek(SeekFrom::Start(end)).map_err(storage)?;
     result
+}
+
+fn seek_event_artifact(
+    file: &mut File,
+    offset: u64,
+    size: u64,
+    schema: ArtifactSchemaV2,
+) -> Result<u64, AppError> {
+    let end = offset.checked_add(size).ok_or_else(invalid)?;
+    if schema != ArtifactSchemaV2::CommonEvents || end > file.metadata().map_err(storage)?.len() {
+        return Err(invalid());
+    }
+    file.seek(SeekFrom::Start(offset)).map_err(storage)?;
+    Ok(end)
 }
 
 fn verify_rows(
@@ -88,6 +125,7 @@ fn verify_rows(
     expected_rows: u64,
     references: &[V10RowReference],
     time: Option<&Range<i64>>,
+    mut predicate: Option<&mut SigmaRowPredicate<'_>>,
     cancel: &CancellationToken,
 ) -> Result<(), AppError> {
     if cancel.is_cancelled() {
@@ -96,23 +134,9 @@ fn verify_rows(
     if references.is_empty() {
         return Ok(());
     }
-    let (builder, row_count) = row_identity_reader(reader, expected_rows, time.is_some())?;
-    let mut selected = Vec::new();
-    let mut next = 0usize;
-    for reference in references {
-        let index = usize::try_from(reference.physical_row).map_err(storage)?;
-        if index < next || index >= row_count {
-            return Err(invalid());
-        }
-        if index > next {
-            selected.push(RowSelector::skip(index - next));
-        }
-        selected.push(RowSelector::select(1));
-        next = index + 1;
-    }
-    if next < row_count {
-        selected.push(RowSelector::skip(row_count - next));
-    }
+    let (builder, row_count) =
+        row_identity_reader(reader, expected_rows, time.is_some(), predicate.is_some())?;
+    let selected = proof_row_selection(references, row_count)?;
     let rows = builder
         .with_row_selection(RowSelection::from(selected))
         .build()
@@ -132,29 +156,70 @@ fn verify_rows(
                     .ok_or_else(invalid)
             })
             .transpose()?;
+        let original = if predicate.is_some() {
+            Some(
+                batch
+                    .column_by_name("text")
+                    .and_then(|column| column.as_any().downcast_ref::<StringArray>())
+                    .ok_or_else(invalid)?,
+            )
+        } else {
+            None
+        };
         for row in 0..batch.num_rows() {
-            if let Some((time, common)) = time.zip(common)
-                && (common.is_null(row)
-                    || !irmind_app::decode_common_event(common.value(row))?
-                        .timestamp()
-                        .is_some_and(|at| time.contains(&at.instant().unix_micros())))
-            {
-                return Err(invalid());
-            }
+            let reference = expected.next().ok_or_else(invalid)?;
             if hashes.is_null(row) || records.is_null(row) {
                 return Err(invalid());
             }
-            verify_v10_row_identity(
-                expected.next().ok_or_else(invalid)?,
-                hashes.value(row),
-                records.value(row),
-            )?;
+            verify_v10_row_identity(reference, hashes.value(row), records.value(row))?;
+            if let Some((time, common)) = time.zip(common) {
+                if common.is_null(row) {
+                    return Err(invalid());
+                }
+                let event = irmind_app::decode_common_event(common.value(row))?;
+                if !event
+                    .timestamp()
+                    .is_some_and(|at| time.contains(&at.instant().unix_micros()))
+                {
+                    return Err(invalid());
+                }
+                if let Some((check, text)) = predicate.as_deref_mut().zip(original) {
+                    if text.is_null(row) {
+                        return Err(invalid());
+                    }
+                    check(reference, &event, text.value(row))?;
+                }
+            }
         }
     }
+
     if expected.next().is_some() {
         return Err(invalid());
     }
     Ok(())
+}
+
+fn proof_row_selection(
+    references: &[V10RowReference],
+    row_count: usize,
+) -> Result<Vec<RowSelector>, AppError> {
+    let mut selected = Vec::new();
+    let mut next = 0usize;
+    for reference in references {
+        let index = usize::try_from(reference.physical_row).map_err(storage)?;
+        if index < next || index >= row_count {
+            return Err(invalid());
+        }
+        if index > next {
+            selected.push(RowSelector::skip(index - next));
+        }
+        selected.push(RowSelector::select(1));
+        next = index + 1;
+    }
+    if next < row_count {
+        selected.push(RowSelector::skip(row_count - next));
+    }
+    Ok(selected)
 }
 
 /// Resolve eligible logical references in physical row order. Authenticate
@@ -171,7 +236,7 @@ pub(in crate::seal) fn locate_v10_artifact_rows(
         return Err(invalid());
     }
     verify_v10_artifact_rows(&mut file, 0, artifact, &[], cancel)?;
-    let (reader, _) = row_identity_reader(file, envelope.pipeline().rows(), false)?;
+    let (reader, _) = row_identity_reader(file, envelope.pipeline().rows(), false, false)?;
     let mut physical_row = 0u64;
     for batch in reader.build().map_err(storage)? {
         if cancel.is_cancelled() {
@@ -204,6 +269,7 @@ fn row_identity_reader<R: ChunkReader + 'static>(
     reader: R,
     expected_rows: u64,
     with_time: bool,
+    with_original: bool,
 ) -> Result<(ArrowReaderBuilder<SyncReader<R>>, usize), AppError> {
     let builder = ParquetRecordBatchReaderBuilder::try_new(reader).map_err(storage)?;
     let row_count =
@@ -217,6 +283,9 @@ fn row_identity_reader<R: ChunkReader + 'static>(
     let mut columns = vec![source, record];
     if with_time {
         columns.push(schema.index_of("common_payload").map_err(storage)?);
+    }
+    if with_original {
+        columns.push(schema.index_of("text").map_err(storage)?);
     }
     let projection = ProjectionMask::roots(builder.parquet_schema(), columns);
     Ok((
@@ -300,6 +369,7 @@ mod tests {
                 bytes.clone(),
                 3,
                 references,
+                None,
                 None,
                 &CancellationToken::new(),
             )

@@ -5,6 +5,10 @@ pub mod field_table;
 #[cfg(feature = "sigma")]
 mod runtime;
 #[cfg(feature = "sigma")]
+pub(crate) use runtime::{SigmaMatchCheck, verify_class_plan};
+#[cfg(feature = "sigma")]
+mod plan;
+#[cfg(feature = "sigma")]
 mod storage;
 use irmind_app::{
     AppError, CancellationToken,
@@ -17,6 +21,38 @@ use std::{
 };
 #[cfg(feature = "sigma")]
 pub use storage::AdmittedSigmaPack;
+
+pub(crate) fn sigma_proof_read(
+    kind: u8,
+    bytes: Vec<u8>,
+) -> Result<irmind_app::v10_proofs::SigmaProofRead, AppError> {
+    let class_labels = if kind == 2 {
+        let table =
+            irmind_app::v10_proofs::SigmaFieldTableV1::decode(&bytes).map_err(|_| invalid())?;
+        field_table::ReviewedSigmaFieldTable::parse(&table)?
+            .variants
+            .iter()
+            .enumerate()
+            .map(|(ordinal, class)| {
+                format!(
+                    "#{} {} / {} / {} · {} · {}",
+                    ordinal,
+                    class.product.as_deref().unwrap_or("*"),
+                    class.service.as_deref().unwrap_or("*"),
+                    class.category.as_deref().unwrap_or("*"),
+                    class.parser_id,
+                    class.mapping_id,
+                )
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    Ok(irmind_app::v10_proofs::SigmaProofRead {
+        bytes,
+        class_labels,
+    })
+}
 
 const MAX_FILES: usize = 4096;
 const MAX_DEPTH: usize = 16;
