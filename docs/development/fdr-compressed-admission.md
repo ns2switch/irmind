@@ -4,9 +4,9 @@ Implemented in the FDR ingestion pipeline. [Español](../es/development/fdr-comp
 
 ## Admission and reservation
 
-`DecodedJson16` applies only to `parser-fdr/fdr-source-v1`. VPC Flow Logs use
-`CompactFlow32`. Extending the decoded JSON profile to ALB, S3 access logs,
-CloudTrail gzip or any other decoder requires separate approval.
+`DecodedJson16` was introduced for `parser-fdr/fdr-source-v1`. Starting in
+v0.7.2, `parser-json/json-source-v1` also uses it for gzip. VPC Flow Logs use
+`CompactFlow32`. Other decoders require separate approval to use this profile.
 
 The first pass opens the original for reading, caps physical and decoded
 input at 50 GiB, and validates the CRC and size trailer of every gzip member.

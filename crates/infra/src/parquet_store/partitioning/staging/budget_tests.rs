@@ -2,7 +2,7 @@
 use super::*;
 use std::{io::Seek, sync::Arc};
 #[test]
-fn default_decoder_keeps_historical_allowance_and_rewinds() {
+fn plain_json_keeps_historical_allowance_and_rewinds() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("source.json");
     let bytes = b"{}";
@@ -20,7 +20,7 @@ fn default_decoder_keeps_historical_allowance_and_rewinds() {
         .unwrap();
     assert_eq!(size, bytes.len() as u64);
     assert_eq!(budget.normalized_bytes, size * 16 + MAX_STAGED_ROW);
-    assert_eq!(budget.decoded_byte_ceiling, None);
+    assert_eq!(budget.decoded_byte_ceiling, Some(size));
     assert_eq!(file.stream_position().unwrap(), 0);
     assert!(matches!(
         check_space(budget.normalized_bytes - 1, budget.normalized_bytes),
@@ -100,16 +100,22 @@ fn only_source_format_and_source_limits_allow_exclusion_retries() -> Result<(), 
 }
 
 #[test]
-fn decoded_json_reservation_is_restricted_to_the_current_fdr_decoder() {
+fn decoded_json_reservation_is_restricted_to_the_current_fdr_and_json_decoders() {
     let budget =
         NormalizedSourceBudget::try_new(1024, NormalizedExpansionProfile::DecodedJson16).unwrap();
     let fdr = irmind_app::ParserIdentity {
         name: "parser-fdr",
         version: "fdr-source-v1",
     };
-    let reservation = reserve_profile(fdr, budget).unwrap();
-    assert_eq!(reservation.decoded_byte_ceiling, Some(1024));
-    assert_eq!(reservation.normalized_bytes, 1024 * 16 + MAX_STAGED_ROW);
+    for (name, version) in [
+        ("parser-fdr", "fdr-source-v1"),
+        ("parser-json", "json-source-v1"),
+    ] {
+        let reservation =
+            reserve_profile(irmind_app::ParserIdentity { name, version }, budget).unwrap();
+        assert_eq!(reservation.decoded_byte_ceiling, Some(1024));
+        assert_eq!(reservation.normalized_bytes, 1024 * 16 + MAX_STAGED_ROW);
+    }
     for name in [
         "parser-json",
         "parser-vpc-flow",

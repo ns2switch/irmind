@@ -103,6 +103,7 @@ fn invalid() -> AppError {
 pub fn source_log_parser() -> Arc<dyn LogParser> {
     Arc::new(
         SourceDecoderSelection::new(Arc::new(PlasoSourceDecoder))
+            .with_description(crate::PlasoParser.description())
             .with_detector(|source, sample| super::PlasoParser.detect(source, sample))
             .with_time_detector(|source, sample| {
                 super::PlasoParser.time_context_requirement(source, sample)

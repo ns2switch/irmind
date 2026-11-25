@@ -36,6 +36,9 @@ impl Module for ZeekParser {
 }
 
 impl LogParser for ZeekParser {
+    fn description(&self) -> &'static str {
+        "Zeek TSV and JSON logs"
+    }
     fn detect(&self, _source_name: &str, sample: &[u8]) -> Option<ParserConfidence> {
         let sample = &sample[..sample.len().min(64 * 1024)];
         let tsv = sample.starts_with(b"#separator ")

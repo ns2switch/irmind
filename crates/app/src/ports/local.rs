@@ -229,6 +229,15 @@ impl ParserConfidence {
 /// Format-specific, bounded evidence decoder. `detect` receives at most 64 KiB
 /// from the caller and must remain pure and cheap.
 pub trait LogParser: StreamingEventParser {
+    /// Identify a known non-event document from the bounded format sample.
+    fn non_event_source(
+        &self,
+        _source_name: &str,
+        _sample: &[u8],
+    ) -> Option<crate::modules::NonEventSource> {
+        None
+    }
+
     fn cluster_context_requirement(
         &self,
         _source_name: &str,

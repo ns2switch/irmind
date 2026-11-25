@@ -47,7 +47,7 @@ pub(super) fn decode(
             match result? {
                 Some(frames) => {
                     for frame in frames {
-                        forward_prepared(metadata, frame, start, &mut report, emit)?;
+                        forward_prepared(metadata, frame, Some(start), &mut report, emit)?;
                     }
                 }
                 None => reject(&mut report, &bytes),

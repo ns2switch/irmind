@@ -90,7 +90,9 @@ fn choose(
     choice: ParserChoice,
     catalog: &ParserCatalog,
 ) -> Result<(String, u8, ParserSelectionMode), AppError> {
-    if let Some(id) = request.parser_override {
+    if let Some(id) = request.parser_override
+        && !matches!(choice, ParserChoice::NonEvent(_))
+    {
         let confidence = match &choice {
             ParserChoice::Auto(candidate) if candidate.id == id => candidate.confidence.value(),
             ParserChoice::NeedsAnalyst(candidates) => candidates
@@ -110,6 +112,7 @@ fn choose(
         ));
     }
     match choice {
+        ParserChoice::NonEvent(kind) => Err(AppError::NonEventSource { kind }),
         ParserChoice::Auto(DetectedParser { id, confidence }) => {
             Ok((id, confidence.value(), ParserSelectionMode::Automatic))
         }
@@ -120,13 +123,32 @@ fn choose(
                 .map(|c| (c.id, c.confidence.value()))
                 .collect(),
         }),
-        ParserChoice::Unsupported => Err(AppError::ParserSelection {
-            source_name: request.source.into(),
-            candidates: catalog
-                .available()
-                .into_iter()
-                .map(|(id, _)| (id, 0))
-                .collect(),
-        }),
+        ParserChoice::Unsupported => {
+            if let Some(format) = compression_format(request.sample) {
+                return Err(AppError::UnsupportedCompressedSource { format });
+            }
+            Err(AppError::ParserSelection {
+                source_name: request.source.into(),
+                candidates: catalog
+                    .available()
+                    .into_iter()
+                    .map(|(id, _)| (id, 0))
+                    .collect(),
+            })
+        }
+    }
+}
+
+fn compression_format(sample: &[u8]) -> Option<&'static str> {
+    match sample {
+        [0x1f, 0x8b, ..] => Some("gzip"),
+        [b'P', b'K', 3, 4, ..] | [b'P', b'K', 5, 6, ..] | [b'P', b'K', 7, 8, ..] => Some("ZIP"),
+        [0x28, 0xb5, 0x2f, 0xfd, ..] => Some("Zstandard"),
+        [0xfd, b'7', b'z', b'X', b'Z', 0, ..] => Some("XZ"),
+        [b'B', b'Z', b'h', b'1'..=b'9', ..] => Some("bzip2"),
+        [0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c, ..] => Some("7-Zip"),
+        [b'R', b'a', b'r', b'!', 0x1a, 0x07, 0x00 | 0x01, ..] => Some("RAR"),
+        [0x04, 0x22, 0x4d, 0x18, ..] => Some("LZ4"),
+        _ => None,
     }
 }

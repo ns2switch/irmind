@@ -150,6 +150,7 @@ fn invalid() -> AppError {
 pub fn source_log_parser() -> Arc<dyn LogParser> {
     Arc::new(
         SourceDecoderSelection::new(Arc::new(EztoolsSourceDecoder))
+            .with_description(crate::EztoolsParser.description())
             .with_detector(|source, sample| super::EztoolsParser.detect(source, sample))
             .with_time_detector(|source, sample| {
                 super::EztoolsParser.time_context_requirement(source, sample)

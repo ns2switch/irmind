@@ -65,7 +65,7 @@ impl ParserPrompt {
     }
 
     pub(super) fn page_size(body_height: u16) -> usize {
-        usize::from(body_height.saturating_sub(6).max(1))
+        usize::from(body_height.saturating_sub(5).max(1))
     }
 
     pub(super) fn update(&mut self, key: KeyCode, page: usize) -> ParserPromptAction {

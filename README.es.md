@@ -1,4 +1,4 @@
-Traducción de README.md en el commit d8554a9e9b191f3f0d934608fed23c023f730d59; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit ceaf09d3ea76d8bede187c11934e659564d69fdf; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — investigaciones en terminal con registro firmado
 
@@ -38,7 +38,8 @@ Sin configurar modelos, claves de API, cuentas ni coste. La interfaz real invest
 
 ## Novedades recientes
 
-- **v0.7.1** añade reglas Sigma locales e informes firmados. El marcador de caso 6 y la exportación V10 requieren esta versión. Para abrir, verificar, exportar o reconstruir por completo un caso de v0.6.x, usa el binario original.
+- **v0.7.2** ingiere las entregas gzip estándar de CloudTrail e identifica los digests de integridad al importar un directorio. Consulta la [guía de parsers](docs/es/parsers.md#entregas-de-cloudtrail).
+- **v0.7.1** añade reglas Sigma locales e informes firmados. El marcador de caso 6 y la exportación V10 requieren v0.7.x. Para abrir, verificar, exportar o reconstruir por completo un caso de v0.6.x, usa el binario original.
 - **v0.6.0** añade consultas experimentales en Athena, BigQuery y Azure Log Analytics. Están desactivadas por defecto y requieren `[source_queries]` en la política de la organización y credenciales en el keystore de IRMind. Los tres proveedores solo se han probado con simuladores. Consulta las guías del [workgroup de Athena](docs/es/configuration.md#athena), el [sink de BigQuery](docs/es/configuration.md#bigquery) y el [registro de aplicación en Entra](docs/es/configuration.md#azure-log-analytics).
 - **Cambio de formato en v0.6.0.** El marcador de caso 5 y la exportación V9 son incompatibles con v0.5.x. Usa el binario original para abrir, verificar o exportar un caso de v0.5.x, o reingiere los originales verificados en un caso nuevo.
 - **v0.5.7** reduce las pasadas de ordenación de registros desordenados, incluidos los flow logs de Azure VNet y NSG.
@@ -79,13 +80,13 @@ Empieza por [la instalación verificada](docs/es/platforms.md#verificar-una-vers
 
 
 
-La [versión preliminar v0.7.1](https://github.com/ns2switch/irmind/releases/tag/v0.7.1) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
+La [versión preliminar v0.7.2](https://github.com/ns2switch/irmind/releases/tag/v0.7.2) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
 
 Conserva la versión de IRMind que creó cada caso. Consulta la [nota de formatos](CHANGELOG.md) y la [política de versiones](docs/development/decisions.md#pre-10-format-policy).
 
 ```sh
 # Tras descargar el binario, SHA256SUMS y ambos bundles .sigstore.json:
-tag=v0.7.1; binary=irmind-linux-x86_64
+tag=v0.7.2; binary=irmind-linux-x86_64
 for file in "$binary" SHA256SUMS; do
   cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done

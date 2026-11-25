@@ -182,6 +182,7 @@ fn invalid() -> AppError {
 pub fn source_log_parser() -> Arc<dyn LogParser> {
     Arc::new(
         SourceDecoderSelection::new(Arc::new(EcsSourceDecoder))
+            .with_description(crate::EcsParser.description())
             .with_detector(|source, sample| super::EcsParser.detect(source, sample))
             .with_time_detector(|source, sample| {
                 super::EcsParser.time_context_requirement(source, sample)

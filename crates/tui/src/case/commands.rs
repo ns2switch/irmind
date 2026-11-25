@@ -476,10 +476,19 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                         cancel: &cancel,
                     },
                     |done, count, source| {
-                        let _ = progress.send(format!("Ingested {done}/{count}: {source}"));
+                        let _ = progress.send(format!("Processed {done}/{count}: {source}"));
                     },
                 )
-                .and_then(|count| {
+                .and_then(|summary| {
+                    let count = summary.files;
+                    let integrity = if summary.integrity_files == 0 {
+                        String::new()
+                    } else {
+                        format!(
+                            " · Skipped {} CloudTrail integrity digest file(s)",
+                            summary.integrity_files
+                        )
+                    };
                     let rejected = workflow
                         .engine
                         .audit_log
@@ -497,7 +506,7 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                         format!(" · {rejected} rejected; expand the rejection cards for details")
                     };
                     Ok(format!(
-                        "Ingested {count} {}{rejected}",
+                        "Ingested {count} {}{integrity}{rejected}",
                         if count == 1 { "file" } else { "files" }
                     ))
                 })

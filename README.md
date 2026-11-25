@@ -38,7 +38,8 @@ No model setup, API key, account or cost. The real interface runs a synthetic in
 
 ## Recent releases
 
-- **v0.7.1** adds local Sigma detection and signed reports. Case marker 6 and export V10 require this version. Use the original v0.6.x binary to open, verify, export or fully reconstruct a case it created.
+- **v0.7.2** ingests standard CloudTrail gzip deliveries and identifies integrity digests when importing a directory. See the [parser guide](docs/parsers.md#cloudtrail-deliveries).
+- **v0.7.1** adds local Sigma detection and signed reports. Case marker 6 and export V10 require v0.7.x. Use the original v0.6.x binary to open, verify, export or fully reconstruct a case it created.
 - **v0.6.0** adds experimental source queries for Athena, BigQuery and Azure Log Analytics. They are disabled by default and require `[source_queries]` in the organization policy and credentials in the IRMind keystore. All three have been tested only with simulators. See the setup guides for the [Athena workgroup](docs/configuration.md#athena), [BigQuery sink](docs/configuration.md#bigquery) and [Entra app registration](docs/configuration.md#azure-log-analytics).
 - **Format change in v0.6.0.** Case marker 5 and export V9 are incompatible with v0.5.x. Use the original IRMind binary to open, verify or export a v0.5.x case, or re-ingest the verified originals into a new case.
 - **v0.5.7** reduces external sort passes for out-of-order records, including Azure VNet and NSG flow logs.
@@ -78,13 +79,13 @@ Start with the [verified release instructions](docs/platforms.md#verify-a-releas
 
 
 
-The [v0.7.1 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.7.1) provides keyless Sigstore bundles, GitHub provenance, an SBOM, and checksums. Download a binary and `SHA256SUMS`, verify their exact signer identity and checksums with cosign 3.1.3 or newer, then check `gh attestation verify`. The [platform guide](docs/platforms.md#verify-a-release-before-installing) has the commands. After verifying a downloaded copy of [install.sh](install.sh) or [install.ps1](install.ps1), the installer can perform these checks for you.
+The [v0.7.2 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.7.2) provides keyless Sigstore bundles, GitHub provenance, an SBOM, and checksums. Download a binary and `SHA256SUMS`, verify their exact signer identity and checksums with cosign 3.1.3 or newer, then check `gh attestation verify`. The [platform guide](docs/platforms.md#verify-a-release-before-installing) has the commands. After verifying a downloaded copy of [install.sh](install.sh) or [install.ps1](install.ps1), the installer can perform these checks for you.
 
 Keep the IRMind version that created each case. See the [format-impact note](CHANGELOG.md) and [version policy](docs/development/decisions.md#pre-10-format-policy).
 
 ```sh
 # After downloading the binary, SHA256SUMS, and both .sigstore.json bundles:
-tag=v0.7.1; binary=irmind-linux-x86_64
+tag=v0.7.2; binary=irmind-linux-x86_64
 for file in "$binary" SHA256SUMS; do
   cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done

@@ -200,6 +200,7 @@ fn limit() -> AppError {
 pub fn source_log_parser() -> Arc<dyn LogParser> {
     Arc::new(
         irmind_app::source_mapping::SourceDecoderSelection::new(Arc::new(OcsfSourceDecoder))
+            .with_description(crate::OcsfParser.description())
             .with_detector(|source, sample| crate::OcsfParser.detect(source, sample)),
     )
 }

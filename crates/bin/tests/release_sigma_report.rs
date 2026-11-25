@@ -8,14 +8,14 @@ use irmind_app::v10_proofs::{
     V10Citation,
 };
 use irmind_app::{SignerBackend, hex, sha256};
-use irmind_domain::{Actor, CaseId};
+use irmind_domain::{Actor, AuditEventKind, CaseId, SourceManifestV2};
 use irmind_mod_keystore_file::FileKeystore;
 use secrecy::SecretString;
 use std::{
     fs,
     io::{Cursor, Read, Write},
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::{Command, Output, Stdio},
 };
 
 #[path = "support/demo_session.rs"]
@@ -29,7 +29,7 @@ const PASSPHRASE: &str = "synthetic release test file keystore";
 struct Scenario {
     name: &'static str,
     title: &'static str,
-    parser: &'static str,
+    parser: Option<&'static str>,
     rule_id: &'static str,
     rule: &'static str,
     time_range: &'static str,
@@ -40,7 +40,7 @@ const SCENARIOS: [Scenario; 2] = [
     Scenario {
         name: "cloudtrail",
         title: "Synthetic failed CloudTrail sign-in",
-        parser: "parser-json",
+        parser: None,
         rule_id: "427b4a53-2c9b-4c89-8b76-25ef2a96e2aa",
         rule: "title: Synthetic failed CloudTrail sign-in
 id: 427b4a53-2c9b-4c89-8b76-25ef2a96e2aa
@@ -53,7 +53,7 @@ detection: {selection: {Outcome: failure}, condition: selection}
     Scenario {
         name: "windows",
         title: "Synthetic Sysmon process start",
-        parser: "parser-evtx",
+        parser: Some("parser-evtx"),
         rule_id: "427b4a53-2c9b-4c89-8b76-25ef2a96e2ab",
         rule: "title: Synthetic Sysmon process start
 id: 427b4a53-2c9b-4c89-8b76-25ef2a96e2ab
@@ -65,6 +65,12 @@ detection: {selection: {EventID: 1, 'CommandLine|contains': 'echo synthetic'}, c
     },
 ];
 const RULE_FILE: &str = "synthetic.yml";
+const LOG_DIRECTORY: &str = "AWSLogs/111122223333/CloudTrail/us-east-2/2026/11/01";
+const FAILED_LOG: &str =
+    "111122223333_CloudTrail_us-east-2_20261101T0000Z_synthetic-fail00.json.gz";
+const SUCCESS_LOG: &str =
+    "111122223333_CloudTrail_us-east-2_20261101T0001Z_synthetic-pass00.json.gz";
+const DIGEST: &str = "AWSLogs/111122223333/CloudTrail-Digest/us-east-2/2026/11/01/111122223333_CloudTrail-Digest_us-east-2_synthetic_us-east-2_20261101T010000Z.json.gz";
 
 #[test]
 #[ignore = "requires the staged distribution binary and an artifact output directory"]
@@ -100,13 +106,24 @@ fn run_scenario(binary: &Path, output: &Path, scenario: &Scenario) {
     ]);
     let case = case.trim();
     CaseId::parse(case).unwrap();
-    cli(&[
-        "ingest",
-        case,
-        source.to_str().unwrap(),
-        "--parser",
-        scenario.parser,
-    ]);
+    let mut ingest = vec!["ingest", case, source.to_str().unwrap()];
+    if let Some(parser) = scenario.parser {
+        ingest.extend(["--parser", parser]);
+    }
+    let ingested = cli_output(binary, &home, &ingest);
+    if source.is_dir() {
+        assert_eq!(
+            String::from_utf8(ingested.stdout).unwrap().lines().count(),
+            2
+        );
+        let stderr = String::from_utf8(ingested.stderr).unwrap();
+        assert!(stderr.contains("CloudTrail integrity digest"), "{stderr}");
+        assert!(stderr.contains("CloudTrail-Digest"), "{stderr}");
+        let mut ui = open_tui(binary, &home, case);
+        ui.send(format!("/ingest {}\r", source.display())).unwrap();
+        ui.expect("Skipped 1 CloudTrail integrity digest").unwrap();
+        quit(&mut ui);
+    }
 
     let finding = evaluate(binary, &home, case, &pack, scenario, &cli);
     cli(&["confirm-finding", case, &finding]);
@@ -115,7 +132,13 @@ fn run_scenario(binary: &Path, output: &Path, scenario: &Scenario) {
         "verify",
         case,
         "--source-root",
-        scratch.path().to_str().unwrap(),
+        if source.is_dir() {
+            &source
+        } else {
+            scratch.path()
+        }
+        .to_str()
+        .unwrap(),
     ]);
     cli(&["seal", case]);
 
@@ -124,6 +147,9 @@ fn run_scenario(binary: &Path, output: &Path, scenario: &Scenario) {
     let bytes = fs::read(&export).unwrap();
     assert!(bytes.len() < 16 * 1024 * 1024);
     assert_package(&bytes, &finding, scenario);
+    if source.is_dir() {
+        assert_cloudtrail_originals(&bytes, &source);
+    }
     fs::write(output.join("expected-key.txt"), format!("{key}\n")).unwrap();
     fs::write(
         output.join("archive-sha256.txt"),
@@ -162,9 +188,52 @@ fn write_cloudtrail(root: &Path) -> PathBuf {
     success["responseElements"]["ConsoleLogin"] = "Success".into();
     success["eventTime"] = "2026-11-01T00:01:00Z".into();
     success["eventID"] = "synthetic-console-success".into();
-    let path = root.join("cloudtrail.jsonl");
-    fs::write(&path, format!("{}\n{success}\n", failure.trim_end())).unwrap();
-    path
+    let delivery = root.join("cloudtrail-delivery");
+    let logs = delivery.join(LOG_DIRECTORY);
+    fs::create_dir_all(&logs).unwrap();
+    let failure = format!("{{\"Records\":[{}]}}", failure.trim_end());
+    let success = format!("{{\"Records\":[{success}]}}");
+    for (name, content) in [(FAILED_LOG, &failure), (SUCCESS_LOG, &success)] {
+        let midpoint = content.len() / 2;
+        write_gzip_members(
+            &logs.join(name),
+            [
+                &content.as_bytes()[..midpoint],
+                &content.as_bytes()[midpoint..],
+            ],
+        );
+    }
+    let log_files = [(FAILED_LOG, failure), (SUCCESS_LOG, success)].map(|(name, log)| {
+        serde_json::json!({
+            "s3Bucket": "synthetic-delivery",
+            "s3Object": format!("{LOG_DIRECTORY}/{name}"),
+            "hashValue": hex(&sha256(log.as_bytes())),
+            "hashAlgorithm": "SHA-256"
+        })
+    });
+    let digest = serde_json::json!({
+        "awsAccountId": "111122223333",
+        "digestStartTime": "2026-11-01T00:00:00Z",
+        "digestEndTime": "2026-11-01T01:00:00Z",
+        "digestS3Bucket": "synthetic-delivery",
+        "digestS3Object": DIGEST,
+        "digestPublicKeyFingerprint": "00000000000000000000000000000000",
+        "digestSignatureAlgorithm": "SHA256withRSA",
+        "logFiles": log_files
+    });
+    let path = delivery.join(DIGEST);
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    write_gzip_members(&path, [digest.to_string().as_bytes()]);
+    delivery
+}
+
+fn write_gzip_members(path: &Path, members: impl IntoIterator<Item = impl AsRef<[u8]>>) {
+    let mut file = fs::File::create(path).unwrap();
+    for member in members {
+        let mut encoder = flate2::write::GzEncoder::new(&mut file, flate2::Compression::fast());
+        encoder.write_all(member.as_ref()).unwrap();
+        encoder.finish().unwrap();
+    }
 }
 
 fn write_sysmon(root: &Path) -> PathBuf {
@@ -190,6 +259,10 @@ fn command(binary: &Path, home: &Path) -> Command {
 }
 
 fn run_cli(binary: &Path, home: &Path, args: &[&str]) -> String {
+    String::from_utf8(cli_output(binary, home, args).stdout).unwrap()
+}
+
+fn cli_output(binary: &Path, home: &Path, args: &[&str]) -> Output {
     let mut child = command(binary, home)
         .args(["--passphrase-fd", "0"])
         .args(args)
@@ -206,7 +279,7 @@ fn run_cli(binary: &Path, home: &Path, args: &[&str]) -> String {
         args[0],
         String::from_utf8_lossy(&result.stderr)
     );
-    String::from_utf8(result.stdout).unwrap()
+    result
 }
 
 fn open_tui(binary: &Path, home: &Path, case: &str) -> DemoSession {
@@ -310,6 +383,34 @@ fn read_frame(reader: &mut impl Read) -> serde_json::Value {
     let mut frame = vec![0; size];
     reader.read_exact(&mut frame).unwrap();
     serde_json::from_slice(&frame).unwrap()
+}
+
+fn assert_cloudtrail_originals(bytes: &[u8], delivery: &Path) {
+    let mut reader = Cursor::new(bytes.strip_prefix(b"IRMIND-EXPORT-V10\0").unwrap());
+    read_frame(&mut reader);
+    let count = read_count(&mut reader);
+    let sources = (0..count)
+        .map(|_| read_frame(&mut reader))
+        .filter(|entry| entry["kind"] == AuditEventKind::SourceManifestV2.as_str())
+        .map(|entry| SourceManifestV2::decode(entry["payload"].as_str().unwrap()).unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(sources.len(), 2);
+    for name in [FAILED_LOG, SUCCESS_LOG] {
+        let relative = format!("{LOG_DIRECTORY}/{name}");
+        let source = sources
+            .iter()
+            .find(|source| source.source.source == relative)
+            .unwrap();
+        assert_eq!(source.parser_id, "parser-json");
+        assert_eq!(
+            source.selection,
+            irmind_domain::ParserSelectionMode::Automatic
+        );
+        assert_eq!(
+            source.source.sha256.as_str(),
+            hex(&sha256(&fs::read(delivery.join(relative)).unwrap()))
+        );
+    }
 }
 
 fn assert_package(bytes: &[u8], finding: &str, scenario: &Scenario) {

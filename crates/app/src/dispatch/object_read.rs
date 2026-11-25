@@ -111,14 +111,14 @@ impl Engine<'_> {
             } else {
                 AuditEventKind::ToolError
             };
-            self.audit_local(
-                id,
-                AuditOrigin::System,
-                kind,
-                "object read did not complete",
-                None,
-            )
-            .await?;
+            let note = match error {
+                AppError::NonEventSource { .. } | AppError::UnsupportedCompressedSource { .. } => {
+                    error.to_string()
+                }
+                _ => "object read did not complete".into(),
+            };
+            self.audit_local(id, AuditOrigin::System, kind, &note, None)
+                .await?;
         }
         result
     }

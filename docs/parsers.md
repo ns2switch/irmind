@@ -8,6 +8,8 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 
 `/ingest` opens the file picker. Use `/ingest --parser <name> <path>` for an explicit choice; it is audited. In **Settings → Preferences**, inspect compiled parser names and versions. Compilation includes no automatic remote model selection.
 
+The parser chooser shows the formats covered by each candidate. If the sample has a known compression signature and no parser recognizes its contents, IRMind names the compression instead of proposing zero-confidence candidates.
+
 | Parser | Input | Detection | Mapped fields | Status |
 | --- | --- | --- | --- | --- |
 | Microsoft 365 Unified Audit Log | Purview CSV, Search-UnifiedAuditLog JSON, Management Activity API JSON | Native AuditData/Operation, CreationTime and workload; 98 | UTC time, actor, mailbox target when explicit, resource, source IP, user agent, workload, finite operation/outcome tables | experimental |
@@ -32,7 +34,7 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 | Syslog | RFC 5424 / RFC 3164, plain or gzip | PRI and timestamp/header shape; 95 / 90 | UTC time, host, application, PID, facility, severity, message and raw data | experimental |
 | GCP Cloud Audit Logs | JSON/NDJSON LogEntry; GKE audit exports | Original protoPayload method/service and timestamp | UTC nanoseconds, explicit status, principal/resource/endpoint roles; confirmed GKE cluster | experimental |
 | Microsoft Entra ID | Azure Monitor JSON/NDJSON and Log Analytics object rows | Documented category or Type and original time | Sign-ins and audit, explicit outcome, tenant, actor, target and IP | experimental |
-| JSON and exported cloud logs | JSON/NDJSON; AWS, GCP, Azure and HuntEval | Recognized record fields | Time, identities, accounts, resources and IPs | experimental |
+| JSON and exported cloud logs (`parser-json`) | CloudTrail `Records` deliveries, JSON and NDJSON, plain or gzip | Bounded content sample, inflated for gzip; recognized CloudTrail record fields | Time, identities, accounts, resources and IPs | experimental |
 | ECS | NDJSON | ECS version and timestamp/characteristic fields | Event, host, user, source, destination, process, file, URL | experimental |
 | OCSF | JSON/NDJSON or local Parquet | Class, category and schema metadata; Parquet needs confirmation | Authentication, API, network, process, file and findings | experimental |
 | DFIR tools | Velociraptor, Hayabusa, Chainsaw, plaso, EZTools | Format markers or exact CSV headers | Time, host, user, process, action and available entities | experimental |
@@ -41,6 +43,12 @@ The registry passes at most the first 64 KiB to every compiled detector. A filen
 | Kubernetes audit | Native `audit.k8s.io/v1` Event JSON/NDJSON | Explicit API version and kind; 98 | Original fields and nanosecond timestamps; signed cluster context. Semantic classification is provided separately by mapping modules. | experimental |
 | Falco | JSON/NDJSON detections | Rule, priority, timestamp and output-fields object; 98 | Original rule/output fields and precise time; Kubernetes records require confirmed cluster context. Source detections are not analyst confirmations. | experimental |
 | Declarative | CSV, JSON, NDJSON or bounded regex | Exact header, required JSON pointers or sample regex; at most 70% | Explicit mapping described below | experimental |
+
+## CloudTrail deliveries
+
+Ingest a downloaded `AWSLogs` directory or individual `.json.gz` logs without extracting them first. The detector checks gzip magic and reads a bounded decoded prefix. Before Parquet staging, IRMind counts the decoded bytes and verifies every gzip member, then reserves disk from that count. The decoded input ceiling is 50 GiB per file. Citations identify the compressed original by its SHA-256 and record number. [AWS CloudTrail log file format](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-log-file-examples.html)
+
+IRMind identifies CloudTrail integrity digests in a delivery and reports them as skipped. Keep those files and their original S3 metadata for integrity verification. [CloudTrail digest file structure](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-log-file-validation-digest-file-structure.html) · [Planned verification](https://github.com/ns2switch/irmind/issues/428)
 
 ## Cluster acquisition context
 

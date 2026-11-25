@@ -70,6 +70,7 @@ pub(super) fn experimental_parsers(
             mappings
                 .decoder_selection("parser-evtx", irmind_mod_parser_evtx::SOURCE_VERSION)
                 .map_err(AppError::from)?
+                .with_description(irmind_mod_parser_evtx::DESCRIPTION)
                 .with_detector(irmind_mod_parser_evtx::detect_source),
         ))?
     } else {

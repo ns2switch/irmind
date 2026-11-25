@@ -113,9 +113,20 @@ fn object_proposal(tool: Tool, max_bytes: &str) -> ProposedCall {
 }
 
 #[test]
+fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
+    assert_scoped_object_custody(br#"{"Records":[{"eventTime":"2026-10-23T12:00:00Z","eventName":"AssumeRole","recipientAccountId":"123","awsRegion":"eu-west-1","sourceIPAddress":"203.0.113.8"}]}"#);
+}
+
+#[test]
+fn scoped_gzip_cloudtrail_object_keeps_and_verifies_the_compressed_original() {
+    assert_scoped_object_custody(include_bytes!(
+        "../../../testkit/fixtures/common/cloudtrail-delivery.json.gz"
+    ));
+}
+
 #[allow(clippy::too_many_lines)]
 #[allow(clippy::cognitive_complexity)]
-fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
+fn assert_scoped_object_custody(bytes: &[u8]) {
     let root = tempfile::tempdir().unwrap();
     let (store, parser_registry) = current_object_pipeline(root.path());
     let signer = Arc::new(LocalSigner {
@@ -125,7 +136,7 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
     let parser = Arc::new(JsonParser);
     let source = FakeObjectSource {
         uri: URI,
-        bytes: br#"{"Records":[{"eventTime":"2026-10-23T12:00:00Z","eventName":"AssumeRole","recipientAccountId":"123","awsRegion":"eu-west-1","sourceIPAddress":"203.0.113.8"}]}"#.to_vec(),
+        bytes: bytes.to_vec(),
         reads: AtomicUsize::new(0),
         stream_mode: AtomicUsize::new(0),
         spool_probe: std::sync::Mutex::new(None),
@@ -294,6 +305,11 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
         .unwrap()
         .source;
     assert!(manifest.copied);
+    assert_eq!(
+        manifest.sha256.as_str(),
+        irmind_app::hex(&irmind_app::sha256(bytes))
+    );
+    assert_eq!(manifest.size, bytes.len() as u64);
     store
         .verify_copied_source(&copied_case.id, &manifest, &CancellationToken::new())
         .unwrap();
@@ -354,6 +370,36 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
 
 #[test]
 fn cloud_object_without_a_unique_high_confidence_parser_is_not_converted() {
+    let (error, _) = rejected_cloud_object(br#"{"unrecognized":"format"}"#);
+    assert!(matches!(error, AppError::ParserSelection { .. }));
+}
+
+#[test]
+fn cloudtrail_digest_object_is_reported_without_publishing_an_event_source() {
+    let (error, entries) = rejected_cloud_object(
+        br#"{
+        "digestStartTime":"2026-10-23T12:00:00Z",
+        "digestEndTime":"2026-10-23T13:00:00Z",
+        "digestS3Bucket":"synthetic-audit",
+        "digestS3Object":"AWSLogs/123/CloudTrail-Digest/synthetic.json.gz",
+        "digestPublicKeyFingerprint":"00000000000000000000000000000000",
+        "digestSignatureAlgorithm":"SHA256withRSA",
+        "logFiles":[]
+    }"#,
+    );
+    assert!(matches!(
+        error,
+        AppError::NonEventSource {
+            kind: irmind_app::modules::NonEventSource::CloudTrailDigest
+        }
+    ));
+    assert!(entries.iter().any(|entry| {
+        entry.kind == irmind_domain::AuditEventKind::ToolError
+            && entry.payload.contains("CloudTrail integrity digest")
+    }));
+}
+
+fn rejected_cloud_object(bytes: &[u8]) -> (AppError, Vec<irmind_app::SignedEntry>) {
     let root = tempfile::tempdir().unwrap();
     let (store, parser_registry) = current_object_pipeline(root.path());
     let signer = Arc::new(LocalSigner {
@@ -363,7 +409,7 @@ fn cloud_object_without_a_unique_high_confidence_parser_is_not_converted() {
     let parser = Arc::new(JsonParser);
     let source = FakeObjectSource {
         uri: URI,
-        bytes: br#"{"unrecognized":"format"}"#.to_vec(),
+        bytes: bytes.to_vec(),
         reads: AtomicUsize::new(0),
         stream_mode: AtomicUsize::new(0),
         spool_probe: std::sync::Mutex::new(None),
@@ -406,15 +452,14 @@ fn cloud_object_without_a_unique_high_confidence_parser_is_not_converted() {
             &CancellationToken::new(),
         )
         .unwrap_err();
-    assert!(matches!(result, AppError::ParserSelection { .. }));
     assert_eq!(source.reads.load(Ordering::SeqCst), 1);
-    assert!(
-        !store
-            .entries(&case.id)
-            .unwrap()
-            .iter()
-            .any(|entry| { entry.kind == irmind_domain::AuditEventKind::SourceManifestV2 })
-    );
+    let entries = store.entries(&case.id).unwrap();
+    assert!(!entries.iter().any(|entry| matches!(
+        entry.kind,
+        irmind_domain::AuditEventKind::SourceManifestV2
+            | irmind_domain::AuditEventKind::ParquetArtifactV3
+    )));
+    (result, entries)
 }
 
 mod completeness;

@@ -3,7 +3,9 @@ mod parsers;
 mod registry;
 
 pub use config::{ConfigField, Module, ModuleConfig, ModuleManifest, ModulePort};
-pub use parsers::{DetectedParser, ParserCatalog, ParserChoice, ParserResolver, RebuildParser};
+pub use parsers::{
+    DetectedParser, NonEventSource, ParserCatalog, ParserChoice, ParserResolver, RebuildParser,
+};
 pub use registry::ModuleRegistry;
 
 #[cfg(test)]

@@ -28,6 +28,45 @@ fn existing_json_detection_rejects_unrelated_logs() -> Result<(), irmind_app::Ap
     Ok(())
 }
 
+#[test]
+fn unsupported_compression_reports_format_without_opening_parser_selection()
+-> Result<(), irmind_app::AppError> {
+    use irmind_app::{
+        AppError,
+        modules::{ModuleConfig, ModuleRegistry, ParserSelectionRequest},
+    };
+
+    let mut registry = ModuleRegistry::new();
+    registry.register(
+        Box::new(irmind_mod_parser_json::JsonParser),
+        &ModuleConfig::new(),
+    )?;
+    let catalog = registry.parser_catalog();
+    let request = ParserSelectionRequest {
+        source: "renamed.json",
+        sample: b"",
+        parser_override: None,
+        forced: false,
+        time_context: None,
+        cluster_context: None,
+    };
+    for (sample, expected) in [
+        (b"\x1f\x8b\x08\x00".as_slice(), "gzip"),
+        (b"PK\x03\x04", "ZIP"),
+        (b"\x28\xb5\x2f\xfd", "Zstandard"),
+    ] {
+        assert!(matches!(
+            catalog.select_source(ParserSelectionRequest { sample, ..request }),
+            Err(AppError::UnsupportedCompressedSource { format }) if format == expected
+        ));
+    }
+    assert!(matches!(
+        catalog.select_source(request),
+        Err(AppError::ParserSelection { candidates, .. }) if candidates == [("parser-json".into(), 0)]
+    ));
+    Ok(())
+}
+
 #[cfg(all(
     feature = "parser-ecs",
     feature = "parser-ocsf",
@@ -650,6 +689,12 @@ mod matrix {
                 "parser-falco",
             ),
             ("ecs.ndjson", ECS, "parser-ecs"),
+            (
+                "cloudtrail-delivery.json.gz",
+                include_bytes!("../../testkit/fixtures/common/cloudtrail-delivery.json.gz")
+                    .as_slice(),
+                "parser-json",
+            ),
             ("ocsf.ndjson", OCSF, "parser-ocsf"),
             ("velociraptor.jsonl", VELOCIRAPTOR, "parser-velociraptor"),
             ("hayabusa.jsonl", HAYABUSA, "parser-hayabusa"),

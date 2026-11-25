@@ -52,6 +52,50 @@ fn source_decoder_preserves_fields_without_normalization_or_entity_interpretatio
 }
 
 #[test]
+fn gzip_members_preserve_cloudtrail_records_and_the_compressed_original_hash() {
+    use irmind_app::LogParser as _;
+    use std::io::Write as _;
+
+    let parts: [&[u8]; 3] = [
+        br#"{"Records":[{"eventVersion":"1.08","eventTime":"2026-11-08T00:"#,
+        br#"00:00Z","eventName":"ConsoleLogin"},"#,
+        br#"{"eventVersion":"1.08","eventTime":"2026-11-08T00:00:01Z","eventName":"PutObject"}]}"#,
+    ];
+    let mut compressed = Vec::new();
+    for part in parts {
+        let mut gzip = flate2::write::GzEncoder::new(&mut compressed, flate2::Compression::fast());
+        gzip.write_all(part).unwrap();
+        gzip.finish().unwrap();
+    }
+    let parser = crate::JsonParser;
+    assert!(
+        parser
+            .detect("misleading.jsonl", &compressed)
+            .unwrap()
+            .is_high()
+    );
+    let (report, records) = decode(&compressed);
+    let (plain_report, plain) = decode(&parts.concat());
+    assert_eq!((report.accepted, report.rejected), (2, 0));
+    assert_eq!(plain_report.accepted, report.accepted);
+    for (index, (record, original)) in records.iter().zip(&plain).enumerate() {
+        record.inspect(|record| {
+            original.inspect(|original| {
+                assert_eq!(record.fields(), original.fields());
+                assert_eq!(record.timestamp(), original.timestamp());
+                assert_eq!(record.origin().record(), index as u64);
+                assert_eq!(record.origin().offset(), None);
+                assert_eq!(
+                    record.origin().source(),
+                    &EvidenceHash::from_bytes(irmind_app::sha256(&compressed))
+                );
+                assert!(original.origin().offset().is_some());
+            });
+        });
+    }
+}
+
+#[test]
 fn source_decoder_streams_a_large_single_line_array_without_losing_its_prefix() {
     let row = format!(
         "{{\"eventTime\":\"2026-11-08T00:00:00Z\",\"original\":\"{}\"}}",

@@ -6,6 +6,7 @@ use crate::{
 use std::sync::Arc;
 
 type Detector = fn(&str, &[u8]) -> Option<ParserConfidence>;
+type NonEventDetector = fn(&str, &[u8]) -> Option<crate::modules::NonEventSource>;
 type TimeDetector = fn(&str, &[u8]) -> Result<Option<crate::ParserTimeRequirement>, AppError>;
 
 pub struct SourceDecoderSelection {
@@ -13,8 +14,10 @@ pub struct SourceDecoderSelection {
     context: Option<String>,
     cluster: Option<crate::SourceClusterContext>,
     detector: Option<Detector>,
+    non_event_detector: Option<NonEventDetector>,
     time_detector: Option<TimeDetector>,
     selector: Option<Arc<dyn LogParser>>,
+    description: &'static str,
 }
 impl SourceDecoderSelection {
     pub fn new(decoder: Arc<dyn SourceDecoder>) -> Self {
@@ -23,8 +26,10 @@ impl SourceDecoderSelection {
             context: None,
             cluster: None,
             detector: None,
+            non_event_detector: None,
             time_detector: None,
             selector: None,
+            description: "",
         }
     }
 }
@@ -43,8 +48,18 @@ impl SourceDecoderSelection {
         self
     }
     #[must_use]
+    pub fn with_non_event_detector(mut self, detector: NonEventDetector) -> Self {
+        self.non_event_detector = Some(detector);
+        self
+    }
+    #[must_use]
     pub fn with_time_detector(mut self, detector: TimeDetector) -> Self {
         self.time_detector = Some(detector);
+        self
+    }
+    #[must_use]
+    pub fn with_description(mut self, description: &'static str) -> Self {
+        self.description = description;
         self
     }
 }
@@ -76,6 +91,19 @@ impl StreamingEventParser for SourceDecoderSelection {
 }
 
 impl LogParser for SourceDecoderSelection {
+    fn non_event_source(
+        &self,
+        source: &str,
+        sample: &[u8],
+    ) -> Option<crate::modules::NonEventSource> {
+        let sample = &sample[..sample.len().min(65_536)];
+        if let Some(selector) = &self.selector {
+            return selector.non_event_source(source, sample);
+        }
+        self.non_event_detector
+            .and_then(|detect| detect(source, sample))
+    }
+
     fn cluster_context_requirement(
         &self,
         source: &str,
@@ -94,14 +122,16 @@ impl LogParser for SourceDecoderSelection {
             context: self.context.clone(),
             cluster: Some(context.clone()),
             detector: self.detector,
+            non_event_detector: self.non_event_detector,
             time_detector: self.time_detector,
             selector: self.selector.clone(),
+            description: self.description,
         }))
     }
     fn description(&self) -> &str {
         self.selector
             .as_ref()
-            .map_or("", |selector| selector.description())
+            .map_or(self.description, |selector| selector.description())
     }
     fn with_time_context(
         &self,
@@ -112,8 +142,10 @@ impl LogParser for SourceDecoderSelection {
             context: Some(super::source_time_snapshot(context)?),
             cluster: self.cluster.clone(),
             detector: self.detector,
+            non_event_detector: self.non_event_detector,
             time_detector: self.time_detector,
             selector: self.selector.clone(),
+            description: self.description,
         }))
     }
 

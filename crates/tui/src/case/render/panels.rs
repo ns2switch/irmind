@@ -247,23 +247,24 @@ pub(in crate::case) fn parser_prompt_text(
     }
     for (offset, (name, confidence)) in prompt.candidates[start..end].iter().enumerate() {
         let index = start + offset;
-        lines.push(format!(
+        let mut line = format!(
             "{} {}. {} · {}% confidence",
             if index == prompt.selected { '>' } else { ' ' },
             index + 1,
             name,
             confidence
-        ));
+        );
+        if let Some(description) = prompt
+            .descriptions
+            .get(name)
+            .filter(|s| !s.is_empty() && *s != name)
+        {
+            line.push_str(" · ");
+            line.push_str(description);
+        }
+        lines.push(line);
     }
     if body.height >= 7 {
-        lines.push(
-            prompt
-                .candidates
-                .get(prompt.selected)
-                .and_then(|(id, _)| prompt.descriptions.get(id))
-                .cloned()
-                .unwrap_or_default(),
-        );
         lines.push(if prompt.invalid_number {
             format!(
                 "No option {}. Enter a number from 1 to {end_limit}.",

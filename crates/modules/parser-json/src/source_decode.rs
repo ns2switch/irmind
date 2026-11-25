@@ -1,9 +1,10 @@
 //! Original source fields only; classifications and extraction live in mapping modules.
 use irmind_app::{
-    AppError, ParseReport, ParserIdentity, SourceDecoder,
+    AppError, CancellationToken, ParseReport, ParserIdentity, SourceDecoder,
     source_mapping::{
-        DecodeAnnotationsV1, DecodeBudget, DecodeInput, SourceDiscriminator, SourceFormatV1,
-        SourceInput, SourceMetadata, SourceRecordV1, SourceValue,
+        BoundedSourceReader, DecodeAnnotationsV1, DecodeBudget, DecodeInput,
+        NormalizedSourceBudget, SourceDiscriminator, SourceFormatV1, SourceInput, SourceMetadata,
+        SourceRecordV1, SourceValue,
         json::{JsonFrame, JsonFrames, SourceJsonLimits, decode_json_fields},
         ordered_decode::decode_ordered,
     },
@@ -19,6 +20,14 @@ impl SourceDecoder for JsonSourceDecoder {
             version: "json-source-v1",
         }
     }
+    fn normalized_source_budget(
+        &self,
+        file: &mut std::fs::File,
+        cancel: &CancellationToken,
+    ) -> Result<Option<NormalizedSourceBudget>, AppError> {
+        crate::gzip::preflight(file, cancel)
+    }
+
     fn decode_reader(
         &self,
         input: SourceInput<'_>,
@@ -42,12 +51,87 @@ fn decode(
     budget: DecodeBudget,
     emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
 ) -> Result<ParseReport, AppError> {
+    if metadata.cancel.is_cancelled() {
+        return Err(AppError::Cancelled);
+    }
+    let (compressed, mut reader) = crate::gzip::prefix(reader)?;
+    if compressed {
+        let mut decoded = crate::gzip::reader(
+            reader,
+            metadata.cancel,
+            budget
+                .decoded_byte_ceiling()
+                .unwrap_or(NormalizedSourceBudget::MAX_DECODED_BYTES),
+        );
+        let mut callback_failed = false;
+        let result = decode_frames(metadata, &mut decoded, None, budget, &mut |record| {
+            let result = emit(record);
+            callback_failed |= result.is_err();
+            result
+        });
+        return if callback_failed {
+            result
+        } else {
+            crate::gzip::check(&decoded, metadata.cancel, result)
+        };
+    }
+    if let Some(ceiling) = budget.decoded_byte_ceiling() {
+        // The input may change encodings after admission. The decoded bytes
+        // still have to fit the quota already reserved for this source.
+        let mut reader = BoundedSourceReader::new(reader, metadata.cancel, ceiling);
+        let mut callback_failed = false;
+        let result = decode_plain(
+            SourceInput {
+                metadata,
+                reader: &mut reader,
+            },
+            budget,
+            &mut |record| {
+                let result = emit(record);
+                callback_failed |= result.is_err();
+                result
+            },
+        );
+        if !callback_failed && metadata.cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
+        if !callback_failed && reader.exceeded() {
+            return Err(AppError::Fixed(irmind_app::FixedAppError::SourceLimit));
+        }
+        return result;
+    }
+    decode_plain(
+        SourceInput {
+            metadata,
+            reader: &mut reader,
+        },
+        budget,
+        emit,
+    )
+}
+
+fn decode_plain(
+    input: SourceInput<'_>,
+    budget: DecodeBudget,
+    emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+) -> Result<ParseReport, AppError> {
+    let SourceInput { metadata, reader } = input;
     if std::path::Path::new(metadata.source.reference())
         .extension()
         .is_some_and(|e| e.eq_ignore_ascii_case("ndjson") || e.eq_ignore_ascii_case("jsonl"))
     {
         return lines::decode(SourceInput { metadata, reader }, budget, emit);
     }
+    decode_frames(metadata, reader, Some(0), budget, emit)
+}
+
+fn decode_frames(
+    metadata: SourceMetadata<'_>,
+    reader: &mut dyn std::io::Read,
+    physical_base: Option<u64>,
+    budget: DecodeBudget,
+    emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
+) -> Result<ParseReport, AppError> {
     let mut frames = JsonFrames::new(reader, metadata.cancel);
     let mut seen = 0u64;
     let mut report = ParseReport {
@@ -71,7 +155,7 @@ fn decode(
             Ok(Some((frame, weight)))
         },
         prepare_frame,
-        |prepared| forward_prepared(metadata, prepared, 0, &mut report, emit),
+        |prepared| forward_prepared(metadata, prepared, physical_base, &mut report, emit),
     )?;
     Ok(report)
 }
@@ -85,7 +169,7 @@ type PreparedFrame = (
 fn forward_prepared(
     metadata: SourceMetadata<'_>,
     (frame, parsed): PreparedFrame,
-    base: u64,
+    physical_base: Option<u64>,
     report: &mut ParseReport,
     emit: &mut dyn FnMut(Tainted<SourceRecordV1>) -> Result<(), AppError>,
 ) -> Result<(), AppError> {
@@ -95,22 +179,25 @@ fn forward_prepared(
     if report.accepted as u64 + report.rejected >= 10_000_000 {
         return Err(AppError::Fixed(irmind_app::FixedAppError::SourceLimit));
     }
-    let offset = base.checked_add(frame.offset()).ok_or_else(invalid)?;
+    let offset = physical_base
+        .map(|base| base.checked_add(frame.offset()).ok_or_else(invalid))
+        .transpose()?;
     match parsed.and_then(|(fields, time)| {
-        materialize_frame(metadata, &frame, report.accepted, fields, time, base)
+        materialize_frame(metadata, report.accepted, fields, time, offset)
     }) {
         Ok(record) => {
-            let location = ParserLocation::new(metadata.source.reference(), "parser-json", offset)
-                .map_err(|_| invalid())?;
-            emit(Tainted::from_external(
-                record,
-                Provenance::new(
-                    metadata.evidence_hash,
-                    Some(report.accepted as u64),
-                    metadata.source.kind(),
-                )
-                .with_parser_location(location),
-            ))?;
+            let mut provenance = Provenance::new(
+                metadata.evidence_hash,
+                Some(report.accepted as u64),
+                metadata.source.kind(),
+            );
+            if let Some(offset) = offset {
+                let location =
+                    ParserLocation::new(metadata.source.reference(), "parser-json", offset)
+                        .map_err(|_| invalid())?;
+                provenance = provenance.with_parser_location(location);
+            }
+            emit(Tainted::from_external(record, provenance))?;
             report.accepted += 1;
         }
         Err(_) => reject(report, frame.bytes()),
@@ -139,16 +226,15 @@ fn prepare_frame(
 
 fn materialize_frame(
     metadata: SourceMetadata<'_>,
-    frame: &JsonFrame,
     index: usize,
     fields: SourceValue,
     timestamp: Option<IndexedTime>,
-    base: u64,
+    physical_offset: Option<u64>,
 ) -> Result<SourceRecordV1, AppError> {
     let origin = EventOrigin::try_new(
         EvidenceHash::from_bytes(metadata.evidence_hash),
         index as u64,
-        Some(base.checked_add(frame.offset()).ok_or_else(invalid)?),
+        physical_offset,
         "parser-json",
         "json-source-v1",
     )

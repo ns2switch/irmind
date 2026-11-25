@@ -52,6 +52,8 @@ impl Engine<'_> {
                 Ok(selected) => selected,
                 Err(
                     AppError::ParserSelection { .. }
+                    | AppError::UnsupportedCompressedSource { .. }
+                    | AppError::NonEventSource { .. }
                     | AppError::ParserTimeContextRequired { .. }
                     | AppError::ParserClusterContextRequired { .. },
                 ) => return Ok(None),

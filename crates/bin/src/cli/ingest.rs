@@ -221,7 +221,14 @@ fn plan_ingest(input: IngestPlanInput<'_>) -> Result<Vec<(String, ResolvedParser
         });
         match selected {
             Ok(selection) => plan.push((source, selection)),
-            Err(error @ irmind_app::AppError::ParserUnavailable { .. }) => {
+            Err(irmind_app::AppError::NonEventSource { kind }) => {
+                let safe = input.engine.guard.screen(&source)?.text;
+                eprintln!("Skipped {}: {kind}", terminal_safe_path(Path::new(&safe)));
+            }
+            Err(
+                error @ (irmind_app::AppError::ParserUnavailable { .. }
+                | irmind_app::AppError::UnsupportedCompressedSource { .. }),
+            ) => {
                 input
                     .engine
                     .record_parser_selection_required(input.id, "unsupported")?;

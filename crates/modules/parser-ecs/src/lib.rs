@@ -39,6 +39,9 @@ impl Module for EcsParser {
 }
 
 impl LogParser for EcsParser {
+    fn description(&self) -> &'static str {
+        "Elastic Common Schema (ECS) NDJSON"
+    }
     fn time_context_requirement(
         &self,
         source: &str,

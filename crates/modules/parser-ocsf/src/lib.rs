@@ -37,6 +37,9 @@ impl Module for OcsfParser {
 }
 
 impl LogParser for OcsfParser {
+    fn description(&self) -> &'static str {
+        "OCSF JSON, NDJSON and local Parquet"
+    }
     fn detect(&self, source_name: &str, sample: &[u8]) -> Option<ParserConfidence> {
         if sample.starts_with(b"PAR1") {
             return ParserConfidence::new(if source_name.ends_with(".parquet") {

@@ -68,6 +68,7 @@ fn invalid() -> AppError {
 pub fn source_log_parser() -> Arc<dyn LogParser> {
     Arc::new(
         SourceDecoderSelection::new(Arc::new(SuricataSourceDecoder))
+            .with_description(crate::SuricataParser.description())
             .with_detector(|source, sample| crate::SuricataParser.detect(source, sample)),
     )
 }
