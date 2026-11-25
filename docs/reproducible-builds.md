@@ -26,11 +26,8 @@ The signed tool inventory and paired-build command below start with v0.6.2.
 
 ## Rehearse publication before tagging
 
-From the candidate branch, run the full release rehearsal:
-
-```sh
-gh workflow run ci.yml --ref "$candidate_branch" -f release_dry_run=true
-```
+In GitHub Actions, open **Rust CI**, select **Run workflow** and choose the
+candidate branch. Enable `release_dry_run`.
 
 Require a successful `release` job on the same Git tree that will be tagged.
 The job downloads the five distribution packages and the native mapping

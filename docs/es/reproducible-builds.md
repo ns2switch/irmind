@@ -27,11 +27,8 @@ v0.6.2.
 
 ## Ensayar la publicación antes de crear el tag
 
-Ejecuta el ensayo completo desde la rama candidata:
-
-```sh
-gh workflow run ci.yml --ref "$candidate_branch" -f release_dry_run=true
-```
+En GitHub Actions, abre **Rust CI**, selecciona **Run workflow** y elige
+la rama candidata. Activa `release_dry_run`.
 
 Antes de crear el tag, comprueba que el job `release` terminó correctamente
 sobre el mismo árbol Git que se etiquetará. El job descarga los cinco paquetes
