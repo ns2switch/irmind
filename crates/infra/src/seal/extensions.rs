@@ -272,7 +272,7 @@ fn verify_sigma_v3(
         },
         cancel,
     )?;
-    Ok(check.units())
+    check.finish()
 }
 
 #[cfg(test)]

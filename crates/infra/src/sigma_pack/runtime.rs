@@ -221,6 +221,10 @@ struct ScanOutcome<'a> {
 }
 
 #[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "the class loop retains scan stops and accumulated coverage together"
+)]
 fn scan_matches<'a>(
     scope: &SigmaExecutionContext<'_>,
     work: &'a Workset,
@@ -263,12 +267,15 @@ fn scan_matches<'a>(
             }
             let mut file = irmind_fs::open_regular_no_follow(directory, Path::new(artifact.path()))
                 .map_err(|_| invalid())?;
-            match crate::verify_v10_artifact_rows(&mut file, 0, artifact, &[], cancel) {
-                Ok(()) => {}
-                Err(AppError::Cancelled) => {
-                    scan.stop(deadline, cancel);
-                    break;
+            match crate::seal::verify_sigma_scan_artifact(&mut file, artifact, || {
+                if scan.stop(deadline, cancel) {
+                    Err(AppError::Cancelled)
+                } else {
+                    Ok(())
                 }
+            }) {
+                Ok(()) => {}
+                Err(AppError::Cancelled) => break,
                 Err(error) => return Err(error),
             }
             scan.scan_authenticated(
@@ -807,8 +814,9 @@ impl<'a> SigmaMatchCheck<'a> {
         }
     }
 
-    pub(crate) fn units(&self) -> u64 {
-        self.units
+    pub(crate) fn finish(&self) -> Result<u64, AppError> {
+        plan::check_budget(self.deadline, self.cancel)?;
+        Ok(self.units)
     }
 
     pub(crate) fn check(

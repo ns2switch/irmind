@@ -34,6 +34,18 @@ pub fn verify_v10_artifact_rows(
     verify_artifact(file, offset, artifact, references, None, None, cancel)
 }
 
+#[cfg(feature = "sigma")]
+pub(crate) fn verify_sigma_scan_artifact(
+    file: &mut File,
+    artifact: &ParquetArtifact,
+    check: impl FnMut() -> Result<(), AppError>,
+) -> Result<(), AppError> {
+    let ParquetArtifact::V3(envelope) = artifact;
+    let core = envelope.core();
+    seek_event_artifact(file, 0, core.size, core.schema)?;
+    super::super::frames::verify_raw_guarded(file, core.size, core.sha256.as_str(), check)
+}
+
 pub(in crate::seal) fn verify_v10_sigma_rows(
     file: &mut File,
     offset: u64,
@@ -65,19 +77,12 @@ fn verify_artifact(
 ) -> Result<(), AppError> {
     let ParquetArtifact::V3(envelope) = artifact;
     let core = envelope.core();
-    if core.schema != ArtifactSchemaV2::CommonEvents
-        || references.iter().any(|reference| {
-            irmind_domain::EvidenceHash::from_bytes(reference.artifact.artifact_sha256)
-                != core.sha256
-        })
-    {
+    if references.iter().any(|reference| {
+        irmind_domain::EvidenceHash::from_bytes(reference.artifact.artifact_sha256) != core.sha256
+    }) {
         return Err(invalid());
     }
-    let end = offset.checked_add(core.size).ok_or_else(invalid)?;
-    if end > file.metadata().map_err(storage)?.len() {
-        return Err(invalid());
-    }
-    file.seek(SeekFrom::Start(offset)).map_err(storage)?;
+    let end = seek_event_artifact(file, offset, core.size, core.schema)?;
     super::super::frames::verify_raw_with_cancel(
         file,
         core.size,
@@ -99,6 +104,20 @@ fn verify_artifact(
     );
     file.seek(SeekFrom::Start(end)).map_err(storage)?;
     result
+}
+
+fn seek_event_artifact(
+    file: &mut File,
+    offset: u64,
+    size: u64,
+    schema: ArtifactSchemaV2,
+) -> Result<u64, AppError> {
+    let end = offset.checked_add(size).ok_or_else(invalid)?;
+    if schema != ArtifactSchemaV2::CommonEvents || end > file.metadata().map_err(storage)?.len() {
+        return Err(invalid());
+    }
+    file.seek(SeekFrom::Start(offset)).map_err(storage)?;
+    Ok(end)
 }
 
 fn verify_rows(

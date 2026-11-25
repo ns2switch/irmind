@@ -291,10 +291,10 @@ fn scan(store: &LocalStore, case: &CaseId, cancel: &CancellationToken) -> V10Row
         )
         .unwrap();
     assert_eq!(matches.len(), 1);
-    let (matched, event) = &matches[0];
-    verify_sigma_case_references(&entries, &base, *matched, key.clone(), &root, cancel);
-    verify_sigma_v3_binding(&entries, &base, &artifact, *matched, event, key, cancel);
-    *matched
+    let (row, event) = &matches[0];
+    verify_sigma_case_references(&entries, &base, *row, key.clone(), &root, cancel);
+    verify_sigma_v3_binding(&entries, &base, &artifact, *row, event, key, cancel);
+    *row
 }
 
 fn verify_sigma_v3_binding(
@@ -611,6 +611,23 @@ fn admit_test_sigma_pack(
     digest
 }
 
+fn write_failed_deliveries(originals: &Path) -> Vec<String> {
+    fs::create_dir(originals).unwrap();
+    let raw = include_bytes!("../../../../testkit/fixtures/common/cloudtrail-console-login.jsonl");
+    let mut event: serde_json::Value = serde_json::from_slice(raw).unwrap();
+    (0..4)
+        .map(|source| {
+            let name = format!("aws-{source}.json");
+            event["sourceIPAddress"] = format!("203.0.113.{source}").into();
+            event["eventID"] = format!("synthetic-console-failure-{source}").into();
+            let delivery = serde_json::json!({ "Records": [&event] });
+            let bytes = serde_json::to_vec(&delivery).unwrap();
+            fs::write(originals.join(&name), bytes).unwrap();
+            name
+        })
+        .collect()
+}
+
 #[test]
 fn sigma_v3_signed_proofs_are_identical_across_ingest_worker_caps() {
     use irmind_testkit::FixedClock;
@@ -619,23 +636,7 @@ fn sigma_v3_signed_proofs_are_identical_across_ingest_worker_caps() {
     let temporary = tempfile::tempdir().unwrap();
     let root = temporary.path();
     let originals = root.join("originals");
-    fs::create_dir(&originals).unwrap();
-    let raw = include_bytes!("../../../../testkit/fixtures/common/cloudtrail-console-login.jsonl");
-    let mut event: serde_json::Value = serde_json::from_slice(raw).unwrap();
-    let paths = (0..4)
-        .map(|source| {
-            let name = format!("aws-{source}.json");
-            event["sourceIPAddress"] = format!("203.0.113.{source}").into();
-            event["eventID"] = format!("synthetic-console-failure-{source}").into();
-            let delivery = serde_json::json!({ "Records": [&event] });
-            fs::write(
-                originals.join(&name),
-                serde_json::to_vec(&delivery).unwrap(),
-            )
-            .unwrap();
-            name
-        })
-        .collect::<Vec<_>>();
+    let paths = write_failed_deliveries(&originals);
     let catalog = Arc::new(
         MappingCatalog::freeze(
             vec![Arc::new(JsonSourceDecoder)],
