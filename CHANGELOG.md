@@ -4,7 +4,11 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
-## 0.7.0 — Local Sigma detection and signed reports
+## 0.7.1 — Local Sigma detection and signed reports
+
+This is the first published release in the 0.7 series. The workflow for tag
+`v0.7.0` stopped before signing and publication. The release job now
+downloads the native mapping build inventory before packaging.
 
 **Format impact:** Case marker 6 and export V10 require their creating minor
 version. Use IRMind v0.6.x for cases with marker 5 and exports with magic V9,

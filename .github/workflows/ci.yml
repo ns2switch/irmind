@@ -15,7 +15,7 @@ on:
         type: boolean
         default: false
       release_dry_run:
-        description: Build and verify signed release artifacts without creating a tag or release
+        description: Rehearse the full release job through packaging, signing and verification without publishing
         type: boolean
         default: false
       release_profile_benchmark:
@@ -27,7 +27,7 @@ on:
         type: boolean
         default: false
       release_binary_reproducibility:
-        description: Build the five reproducible release packages and test the portable Sigma case
+        description: Check reproducible binaries and portable Sigma cases only
         type: boolean
         default: false
 permissions:
@@ -726,10 +726,10 @@ jobs:
             fi
           done
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && inputs.release_dry_run == true
         with: {name: signed-release-dry-run, path: release/, if-no-files-found: error, retention-days: 30}
       - name: Publish the signed prerelease only for an existing tag
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -744,7 +744,7 @@ jobs:
             gh release create "$GITHUB_REF_NAME" release/* --verify-tag --prerelease "${notes[@]}" --title "IRMind $GITHUB_REF_NAME"
           fi
       - name: Add the public code signing policy to release notes
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

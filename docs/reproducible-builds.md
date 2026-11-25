@@ -24,6 +24,30 @@ For v0.6.1, use the commands in the
 and its [build logs](https://github.com/ns2switch/irmind/actions/runs/45056933393).
 The signed tool inventory and paired-build command below start with v0.6.2.
 
+## Rehearse publication before tagging
+
+From the candidate branch, run the full release rehearsal:
+
+```sh
+gh workflow run ci.yml --ref "$candidate_branch" -f release_dry_run=true
+```
+
+Require a successful `release` job on the same Git tree that will be tagged.
+The job downloads the five distribution packages and the native mapping
+inventory, packages them, generates the SBOMs and attestations, and signs and
+verifies the payload with Sigstore. Its `signed-release-dry-run` artifact
+contains the verified payload. If the candidate tree changes, repeat the
+rehearsal. `release_binary_reproducibility` covers reproducible binaries and
+portable Sigma cases only. It does not exercise release packaging.
+
+| Step or job skipped in the full rehearsal | Reason |
+| --- | --- |
+| Create or update the GitHub release and append its code signing policy | These steps write to a public release and require a tag push. |
+| `native_macos` | Developer ID signing is disabled. If activated separately, it requires a protected tag deployment with Apple credentials. |
+| `verify_install_linux`, `verify_install_macos`, `verify_install_windows` | These jobs use the public release URL and the tag's signing identity. The rehearsal runs the offline installer tests in the platform matrix and exercises the staged signed payload via `rehearse_install_windows`. |
+| `update_homebrew` | The tap updates a published tag after the protected `release` environment is approved. |
+| `release_profile` and its profile benchmark and reproducibility jobs | These are separate manual performance experiments. The five-target reproducibility gate runs in the rehearsal. |
+
 ## Build inputs
 
 Start with a native host or VM for the target architecture, Git, and Python

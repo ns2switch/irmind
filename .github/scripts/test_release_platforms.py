@@ -68,14 +68,35 @@ class MacOSReleaseTests(unittest.TestCase):
         self.assertIn('subject-path: |\n            release/*SBOM.spdx.json\n            release/BUILD-ENVIRONMENT.json', release)
         self.assertIn('release/* --clobber', release)
 
-    def test_release_downloads_the_mapping_manifest_before_packaging(self):
+    def test_release_downloads_every_required_artifact_before_packaging(self):
         release = WORKFLOW.read_text().split('  release:\n', 1)[1].split('  post_release:', 1)[0]
-        before, _ = release.split('      - name: Assemble the build environment inventory', 1)
-        self.assertRegex(
-            before,
+        downloads, _ = release.split('      - name: Stage binaries and install scripts', 1)
+        required = re.findall(
             r'(?m)^      - uses: actions/download-artifact@[^\n]+\n'
-            r'        with: \{name: native-mapping-build-inputs, path: artifacts/native-mapping-build-inputs\}$',
+            r'        with: \{name: ([^,]+), path: artifacts/([^}]+)\}$',
+            downloads,
         )
+        self.assertCountEqual(required, [
+            ('irmind-linux', 'linux-x86_64'),
+            ('irmind-linux-arm64', 'linux-aarch64'),
+            ('irmind-macos-arm64', 'macos-aarch64'),
+            ('irmind-macos-x86_64', 'macos-x86_64'),
+            ('irmind-windows', 'windows-x86_64'),
+            ('native-mapping-build-inputs', 'native-mapping-build-inputs'),
+        ])
+
+    def test_full_rehearsal_keeps_verified_assets_and_skips_release_writes(self):
+        release = WORKFLOW.read_text().split('  release:\n', 1)[1].split('  post_release:', 1)[0]
+        shared, publication = release.split('      - name: Publish the signed prerelease', 1)
+        self.assertIn("github.event_name == 'workflow_dispatch' && inputs.release_dry_run == true", shared)
+        self.assertLess(shared.index('cosign verify-blob'), shared.index('name: signed-release-dry-run'))
+        self.assertNotIn('gh release ', shared)
+        tag_gate = "if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')"
+        publish, edit_notes = publication.split('      - name: Add the public code signing policy', 1)
+        self.assertIn(tag_gate, publish)
+        self.assertIn('gh release create ', publish)
+        self.assertIn(tag_gate, edit_notes)
+        self.assertIn('gh release edit ', edit_notes)
 
     def test_windows_rehearsal_runs_with_the_verified_release_helper(self):
         build = BINARIES.read_text()
