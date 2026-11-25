@@ -3,7 +3,7 @@ use crate::{AppError, CancellationToken, CaseId, LocalStore, Repository};
 use irmind_app::v10_proofs::{V10ProofDescriptor, V10ProofFamily, v10_proof_commitment};
 use std::{
     fs::{self, File},
-    io::{Seek, Write as _},
+    io::{Read as _, Seek, Write as _},
     path::{Path, PathBuf},
 };
 
@@ -85,6 +85,57 @@ impl LocalStore {
             root,
             retained: false,
         })
+    }
+
+    pub(super) fn open_addressed_report_proof(
+        &self,
+        case: &CaseId,
+        kind: u8,
+        hash: [u8; 32],
+        cancel: &CancellationToken,
+    ) -> Result<(V10ProofDescriptor, File), AppError> {
+        self.open_addressed_v10_proof(case, V10ProofFamily::Report, kind, hash, cancel)
+    }
+
+    pub(super) fn open_addressed_v10_proof(
+        &self,
+        case: &CaseId,
+        family: V10ProofFamily,
+        kind: u8,
+        hash: [u8; 32],
+        cancel: &CancellationToken,
+    ) -> Result<(V10ProofDescriptor, File), AppError> {
+        check_cancel(cancel)?;
+        let case_dir = self.parquet.owned_case_path(case);
+        ensure_directory(case_dir.parent().ok_or_else(invalid)?, false)?;
+        ensure_directory(&case_dir, false)?;
+        let root = case_dir.join(namespace(family));
+        ensure_directory(&root, false)?;
+        let name = format!("{}-{}.proof", kind, irmind_app::hex(&hash));
+        let file =
+            irmind_fs::open_regular_no_follow(&root, Path::new(&name)).map_err(|_| invalid())?;
+        let bytes = file.metadata().map_err(|_| invalid())?.len();
+        let descriptor =
+            V10ProofDescriptor::new(family, kind, hash, bytes).map_err(|_| invalid())?;
+        Ok((descriptor, verify_open_object(file, descriptor, cancel)?))
+    }
+
+    pub(crate) fn read_addressed_report_proof(
+        &self,
+        case: &CaseId,
+        kind: u8,
+        hash: [u8; 32],
+        cancel: &CancellationToken,
+    ) -> Result<Vec<u8>, AppError> {
+        let (descriptor, file) = self.open_addressed_report_proof(case, kind, hash, cancel)?;
+        let mut data = Vec::new();
+        file.take(descriptor.size())
+            .read_to_end(&mut data)
+            .map_err(|_| invalid())?;
+        if data.len() as u64 != descriptor.size() {
+            return Err(invalid());
+        }
+        Ok(data)
     }
 
     pub fn open_v10_case_object(
@@ -174,8 +225,16 @@ fn open_object(
     cancel: &CancellationToken,
 ) -> Result<File, AppError> {
     check_cancel(cancel)?;
-    let mut file = irmind_fs::open_regular_no_follow(root, Path::new(&filename(descriptor)))
+    let file = irmind_fs::open_regular_no_follow(root, Path::new(&filename(descriptor)))
         .map_err(|_| invalid())?;
+    verify_open_object(file, descriptor, cancel)
+}
+
+fn verify_open_object(
+    mut file: File,
+    descriptor: V10ProofDescriptor,
+    cancel: &CancellationToken,
+) -> Result<File, AppError> {
     if file.metadata().map_err(|_| invalid())?.len() != descriptor.size()
         || !irmind_fs::regular_file_has_single_link(&file).map_err(|_| invalid())?
     {

@@ -5,9 +5,31 @@ use irmind_mapping_contracts::source_mapping::{
 };
 impl TableMapping {
     pub(super) fn project(&self, source: &SourceRecordV1) -> Result<MappingOutput, MappingError> {
+        self.project_with_optional_fields(source, false)
+    }
+
+    /// Cluster audit attributes can be supplied by the client. Discard an
+    /// invalid optional derivation while retaining the authenticated row.
+    pub fn project_cluster_audit(
+        &self,
+        source: &SourceRecordV1,
+    ) -> Result<MappingOutput, MappingError> {
+        self.project_with_optional_fields(source, true)
+    }
+
+    fn project_with_optional_fields(
+        &self,
+        source: &SourceRecordV1,
+        omit_invalid: bool,
+    ) -> Result<MappingOutput, MappingError> {
         let rule = self.selected_rule(source)?;
-        let header = self.header(source, rule)?;
-        let (context, observations) = self.project_fields(source, rule)?;
+        let header = match self.header(source, rule) {
+            Err(MappingError::UnsupportedSourceValue) if omit_invalid => {
+                rule.map(|rule| rule.header.clone()).unwrap_or_default()
+            }
+            result => result?,
+        };
+        let (context, observations) = self.project_fields(source, rule, omit_invalid)?;
         let common = CommonEventV1::try_new(
             source.origin().clone(),
             source.timestamp(),
@@ -81,10 +103,11 @@ impl TableMapping {
         &self,
         source: &SourceRecordV1,
         rule: Option<&super::CompiledRule>,
+        omit_invalid: bool,
     ) -> Result<(EventContextV1, BoundedObservations), MappingError> {
         let mut context = acquisition_context(source)?;
         let mut observations = Vec::new();
-        for field in self
+        'field: for field in self
             .fields
             .iter()
             .chain(rule.into_iter().flat_map(|r| &r.fields))
@@ -108,7 +131,12 @@ impl TableMapping {
                 }
                 continue;
             }
-            let value = field.convert(original)?;
+            let omit_invalid = omit_invalid && !field.requires_provider_identity;
+            let value = match field.convert(original) {
+                Err(MappingError::UnsupportedSourceValue) if omit_invalid => continue,
+                result => result?,
+            };
+            let checkpoint = observations.len();
             for observation in field
                 .observation
                 .iter()
@@ -118,11 +146,21 @@ impl TableMapping {
                 if observations.len() >= 32 {
                     return Err(MappingError::UnsupportedSourceValue);
                 }
-                observations.push(observation.project(source, field.target, &value)?);
+                match observation.project(source, field.target, &value) {
+                    Err(MappingError::UnsupportedSourceValue) if omit_invalid => {
+                        observations.truncate(checkpoint);
+                        continue 'field;
+                    }
+                    projected => observations.push(projected?),
+                }
             }
-            context
-                .try_insert(field.target, value)
-                .map_err(|_| MappingError::UnsupportedSourceValue)?;
+            if context.try_insert(field.target, value).is_err() {
+                if omit_invalid {
+                    observations.truncate(checkpoint);
+                    continue;
+                }
+                return Err(MappingError::UnsupportedSourceValue);
+            }
         }
         Ok((
             context,

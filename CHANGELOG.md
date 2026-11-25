@@ -4,6 +4,8 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+## 0.7.0 — Local Sigma detection and signed reports
+
 **Format impact:** Case marker 6 and export V10 require their creating minor
 version. Use IRMind v0.6.x for cases with marker 5 and exports with magic V9,
 or re-ingest the verified originals in a new case.
@@ -12,6 +14,14 @@ or re-ingest the verified originals in a new case.
   dependency manifest. Full reconstruction of v0.6.x cases requires the
   original IRMind executable. Subsequent dependency changes outside the
   production closure of a native mapper leave its identity intact.
+- Run bounded local Sigma rules against authenticated case artifacts without
+  a model. Signed runs retain field bindings, coverage, exact matches and
+  indeterminate row counts. [Sigma guide](docs/sigma.md).
+- Publish signed Markdown and PDF reports with analyst-confirmed findings,
+  verifiable evidence citations and explicit coverage and limitations.
+  The sealed V10 archive includes the published report proofs.
+- Ship third-party notices for `saphyr-parser` and `arraydeque`.
+
 - Keep the selected parser visible in long ambiguity lists, sort candidates
   by confidence, and show an error when a typed option does not exist.
 

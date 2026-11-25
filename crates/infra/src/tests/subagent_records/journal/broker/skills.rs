@@ -221,3 +221,136 @@ fn count_method_receipts(
     material.finish().unwrap();
     (loaded, limited)
 }
+
+#[test]
+fn report_coverage_resolves_the_same_skill_load_position_in_two_signed_branches() {
+    let history = History::new();
+    let root = tempfile::tempdir().unwrap();
+    let (store, engine) = stored_history_engine(root.path(), &history, &[]);
+    let engine = engine.with_large_case_pipeline(store.clone(), Arc::new(json_source_parser()));
+    let cancel = CancellationToken::new();
+    let make_task = || {
+        let mut task = proposal(100_000);
+        task.skill = Some(irmind_domain::SkillName::parse("windows-triage").unwrap());
+        task
+    };
+    let prepared = engine
+        .prepare_subagent_plan(
+            &history.case,
+            "00000000-0000-0000-0000-000000000009".parse().unwrap(),
+            vec![make_task(), make_task()],
+            SubagentResources::default(),
+            &cancel,
+        )
+        .unwrap();
+    let started = engine
+        .admit_subagent_plan(
+            &prepared,
+            &prepared.preview().automatic_start().unwrap(),
+            &cancel,
+        )
+        .unwrap()
+        .unwrap();
+    for task in &started.plan().tasks {
+        let result = engine
+            .run_subagent_task(&started, task.task_id, &child_model(true), &cancel)
+            .unwrap();
+        assert_eq!(result.status, SubagentStatus::Completed);
+    }
+    engine.finish_subagent_plan(&started).unwrap();
+
+    let coverage = engine.report_coverage(&history.case, &cancel).unwrap();
+    let hits = coverage
+        .delegated_skill_gaps
+        .iter()
+        .filter(|gap| gap.gap_index == 0)
+        .collect::<Vec<_>>();
+    assert_eq!(hits.len(), 2);
+    assert_eq!(hits[0].load_sequence, hits[1].load_sequence);
+    assert_ne!(hits[0].task_id, hits[1].task_id);
+    assert_ne!(hits[0].load_sha256, hits[1].load_sha256);
+    assert_ne!(hits[0].checkpoint, hits[1].checkpoint);
+    let entries = store.entries(&history.case).unwrap();
+    for gap in &hits {
+        assert_report_gap_load(&store, &history, &entries, gap, &cancel);
+    }
+    let rendered = publish_delegated_report(&engine, &store, &history.case, &coverage, &cancel);
+    for gap in hits {
+        assert!(rendered.contains(&hex(&gap.task_id)));
+    }
+    engine.verify(&history.case).unwrap();
+    engine.seal(&history.case).unwrap();
+    let path = root.path().join("delegated-report.irmind");
+    CaseExporter::export_case(store.as_ref(), &history.case, &path, &cancel).unwrap();
+    verify_export_expected(&path, Some(&hex(&sha256(&history.analyst.public_key())))).unwrap();
+}
+
+fn publish_delegated_report(
+    engine: &Engine<'_>,
+    store: &LocalStore,
+    case: &CaseId,
+    coverage: &irmind_app::v10_proofs::ReportCoverageV2,
+    cancel: &CancellationToken,
+) -> String {
+    assert_eq!(
+        irmind_app::v10_proofs::ReportCoverageV2::decode(&coverage.encode().unwrap()).unwrap(),
+        *coverage
+    );
+    let plan = store
+        .plan_cited_report(
+            engine,
+            case,
+            irmind_app::ReportDocumentLanguage::English,
+            irmind_app::ReportDocumentFormat::Markdown,
+            cancel,
+        )
+        .unwrap();
+    let receipt = engine.publish_cited_report(case, plan, cancel).unwrap();
+    let stored = store
+        .read_addressed_report_proof(case, 2, receipt.coverage, cancel)
+        .unwrap();
+    assert_eq!(
+        irmind_app::v10_proofs::ReportCoverageV2::decode(&stored).unwrap(),
+        *coverage
+    );
+    let rendered = store
+        .read_addressed_report_proof(case, 3, receipt.rendered_sha256, cancel)
+        .unwrap();
+    String::from_utf8(rendered).unwrap()
+}
+
+fn assert_report_gap_load(
+    store: &LocalStore,
+    history: &History,
+    entries: &[SignedEntry],
+    gap: &irmind_app::v10_proofs::V10DelegatedSkillGap,
+    cancel: &CancellationToken,
+) {
+    use irmind_app::subagents::{
+        BranchChunkRef, CheckedBranchChunk, SubagentBranchPayload, SubagentBranchStore,
+        SubagentCheckpointV1,
+    };
+    let checkpoint = &entries[usize::try_from(gap.checkpoint.sequence - 1).unwrap()];
+    assert_eq!(checkpoint.hash, gap.checkpoint.entry_sha256);
+    assert_eq!(checkpoint.kind, AuditEventKind::SubagentCheckpointV1);
+    let (_, payload) = checkpoint.payload.split_once(':').unwrap();
+    let parsed = SubagentCheckpointV1::decode(&::hex::decode(payload).unwrap()).unwrap();
+    assert_eq!(parsed.task_id.as_bytes(), &gap.task_id);
+    let reference = BranchChunkRef::new(parsed.chunk_sha256, parsed.chunk_bytes).unwrap();
+    let material = store
+        .parquet
+        .read(&history.case, &reference, cancel)
+        .unwrap();
+    let decoded = CheckedBranchChunk::decode(
+        material.as_bytes(),
+        &history.agent.public_key(),
+        &history.verifier,
+    )
+    .unwrap();
+    let load = &decoded.entries()[usize::try_from(gap.load_sequence - parsed.first).unwrap()];
+    assert_eq!(load.hash.as_bytes(), &gap.load_sha256);
+    assert!(matches!(
+        load.body.payload,
+        SubagentBranchPayload::SkillLoad(_)
+    ));
+}

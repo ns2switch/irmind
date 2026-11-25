@@ -8,11 +8,46 @@ de datos permanecen en sus ubicaciones registradas. Sellar hace inmutable el cas
 
 ## Casos y exportaciones de una versión anterior
 
-La versión 0.6 usa el marcador de caso 5, artefactos Parquet V3 con mapeo y la
-exportación V9. Usa la versión que creó el caso para abrirlo, verificarlo o
+La versión 0.7 usa el marcador de caso 6, artefactos Parquet V3 con mapeo y la
+exportación V10. Usa la versión que creó el caso para abrirlo, verificarlo o
 exportarlo. Para usar la versión actual, verifica los originales con la versión
 que creó el caso e ingiérelos en un caso nuevo. El caso original conserva sus
 aprobaciones, hallazgos confirmados y sello.
+
+## Ejecutar un análisis Sigma firmado
+
+Usa `/sigma inspect <directorio>` para revisar un pack local. Con
+`/sigma import --license <id> <directorio>`, confirma el hash del manifiesto
+mostrado para firmar la admisión. Si una ejecución usa el pack, la exportación
+V10 del caso incluye las reglas exactas admitidas.
+
+Ejecuta `/sigma run <SHA-256 del pack> <inicio UTC> <fin UTC>` desde un caso
+abierto. La tabla de v0.7 cubre los canales revisados de Windows EVTX Security,
+Sysmon y PowerShell, la autenticación de Linux, auditd y ECS mapeado, AWS CloudTrail
+y los eventos DNS, HTTP y de conexión de Zeek y Suricata. También cubre los inicios
+de sesión y la auditoría de Entra ID, Azure Activity, Microsoft 365, Okta, la
+auditoría de GCP y Kubernetes y las clases revisadas de procesos y eventos
+relacionados de Defender, CrowdStrike FDR y eslogger. La [guía de Sigma](sigma.md) detalla los campos por fuente. La cobertura depende del
+logsource, los campos y la versión exacta del mapeo. IRMind informa de las reglas
+omitidas, las ejecuciones parciales y cuántas filas por fuente tienen campos
+exactos no disponibles. Una fila es indeterminada para una regla cuando falta
+un campo exacto que necesita. Esto puede indicar manipulación de la fuente.
+Revisa el original íntegro. El informe explica la limitación y cita la
+ejecución firmada. Cada coincidencia propone un hallazgo sin confirmar vinculado a una fila de evidencia. Revísalo y usa
+`/confirm <id del hallazgo>` antes de publicar el informe.
+
+## Publicar un informe firmado
+
+En un caso abierto, usa `/report preview en` o `/report preview es`. El informe
+incluye solo hallazgos que hayas confirmado y que apunten a una fila exacta de
+evidencia. Consulta la sección de cobertura para ver la disponibilidad de las
+fuentes, los huecos de las skills y las consultas que alcanzaron su límite.
+
+Usa `/report save md en` o `/report save pdf es` para firmar y conservar
+el documento en el caso. El comando muestra su SHA-256. Tras sellar el caso, la
+exportación V10 incluye sus informes publicados. `/verify` comprueba la firma,
+las filas de origen, la cobertura y los bytes del documento. Para publicar otra
+revisión, usa un caso abierto.
 
 ## Borrar un caso no sellado
 

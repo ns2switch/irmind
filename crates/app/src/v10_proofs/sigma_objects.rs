@@ -10,6 +10,9 @@ const PACK: &[u8] = b"irmind-sigma-pack-manifest-v1\0";
 const TABLE: &[u8] = b"irmind-sigma-field-table-v1\0";
 const SCOPE: &[u8] = b"irmind-sigma-source-scope-v1\0";
 const COMPILED: &[u8] = b"irmind-sigma-compiled-rules-v1\0";
+mod results_v2;
+pub use results_v2::SigmaRunResultsV2;
+
 const RESULTS: &[u8] = b"irmind-sigma-run-results-v1\0";
 const MAX_RULES: usize = 4096;
 const MAX_RULE_BYTES: u64 = 64 * 1024;
@@ -292,6 +295,12 @@ pub struct SigmaRunResultsV1 {
 impl SigmaRunResultsV1 {
     pub fn decode(body: &[u8]) -> Result<Self> {
         let mut wire = Wire::object(body, RESULTS)?;
+        let result = Self::read_lists(&mut wire)?;
+        wire.finish()?;
+        Ok(result)
+    }
+
+    fn read_lists(wire: &mut Wire<'_>) -> Result<Self> {
         let coverage = wire.bounded_list(MAX_RULES, 5 + 32 + 1 + 1, |wire| {
             Ok(SigmaRuleCoverageV1 {
                 rule: SigmaRuleKeyV1::read(wire)?,
@@ -313,34 +322,38 @@ impl SigmaRunResultsV1 {
                 query_limit,
             })
         })?;
-        wire.finish()?;
         let result = Self { coverage, matches };
         result.validate()?;
         Ok(result)
     }
 
     pub fn encode(&self) -> Result<Vec<u8>> {
-        self.validate()?;
         let mut out = RESULTS.to_vec();
-        put_count(&mut out, self.coverage.len())?;
+        self.write_lists(&mut out)?;
+        Ok(out)
+    }
+
+    fn write_lists(&self, out: &mut Vec<u8>) -> Result<()> {
+        self.validate()?;
+        put_count(out, self.coverage.len())?;
         for entry in &self.coverage {
-            entry.rule.write(&mut out)?;
+            entry.rule.write(out)?;
             out.push(entry.status as u8);
-            write_optional_text(&mut out, entry.detail.as_deref(), MAX_METADATA)?;
+            write_optional_text(out, entry.detail.as_deref(), MAX_METADATA)?;
         }
-        put_count(&mut out, self.matches.len())?;
+        put_count(out, self.matches.len())?;
         for item in &self.matches {
-            item.rule.write(&mut out)?;
-            item.row.write(&mut out)?;
+            item.rule.write(out)?;
+            item.row.write(out)?;
             if let Some(receipt) = item.query_limit {
                 out.push(1);
-                receipt.write(&mut out)?;
+                receipt.write(out)?;
             } else {
                 out.push(0);
             }
             check_size(out.len())?;
         }
-        Ok(out)
+        Ok(())
     }
 
     fn validate(&self) -> Result<()> {

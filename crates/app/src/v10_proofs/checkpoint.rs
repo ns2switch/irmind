@@ -24,8 +24,8 @@ impl<'a> V10CheckpointView<'a> {
         checkpoint: &CaseCheckpointV1,
     ) -> Result<Self, AppError> {
         let invalid = || AppError::InvalidChain(checkpoint.sequence);
-        let length = usize::try_from(checkpoint.sequence).map_err(|_| invalid())?;
-        let entries = entries.get(..length).ok_or_else(invalid)?;
+        let length = entries.partition_point(|entry| entry.seq <= checkpoint.sequence);
+        let entries = &entries[..length];
         let edge = entries.last().ok_or_else(invalid)?;
         if edge.seq != checkpoint.sequence
             || edge.hash != checkpoint.entry_hash
@@ -65,18 +65,38 @@ impl<'a> V10CheckpointView<'a> {
         reference: V10AuditReference,
         kind: AuditEventKind,
     ) -> Result<&SignedEntry, AppError> {
-        let index = reference
-            .sequence
-            .checked_sub(1)
-            .and_then(|seq| usize::try_from(seq).ok());
-        index
+        self.entries
+            .binary_search_by_key(&reference.sequence, |entry| entry.seq)
+            .ok()
             .and_then(|position| self.entries.get(position))
-            .filter(|entry| {
-                entry.seq == reference.sequence
-                    && entry.hash == reference.entry_sha256
-                    && entry.kind == kind
-            })
+            .filter(|entry| entry.hash == reference.entry_sha256 && entry.kind == kind)
             .ok_or(AppError::InvalidChain(reference.sequence))
+    }
+
+    pub fn entries(&self) -> &[SignedEntry] {
+        self.entries
+    }
+
+    /// Use the existing seal inventory commitment on just the active artifact
+    /// entries. Compacted parents remain in the case seal and outside this scan.
+    pub fn active_artifact_inventory(&self) -> Result<[u8; 32], AppError> {
+        let mut inventory = crate::SealInventoryBuilder::default();
+        for entry in self
+            .entries
+            .iter()
+            .filter(|entry| entry.kind == AuditEventKind::ParquetArtifactV3)
+        {
+            let artifact = ParquetArtifact::decode(entry.kind, &entry.payload)
+                .map_err(|_| AppError::InvalidChain(entry.seq))?;
+            if self.active_paths.contains(artifact.path()) {
+                inventory.accept(entry)?;
+            }
+        }
+        let inventory = inventory.commitment()?;
+        let mut bytes = [0; 32];
+        hex::decode_to_slice(inventory.sha256.as_str(), &mut bytes)
+            .map_err(|_| AppError::InvalidChain(0))?;
+        Ok(bytes)
     }
 
     pub fn confirmed_finding(
@@ -99,6 +119,19 @@ impl<'a> V10CheckpointView<'a> {
             return Err(invalid());
         }
         Ok(manifest)
+    }
+
+    pub(super) fn records_for_source(
+        &self,
+        reference: V10SourceReference,
+    ) -> Result<u64, AppError> {
+        let manifest = self.source(reference)?;
+        self.source_sets
+            .values()
+            .filter(|set| set.validate_manifest(&manifest).is_ok())
+            .map(irmind_domain::SourceRecordSetV1::records)
+            .max()
+            .ok_or(AppError::InvalidChain(reference.manifest.sequence))
     }
 
     pub fn artifact(

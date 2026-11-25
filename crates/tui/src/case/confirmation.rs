@@ -6,6 +6,13 @@ pub(super) enum Confirmation {
     Export(String, String),
     ObjectRead(String, String),
     RecoverSubagents(String),
+    SigmaImport {
+        command: String,
+        directory: std::path::PathBuf,
+        manifest: [u8; 32],
+        license: String,
+        detail: String,
+    },
 }
 
 impl Confirmation {
@@ -14,7 +21,8 @@ impl Confirmation {
             Self::Seal(_, detail)
             | Self::Export(_, detail)
             | Self::ObjectRead(_, detail)
-            | Self::RecoverSubagents(detail) => detail,
+            | Self::RecoverSubagents(detail)
+            | Self::SigmaImport { detail, .. } => detail,
         }
     }
 }

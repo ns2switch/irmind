@@ -68,7 +68,7 @@ struct HeldCaseFile {
 }
 impl CaseLock for HeldCaseFile {}
 
-pub use seal::V10PreparedObjects;
+pub use seal::{CitedReportPreview, V10PreparedObjects};
 pub use seal::{
     LocalExportVerifier, verify_export, verify_export_expected, verify_v10_artifact_rows,
 };

@@ -552,8 +552,163 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         Ok(false)
     }
 
+    fn sigma_pack_command(&mut self, prompt: &str) -> bool {
+        if prompt == "/sigma" || prompt == "/sigma inspect" {
+            self.state.messages.push(
+                "Use /sigma inspect <directory>, /sigma import --license <id> <directory>, or /sigma run <pack SHA-256> <start UTC> <end UTC>."
+                    .into(),
+            );
+            return true;
+        }
+        if let Some(rest) = prompt.strip_prefix("/sigma run ") {
+            self.sigma_run(rest);
+            return true;
+        }
+        if let Some(rest) = prompt.strip_prefix("/sigma import ") {
+            self.sigma_import(prompt, rest);
+            return true;
+        }
+        if let Some(directory) = prompt.strip_prefix("/sigma inspect ") {
+            let root = std::path::PathBuf::from(directory.trim());
+            let io = self.io_ops;
+            self.start_task("Sigma pack", move |cancel| {
+                io.inspect_sigma_pack(&root, &cancel)
+            });
+            return true;
+        }
+        false
+    }
+
+    fn sigma_run(&mut self, arguments: &str) {
+        let parts = arguments.split_ascii_whitespace().collect::<Vec<_>>();
+        if let [digest, start, end] = parts.as_slice()
+            && let (Ok(start), Ok(end)) = (
+                irmind_app::IndexedTime::from_rfc3339(start, false),
+                irmind_app::IndexedTime::from_rfc3339(end, false),
+            )
+            && let Some(manifest) = irmind_app::v10_proofs::parse_sigma_manifest_digest(digest)
+        {
+            let io = self.io_ops;
+            let engine = self.engine;
+            let id = self.id;
+            let time = start.instant().unix_micros()..end.instant().unix_micros();
+            self.start_task("Run Sigma", move |cancel| {
+                io.run_sigma_pack(engine, id, manifest, time, &cancel)
+            });
+            return;
+        }
+        self.state
+            .messages
+            .push("Use /sigma run <pack SHA-256> <start UTC> <end UTC>".into());
+    }
+
+    fn sigma_import(&mut self, prompt: &str, rest: &str) {
+        use super::Confirmation;
+        let io = self.io_ops;
+        if let Some(Confirmation::SigmaImport {
+            command,
+            directory,
+            manifest,
+            license,
+            ..
+        }) = self.state.confirmed_action.take()
+            && command == prompt
+        {
+            let engine = self.engine;
+            self.start_task("Import Sigma pack", move |cancel| {
+                io.admit_sigma_pack(engine, &directory, manifest, &license, &cancel)?;
+                Ok(format!(
+                    "Sigma pack admitted · SHA-256 {}",
+                    irmind_app::hex(&manifest)
+                ))
+            });
+            return;
+        }
+        let parsed = rest
+            .strip_prefix("--license ")
+            .and_then(|value| value.split_once(' '));
+        let Some((license, directory)) = parsed.filter(|(license, directory)| {
+            (1..=128).contains(&license.len())
+                && license
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || b"-.+".contains(&byte))
+                && !directory.trim().is_empty()
+        }) else {
+            self.state
+                .messages
+                .push("Use /sigma import --license <id> <directory>".into());
+            return;
+        };
+        let command = prompt.to_owned();
+        let directory = PathBuf::from(directory.trim());
+        let license = license.to_owned();
+        let sender = self.confirmation_tx.clone();
+        self.start_task("Prepare Sigma pack", move |cancel| {
+            let (manifest, rules) = io.prepare_sigma_admission(&directory, &cancel)?;
+            let detail = format!(
+                "Sign Sigma pack admission?\nLocal directory: {}\nRules: {rules}\nLicense: {license}\nManifest SHA-256 {}",
+                directory.display(), irmind_app::hex(&manifest)
+            );
+            sender.send(Confirmation::SigmaImport {
+                command, directory, manifest, license, detail,
+            }).map_err(|_| irmind_app::AppError::Cancelled)?;
+            Ok("Review the rule pack before signing".into())
+        });
+    }
+
+    fn report_command(&mut self, prompt: &str) -> bool {
+        use irmind_app::{
+            ReportDocumentFormat::{Markdown, Pdf},
+            ReportDocumentLanguage::{English, Spanish},
+        };
+        let mut words = prompt.split_whitespace();
+        if words.next() != Some("/report") {
+            return false;
+        }
+        let action = words.next();
+        let first = words.next();
+        let second = words.next();
+        let io = self.io_ops;
+        let engine = self.engine;
+        let id = self.id;
+        match (action, first, second, words.next()) {
+            (None | Some("preview"), None | Some("en" | "es"), None, None) => {
+                let language = if first == Some("es") {
+                    Spanish
+                } else {
+                    English
+                };
+                self.start_task("Report preview", move |cancel| {
+                    io.preview_cited_report(engine, id, language, &cancel)
+                });
+            }
+            (Some("save"), Some(format @ ("md" | "pdf")), None | Some("en" | "es"), None) => {
+                let language = if second == Some("es") {
+                    Spanish
+                } else {
+                    English
+                };
+                let format = if format == "pdf" { Pdf } else { Markdown };
+                self.start_task("Publish report", move |cancel| {
+                    io.publish_cited_report(engine, id, language, format, &cancel)
+                });
+            }
+            _ => self
+                .state
+                .messages
+                .push("Use /report preview [en|es] or /report save <md|pdf> [en|es]".into()),
+        }
+        true
+    }
+
     fn case_command(&mut self, prompt: &str) -> Result<bool> {
         if self.source_query_command(prompt) {
+            return Ok(true);
+        }
+        if self.sigma_pack_command(prompt) {
+            return Ok(true);
+        }
+        if self.report_command(prompt) {
             return Ok(true);
         }
         match prompt {
@@ -592,10 +747,6 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             "/iocs" => self.state.tab = 5,
             "/hypotheses" => self.state.tab = 6,
             "/techniques" => self.state.tab = 7,
-            "/report" => match self.engine.report(self.id) {
-                Ok(report) => self.state.messages.push(report),
-                Err(error) => self.state.messages.push(format!("Report error: {error}")),
-            },
             "/graph" => match self.engine.graph.graph_summary(self.id) {
                 Ok(summary) => self.state.result_cards.push(("Evidence graph", summary)),
                 Err(error) => self.state.messages.push(format!("Graph error: {error}")),

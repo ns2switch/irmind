@@ -202,7 +202,20 @@ fn resource_type_proves_each_typed_target_and_missing_pod_namespace_is_not_infer
         .as_object_mut()
         .unwrap()
         .remove("namespace");
-    assert!(interpreter.map(&decode(&pod)).is_err());
+    let source = decode(&pod);
+    let output = interpreter.map(&source).unwrap();
+    assert_eq!(output.record().common.origin(), source.origin());
+    assert!(
+        !output
+            .record()
+            .common
+            .observations()
+            .values()
+            .iter()
+            .any(|observation| {
+                observation.entity().kind() == ObservedEntityKind::KubernetesPod
+            })
+    );
 }
 
 #[test]
@@ -237,4 +250,47 @@ fn informational_protocol_upgrade_retains_api_category_without_claiming_executio
         output.record().common.event().outcome(),
         EventOutcome::Unknown
     );
+}
+
+#[test]
+fn forwarded_ip_anomalies_preserve_the_event_and_original_fields() {
+    let vectors: Value = serde_json::from_str(include_str!(
+        "../../../testkit/fixtures/contracts/sigma_exact_source_fields.json"
+    ))
+    .unwrap();
+    let mapper = KubernetesMapping::new().unwrap();
+    for label in [
+        "xff_33_ips",
+        "invalid_first_ip",
+        "duplicate_ip",
+        "non_string_ip",
+    ] {
+        let vector = vectors["retained_text"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|vector| vector["case"] == label)
+            .unwrap();
+        let mut input = fixture();
+        input["sourceIPs"] = vector["source"]["sourceIPs"].clone();
+        let source = decode(&input);
+        let expected = source.fields().field("sourceIPs").unwrap().clone();
+        let output = mapper.map(&source).unwrap();
+        assert_eq!(source.fields().field("sourceIPs"), Some(&expected));
+        let indexed = &output.record().indexed.record;
+        let retained: Value = serde_json::from_str(&indexed.text).unwrap();
+        assert_eq!(retained["unavailable"], vector["retained"]["unavailable"]);
+        assert_eq!(retained["original"], json!({}));
+        assert_eq!(output.record().common.origin(), source.origin());
+        if label == "invalid_first_ip" {
+            assert!(
+                output
+                    .record()
+                    .common
+                    .context()
+                    .get(irmind_domain::CommonField::SourceIp)
+                    .is_none()
+            );
+        }
+    }
 }

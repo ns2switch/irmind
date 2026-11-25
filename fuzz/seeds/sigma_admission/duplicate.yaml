@@ -1,0 +1,4 @@
+title: Synthetic Sigma input
+logsource: {product: windows}
+detection: {selection: {Image|endswith: test.exe}, condition: selection}
+duplicate: {field: a, "fi\x65ld": b}

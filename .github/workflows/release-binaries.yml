@@ -6,6 +6,11 @@ on:
         type: boolean
         default: false
 
+    outputs:
+      portable_sigma_verified:
+        description: The packaged Linux export passed macOS and Windows verification
+        value: ${{ jobs.require_sigma_report_case.outputs.verified }}
+
 permissions:
   contents: read
 
@@ -143,3 +148,74 @@ jobs:
         run: cargo test -p irmind --no-default-features --features keystore-file --profile ci --locked --test release_azure_capture_mapping -- --ignored
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with: {name: "${{ matrix.artifact }}", path: dist/, if-no-files-found: error, retention-days: "${{ github.event_name == 'workflow_dispatch' && '30' || (startsWith(github.ref, 'refs/tags/v') && '0' || '7') }}"}
+
+  create_sigma_report_case:
+    needs: verify_release_reproducibility
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: dtolnay/rust-toolchain@766a42937d994bd78bb4591385445c188ccb3f09 # 1.97.1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: {name: irmind-linux, path: release-binary}
+      - name: Create signed CloudTrail and Sysmon cases with the Linux release executable
+        env:
+          IRMIND_RELEASE_BINARY: ${{ github.workspace }}/release-binary/irmind
+          IRMIND_RELEASE_SIGMA_OUTPUT: ${{ github.workspace }}/portable-sigma
+          CARGO_INCREMENTAL: 0
+        run: |
+          (cd release-binary && sha256sum --check SHA256SUMS)
+          chmod +x "$IRMIND_RELEASE_BINARY" release-binary/irmind-evtx
+          "$IRMIND_RELEASE_BINARY" --version
+          cargo test -p irmind --no-default-features --features keystore-file --profile ci --locked --test release_sigma_report -- --ignored
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-sigma-report-v10
+          path: portable-sigma/
+          if-no-files-found: error
+          retention-days: "${{ github.event_name == 'workflow_dispatch' && '30' || (startsWith(github.ref, 'refs/tags/v') && '0' || '7') }}"
+
+  verify_sigma_report_case:
+    needs: [verify_release_reproducibility, create_sigma_report_case]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: macos-26, binary: irmind, artifact: irmind-macos-arm64}
+          - {runner: macos-15-intel, binary: irmind, artifact: irmind-macos-x86_64}
+          - {runner: windows-2025-vs2026, binary: irmind.exe, artifact: irmind-windows}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with: {python-version: '3.11'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: {name: '${{ matrix.artifact }}', path: release-binary}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: {name: release-sigma-report-v10, path: portable-sigma}
+      - name: Verify the Linux exports with this platform's release executable
+        shell: bash
+        env:
+          RELEASE_EXECUTABLE: release-binary/${{ matrix.binary }}
+        run: |
+          if [[ "$RUNNER_OS" == macOS ]]; then
+            (cd release-binary && shasum -a 256 -c SHA256SUMS)
+            chmod +x "$RELEASE_EXECUTABLE"
+          else
+            (cd release-binary && sha256sum --check SHA256SUMS)
+          fi
+          "$RELEASE_EXECUTABLE" --version
+          python -B .github/scripts/verify_release_sigma_report.py "$RELEASE_EXECUTABLE" portable-sigma
+
+  require_sigma_report_case:
+    needs: [create_sigma_report_case, verify_sigma_report_case]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    outputs:
+      verified: ${{ steps.complete.outputs.verified }}
+    steps:
+      - id: complete
+        run: echo 'verified=true' >> "$GITHUB_OUTPUT"

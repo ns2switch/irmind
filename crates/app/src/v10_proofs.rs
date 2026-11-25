@@ -8,13 +8,20 @@ pub use checkpoint::*;
 mod proofs;
 pub use proofs::*;
 mod report_objects;
+mod report_skills;
 pub use report_objects::*;
+pub use report_skills::*;
 mod section;
 pub use section::{V10ObjectSection, write_v10_object_section};
+mod sigma_admission;
+pub use sigma_admission::*;
+mod sigma_execution;
+pub use sigma_execution::*;
 mod sigma_objects;
 pub use sigma_objects::*;
 
 const ADMISSION: &[u8] = b"irmind-sigma-pack-admission-v1\0";
+pub const SIGMA_EVALUATOR_V2: &str = "irmind-sigma-evaluator-v2";
 const RUN: &[u8] = b"irmind-sigma-run-v1\0";
 const REPORT: &[u8] = b"irmind-report-published-v1\0";
 const MAX_LABEL: usize = 256;
@@ -147,7 +154,7 @@ fn canonical_uuid(value: &str) -> bool {
         })
 }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(u8)]
 pub enum SigmaRunStatusV1 {
     Complete = 0,
@@ -155,6 +162,7 @@ pub enum SigmaRunStatusV1 {
     WorkLimit = 2,
     OversizedInput = 3,
     Cancelled = 4,
+    ExactFieldsUnavailable = 5,
 }
 
 impl SigmaRunStatusV1 {
@@ -165,6 +173,7 @@ impl SigmaRunStatusV1 {
             2 => Ok(Self::WorkLimit),
             3 => Ok(Self::OversizedInput),
             4 => Ok(Self::Cancelled),
+            5 => Ok(Self::ExactFieldsUnavailable),
             _ => Err(INVALID),
         }
     }
@@ -455,7 +464,7 @@ mod tests {
         ] {
             let bytes = vector(name);
             let run = SigmaRunV1::decode(&bytes).unwrap();
-            assert!(run.status == expected);
+            assert_eq!(run.status, expected);
             assert_eq!(run.encode().unwrap(), bytes);
         }
         let bytes = vector("report_published_v1");

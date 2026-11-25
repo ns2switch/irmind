@@ -63,3 +63,23 @@ fn local_sigma_pack_rejects_symbolic_links_even_for_non_rule_names() {
     std::os::unix::fs::symlink(&rule, root.path().join("license")).unwrap();
     assert!(read_local_sigma_pack(root.path(), &CancellationToken::new(), synthetic_rule).is_err());
 }
+
+#[cfg(feature = "sigma")]
+#[test]
+fn sigma_inspection_uses_the_strict_yaml_admission_and_keeps_raw_rule_identity() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("login.yml");
+    let raw = b"title: Synthetic login\r\nid: fixture-login\r\nversion: '1'\r\nauthor: Fixture Author\r\nlogsource: {product: fixture}\r\ndetection: {select: {Activity: signal}, condition: select}\r\n";
+    fs::write(&path, raw).unwrap();
+    let cancel = CancellationToken::new();
+    let pack = inspect_local_sigma_pack(root.path(), &cancel).unwrap();
+    let item = &pack.manifest.0[0];
+    assert_eq!(item.rule.id, "fixture-login");
+    assert_eq!(item.version.as_deref(), Some("1"));
+    assert_eq!(item.author.as_deref(), Some("Fixture Author"));
+    assert_eq!(item.rule.sha256, irmind_app::sha256(raw));
+    assert_eq!(pack.rules[0], raw);
+
+    fs::write(&path, b"title: &name Synthetic login\n").unwrap();
+    assert!(inspect_local_sigma_pack(root.path(), &cancel).is_err());
+}

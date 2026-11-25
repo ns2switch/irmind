@@ -6,11 +6,45 @@ at their recorded locations. Sealing makes a case immutable.
 
 ## Cases and exports from an earlier version
 
-Version 0.6 uses case marker 5, mapped V3 Parquet artifacts and export V9. Use
+Version 0.7 uses case marker 6, mapped V3 Parquet artifacts and export V10. Use
 the creating version of IRMind to open, verify or export earlier cases. To use
 the current version, verify the originals with the creating version and ingest
 them into a new case. The original case retains its approvals, confirmed
 findings and seal.
+
+## Run a signed Sigma scan
+
+Use `/sigma inspect <directory>` to review a local pack. Use
+`/sigma import --license <id> <directory>` and confirm the displayed manifest hash
+to sign its admission. The case keeps the exact admitted rules in its V10 export
+when a run references them.
+
+Run `/sigma run <pack SHA-256> <start UTC> <end UTC>` from an open case. The
+v0.7 field table covers the reviewed Windows EVTX Security, Sysmon and PowerShell
+channels, Linux authentication, auditd and mapped ECS, AWS CloudTrail, and
+Zeek and Suricata DNS, HTTP and connections. It also covers Entra ID sign-in
+and audit, Azure Activity, Microsoft 365, Okta, GCP and Kubernetes audit, and
+the reviewed Defender, CrowdStrike FDR and eslogger process and related classes.
+The [Sigma guide](sigma.md) lists the exact source fields. Coverage depends on the exact logsource, fields and mapping version. IRMind
+reports skipped rules, partial scans and rows with unavailable exact fields by
+source. A row is indeterminate for a rule when an exact field it needs is
+unavailable. This can indicate source manipulation. Review the intact original.
+The report explains the coverage gap and cites the signed execution.
+Each match proposes an unconfirmed finding tied to an exact evidence row. Review it and
+use `/confirm <finding-id>` before publishing a report.
+
+## Publish a signed report
+
+In an open case, use `/report preview en` or `/report preview es`. The report
+includes only findings you confirmed that resolve to an exact evidence row.
+Check the coverage section for source availability, skill gaps and queries that
+reached their result limit.
+
+Use `/report save md en` or `/report save pdf es` to sign and retain the
+rendered document in the case. The command shows its SHA-256. Once sealed, the
+case includes its published reports in the V10 export. `/verify` checks the
+signature, source rows, coverage and rendered bytes. To publish another
+revision, use an open case.
 
 ## Delete an unsealed case
 

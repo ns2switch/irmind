@@ -156,6 +156,39 @@ impl<'a> BranchMaterialVerifier<'a> {
         }
         let current = self.current.as_mut().ok_or(SubagentRecordError)?;
         current.accept(&chunk, expected.checkpoint, skills, compiler)?;
+        if skills.tracks_report_loads() {
+            let identity = expected.checkpoint.identity()?;
+            let sequence = *self
+                .journal
+                .checkpoint_sequences
+                .get(&identity)
+                .ok_or(SubagentRecordError)?;
+            let hash = self
+                .journal
+                .checkpoint_audit_hashes
+                .get(&identity)
+                .ok_or(SubagentRecordError)?;
+            for entry in chunk.entries() {
+                if let crate::subagents::SubagentBranchPayload::SkillLoad(raw) = &entry.body.payload
+                {
+                    let load = crate::SkillLoadV1::decode(raw).map_err(|_| SubagentRecordError)?;
+                    skills
+                        .record_report_load(
+                            crate::v10_proofs::ReportSkillLoad::Delegated {
+                                checkpoint: crate::v10_proofs::V10AuditReference {
+                                    sequence,
+                                    entry_sha256: *hash.as_bytes(),
+                                },
+                                task_id: *entry.body.task_id.as_bytes(),
+                                load_sequence: entry.body.seq,
+                                load_sha256: *entry.hash.as_bytes(),
+                            },
+                            &load,
+                        )
+                        .map_err(|_| SubagentRecordError)?;
+                }
+            }
+        }
         for entry in chunk.entries() {
             if matches!(
                 entry.body.payload,

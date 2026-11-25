@@ -12,6 +12,7 @@ export = ["dep:irmind-infra"]
 cargo-fuzz = true
 
 [dependencies]
+irmind-sigma = { path = "../crates/modules/sigma", version = "0.1.0" }
 irmind-mod-query-azure-log-analytics = { path = "../crates/modules/query-azure-log-analytics", version = "0.1.0" }
 irmind-mod-query-bigquery = { path = "../crates/modules/query-bigquery", version = "0.1.0" }
 irmind-mod-query-athena = { path = "../crates/modules/query-athena", version = "0.1.0" }
@@ -376,6 +377,21 @@ bench = false
 [[bin]]
 name = "query_page_azure_analytics"
 path = "fuzz_targets/query_page_azure_analytics.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sigma_admission"
+path = "fuzz_targets/sigma_admission.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "sigma_field_table"
+path = "fuzz_targets/sigma_field_table.rs"
+required-features = ["export"]
 test = false
 doc = false
 bench = false

@@ -1,12 +1,13 @@
 [package]
 name = "irmind"
-version = "0.6.2"
+version = "0.7.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
 [features]
 default = [
+    "sigma",
     "query-azure-log-analytics",
     "query-bigquery",
     "query-athena",
@@ -36,6 +37,7 @@ default = [
     "siem-splunk", "siem-elastic", "siem-chronicle", "cloud-aws", "edr-crowdstrike", "edr-sentinelone",
     "ti-misp", "ti-virustotal", "storage-s3", "storage-gcs", "storage-azure",
 ]
+sigma = ["irmind-infra/sigma"]
 parser-s3-access = ["dep:irmind-mod-parser-s3-access", "mapping-s3-access"]
 parser-elb = ["dep:irmind-mod-parser-elb", "mapping-elb"]
 parser-iis-w3c = ["dep:irmind-mod-parser-iis-w3c", "mapping-iis-w3c"]
@@ -183,7 +185,7 @@ irmind-mod-mapping-journald-compat = { path = "../modules/mapping-journald-compa
 irmind-mod-parser-evtx = { path = "../modules/parser-evtx", version = "0.1.0", optional = true }
 irmind-app = { path = "../app", version = "0.1.0" }
 irmind-http = { path = "../http", version = "0.1.0" }
-irmind-tui = { path = "../tui", version = "0.6.2" }
+irmind-tui = { path = "../tui", version = "0.7.0" }
 irmind-domain = { path = "../domain", version = "0.1.0" }
 irmind-security = { path = "../security", version = "0.1.0" }
 irmind-infra = { path = "../infra", version = "0.1.0" }

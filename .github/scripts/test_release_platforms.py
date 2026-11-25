@@ -27,6 +27,30 @@ class MacOSReleaseTests(unittest.TestCase):
         self.assertIn('runner: macos-26, artifact: irmind-macos-arm64', binaries)
         self.assertIn('runner: macos-15-intel, artifact: irmind-macos-x86_64', binaries)
 
+    def test_portable_sigma_case_is_required_on_tags_and_tagless_rehearsals(self):
+        workflow = WORKFLOW.read_text()
+        caller = workflow.split('  release_binaries:\n', 1)[1].split('  native_macos:', 1)[0]
+        self.assertIn("needs.dco.outputs.release_build == 'true'", caller)
+        self.assertNotIn('secrets:', caller)
+        release = workflow.split('  release:\n', 1)[1].split('  post_release:', 1)[0]
+        self.assertIn("needs.release_binaries.outputs.portable_sigma_verified == 'true'", release)
+        self.assertIn("startsWith(github.ref, 'refs/tags/v')", release)
+        self.assertIn('inputs.release_dry_run == true', release)
+        binaries = BINARIES.read_text()
+        self.assertIn('jobs.require_sigma_report_case.outputs.verified', binaries)
+        producer, tail = binaries.split('  create_sigma_report_case:\n', 1)[1].split(
+            '  verify_sigma_report_case:\n', 1)
+        consumer, gate = tail.split('  require_sigma_report_case:\n', 1)
+        self.assertIn('needs: verify_release_reproducibility', producer)
+        self.assertIn('--test release_sigma_report -- --ignored', producer)
+        self.assertIn('needs: [verify_release_reproducibility, create_sigma_report_case]', consumer)
+        self.assertIn('verify_release_sigma_report.py', consumer)
+        self.assertIn('needs: [create_sigma_report_case, verify_sigma_report_case]', gate)
+        self.assertRegex(gate, r"(?m)^        run: echo 'verified=true'")
+        for job in (producer, consumer, gate):
+            self.assertNotRegex(job, r'(?m)^ +(?:if|continue-on-error|environment|secrets):')
+            self.assertNotRegex(job, r'\b(?:secrets|inputs|vars)\.')
+
     def test_release_workflows_pin_their_runner_images(self):
         for workflow in (WORKFLOW, RELEASE, BINARIES):
             self.assertNotRegex(workflow.read_text(), r"(?:ubuntu|macos|windows)-latest")

@@ -84,6 +84,11 @@ pub use parser_time_json::{ParserTimeFields, json_time_requirement};
 mod ports;
 pub use fixed_errors::FixedAppError;
 mod report;
+pub use report::{
+    ReportDocument, ReportDocumentFormat, ReportDocumentLanguage, ReportLimitation, ReportLocator,
+    ReportPublicationPlan, ReportStatement, ResolvedReportCoverage, report_object_keys,
+    report_publication, verify_report_history,
+};
 mod skills;
 pub use skills::{
     ApprovedSkills, CompiledSkill, SkillCompiler, SkillOrigin, SkillPackageStore,
@@ -109,6 +114,7 @@ pub use custody::{
 };
 pub use engine::{CryptoPorts, Engine, EnginePorts, verify_case_metadata};
 pub use ingest::TimelineEvent;
+pub use irmind_mapping_contracts::common_event::cluster_audit;
 pub use irmind_mapping_contracts::{
     GraphRecord, GraphRelation, IndexedGraphRecord, PartitionProfile,
 };

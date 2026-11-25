@@ -191,6 +191,71 @@ pub trait WorkspaceIo: Send + Sync {
     fn save_evidence(&self, path: &Path, bytes: &[u8]) -> Result<()>;
     fn verify_export(&self, path: &Path, expected_key: &str) -> Result<String>;
     fn case_exporter(&self) -> &dyn irmind_app::CaseExporter;
+    fn inspect_sigma_pack(
+        &self,
+        _directory: &Path,
+        _cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, irmind_app::AppError> {
+        Err(irmind_app::AppError::Policy(
+            "Sigma is unavailable in this workspace".into(),
+        ))
+    }
+    fn prepare_sigma_admission(
+        &self,
+        _directory: &Path,
+        _cancel: &irmind_app::CancellationToken,
+    ) -> Result<([u8; 32], usize), irmind_app::AppError> {
+        Err(irmind_app::AppError::Policy(
+            "Sigma admission is unavailable in this workspace".into(),
+        ))
+    }
+    fn admit_sigma_pack(
+        &self,
+        _engine: &Engine<'_>,
+        _directory: &Path,
+        _manifest: [u8; 32],
+        _license: &str,
+        _cancel: &irmind_app::CancellationToken,
+    ) -> Result<(), irmind_app::AppError> {
+        Err(irmind_app::AppError::Policy(
+            "Sigma admission is unavailable in this workspace".into(),
+        ))
+    }
+    fn run_sigma_pack(
+        &self,
+        _engine: &Engine<'_>,
+        _case: &irmind_app::CaseId,
+        _manifest: [u8; 32],
+        _time: std::ops::Range<i64>,
+        _cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, irmind_app::AppError> {
+        Err(irmind_app::AppError::Policy(
+            "Sigma execution is unavailable in this workspace".into(),
+        ))
+    }
+    fn publish_cited_report(
+        &self,
+        _engine: &Engine<'_>,
+        _id: &irmind_app::CaseId,
+        _language: irmind_app::ReportDocumentLanguage,
+        _format: irmind_app::ReportDocumentFormat,
+        _cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, irmind_app::AppError> {
+        Err(irmind_app::AppError::Policy(
+            "Signed report publication is unavailable in this workspace".into(),
+        ))
+    }
+    fn preview_cited_report(
+        &self,
+        _engine: &Engine<'_>,
+        _id: &irmind_app::CaseId,
+        _language: irmind_app::ReportDocumentLanguage,
+        _cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, irmind_app::AppError> {
+        Err(irmind_app::AppError::Policy(
+            "Cited report previews are unavailable in this workspace".into(),
+        ))
+    }
     fn large_case_exporter(&self) -> Option<&dyn irmind_app::LargeCaseExporter> {
         None
     }

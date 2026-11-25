@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 
 const CITATIONS: &[u8] = b"irmind-report-citations-v1\0";
 const SECTIONS: &[u8] = b"irmind-report-analyst-sections-v1\0";
-const COVERAGE: &[u8] = b"irmind-report-coverage-v1\0";
+const COVERAGE: &[u8] = b"irmind-report-coverage-v2\0";
 const MAX_LIST_ITEMS: usize = 1_000_000;
 const MAX_SECTION_TEXT: usize = 16 * 1024;
 
@@ -130,15 +130,55 @@ pub enum V10SourceAvailability {
     Unknown = 1,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ReportCoverageV1 {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct V10DelegatedSkillGap {
+    pub checkpoint: V10AuditReference,
+    pub task_id: [u8; 32],
+    pub load_sequence: u64,
+    pub load_sha256: [u8; 32],
+    pub gap_index: u64,
+}
+
+impl V10DelegatedSkillGap {
+    fn key(&self) -> (u64, [u8; 32], u64, u64) {
+        (
+            self.checkpoint.sequence,
+            self.task_id,
+            self.load_sequence,
+            self.gap_index,
+        )
+    }
+
+    fn read(wire: &mut Wire<'_>) -> Result<Self> {
+        Ok(Self {
+            checkpoint: V10AuditReference::read(wire)?,
+            task_id: wire.fixed()?,
+            load_sequence: wire.u64()?,
+            load_sha256: wire.fixed()?,
+            gap_index: wire.u64()?,
+        })
+    }
+
+    fn write(self, out: &mut Vec<u8>) -> Result<()> {
+        self.checkpoint.write(out)?;
+        out.extend_from_slice(&self.task_id);
+        out.extend_from_slice(&self.load_sequence.to_be_bytes());
+        out.extend_from_slice(&self.load_sha256);
+        out.extend_from_slice(&self.gap_index.to_be_bytes());
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ReportCoverageV2 {
     pub unavailable_sources: Vec<(V10SourceReference, V10SourceAvailability)>,
     pub skill_gaps: Vec<(V10AuditReference, u64)>,
     pub query_limits: Vec<V10AuditReference>,
     pub partial_sigma_runs: Vec<V10AuditReference>,
+    pub delegated_skill_gaps: Vec<V10DelegatedSkillGap>,
 }
 
-impl ReportCoverageV1 {
+impl ReportCoverageV2 {
     pub fn decode(body: &[u8]) -> Result<Self> {
         let mut wire = Wire::object(body, COVERAGE)?;
         let result = Self {
@@ -154,6 +194,7 @@ impl ReportCoverageV1 {
             skill_gaps: wire.list(48, |wire| Ok((V10AuditReference::read(wire)?, wire.u64()?)))?,
             query_limits: wire.list(40, V10AuditReference::read)?,
             partial_sigma_runs: wire.list(40, V10AuditReference::read)?,
+            delegated_skill_gaps: wire.list(120, V10DelegatedSkillGap::read)?,
         };
         wire.finish()?;
         result.validate()?;
@@ -182,6 +223,11 @@ impl ReportCoverageV1 {
                 check_size(out.len())?;
             }
         }
+        put_count(&mut out, self.delegated_skill_gaps.len())?;
+        for gap in &self.delegated_skill_gaps {
+            gap.write(&mut out)?;
+            check_size(out.len())?;
+        }
         check_size(out.len())?;
         Ok(out)
     }
@@ -192,7 +238,15 @@ impl ReportCoverageV1 {
         })?;
         increasing(&self.skill_gaps, |(load, slot)| (load.sequence, *slot))?;
         increasing(&self.query_limits, |receipt| receipt.sequence)?;
-        increasing(&self.partial_sigma_runs, |receipt| receipt.sequence)
+        increasing(&self.partial_sigma_runs, |receipt| receipt.sequence)?;
+        if self
+            .delegated_skill_gaps
+            .iter()
+            .any(|gap| !(1..=4096).contains(&gap.load_sequence))
+        {
+            return Err(INVALID);
+        }
+        increasing(&self.delegated_skill_gaps, V10DelegatedSkillGap::key)
     }
 }
 
@@ -283,10 +337,33 @@ pub(super) mod tests {
         assert_eq!(decoded.0[1], "");
         assert_eq!(decoded.encode().unwrap(), sections);
 
-        let coverage = object("report_coverage");
-        let decoded = ReportCoverageV1::decode(&coverage).unwrap();
-        assert_eq!(decoded.query_limits.len(), 1);
-        assert_eq!(decoded.partial_sigma_runs.len(), 1);
-        assert_eq!(decoded.encode().unwrap(), coverage);
+        assert!(ReportCoverageV2::decode(&object("report_coverage")).is_err());
+    }
+
+    pub(in crate::v10_proofs) fn coverage_vector(name: &str) -> Vec<u8> {
+        let all: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../testkit/fixtures/contracts/report_coverage_v2.json"
+        ))
+        .unwrap();
+        let bytes = hex::decode(all[name]["bytes_hex"].as_str().unwrap()).unwrap();
+        assert_eq!(crate::hex(&crate::sha256(&bytes)), all[name]["sha256"]);
+        bytes
+    }
+
+    #[test]
+    fn approved_coverage_v2_vectors_round_trip_and_reject_invalid_coordinates() {
+        for name in [
+            "report_coverage_v2_empty_delegated",
+            "report_coverage_v2_two_tasks_same_local_sequence",
+        ] {
+            let bytes = coverage_vector(name);
+            assert_eq!(
+                ReportCoverageV2::decode(&bytes).unwrap().encode().unwrap(),
+                bytes
+            );
+        }
+        for name in ["reject_duplicate_branch_gap", "reject_zero_branch_sequence"] {
+            assert!(ReportCoverageV2::decode(&coverage_vector(name)).is_err());
+        }
     }
 }

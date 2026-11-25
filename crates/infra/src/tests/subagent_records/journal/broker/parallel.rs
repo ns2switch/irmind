@@ -1,10 +1,17 @@
 use super::*;
 use irmind_app::MessageRole;
 use irmind_app::subagents::{
-    SubagentStatus, TaskEvidenceQueries, TaskEvidenceQuery, TaskEvidenceResult,
-    VerifiedTaskQueryView,
+    StartedSubagentPlan, SubagentStatus, TaskEvidenceQueries, TaskEvidenceQuery,
+    TaskEvidenceResult, VerifiedTaskQueryView,
 };
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::{
+    sync::{
+        Mutex,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        mpsc::{self, Receiver, SyncSender},
+    },
+    time::{Duration, Instant},
+};
 
 struct Queries(AtomicUsize, bool);
 impl TaskEvidenceQueries for Queries {
@@ -200,9 +207,17 @@ fn check_determinism(partial: bool) {
     }
 }
 
+#[derive(Debug)]
+enum CancellationPhase {
+    QueryEntered,
+    CancellationObserved,
+    PlanReturned(Option<Vec<SubagentStatus>>),
+}
+
 struct SelectiveQueries {
     target: SubagentDigest,
-    entered: AtomicBool,
+    phase: SyncSender<CancellationPhase>,
+    allow_exit: Mutex<Receiver<()>>,
     exited: AtomicBool,
 }
 impl TaskEvidenceQueries for SelectiveQueries {
@@ -214,22 +229,76 @@ impl TaskEvidenceQueries for SelectiveQueries {
     ) -> Result<TaskEvidenceResult, AppError> {
         query.validate(view)?;
         if view.task() == self.target {
-            self.entered.store(true, Ordering::SeqCst);
-            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-            while !cancel.is_cancelled() && std::time::Instant::now() < deadline {
-                std::thread::sleep(std::time::Duration::from_millis(1));
+            self.phase.send(CancellationPhase::QueryEntered).unwrap();
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while !cancel.is_cancelled() && Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(1));
             }
-            self.exited.store(true, Ordering::SeqCst);
             assert!(
                 cancel.is_cancelled(),
-                "individual cancellation did not reach its query"
+                "the target query entered but did not observe cancellation"
             );
+            self.phase
+                .send(CancellationPhase::CancellationObserved)
+                .unwrap();
+            let exit = self
+                .allow_exit
+                .lock()
+                .unwrap()
+                .recv_timeout(Duration::from_secs(5));
+            assert!(
+                exit.is_ok(),
+                "the controller did not release the cancelled worker: {exit:?}"
+            );
+            self.exited.store(true, Ordering::SeqCst);
             return Err(AppError::Cancelled);
         }
         Ok(TaskEvidenceResult::Text(
             "Unaffected sibling result.".into(),
         ))
     }
+}
+
+fn cancel_entered_query(
+    engine: &Engine<'_>,
+    case: &CaseId,
+    started: &StartedSubagentPlan,
+    target: SubagentDigest,
+    observed: &Receiver<CancellationPhase>,
+    allow_exit: &SyncSender<()>,
+) {
+    // Start checking propagation only after the real blocking query
+    // enters. Plan startup and journal verification can be scheduled late.
+    match observed.recv().unwrap() {
+        CancellationPhase::QueryEntered => {}
+        CancellationPhase::PlanReturned(statuses) => {
+            panic!("the plan returned before the target query entered: {statuses:?}")
+        }
+        CancellationPhase::CancellationObserved => {
+            panic!("the query acknowledged cancellation before reporting its entry")
+        }
+    }
+    assert!(engine.cancel_interrupted_subagent_plans(case).is_err());
+    let other = CaseId::parse("00000000-0000-0000-0000-000000000088").unwrap();
+    assert!(!engine.cancel_live_subagent_task(&other, target).unwrap());
+    assert!(
+        engine.cancel_live_subagent_task(case, target).unwrap(),
+        "the target task lost its live handle after entering the query"
+    );
+    let next = observed
+        .recv_timeout(Duration::from_secs(5))
+        .unwrap_or_else(|error| {
+            panic!("no cancellation acknowledgement or terminal plan outcome: {error}")
+        });
+    assert!(
+        matches!(next, CancellationPhase::CancellationObserved),
+        "expected the query to observe cancellation, got {next:?}"
+    );
+    assert!(
+        engine.finish_subagent_plan(started).is_err(),
+        "the plan could release its allocation while the target query was still running"
+    );
+    allow_exit.send(()).unwrap();
 }
 
 #[test]
@@ -256,9 +325,12 @@ fn individual_live_cancellation_is_case_scoped_does_not_cancel_siblings_and_keep
         .unwrap()
         .unwrap();
     let target = started.plan().tasks[0].task_id;
+    let (phase, observed) = mpsc::sync_channel(2);
+    let (allow_exit, exit_allowed) = mpsc::sync_channel(1);
     let queries = Arc::new(SelectiveQueries {
         target,
-        entered: AtomicBool::new(false),
+        phase: phase.clone(),
+        allow_exit: Mutex::new(exit_allowed),
         exited: AtomicBool::new(false),
     });
     // Reuse the same store through a fresh Engine so the signed prepared plan is retained.
@@ -269,37 +341,30 @@ fn individual_live_cancellation_is_case_scoped_does_not_cancel_siblings_and_keep
         stored_history_engine_with_queries(second_root.path(), &fork, &[], queries.clone());
     let model = ParallelModel::new();
     let results = std::thread::scope(|scope| {
-        let controller = scope.spawn(|| {
-            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-            while !queries.entered.load(Ordering::SeqCst) && std::time::Instant::now() < deadline {
-                std::thread::sleep(std::time::Duration::from_millis(1));
-            }
-            assert!(queries.entered.load(Ordering::SeqCst));
-            assert!(
-                engine
-                    .cancel_interrupted_subagent_plans(&history.case)
-                    .is_err()
-            );
-            let other = CaseId::parse("00000000-0000-0000-0000-000000000088").unwrap();
-            assert!(!engine.cancel_live_subagent_task(&other, target).unwrap());
-            assert!(
-                engine
-                    .cancel_live_subagent_task(&history.case, target)
-                    .unwrap()
-            );
+        let engine = &engine;
+        let started = &started;
+        let case = &history.case;
+        let controller = scope.spawn(move || {
+            cancel_entered_query(engine, case, started, target, &observed, &allow_exit);
         });
-        let result = engine
-            .run_subagent_plan(&started, &model, 2, &cancel)
-            .unwrap();
+        let result = engine.run_subagent_plan(started, &model, 2, &cancel);
+        let statuses = result
+            .as_ref()
+            .ok()
+            .map(|results| results.iter().map(|result| result.status).collect());
+        let _ = phase.send(CancellationPhase::PlanReturned(statuses));
         controller.join().unwrap();
-        result
+        assert!(
+            queries.exited.load(Ordering::SeqCst),
+            "the plan returned before the cancelled query exited"
+        );
+        result.unwrap()
     });
     assert_eq!(results[0].status, SubagentStatus::Cancelled);
     assert_eq!(results[1].status, SubagentStatus::Completed);
     assert_eq!(results[0].usage.calls, 1);
     assert_eq!(results[1].usage.calls, 1);
     assert!(!cancel.is_cancelled());
-    assert!(queries.exited.load(Ordering::SeqCst));
     assert!(
         !engine
             .cancel_live_subagent_task(&history.case, target)

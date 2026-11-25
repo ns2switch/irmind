@@ -1,5 +1,11 @@
 //! Load analyst-selected regular YAML files under a single bounded local root.
+#[cfg(feature = "sigma")]
+pub mod evaluation;
 pub mod field_table;
+#[cfg(feature = "sigma")]
+mod runtime;
+#[cfg(feature = "sigma")]
+mod storage;
 use irmind_app::{
     AppError, CancellationToken,
     v10_proofs::{SigmaPackManifestV1, SigmaPackRuleV1, SigmaRuleKeyV1},
@@ -9,6 +15,8 @@ use std::{
     io::Read as _,
     path::{Path, PathBuf},
 };
+#[cfg(feature = "sigma")]
+pub use storage::AdmittedSigmaPack;
 
 const MAX_FILES: usize = 4096;
 const MAX_DEPTH: usize = 16;
@@ -25,6 +33,30 @@ pub struct SigmaRuleIdentity {
 pub struct LocalSigmaPack {
     pub manifest: SigmaPackManifestV1,
     pub rules: Vec<Vec<u8>>,
+}
+
+/// Validate the exact rule bytes before presenting an analyst's import preview.
+#[cfg(feature = "sigma")]
+pub fn inspect_local_sigma_pack(
+    root: &Path,
+    cancel: &CancellationToken,
+) -> Result<LocalSigmaPack, AppError> {
+    use irmind_sigma::RuleValue;
+    read_local_sigma_pack(root, cancel, |raw| {
+        let document = irmind_sigma::admit_rule(raw).map_err(|_| {
+            AppError::Policy("A Sigma rule is invalid or uses unsupported YAML syntax".into())
+        })?;
+        let text = |name| match document.fields().get(name) {
+            None => Ok(None),
+            Some(RuleValue::Text(value)) => Ok(Some(value.clone())),
+            Some(_) => Err(AppError::Policy("Sigma rule metadata must be text".into())),
+        };
+        Ok(SigmaRuleIdentity {
+            id: text("id")?,
+            version: text("version")?,
+            author: text("author")?,
+        })
+    })
 }
 
 /// Ingest the selected directory without consulting the network. The admission

@@ -173,6 +173,126 @@ impl RootWorkspaceIo {
 }
 
 impl WorkspaceIo for RootWorkspaceIo {
+    #[cfg(feature = "sigma")]
+    fn inspect_sigma_pack(
+        &self,
+        directory: &Path,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, AppError> {
+        let (manifest, rules) = self.prepare_sigma_admission(directory, cancel)?;
+        Ok(format!(
+            "Sigma pack preview · {rules} validated rules\nManifest SHA-256 {}",
+            irmind_app::hex(&manifest)
+        ))
+    }
+
+    #[cfg(feature = "sigma")]
+    fn prepare_sigma_admission(
+        &self,
+        directory: &Path,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<([u8; 32], usize), AppError> {
+        let pack = irmind_infra::sigma_pack::inspect_local_sigma_pack(directory, cancel)?;
+        let manifest = pack.manifest.encode().map_err(|_| {
+            AppError::Policy("Sigma pack manifest exceeds the supported limits".into())
+        })?;
+        Ok((irmind_app::sha256(&manifest), pack.rules.len()))
+    }
+
+    #[cfg(feature = "sigma")]
+    fn admit_sigma_pack(
+        &self,
+        engine: &Engine<'_>,
+        directory: &Path,
+        manifest: [u8; 32],
+        license: &str,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<(), AppError> {
+        self.store
+            .admit_local_sigma_pack(engine, directory, manifest, license, cancel)
+    }
+
+    #[cfg(feature = "sigma")]
+    fn run_sigma_pack(
+        &self,
+        engine: &Engine<'_>,
+        case: &irmind_app::CaseId,
+        manifest: [u8; 32],
+        time: std::ops::Range<i64>,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, AppError> {
+        use irmind_app::v10_proofs::SigmaRunStatusV1;
+        use std::fmt::Write as _;
+        let summary = self.store.run_sigma(engine, case, manifest, time, cancel)?;
+        let run = summary.receipt;
+        let status = match run.status {
+            SigmaRunStatusV1::Complete => "complete",
+            SigmaRunStatusV1::TimeLimit => "partial (time limit)",
+            SigmaRunStatusV1::WorkLimit => "partial (work limit)",
+            SigmaRunStatusV1::OversizedInput => "partial (oversized input)",
+            SigmaRunStatusV1::Cancelled => "partial (cancelled)",
+            SigmaRunStatusV1::ExactFieldsUnavailable => "partial (exact fields unavailable)",
+        };
+        let mut text = format!(
+            "Sigma run {status} · {} unconfirmed matches · {} skipped rules · {} work units",
+            run.matched_rows, summary.skipped_rules, run.used_units
+        );
+        if !summary.unavailable_by_source.is_empty() {
+            text.push_str("\nExamined rows with unavailable exact fields by source. This may indicate source manipulation. Inspect the original evidence.");
+            for (source, count) in summary.unavailable_by_source {
+                let source = cli::terminal_safe_path(Path::new(&source));
+                let _ = write!(text, "\n  {source}: {count}");
+            }
+        }
+        if !summary.indeterminate_by_rule.is_empty() {
+            text.push_str("\nIndeterminate rows are rows Sigma could not evaluate for that rule because an exact field was unavailable.");
+            for (rule, count) in summary.indeterminate_by_rule {
+                let _ = write!(text, "\n  {}: {count}", rule.id);
+            }
+        }
+        Ok(text)
+    }
+
+    fn publish_cited_report(
+        &self,
+        engine: &Engine<'_>,
+        id: &irmind_app::CaseId,
+        language: irmind_app::ReportDocumentLanguage,
+        format: irmind_app::ReportDocumentFormat,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, AppError> {
+        let plan = self
+            .store
+            .plan_cited_report(engine, id, language, format, cancel)?;
+        let receipt = engine.publish_cited_report(id, plan, cancel)?;
+        Ok(format!(
+            "Signed report · SHA-256 {}\nThe report is included in the sealed case export.",
+            irmind_app::hex(&receipt.rendered_sha256)
+        ))
+    }
+
+    fn preview_cited_report(
+        &self,
+        engine: &Engine<'_>,
+        id: &irmind_app::CaseId,
+        language: irmind_app::ReportDocumentLanguage,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, AppError> {
+        use std::fmt::Write as _;
+        let preview = self
+            .store
+            .preview_cited_report(engine, id, language, cancel)?;
+        let mut heading = "Unsigned cited preview".to_owned();
+        if preview.omitted_findings > 0 {
+            let _ = write!(
+                heading,
+                "\nConfirmed findings without a verified row citation: {}",
+                preview.omitted_findings
+            );
+        }
+        Ok(format!("{heading}\n\n{}", preview.markdown))
+    }
+
     fn definition_store(&self) -> Option<&dyn irmind_app::ParserDefinitionStore> {
         Some(&self.definition_store)
     }

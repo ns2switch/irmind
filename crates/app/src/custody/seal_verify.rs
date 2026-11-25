@@ -246,10 +246,28 @@ impl Engine<'_> {
             }
             prev = self.verify_chain_entry(id, index, prev, entry)?;
         }
+        if entries
+            .iter()
+            .any(|entry| entry.kind == crate::AuditEventKind::SigmaRunV1)
+        {
+            let store = self
+                .large_case_store
+                .as_ref()
+                .ok_or(AppError::InvalidChain(0))?;
+            store.verify_sigma_executions(
+                id,
+                &entries,
+                &self.verifier.trusted_public_key(&Actor::Analyst)?,
+                cancel,
+            )?;
+        }
         verify_case_metadata(&case.title, case.severity, &case.scope, &entries)?;
         self.verify_source_query_journal(&entries, cancel, true)?;
         self.verify_mapping_events(entries.iter().map(|e| (e.kind, e.payload.as_str())))?;
-        self.verify_skill_receipts(&entries, cancel)?;
+        let has_reports = entries
+            .iter()
+            .any(|entry| entry.kind == crate::AuditEventKind::ReportPublishedV1);
+        let checked_skills = self.checked_skill_receipts(&entries, cancel, has_reports)?;
         let manifest = crate::large_case::read_manifest_index(&entries)?;
         let source_hashes = manifest
             .sources
@@ -280,6 +298,9 @@ impl Engine<'_> {
         self.verify_seal_metadata(id, &case, &entries)?;
         self.pending_requests_unlocked(&case, &entries)?;
         self.findings_unlocked(id, &entries)?;
+        if has_reports {
+            self.verify_report_publications(&case, &entries, &checked_skills, cancel)?;
+        }
         summarize_usage(&entries)?;
         self.verify_operations_unlocked(id, cancel)?;
         self.remember_verified_checkpoint(id, entries.last())?;

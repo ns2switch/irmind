@@ -1,16 +1,16 @@
 //! Closed source bindings parsed from a hash-authenticated V10 Sigma table.
 use irmind_app::{AppError, v10_proofs::SigmaFieldTableV1};
 use irmind_domain::{CommonField, CommonFieldType};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ReviewedSigmaFieldTable {
     pub variants: Vec<SigmaSourceVariant>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SigmaSourceVariant {
     pub product: Option<String>,
@@ -26,7 +26,7 @@ pub struct SigmaSourceVariant {
     pub fields: Vec<SigmaFieldBinding>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SigmaEventFilter {
     pub column: Option<String>,
@@ -35,7 +35,7 @@ pub struct SigmaEventFilter {
     pub one_of: Option<Vec<SigmaLiteral>>,
 }
 
-#[derive(Clone, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Deserialize, Serialize, Eq, Ord, PartialEq, PartialOrd)]
 #[serde(untagged)]
 pub enum SigmaLiteral {
     Text(String),
@@ -43,7 +43,7 @@ pub enum SigmaLiteral {
     Boolean(bool),
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SigmaFieldBinding {
     pub name: String,
@@ -51,9 +51,21 @@ pub struct SigmaFieldBinding {
     pub path: Option<Vec<String>>,
     pub value_type: SigmaBindingType,
     pub null_policy: SigmaNullPolicy,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conversion: Option<SigmaConversion>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub basename_path: Option<Vec<String>>,
 }
 
-#[derive(Clone, Copy, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Deserialize, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum SigmaConversion {
+    EvtxEventId,
+    EvtxLogonType,
+    DefenderFullPath,
+}
+
+#[derive(Clone, Copy, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum SigmaBindingType {
     Text,
@@ -63,9 +75,10 @@ pub enum SigmaBindingType {
     TextList,
     IntegerList,
     IpList,
+    PairList,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SigmaNullPolicy {
     Absent,
@@ -74,6 +87,54 @@ pub enum SigmaNullPolicy {
 
 impl ReviewedSigmaFieldTable {
     pub fn parse(object: &SigmaFieldTableV1) -> Result<Self, AppError> {
+        Self::read(object, false)
+    }
+
+    #[cfg(feature = "sigma")]
+    pub(super) fn materialize_native(
+        mut object: SigmaFieldTableV1,
+        catalog: &irmind_app::source_mapping::MappingCatalog,
+    ) -> Result<(SigmaFieldTableV1, Self), AppError> {
+        use irmind_app::source_mapping::MappingProvenance;
+        let mut table = Self::read(&object, true)?;
+        let mut changed = false;
+        let mut resolved = Vec::with_capacity(table.variants.len());
+        for mut variant in std::mem::take(&mut table.variants) {
+            let Some(recipe) = variant.mapping_version.strip_prefix('@') else {
+                resolved.push(variant);
+                continue;
+            };
+            changed = true;
+            let mut candidates = catalog.manifests().filter(|manifest| {
+                let identity = manifest.identity();
+                matches!(manifest.provenance(), MappingProvenance::NativeBuild { .. })
+                    && identity.id() == variant.mapping_id
+                    && identity
+                        .version()
+                        .strip_suffix(identity.implementation().as_str())
+                        == Some(recipe)
+            });
+            let Some(manifest) = candidates.next() else {
+                continue;
+            };
+            if candidates.next().is_some() {
+                return Err(invalid());
+            }
+            manifest
+                .identity()
+                .version()
+                .clone_into(&mut variant.mapping_version);
+            resolved.push(variant);
+        }
+        table.variants = resolved;
+        if changed {
+            object.toml = toml::to_string(&table).map_err(|_| invalid())?;
+        }
+        let validated = Self::parse(&object)?;
+        Ok((object, validated))
+    }
+
+    fn read(object: &SigmaFieldTableV1, allow_native_recipes: bool) -> Result<Self, AppError> {
         if object.toml.len() > 512 * 1024 {
             return Err(invalid());
         }
@@ -84,6 +145,9 @@ impl ReviewedSigmaFieldTable {
         let mut source_classes = BTreeMap::<_, Vec<&SigmaSourceVariant>>::new();
         for variant in &table.variants {
             variant.validate()?;
+            if !allow_native_recipes && variant.mapping_version.starts_with('@') {
+                return Err(invalid());
+            }
             let key = (
                 &variant.parser_id,
                 &variant.parser_version,
@@ -103,6 +167,26 @@ impl ReviewedSigmaFieldTable {
 }
 
 impl SigmaSourceVariant {
+    #[cfg(feature = "sigma")]
+    pub(super) fn exact_cluster_field(&self) -> Option<irmind_app::cluster_audit::AuditExactField> {
+        use irmind_app::cluster_audit::AuditExactField;
+        let field = match self.mapping_id.as_str() {
+            "mapping-kubernetes" if self.mapping_version == "kubernetes-audit-tables-v2" => {
+                AuditExactField::SourceIps
+            }
+            "mapping-eks-audit" | "mapping-aks-audit"
+                if self.mapping_version == "kubernetes-audit-tables-v2" =>
+            {
+                AuditExactField::WrappedSourceIps
+            }
+            "mapping-gke-audit" if self.mapping_version.starts_with("gke-paths-v2-") => {
+                AuditExactField::GkeStatus
+            }
+            _ => return None,
+        };
+        Some(field)
+    }
+
     fn overlaps(&self, other: &Self) -> bool {
         let taxonomy = [
             (&self.product, &other.product),
@@ -120,6 +204,10 @@ impl SigmaSourceVariant {
         !self.events.iter().any(|left| {
             other.events.iter().any(|right| {
                 left.column == right.column
+                    && !matches!(
+                        left.column.as_deref(),
+                        Some("event.category" | "event.type")
+                    )
                     && left.path == right.path
                     && !left
                         .values()
@@ -169,13 +257,72 @@ impl SigmaSourceVariant {
             if column_kind.is_some_and(|expected| expected != field.value_type) {
                 return Err(invalid());
             }
+            field.validate_projection(self)?;
+        }
+        Ok(())
+    }
+}
+
+impl SigmaFieldBinding {
+    fn validate_projection(&self, variant: &SigmaSourceVariant) -> Result<(), AppError> {
+        let path_is = |path: &[&str]| {
+            self.path
+                .as_deref()
+                .is_some_and(|actual| actual.iter().map(String::as_str).eq(path.iter().copied()))
+        };
+        let admitted = match self.conversion {
+            None if self.value_type == SigmaBindingType::PairList => {
+                variant.mapping_id == "mapping-m365"
+                    && variant.service.as_deref() == Some("exchange")
+                    && path_is(&["Parameters"])
+            }
+            None => true,
+            Some(SigmaConversion::EvtxEventId) => {
+                variant.parser_id == "parser-evtx"
+                    && variant.channel.is_some()
+                    && self.value_type == SigmaBindingType::Integer
+                    && path_is(&["Event", "System", "EventID"])
+            }
+            Some(SigmaConversion::EvtxLogonType) => {
+                variant.parser_id == "parser-evtx"
+                    && variant.channel.is_some()
+                    && self.value_type == SigmaBindingType::Integer
+                    && path_is(&["Event", "EventData", "LogonType"])
+            }
+            Some(SigmaConversion::DefenderFullPath) => {
+                let admitted_paths = [
+                    ("FolderPath", "FileName"),
+                    ("InitiatingProcessFolderPath", "InitiatingProcessFileName"),
+                ];
+                variant.parser_id == "parser-defender"
+                    && self.value_type == SigmaBindingType::Text
+                    && admitted_paths.into_iter().any(|(path, basename)| {
+                        let basename_is = |expected: &[&str]| {
+                            self.basename_path.as_deref().is_some_and(|actual| {
+                                actual
+                                    .iter()
+                                    .map(String::as_str)
+                                    .eq(expected.iter().copied())
+                            })
+                        };
+                        (path_is(&[path]) && basename_is(&[basename]))
+                            || (path_is(&["properties", path])
+                                && basename_is(&["properties", basename]))
+                    })
+            }
+        };
+        if !admitted
+            || (self.basename_path.is_some()
+                != (self.conversion == Some(SigmaConversion::DefenderFullPath)))
+        {
+            return Err(invalid());
         }
         Ok(())
     }
 }
 
 impl SigmaEventFilter {
-    fn values(&self) -> &[SigmaLiteral] {
+    pub(super) fn values(&self) -> &[SigmaLiteral] {
         self.equals.as_ref().map_or_else(
             || self.one_of.as_deref().unwrap_or(&[]),
             std::slice::from_ref,
@@ -183,7 +330,10 @@ impl SigmaEventFilter {
     }
 
     fn validate(&self) -> Result<(), AppError> {
-        let bound_type = location(self.column.as_deref(), self.path.as_deref())?;
+        let bound_type = match (self.column.as_deref(), self.path.as_deref()) {
+            (Some("event.category" | "event.type"), None) => Some(SigmaBindingType::Text),
+            (column, path) => location(column, path)?,
+        };
         let values = match (&self.equals, &self.one_of) {
             (Some(value), None) => std::slice::from_ref(value),
             (None, Some(values)) if !values.is_empty() && values.len() <= 128 => values.as_slice(),
@@ -194,7 +344,12 @@ impl SigmaEventFilter {
         if values.iter().any(|value| {
             literal_kind(value) != actual
                 || !seen.insert(value)
-                || matches!(value, SigmaLiteral::Text(text) if !bounded_text(text, 512))
+                || matches!(value, SigmaLiteral::Text(text) if !bounded_text(text, 512)
+                || match self.column.as_deref() {
+                    Some("event.category") => irmind_domain::EventCategory::parse(text).is_err(),
+                    Some("event.type") => irmind_domain::EventType::parse(text).is_err(),
+                    _ => false,
+                })
         }) || bound_type.is_some_and(|expected| expected != actual)
         {
             return Err(invalid());
@@ -218,9 +373,10 @@ fn location(
     path: Option<&[String]>,
 ) -> Result<Option<SigmaBindingType>, AppError> {
     match (column, path) {
-        (Some("event.code" | "event.action" | "event.id" | "event.dataset"), None) => {
-            Ok(Some(SigmaBindingType::Text))
-        }
+        (
+            Some("event.code" | "event.action" | "event.id" | "event.dataset" | "event.outcome"),
+            None,
+        ) => Ok(Some(SigmaBindingType::Text)),
         (Some(name), None) => match CommonField::parse(name)
             .map_err(|_| invalid())?
             .value_type()
@@ -266,6 +422,66 @@ fn invalid() -> AppError {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "sigma")]
+    #[test]
+    fn sigma_field_table_materializes_exact_native_build_identity() {
+        use irmind_app::source_mapping::{MappingCatalog, SourceMapper};
+        use irmind_mod_mapping_json_compat::JsonCompatibilityMapping;
+        use irmind_mod_parser_json::JsonSourceDecoder;
+        use std::sync::Arc;
+
+        let mapping = JsonCompatibilityMapping::new().unwrap();
+        let expected = mapping.manifest().identity().version().to_owned();
+        let catalog =
+            MappingCatalog::freeze(vec![Arc::new(JsonSourceDecoder)], vec![Arc::new(mapping)])
+                .unwrap();
+        let baseline = include_str!("cloudtrail-v1.toml");
+        let native = baseline
+            .replace("mapping-cloudtrail", "mapping-json-compat")
+            .replace("cloudtrail-tables-v1", "@json-compat-v1-");
+        let absent = native
+            .replace("@json-compat-v1-", "@outdated-recipe-")
+            .replace("dataset = \"cloudtrail\"", "dataset = \"retired\"");
+        let input = SigmaFieldTableV1 {
+            id: "synthetic-native-build-pinning".into(),
+            version: "v1".into(),
+            toml: format!("{baseline}\n{native}\n{absent}"),
+        };
+        assert!(ReviewedSigmaFieldTable::parse(&input).is_err());
+        let (proof, table) = ReviewedSigmaFieldTable::materialize_native(input, &catalog).unwrap();
+        assert!(!proof.toml.contains("@json-compat"));
+        assert_eq!(table.variants.len(), 2);
+        assert_eq!(table.variants[1].mapping_version, expected);
+        let wire = proof.encode().unwrap();
+        let independent = SigmaFieldTableV1::decode(&wire).unwrap();
+        assert_eq!(
+            ReviewedSigmaFieldTable::parse(&independent)
+                .unwrap()
+                .variants[1]
+                .mapping_version,
+            expected
+        );
+    }
+
+    #[test]
+    fn parses_the_exact_fields_in_the_approved_table_vector() {
+        let bundle: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../testkit/fixtures/contracts/sigma_exact_source_fields.json"
+        ))
+        .unwrap();
+        let bytes =
+            hex::decode(bundle["field_table_wire_v1"]["bytes_hex"].as_str().unwrap()).unwrap();
+        let object = SigmaFieldTableV1::decode(&bytes).unwrap();
+        assert_eq!(object.encode().unwrap(), bytes);
+        assert_eq!(
+            ReviewedSigmaFieldTable::parse(&object)
+                .unwrap()
+                .variants
+                .len(),
+            7
+        );
+    }
 
     #[test]
     fn sigma_field_table_validates_typed_locations_and_exact_source_variants() {

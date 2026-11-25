@@ -1,4 +1,4 @@
-Traducción de README.md en el commit 09ad51c838361f43bcc9dfc6ceea34f34a0fc799; si hay diferencias, prevalece la versión en inglés.
+Traducción de README.md en el commit 275b58f924f17965487b1d384b2cc051400713a7; si hay diferencias, prevalece la versión en inglés.
 
 # IRMind — investigaciones en terminal con registro firmado
 
@@ -34,9 +34,11 @@ Sin configurar modelos, claves de API, cuentas ni coste. La interfaz real invest
 - Revisar y firmar aprobaciones antes de un enriquecimiento externo.
 - Consultar registros indexados y originales disponibles mientras el modelo recibe datos limitados y redactados.
 - Verificar, sellar, exportar y volver a verificar un paquete de caso.
+- Aplicar [reglas Sigma locales](docs/es/sigma.md) y [publica informes firmados en Markdown y PDF](docs/es/cases.md#publicar-un-informe-firmado) con los hallazgos confirmados.
 
 ## Novedades recientes
 
+- **v0.7.0** añade reglas Sigma locales e informes firmados. El marcador de caso 6 y la exportación V10 requieren esta versión. Para abrir, verificar, exportar o reconstruir por completo un caso de v0.6.x, usa el binario original.
 - **v0.6.0** añade consultas experimentales en Athena, BigQuery y Azure Log Analytics. Están desactivadas por defecto y requieren `[source_queries]` en la política de la organización y credenciales en el keystore de IRMind. Los tres proveedores solo se han probado con simuladores. Consulta las guías del [workgroup de Athena](docs/es/configuration.md#athena), el [sink de BigQuery](docs/es/configuration.md#bigquery) y el [registro de aplicación en Entra](docs/es/configuration.md#azure-log-analytics).
 - **Cambio de formato en v0.6.0.** El marcador de caso 5 y la exportación V9 son incompatibles con v0.5.x. Usa el binario original para abrir, verificar o exportar un caso de v0.5.x, o reingiere los originales verificados en un caso nuevo.
 - **v0.5.7** reduce las pasadas de ordenación de registros desordenados, incluidos los flow logs de Azure VNet y NSG.
@@ -77,13 +79,13 @@ Empieza por [la instalación verificada](docs/es/platforms.md#verificar-una-vers
 
 
 
-La [versión preliminar v0.6.0](https://github.com/ns2switch/irmind/releases/tag/v0.6.0) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
+La [versión preliminar v0.7.0](https://github.com/ns2switch/irmind/releases/tag/v0.7.0) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
 
 Conserva la versión de IRMind que creó cada caso. Consulta la [nota de formatos](CHANGELOG.md) y la [política de versiones](docs/development/decisions.md#pre-10-format-policy).
 
 ```sh
 # Tras descargar el binario, SHA256SUMS y ambos bundles .sigstore.json:
-tag=v0.6.0; binary=irmind-linux-x86_64
+tag=v0.7.0; binary=irmind-linux-x86_64
 for file in "$binary" SHA256SUMS; do
   cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done
@@ -113,7 +115,7 @@ Usa `/skills` para inspeccionar y gestionar los 23 métodos incluidos de nube, W
 
 ## Módulos
 
-La versión 0.6 usa una única cadena decodificador de origen → mapeo identificado → escritor V3 en la CLI, la TUI y la demo. Solo lee CaseCreated versión 5 y la exportación V9. [Los casos anteriores necesitan su versión creadora o una ingesta nueva](docs/es/cases.md#casos-y-exportaciones-de-una-versión-anterior).
+La versión 0.7 usa una única cadena decodificador de origen → mapeo identificado → escritor V3 en la CLI, la TUI y la demo. Solo lee CaseCreated versión 6 y la exportación V10. [Los casos anteriores necesitan su versión creadora o una ingesta nueva](docs/es/cases.md#casos-y-exportaciones-de-una-versión-anterior).
 
 La compilación normal incluye todos los módulos de producto actuales y ambos llaveros. Los modelos remotos y conectores permanecen desactivados hasta seleccionarlos y configurarlos. Los parsers locales se eligen por detección del contenido. Una compilación mínima usa `--no-default-features --features keystore-file` porque siempre se necesita firma y un backend de secretos. Todos siguen siendo experimentales.
 
@@ -197,7 +199,8 @@ Lee [security-model.md](docs/es/security-model.md) antes de conectar un proveedo
 - **v0.5 (entregada):** Subagentes paralelos acotados, ramas firmadas y eventos en streaming.
 - **Lanzamiento público:** Publicar la demo, el benchmark y el catálogo inicial de skills.
 - **v0.6:** Añadir consultas en origen con presupuestos.
-- **v0.7:** Añadir detecciones locales, informes exportables, extensiones controladas y una API del motor.
+- **v0.7:** Detección local con Sigma e informes firmados.
+- **v0.8:** Hooks, MCP y API del motor.
 - **1.0:** Estabilizar formatos firmados y completar revisiones externas de seguridad y conectores.
 
 La [hoja de ruta pública](docs/es/roadmap.md) describe intenciones, sin compromisos de publicación.

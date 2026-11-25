@@ -27,7 +27,7 @@ on:
         type: boolean
         default: false
       release_binary_reproducibility:
-        description: Run only the five native reproducibility jobs used by the release
+        description: Build the five reproducible release packages and test the portable Sigma case
         type: boolean
         default: false
 permissions:
@@ -317,7 +317,9 @@ jobs:
           IRMIND_EXPECT_PRESERVE_ORDER: '1'
         run: |
           cargo nextest run -p irmind --test format_goldens --test kubernetes_ingest --test identity_ingest --test parser_detection_matrix --all-features --features serde_json/preserve_order --cargo-profile ci --locked
-          cargo nextest run -p irmind-domain -p irmind-app -p irmind-infra --lib --features serde_json/preserve_order --cargo-profile ci --locked -E 'test(skill) | test(subagent) | test(/^catalog::/) | test(case_budget) | test(case_deletion) | test(cluster) | test(source_record) | test(provider_process) | test(fdr) | test(original_read) | test(source_mapping::stream::tests::replay) | test(source_queries) | test(source_query_dispatch) | test(query_capture) | test(case_created_v6) | test(export_v10_wire) | test(v10_proofs) | test(mapped_export) | test(mapped_pipeline::expanded_catalog) | test(partitioning::sorting) | test(disordered_azure_wide_merge)'
+          cargo nextest run -p irmind-domain -p irmind-app -p irmind-infra --lib --features serde_json/preserve_order --cargo-profile ci --locked -E 'test(skill) | test(subagent) | test(/^catalog::/) | test(case_budget) | test(case_deletion) | test(cluster) | test(source_record) | test(provider_process) | test(fdr) | test(original_read) | test(source_mapping::stream::tests::replay) | test(source_queries) | test(source_query_dispatch) | test(query_capture) | test(case_created_v6) | test(export_v10_wire) | test(v10_proofs) | test(report_coverage) | test(mapped_export) | test(mapped_pipeline::expanded_catalog) | test(partitioning::sorting) | test(disordered_azure_wide_merge)'
+          cargo nextest run -p irmind-infra --lib --features sigma,serde_json/preserve_order --cargo-profile ci --locked -E 'test(sigma)'
+          cargo nextest run -p irmind-sigma --lib --cargo-profile ci --locked
           cargo nextest run -p irmind-mapping-contracts -p irmind-mapping-tables -p irmind-mod-mapping-kubernetes -p irmind-mod-mapping-falco -p irmind-mod-mapping-network -p irmind-mod-parser-fdr -p irmind-mod-mapping-fdr -p irmind-mod-parser-macos -p irmind-mod-mapping-macos -p irmind-mod-parser-google-workspace -p irmind-mod-mapping-google-workspace -p irmind-mod-parser-s3-access -p irmind-mod-mapping-s3-access -p irmind-mod-parser-elb -p irmind-mod-mapping-elb -p irmind-mod-parser-iis-w3c -p irmind-mod-mapping-iis-w3c -p irmind-mod-parser-windows-dns -p irmind-mod-mapping-windows-dns -p irmind-mod-parser-route53 -p irmind-mod-mapping-route53 -p irmind-mod-parser-github-audit -p irmind-mod-mapping-github-audit -p irmind-mod-parser-defender -p irmind-mod-mapping-defender -p irmind-mod-parser-email -p irmind-mod-mapping-email -p irmind-mod-parser-vpc-flow -p irmind-mod-parser-azure-flow -p irmind-mod-parser-gcp-flow -p irmind-mod-mapping-cloud-flow -p irmind-mod-parser-guardduty -p irmind-mod-mapping-guardduty -p irmind-mod-parser-m365 -p irmind-mod-parser-okta -p irmind-mod-mapping-identity -p irmind-mod-parser-entra -p irmind-mod-mapping-entra -p irmind-mod-parser-gcp-audit -p irmind-mod-mapping-gcp-audit -p irmind-mod-mapping-cloudtrail -p irmind-mod-parser-evtx -p irmind-mod-mapping-evtx --lib --features serde_json/preserve_order --cargo-profile ci --locked
           cargo nextest run -p irmind-llm-chat-completions -p irmind-mod-llm-anthropic --lib --features serde_json/preserve_order --cargo-profile ci --locked
           cargo nextest run -p irmind-mod-siem-elastic -p irmind-mod-siem-chronicle -p irmind-mod-mapping-ecs -p irmind-mod-mapping-udm --lib --features serde_json/preserve_order --cargo-profile ci --locked
@@ -579,7 +581,7 @@ jobs:
   # here so installed verifiers retain the exact ci.yml signing identity.
   release:
     needs: [dco, linux, json_formats, release_binaries, windows, macos, native_macos, evtx_linux_compatibility, linux_verify_windows, macos_verify_windows]
-    if: ${{ !cancelled() && (needs.native_macos.result == 'success' || needs.native_macos.result == 'skipped') && needs.linux.result == 'success' && needs.json_formats.result == 'success' && needs.release_binaries.result == 'success' && needs.windows.result == 'success' && needs.macos.result == 'success' && needs.linux_verify_windows.result == 'success' && needs.macos_verify_windows.result == 'success' && needs.evtx_linux_compatibility.result == 'success' && (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_dry_run == true)) }}
+    if: ${{ !cancelled() && (needs.native_macos.result == 'success' || needs.native_macos.result == 'skipped') && needs.linux.result == 'success' && needs.json_formats.result == 'success' && needs.release_binaries.result == 'success' && needs.release_binaries.outputs.portable_sigma_verified == 'true' && needs.windows.result == 'success' && needs.macos.result == 'success' && needs.linux_verify_windows.result == 'success' && needs.macos_verify_windows.result == 'success' && needs.evtx_linux_compatibility.result == 'success' && (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_dry_run == true)) }}
     runs-on: ubuntu-26.04
     timeout-minutes: 30
     permissions:
