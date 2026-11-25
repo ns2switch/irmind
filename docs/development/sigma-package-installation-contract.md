@@ -2,8 +2,8 @@
 
 [Español](../es/development/sigma-package-installation-contract.md)
 
-**Status:** the analyst approved the shared repository and key. The source
-transport and final signed vectors remain under review before implementation.
+**Status:** the analyst approved the shared repository and key. The final
+signed vectors and the pinned deflate-flate2 transport are also approved.
 
 ## Publisher and signing key
 
@@ -106,9 +106,10 @@ from the local compiler, the active source inventory and the reviewed field
 table. A selected source that can supply a class does not guarantee any
 matching events in the case or time range.
 
-The [SigmaHQ transport comparison](sigmahq-package-transport-review.md) covers the three candidate designs. ZIP handling awaits approval.
+The [SigmaHQ transport comparison](sigmahq-package-transport-review.md) covers the three candidate designs. The approved implementation pins zip 9.8.2, disables defaults and enables only deflate-flate2 with the existing miniz backend.
 Cap the archive at 64 MiB of transport and 64 MiB of total decoded
-content and cap directory entries at 8,192. Apply the existing 4,096-rule
+content and cap directory entries at 8,192. Each ZIP entry can decode
+at most 1 MiB and at most 128 times its compressed size. Apply the existing 4,096-rule
 and 64 KiB per selected rule limits. Bound memory and time, and cancel
 between entries and during streaming decode. Validate both
 directory and local records, reject encryption, path aliases, unsafe entry
@@ -116,9 +117,7 @@ types, duplicate paths, unsupported encodings and entry methods. Allow only
 stored or deflated entries, reject any discrepancy in size or CRC, and stream
 validated members into bounded buffers. The raw hash and manifest pin apply
 to the whole candidate. No fetching an alternative archive after failure.
-The index and community bundle need no new dependency. A ZIP dependency
-would require separate approval after comparing a maintained bounded reader
-with the existing compression stack and available interfaces.
+The index and community bundle need no ZIP dependency.
 
 ## Analyst flow and version state
 

@@ -1,4 +1,8 @@
-//! Load analyst-selected regular YAML files under a single bounded local root.
+//! Inspect analyst-selected Sigma rules under a bounded transport.
+#[cfg(feature = "sigma")]
+mod archive;
+#[cfg(feature = "sigma")]
+pub use archive::inspect_sigmahq_archive;
 #[cfg(feature = "sigma")]
 pub mod evaluation;
 pub mod field_table;
@@ -41,21 +45,24 @@ pub fn inspect_local_sigma_pack(
     root: &Path,
     cancel: &CancellationToken,
 ) -> Result<LocalSigmaPack, AppError> {
+    read_local_sigma_pack(root, cancel, admit_rule_identity)
+}
+
+#[cfg(feature = "sigma")]
+fn admit_rule_identity(raw: &[u8]) -> Result<SigmaRuleIdentity, AppError> {
     use irmind_sigma::RuleValue;
-    read_local_sigma_pack(root, cancel, |raw| {
-        let document = irmind_sigma::admit_rule(raw).map_err(|_| {
-            AppError::Policy("A Sigma rule is invalid or uses unsupported YAML syntax".into())
-        })?;
-        let text = |name| match document.fields().get(name) {
-            None => Ok(None),
-            Some(RuleValue::Text(value)) => Ok(Some(value.clone())),
-            Some(_) => Err(AppError::Policy("Sigma rule metadata must be text".into())),
-        };
-        Ok(SigmaRuleIdentity {
-            id: text("id")?,
-            version: text("version")?,
-            author: text("author")?,
-        })
+    let document = irmind_sigma::admit_rule(raw).map_err(|_| {
+        AppError::Policy("A Sigma rule is invalid or uses unsupported YAML syntax".into())
+    })?;
+    let text = |name| match document.fields().get(name) {
+        None => Ok(None),
+        Some(RuleValue::Text(value)) => Ok(Some(value.clone())),
+        Some(_) => Err(AppError::Policy("Sigma rule metadata must be text".into())),
+    };
+    Ok(SigmaRuleIdentity {
+        id: text("id")?,
+        version: text("version")?,
+        author: text("author")?,
     })
 }
 

@@ -62,3 +62,30 @@ read, size, path and manifest controls. The custom reader moves structural
 parsing and discrepancy checks into IRMind. Individual pinned files are
 viable for small curated sets. This recommendation needs approval before
 changing the workspace.
+
+## Linked IRMind measurement
+
+Two Linux x86_64 IRMind release builds used Rust 1.97.1, ThinLTO,
+one codegen unit, default shipping features and stripped symbols.
+Both used the candidate lockfile. The baseline omits all calls to
+the reader. The second uses a temporary entry point that invokes the
+reader on a synthetic archive and its pinned rule selection. The
+entry point was removed after measurement.
+
+| Build | Bytes |
+| --- | ---: |
+| Baseline | 47,265,392 |
+| With the ZIP reader linked | 47,407,984 |
+| Difference | 142,592 |
+
+The workspace lock adds four packages for the approved reader.
+Linux uses `zip`, `typed-path` and `constant_time_eq`.
+The macOS dependency graph adds `nix 0.31.3` through ZIP.
+The only enabled ZIP feature is `deflate-flate2`, with its internal
+`_deflate-any` switch. Cargo-deny accepts the workspace and fuzz
+lockfiles. See [the dependency notices](../../THIRD_PARTY_NOTICES.md#sigmahq-zip-reader).
+
+The reader authenticated all 3,303 members of the pinned SigmaHQ
+archive. It independently checks CRC and deflate stream completion,
+including the exact length consumed. It rejects gaps in the ZIP
+layout and retains only the explicitly selected, hash-pinned rules.

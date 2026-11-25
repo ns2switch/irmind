@@ -2,8 +2,8 @@
 
 [English](../../development/sigma-package-installation-contract.md)
 
-**Estado:** el analista aprobó compartir el repositorio y la clave. Quedan
-por revisar los vectores finales y el transporte de reglas de SigmaHQ.
+**Estado:** el analista aprobó el repositorio y la clave compartidos,
+los vectores finales y el transporte ZIP acotado para SigmaHQ.
 
 ## Catálogo y clave de firma
 
@@ -39,7 +39,13 @@ registra la URL oficial, SHA-256 y atribución DRL 1.1. La selección
 revisada contiene solo coordenadas y hashes. El catálogo no redistribuye
 el YAML de SigmaHQ. El fichero ZIP original se verifica antes de leerlo.
 Una selección explícita permite omitir reglas fuera del subconjunto
-admitido y la vista previa muestra cuántas quedaron fuera. La ruta oficial queda pendiente de la [comparación de transportes](../../development/sigmahq-package-transport-review.md) y de su aprobación.
+admitido y la vista previa muestra cuántas quedaron fuera. El lector fija
+zip 9.8.2 con las opciones predeterminadas desactivadas y solo
+`deflate-flate2` sobre miniz. Admite ZIP32 de un volumen, hasta 8.192 entradas,
+64 MiB de entrada y salida total, y un máximo por entrada de 1 MiB y 128
+veces su tamaño comprimido. Comprueba el CRC de todas las entradas y
+rechaza miembros solapados y datos sin entrada. Consulta la [comparación
+de transportes](../../development/sigmahq-package-transport-review.md).
 [Release fijada de SigmaHQ](https://github.com/SigmaHQ/sigma/releases/tag/r2026-07-01) ·
 [Licencia](https://github.com/SigmaHQ/sigma/blob/552f3fee420ef232a8e5790c4fae591847e32347/LICENSE).
 
