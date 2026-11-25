@@ -177,7 +177,8 @@ All new objects are content-addressed by SHA-256 of their full bodies.
 | Sigma export proof kind 8 | Canonical package metadata JSON as defined above. For an official reference, derive it from the signed entry, using its attribution. Match the committed digest in the installation record |
 
 The installation operation is global and signed by Analyst. The case
-record is signed by Analyst with analyst origin and no evidence attached.
+record uses audit kind `sigma-case-run-admission-v1` and the existing
+case-entry challenge. It is signed by Analyst with analyst origin and no evidence attached.
 The existing run links to the case admission through its checkpoint.
 Commit the case admission, run receipt and findings atomically. Require
 the pre-admission checkpoint, time, sources, inventory, field table,
@@ -228,7 +229,7 @@ job for an approved protected tag alone uses the chosen signing key.
 
 The [independent final vectors](sigma-package-vectors/wire.json) fix the
 package, both signed indexes and cross-domain failures, local and catalog
-installation, deactivation, case admission, all three new proof bodies
+installation, deactivation, the signed case admission, all three new proof bodies
 and the ordered V10 package proof union. The fixtures contain only
 synthetic rules, keys and signatures. Negative fixtures cover invalid signatures and signature
 purpose, package swap, modified byte, rollback after removal, publishing

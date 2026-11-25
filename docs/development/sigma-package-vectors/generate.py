@@ -89,6 +89,32 @@ def global_operation(body):
     return encoded, preimage, digest
 
 
+def signed_case_admission(body, case_id, previous_hash):
+    key_label = "synthetic Sigma package analyst"
+    key, _ = signature(b"synthetic key derivation", key_label)
+
+    def sized(raw):
+        return u64(len(raw)) + raw
+
+    payload = body.hex()
+    kind = "sigma-case-run-admission-v1"
+    preimage = (
+        b"irmind-audit-v2\0" + u64(10) + sized(case_id.encode("ascii"))
+        + u64(1795392100) + sized(b"analyst") + sized(b"analyst")
+        + sized(kind.encode("ascii")) + sized(payload.encode("ascii"))
+        + bytes(1) + previous_hash + sized(key)
+    )
+    digest = sha(preimage)
+    _, sig = signature(digest, key_label)
+    assert_verification(key, digest, sig, True)
+    entry = json_bytes(dict(
+        seq=10, case_id=case_id, at=1795392100, actor="analyst", origin="analyst",
+        kind=kind, payload=payload, evidence=None, prev=list(previous_hash),
+        hash=list(digest), sig=list(sig), public_key=list(key),
+    ))
+    return entry, preimage
+
+
 def proof_records(objects):
     descriptors = [
         (bytes([kind]) + sha(body) + u64(len(body)), body) for kind, body in objects
@@ -167,14 +193,17 @@ def examples():
         + b"\x00\x01" + synthetic("previous signed installation") + sha(metadata)
         + sha(manifest) + sha(package) + text(license_id) + b"\x00\x00"
     )
+    case_id = "00000000-0000-4000-8000-000000000010"
+    checkpoint = synthetic("checkpoint")
     case_admission = (
         b"irmind-sigma-case-run-admission-v1\0"
-        + text("00000000-0000-4000-8000-000000000010") + u64(9) + synthetic("checkpoint")
+        + text(case_id) + u64(9) + checkpoint
         + b"\x01" + operation_digest + synthetic("signed pack admission")
         + sha(manifest) + synthetic("inventory") + synthetic("sources")
         + struct.pack(">qq", 10, 20) + synthetic("table") + synthetic("compiled")
         + text("irmind-sigma-evaluator-v3-case-admission-v1") + u64(1000)
     )
+    case_entry, case_preimage = signed_case_admission(case_admission, case_id, checkpoint)
     return {
         "package": vector(package),
         "index": vector(index),
@@ -200,6 +229,8 @@ def examples():
         "local_installation": vector(installation),
         "local_deactivation": vector(deactivation),
         "case_admission": vector(case_admission),
+        "case_admission_signing_preimage": vector(case_preimage),
+        "signed_case_admission": vector(case_entry),
         "invalid_trailing_package_byte": vector(package + b"\x00"),
     }
 
