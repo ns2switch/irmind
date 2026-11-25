@@ -232,11 +232,31 @@ impl WorkspaceIo for RootWorkspaceIo {
             SigmaRunStatusV1::OversizedInput => "partial (oversized input)",
             SigmaRunStatusV1::Cancelled => "partial (cancelled)",
             SigmaRunStatusV1::ExactFieldsUnavailable => "partial (exact fields unavailable)",
+            SigmaRunStatusV1::CoverageLimited => "partial (source-class coverage)",
         };
         let mut text = format!(
             "Sigma run {status} · {} unconfirmed matches · {} skipped rules · {} work units",
             run.matched_rows, summary.skipped_rules, run.used_units
         );
+        let coverage = summary.class_coverage;
+        let _ = write!(
+            text,
+            "\nSource-class plan · {} rules with all, {} with some, {} with no eligible classes · {} eligible and {} skipped pairs",
+            coverage.all_rules,
+            coverage.some_rules,
+            coverage.no_rules,
+            coverage.eligible_pairs,
+            coverage.skipped_pairs,
+        );
+        if coverage.some_rules > 0 || coverage.no_rules > 0 {
+            text.push_str("\nCoverage gaps leave activity in the skipped classes undetermined.");
+        }
+        for (class, missing, incompatible) in summary.skipped_classes {
+            let _ = write!(
+                text,
+                "\n  {class} · {missing} missing bindings, {incompatible} incompatible types"
+            );
+        }
         if !summary.unavailable_by_source.is_empty() {
             text.push_str("\nExamined rows with unavailable exact fields by source. This may indicate source manipulation. Inspect the original evidence.");
             for (source, count) in summary.unavailable_by_source {

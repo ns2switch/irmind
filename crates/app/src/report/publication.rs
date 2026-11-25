@@ -8,8 +8,8 @@ use crate::{
     SignedEntry, SkillCompiler, SkillReceiptVerifier,
     v10_proofs::{
         CaseCheckpointV1, ReportAnalystSectionsV1, ReportCitationsV1, ReportCoverageV2,
-        ReportLanguageV1, ReportMediaV1, ReportPublishedV1, V10CheckpointView, V10ProofDescriptor,
-        V10ProofFamily, V10RowReference, v10_proof_commitment,
+        ReportLanguageV1, ReportMediaV1, ReportPublishedV1, SigmaProofRead, V10CheckpointView,
+        V10ProofDescriptor, V10ProofFamily, V10RowReference, v10_proof_commitment,
     },
 };
 use irmind_domain::ParquetArtifact;
@@ -77,7 +77,7 @@ impl Engine<'_> {
                 "Report preview is stale. Preview the case again before signing.".into(),
             ));
         }
-        let coverage = self.resolve_cited_report_coverage(view.entries(), cancel)?;
+        let coverage = self.resolve_cited_report_coverage(id, view.entries(), cancel)?;
         let findings = self.findings_unlocked(id, view.entries())?;
         let store = self.large_case_store.as_ref().ok_or_else(unavailable)?;
         let material = CitedReportMaterial {
@@ -163,7 +163,10 @@ impl Engine<'_> {
             self.skills
                 .as_ref()
                 .map(|services| (skills, services.compiler.as_ref())),
-            |kind, digest| store.read_report_proof(&case.id, kind, digest, cancel),
+            (
+                |kind, digest| store.read_report_proof(&case.id, kind, digest, cancel),
+                |kind, digest| store.read_sigma_proof(&case.id, kind, digest, cancel),
+            ),
             |artifact, row| store.verify_report_row(&case.id, artifact, row, cancel),
             cancel,
         )
@@ -178,7 +181,10 @@ pub fn verify_report_history(
     entries: &[SignedEntry],
     copied_evidence: &BTreeSet<String>,
     skills: Option<(&SkillReceiptVerifier, &dyn SkillCompiler)>,
-    mut read: impl FnMut(u8, [u8; 32]) -> Result<Vec<u8>, AppError>,
+    (mut read, mut read_sigma): (
+        impl FnMut(u8, [u8; 32]) -> Result<Vec<u8>, AppError>,
+        impl FnMut(u8, [u8; 32]) -> Result<SigmaProofRead, AppError>,
+    ),
     mut verify_row: impl FnMut(&ParquetArtifact, V10RowReference) -> Result<(), AppError>,
     cancel: &CancellationToken,
 ) -> Result<BTreeSet<(u8, [u8; 32])>, AppError> {
@@ -192,7 +198,7 @@ pub fn verify_report_history(
         }
         let receipt = report_publication(entry)?;
         let view = V10CheckpointView::resolve(entries, &receipt.checkpoint)?;
-        let coverage = ResolvedReportCoverage::resolve(view.entries(), skills)?;
+        let coverage = ResolvedReportCoverage::resolve(view.entries(), skills, &mut read_sigma)?;
         let mut known = copied_evidence.clone();
         for evidence in view.entries() {
             if let Some(source) =

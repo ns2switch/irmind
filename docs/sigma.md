@@ -12,13 +12,14 @@ IRMind evaluates a bounded subset of Sigma detection rules over the authenticate
 4. Review the proposed matches and their row references. Use `/confirm <finding-id>` to confirm an individual finding before publishing the case report.
 5. Run `/verify` to check the authenticated case and its Sigma material. Seal the case before exporting V10. The recipient can verify the export using the case's expected analyst key fingerprint.
 
-A run can skip rules whose logsource or fields lack an exact binding. A rule must resolve its fields in every applicable enrolled class in the case. A scan is partial if it stops early or encounters indeterminate rows. An empty result from a partial scan or from an omitted source leaves the corresponding activity undetermined.
+Sigma compiles the full rule independently for each applicable source class and runs it where all fields have exact bindings. The signed run records skipped class and rule pairs and distinguishes coverage gaps from indeterminate rows and interrupted scans. An empty result leaves activity in any skipped class undetermined.
 
 Of the 3,302 files in the pinned SigmaHQ r2026-07-01 release, 3,301 passed pack admission and 1,022 compiled for all applicable classes in the reviewed field table. See the [counts and rejection reasons by family](development/benchmarks/sigmahq-v070-admission.md).
 
 The [v0.7.3 table-only audit](development/benchmarks/sigmahq-v073-reviewed-fields.md) compiled 1,159 of the same 3,302 rules with the V2 evaluator. The audit records the effect of each block separately.
 
 The [V3 cloud and macOS audit](development/benchmarks/sigmahq-v073-cloud-bindings.md) measures the expanded table in five cumulative runs. The bindings use explicit retained provider fields. Fields requiring a different representation are documented separately in the [projection proposal](development/sigma-structured-original-paths-proposal.md).
+Compare the [V2 and V3 admission and scan measurements](development/benchmarks/sigma-v073-source-classes.md) for the same reviewed table.
 
 ## Source coverage and field names
 

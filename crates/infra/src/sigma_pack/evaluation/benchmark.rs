@@ -84,6 +84,15 @@ fn fixture_file(path: &std::path::Path, records: u64) {
 pub(super) fn write_fixture_rows(
     path: &std::path::Path,
     records: u64,
+    projected: impl FnMut(u64) -> (String, String),
+) {
+    write_padded_fixture_rows(path, records, None, projected);
+}
+
+pub(super) fn write_padded_fixture_rows(
+    path: &std::path::Path,
+    records: u64,
+    padding: Option<&str>,
     mut projected: impl FnMut(u64) -> (String, String),
 ) {
     let file = OpenOptions::new()
@@ -101,14 +110,24 @@ pub(super) fn write_fixture_rows(
         let (common, original): (Vec<_>, Vec<_>) = (begin..(begin + 1024).min(records))
             .map(&mut projected)
             .unzip();
-        let batch = RecordBatch::try_from_iter([
+        let common_count = common.len();
+        let mut columns = vec![
             (
                 "common_payload",
                 Arc::new(StringArray::from(common)) as ArrayRef,
             ),
             ("text", Arc::new(StringArray::from(original)) as ArrayRef),
-        ])
-        .unwrap();
+        ];
+        if let Some(padding) = padding {
+            columns.push((
+                "unused_benchmark_column",
+                Arc::new(StringArray::from_iter_values(std::iter::repeat_n(
+                    padding,
+                    common_count,
+                ))) as ArrayRef,
+            ));
+        }
+        let batch = RecordBatch::try_from_iter(columns).unwrap();
         if writer.is_none() {
             writer = Some(
                 ArrowWriter::try_new(

@@ -163,7 +163,6 @@ impl<'a> SigmaVariantPrograms<'a> {
         &self.skipped
     }
 
-    #[cfg(test)]
     pub fn eligible(&self) -> usize {
         self.eligible.len()
     }
@@ -639,7 +638,7 @@ fn scalar_json(
     }
 }
 
-fn field_kind(field: SigmaBindingType) -> SigmaFieldKind {
+pub(super) fn field_kind(field: SigmaBindingType) -> SigmaFieldKind {
     use SigmaBindingType as Kind;
     match field {
         Kind::Text => SigmaFieldKind::Text,

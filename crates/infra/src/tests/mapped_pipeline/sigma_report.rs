@@ -277,19 +277,65 @@ fn scan(store: &LocalStore, case: &CaseId, cancel: &CancellationToken) -> V10Row
             cancel,
             |physical_row, common, _| {
                 assert_eq!(common.origin().source(), &manifest.source.sha256);
-                matches.push(V10RowReference {
-                    source,
-                    artifact: artifact_ref,
-                    physical_row,
-                    record: common.origin().record(),
-                });
+                matches.push((
+                    V10RowReference {
+                        source,
+                        artifact: artifact_ref,
+                        physical_row,
+                        record: common.origin().record(),
+                    },
+                    common.clone(),
+                ));
                 Ok(())
             },
         )
         .unwrap();
     assert_eq!(matches.len(), 1);
-    verify_sigma_case_references(&entries, &base, matches[0], key, &root, cancel);
-    matches[0]
+    let (row, event) = &matches[0];
+    verify_sigma_case_references(&entries, &base, *row, key.clone(), &root, cancel);
+    verify_sigma_v3_binding(&entries, &base, &artifact, *row, event, key, cancel);
+    *row
+}
+
+fn verify_sigma_v3_binding(
+    entries: &[SignedEntry],
+    checkpoint: &CaseCheckpointV1,
+    artifact: &ParquetArtifact,
+    row: V10RowReference,
+    event: &irmind_domain::CommonEventV1,
+    rule: SigmaRuleKeyV1,
+    cancel: &CancellationToken,
+) {
+    use crate::sigma_pack::{SigmaMatchCheck, verify_class_plan};
+    use irmind_app::v10_proofs::{SigmaClassOutcome, SigmaClassPlan};
+
+    let (receipt, mut materials) = sigma_case_row_proofs(checkpoint, row, rule.clone(), cancel);
+    let table = ReviewedSigmaFieldTable::parse(&materials.field_table).unwrap();
+    let mut plan = SigmaClassPlan::new(vec![0], 1).unwrap();
+    plan.set(0, 0, SigmaClassOutcome::Eligible).unwrap();
+    materials.class_plan = Some(plan);
+    let rules = [(rule, SIGMA_RULE)];
+    let deadline = Instant::now() + Duration::from_secs(5);
+    verify_class_plan(
+        &receipt, &materials, &table, entries, &rules, deadline, cancel,
+    )
+    .unwrap();
+    SigmaMatchCheck::new(&table, &materials, &rules, deadline, 10_000, cancel)
+        .check(artifact, row, event, "{}")
+        .unwrap();
+
+    materials.compiled_rules.0[0].variants.clear();
+    assert!(
+        verify_class_plan(
+            &receipt, &materials, &table, entries, &rules, deadline, cancel
+        )
+        .is_err()
+    );
+    assert!(
+        SigmaMatchCheck::new(&table, &materials, &rules, deadline, 10_000, cancel)
+            .check(artifact, row, event, "{}")
+            .is_err()
+    );
 }
 
 fn verify_sigma_case_references(
@@ -333,6 +379,7 @@ fn sigma_case_row_proofs(
         V10ProofDescriptor, V10ProofFamily, v10_proof_commitment,
     };
     let objects = V10SigmaRunObjects {
+        class_plan: None,
         field_table: cloudtrail_definition(),
         selected_sources: SigmaSourceScopeV1(vec![row.source]),
         compiled_rules: SigmaCompiledRulesV1(vec![SigmaCompiledRuleV1 {
@@ -503,10 +550,28 @@ fn signed_sigma_run_and_admitted_rules_verify_in_the_actual_sealed_v10_export() 
         .run_sigma(&engine, &case.id, pack, range, &cancel)
         .unwrap();
     assert_eq!(receipt.receipt.matched_rows, 1);
-    assert_eq!(receipt.skipped_rules, 0);
+    assert_eq!(receipt.skipped_rules, 1);
+    assert_eq!(receipt.class_coverage.no_rules, 1);
+    assert_eq!(
+        receipt.receipt.status,
+        irmind_app::v10_proofs::SigmaRunStatusV1::CoverageLimited
+    );
+    assert_signed_coverage_notices(&store, &engine, &case.id, &cancel);
     let findings = engine.findings(&case.id).unwrap();
     assert_eq!(findings.len(), 1);
     assert!(!findings[0].confirmed);
+    let plan = store
+        .plan_cited_report(
+            &engine,
+            &case.id,
+            ReportDocumentLanguage::English,
+            ReportDocumentFormat::Markdown,
+            &cancel,
+        )
+        .unwrap();
+    engine
+        .publish_cited_report(&case.id, plan, &cancel)
+        .unwrap();
     engine.verify(&case.id).unwrap();
     engine.seal(&case.id).unwrap();
     let package = root.path().join("sigma-executed.irmind");
@@ -530,6 +595,27 @@ fn signed_sigma_run_and_admitted_rules_verify_in_the_actual_sealed_v10_export() 
     );
 }
 
+fn assert_signed_coverage_notices(
+    store: &LocalStore,
+    engine: &Engine<'_>,
+    case: &CaseId,
+    cancel: &CancellationToken,
+) {
+    let preview = store
+        .preview_cited_report(engine, case, ReportDocumentLanguage::English, cancel)
+        .unwrap();
+    assert!(preview.markdown.contains("remains undetermined"));
+    assert!(preview.markdown.contains(r"aws \/ cloudtrail \/"));
+    assert!(preview.markdown.contains("1 missing bindings"));
+    let notices = engine
+        .verify_with_mapping_and_query_notices(case, cancel)
+        .unwrap();
+    let notice = &notices.sigma_runs[0];
+    assert_eq!(notice.coverage.skipped_pairs, 1);
+    assert_eq!(notice.skipped_classes[0].1, 1);
+    assert!(notice.skipped_classes[0].0.contains("aws / cloudtrail /"));
+}
+
 fn admit_test_sigma_pack(
     store: &LocalStore,
     engine: &Engine<'_>,
@@ -539,10 +625,107 @@ fn admit_test_sigma_pack(
     let rules = root.join("rules");
     fs::create_dir(&rules).unwrap();
     fs::write(rules.join("auth.yml"), SIGMA_RULE).unwrap();
+    fs::write(
+        rules.join("unsupported.yml"),
+        "title: Synthetic missing cloud field\nlogsource: {product: aws, service: cloudtrail}\ndetection: {selection: {SyntheticMissing: test}, condition: selection}\n",
+    ).unwrap();
     let preview = crate::sigma_pack::inspect_local_sigma_pack(&rules, cancel).unwrap();
     let digest = sha256(&preview.manifest.encode().unwrap());
     store
         .admit_local_sigma_pack(engine, &rules, digest, "MIT", cancel)
         .unwrap();
     digest
+}
+
+fn write_failed_deliveries(originals: &Path) -> Vec<String> {
+    fs::create_dir(originals).unwrap();
+    let raw = include_bytes!("../../../../testkit/fixtures/common/cloudtrail-console-login.jsonl");
+    let mut event: serde_json::Value = serde_json::from_slice(raw).unwrap();
+    (0..4)
+        .map(|source| {
+            let name = format!("aws-{source}.json");
+            event["sourceIPAddress"] = format!("203.0.113.{source}").into();
+            event["eventID"] = format!("synthetic-console-failure-{source}").into();
+            let delivery = serde_json::json!({ "Records": [&event] });
+            let bytes = serde_json::to_vec(&delivery).unwrap();
+            fs::write(originals.join(&name), bytes).unwrap();
+            name
+        })
+        .collect()
+}
+
+#[test]
+fn sigma_v3_signed_proofs_are_identical_across_ingest_worker_caps() {
+    use irmind_testkit::FixedClock;
+    use std::num::NonZeroU16;
+
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path();
+    let originals = root.join("originals");
+    let paths = write_failed_deliveries(&originals);
+    let catalog = Arc::new(
+        MappingCatalog::freeze(
+            vec![Arc::new(JsonSourceDecoder)],
+            vec![Arc::new(
+                irmind_mod_mapping_cloudtrail::CloudTrailMapping::new().unwrap(),
+            )],
+        )
+        .unwrap(),
+    );
+    let seed = root.join("seed");
+    let (_, engine, _) = fixture_catalog(&seed, catalog.clone());
+    let case = engine
+        .create_case("Sigma worker determinism", "local only")
+        .unwrap();
+    drop(engine);
+    let clock = Arc::new(FixedClock::new(1_793_491_200));
+    let cancel = CancellationToken::new();
+    let mut expected = None;
+    for cap in [1, 4] {
+        let directory = root.join(format!("workers-{cap}"));
+        fs::create_dir(&directory).unwrap();
+        fs::copy(seed.join("irmind.db"), directory.join("irmind.db")).unwrap();
+        let (store, engine, catalog) =
+            fixture_with_clock(&directory, catalog.clone(), clock.clone());
+        let engine = engine.with_large_case_pipeline(store.clone(), Arc::new(json_source_parser()));
+        store.set_parallel_worker_limit(NonZeroU16::new(cap));
+        let parser = catalog
+            .decoder_selection("parser-json", "json-source-v1")
+            .unwrap();
+        let large = LargeCaseUseCases {
+            engine: &engine,
+            store: store.as_ref(),
+            parser: &parser,
+        };
+        assert_eq!(
+            large
+                .ingest_local_batch(&case.id, &originals, &paths, false, &cancel)
+                .unwrap()
+                .len(),
+            4
+        );
+        let pack = admit_test_sigma_pack(&store, &engine, &directory, &cancel);
+        let run = store
+            .run_sigma(&engine, &case.id, pack, 0..i64::MAX, &cancel)
+            .unwrap();
+        assert_eq!(run.receipt.matched_rows, 4);
+        engine.verify(&case.id).unwrap();
+        let entries = store.entries(&case.id).unwrap();
+        let execution = entries
+            .iter()
+            .position(|entry| entry.kind == AuditEventKind::SigmaRunV1)
+            .unwrap();
+        // Finding drafts have independent UUIDs. Compare the entire signed
+        // prefix through the run, which commits the exact rows and class plan.
+        let hashes = entries[..=execution]
+            .iter()
+            .map(|entry| entry.hash)
+            .collect::<Vec<_>>();
+        let actual = (run.receipt.encode().unwrap(), hashes);
+        if let Some(expected) = &expected {
+            assert_eq!(&actual, expected);
+        } else {
+            expected = Some(actual);
+        }
+    }
 }
