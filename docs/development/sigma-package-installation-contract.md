@@ -2,27 +2,35 @@
 
 [Español](../es/development/sigma-package-installation-contract.md)
 
-**Status:** proposed for review. Both catalog options use the same package,
-installation and case formats below. The choice of publisher and trust root,
-the signed records and the ZIP reader need approval before implementation.
+**Status:** the analyst approved the shared repository and key. The source
+transport and final signed vectors remain under review before implementation.
 
 ## Publisher and signing key
 
 | Option | Advantages | Costs and trust boundary |
 | --- | --- | --- |
-| Use `irmind-skills` and its existing Ed25519 key | One repository, contribution process, protected release environment, key to provision and rotation procedure. Reuse the release infrastructure and keep discovery in one place. | The same private key can approve both catalogs. A key compromise or compromised publish workflow can affect both. Key rotation and release availability are coupled. The repository needs separate asset names, CI paths and monotonically increasing sequences for each catalog. |
-| Separate Sigma catalog and maintainer-generated Ed25519 key | Independent trust, release cadence, license review, rollback history and revocation. Revoking a key for one catalog leaves the other trust root available. | An additional repository and protected environment, separate workflows, initial key provisioning and an IRMind release to compile that public key. Maintaining both takes more time. |
+| **Approved** · use `irmind-skills` and its existing Ed25519 key | Reuse the repository, protected release environment, publishing infrastructure and key management. | The same private key authorizes both catalogs. Key rotation or revocation affects both. Keep separate assets, index domains, release sequences and validation jobs. |
+| Separate Sigma catalog and Ed25519 key | Independent trust, release cadence, reviews and revocation. | An additional repository, protected environment and key to provision. |
 
-Recommend the separate catalog and key because rules and forensic methods
-have separate contribution and licensing workflows. The maintainer chooses
-the repository and provisions its key if this option is approved.
-In either option, compile the publisher identity, purpose and a bounded list
-of up to eight accepted Ed25519 public keys into IRMind. Verify index signatures
-strictly with the existing verifier. The signature domain is specific to Sigma
-even with a shared key. A signed skill index does not satisfy it. Revocation
-and rotation use an IRMind release. Historical installed packs keep their
-original publisher evidence. Full verification reports unavailable publisher
-trust if the verifying build no longer authorizes that key.
+Use `ns2switch/irmind-skills`, directory `sigma/`, and the existing compiled
+catalog keyset. The Sigma release job publishes `sigma-index.json`,
+`sigma-index.ed25519` and distinctly named Sigma assets. Use a separate
+monotonic Sigma sequence even when both catalogs ship under the same tag.
+The skills index, asset names, admission and sequence remain distinct.
+Reuse the existing protected `release` environment and its
+`CATALOG_ED25519_SEED_HEX` secret for protected-tag publishing. No key is
+generated for this change. The [key rotation procedure](catalog-key-setup.md)
+applies to both catalogs. Remove a compromised key from both sets of accepted
+indexes in the same IRMind release. Historical installed packs retain their
+publisher evidence and report unavailable publisher trust if the verifying
+build has retired that key.
+
+The existing strict Ed25519 verifier checks different signature domains.
+The vectors use the same synthetic signer for both indexes. Each verifies
+in its own domain and fails under the other domain with identical content
+bytes and key. CI checks Sigma packages with IRMind's current admission,
+compiler and field tables in a separate job from the existing skill checks.
+Fork checks have no access to the protected release environment or seed.
 
 ## Package and catalog
 
@@ -98,7 +106,7 @@ from the local compiler, the active source inventory and the reviewed field
 table. A selected source that can supply a class does not guarantee any
 matching events in the case or time range.
 
-Exact ZIP handling for official references is a distinct review point.
+The [SigmaHQ transport comparison](sigmahq-package-transport-review.md) covers the three candidate designs. ZIP handling awaits approval.
 Cap the archive at 64 MiB of transport and 64 MiB of total decoded
 content and cap directory entries at 8,192. Apply the existing 4,096-rule
 and 64 KiB per selected rule limits. Bound memory and time, and cancel
@@ -164,7 +172,7 @@ All new objects are content-addressed by SHA-256 of their full bodies.
 | --- | --- |
 | Global `SigmaPackageInstallationV1` | Domain `irmind-sigma-package-installation-v1\0`, then name, version, active byte, previous installation operation digest (optional only for the first install), metadata digest, manifest digest, asset digest, license, origin byte (0 local, 1 signed catalog asset, 2 signed SigmaHQ reference), publisher-proof digest (absent exactly for local) |
 | Case `SigmaCaseRunAdmissionV1` | Domain `irmind-sigma-case-run-admission-v1\0`, then existing `CaseCheckpointV1` for the pre-admission case head, installation operation digest (optional for an existing direct directory import), existing global Sigma pack admission digest, manifest digest, active artifact inventory digest, selected-sources digest, start and end UTC microseconds (signed i64 big-endian), field-table digest, compiled-rule digest, evaluator text, reserved work u64 |
-| Sigma export proof kind 6 | The exact canonical Analyst-signed global installation operation, with the existing global operation encoding. SHA-256 of the body is its object identity. Authenticate the operation signature independently and match its signed operation hash to the case admission |
+| Sigma export proof kind 6 | The exact canonical UTF-8 JSON of the Analyst-signed operation, in the existing order `case_id,seq,at,actor,operation,prev,hash,sig,public_key`. Byte arrays are JSON arrays of unsigned decimal bytes. The operation contains the lowercase-hex payload. Recompute the existing `irmind-operation-v1` challenge hash and verify the Analyst signature. SHA-256 of the body is its object identity. Authenticate the operation signature independently and match its signed operation hash to the case admission |
 | Sigma export proof kind 7 | Domain `irmind-sigma-catalog-proof-v1\0`, u64 index length, exact signed JSON bytes and raw 64-byte signature. Require the full index so verification can reconstruct the signature preimage |
 | Sigma export proof kind 8 | Canonical package metadata JSON as defined above. For an official reference, derive it from the signed entry, using its attribution. Match the committed digest in the installation record |
 
@@ -218,14 +226,13 @@ catalog. Community packs are checked with synthetic fixtures. Fork
 checks have read-only permissions and no release secrets. The release
 job for an approved protected tag alone uses the chosen signing key.
 
-The [independent draft vectors](sigma-package-vectors/wire.json) fix
-package, index and signature preimage, local installation and deactivation,
-and case admission bytes. The index uses a synthetic publisher name.
-Finalize the signed catalog proof and V10 proof-union vectors with the
-publisher choice before implementing the records. Negative fixtures cover invalid signatures and signature
+The [independent final vectors](sigma-package-vectors/wire.json) fix the
+package, both signed indexes and cross-domain failures, local and catalog
+installation, deactivation, case admission, all three new proof bodies
+and the ordered V10 package proof union. The fixtures contain only
+synthetic rules, keys and signatures. Negative fixtures cover invalid signatures and signature
 purpose, package swap, modified byte, rollback after removal, publishing
 equivocation, stale case plans, missing admission, unexpected proof
 and interrupted commits. Fuzz and test archive and canonical decoders
-with bounded synthetic inputs before shipping them. The concrete key
-and publisher choice, format identifiers and vectors, the ZIP path and
-any new production dependency or port are separate approval points.
+with bounded synthetic inputs before shipping them. The final vectors and the upstream transport choice
+require approval before adding the records or a reader.

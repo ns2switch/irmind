@@ -2,22 +2,26 @@
 
 [English](../../development/sigma-package-installation-contract.md)
 
-**Estado:** propuesta para revisión previa a la implementación. Quedan
-por aprobar el catálogo y la clave, los formatos firmados y el lector ZIP.
+**Estado:** el analista aprobó compartir el repositorio y la clave. Quedan
+por revisar los vectores finales y el transporte de reglas de SigmaHQ.
 
 ## Catálogo y clave de firma
 
 | Opción | Ventajas | Inconvenientes |
 | --- | --- | --- |
-| Reutilizar `irmind-skills` y su clave Ed25519 | Un repositorio, un proceso de contribución, un entorno protegido y una clave que mantener. Se reutiliza el flujo de publicación. | La misma clave autoriza ambos catálogos. Un incidente en la clave o el workflow puede afectar a las dos clases de paquetes. La rotación y la publicación quedan acopladas. Cada catálogo necesita sus propios nombres de artefactos y su secuencia. |
+| **Aprobada** · reutilizar `irmind-skills` y su clave Ed25519 | Un repositorio, un proceso de contribución, un entorno protegido y una clave que mantener. Se reutiliza el flujo de publicación. | La misma clave autoriza ambos catálogos. Un incidente en la clave o el workflow puede afectar a las dos clases de paquetes. La rotación y la publicación quedan acopladas. Cada catálogo necesita sus propios nombres de artefactos y su secuencia. |
 | Usar un catálogo separado con clave propia generada por el mantenedor | La confianza, los plazos de publicación, las licencias, el historial de versiones y la revocación quedan separados. | Otro repositorio y entorno protegido, workflows separados, generación de la clave y una release de IRMind que incluya su clave pública. |
 
-La propuesta recomienda la segunda opción. Ambas reutilizan la
-verificación estricta Ed25519. El binario fija la identidad del catálogo
-y las claves públicas aceptadas. Las firmas de índices Sigma usan su
-propio dominio, aunque se comparta la clave. La rotación y la retirada
-exigen una release de IRMind. La clave privada se aprovisiona fuera
-del repositorio y solo se usa en el entorno protegido de publicación.
+Sigma usa el directorio `sigma/` de `ns2switch/irmind-skills`, con
+`sigma-index.json`, `sigma-index.ed25519`, nombres de artefactos
+propios y una secuencia independiente. La publicación conserva el
+entorno protegido `release` y el secreto `CATALOG_ED25519_SEED_HEX`.
+Los dos índices usan el mismo conjunto de claves y distintos dominios
+de firma. Los vectores verifican cada índice en su dominio y lo rechazan
+al intercambiarlos. La rotación o retirada de una clave afecta a ambos
+catálogos y exige una release de IRMind. La CI de Sigma utiliza la
+admisión, el compilador y las tablas de IRMind en un job separado del
+de las skills.
 
 ## Índice y origen de los paquetes
 
@@ -35,8 +39,7 @@ registra la URL oficial, SHA-256 y atribución DRL 1.1. La selección
 revisada contiene solo coordenadas y hashes. El catálogo no redistribuye
 el YAML de SigmaHQ. El fichero ZIP original se verifica antes de leerlo.
 Una selección explícita permite omitir reglas fuera del subconjunto
-admitido y la vista previa muestra cuántas quedaron fuera. La ruta
-oficial requiere aprobar el lector ZIP y cualquier dependencia nueva.
+admitido y la vista previa muestra cuántas quedaron fuera. La ruta oficial queda pendiente de la [comparación de transportes](../../development/sigmahq-package-transport-review.md) y de su aprobación.
 [Release fijada de SigmaHQ](https://github.com/SigmaHQ/sigma/releases/tag/r2026-07-01) ·
 [Licencia](https://github.com/SigmaHQ/sigma/blob/552f3fee420ef232a8e5790c4fae591847e32347/LICENSE).
 
@@ -84,6 +87,4 @@ La CI del catálogo comprueba la licencia declarada y usa la misma
 admisión, el mismo compilador y las mismas tablas que IRMind para
 publicar la cobertura. Los PRs de forks usan permisos de solo lectura.
 La versión inglesa fija el detalle del wire y las pruebas negativas.
-El borrador incluye [vectores de wire](../../development/sigma-package-vectors/wire.json).
-La elección de catálogo y clave precede a los vectores finales de firma
-y a la implementación de los registros.
+Los [vectores finales](../../development/sigma-package-vectors/wire.json) cubren ambas firmas, la instalación, la admisión de caso y los tres objetos nuevos de V10. Los registros esperan su revisión.
