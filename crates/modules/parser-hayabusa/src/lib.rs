@@ -35,6 +35,9 @@ impl Module for HayabusaParser {
     }
 }
 impl LogParser for HayabusaParser {
+    fn description(&self) -> &'static str {
+        "Hayabusa CSV and JSONL timelines"
+    }
     fn time_context_requirement(
         &self,
         source: &str,

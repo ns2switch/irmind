@@ -40,6 +40,9 @@ impl Module for LinuxParser {
     }
 }
 impl LogParser for LinuxParser {
+    fn description(&self) -> &'static str {
+        "Linux auth, auditd, journald and HTTP access logs"
+    }
     fn detect(&self, _: &str, sample: &[u8]) -> Option<ParserConfidence> {
         let line = sample[..sample.len().min(65_536)]
             .split(|byte| *byte == b'\n')

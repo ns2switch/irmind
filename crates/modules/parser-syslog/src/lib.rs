@@ -41,6 +41,9 @@ impl Module for SyslogParser {
 }
 
 impl LogParser for SyslogParser {
+    fn description(&self) -> &'static str {
+        "Syslog RFC 5424/3164, plain or gzip"
+    }
     fn time_context_requirement(
         &self,
         source: &str,

@@ -31,6 +31,9 @@ impl Module for ChainsawParser {
     }
 }
 impl LogParser for ChainsawParser {
+    fn description(&self) -> &'static str {
+        "Chainsaw JSON and JSONL findings"
+    }
     fn time_context_requirement(
         &self,
         source: &str,

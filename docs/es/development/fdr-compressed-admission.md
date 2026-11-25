@@ -4,9 +4,9 @@ Implementado en la ruta de ingesta de FDR. [English](../../development/fdr-compr
 
 ## Admisión y reserva
 
-`DecodedJson16` se aplica solo a `parser-fdr/fdr-source-v1`. VPC Flow Logs usa
-`CompactFlow32`. Extender el perfil de JSON decodificado a ALB, S3 access logs,
-CloudTrail gzip u otro decodificador requiere una aprobación aparte.
+`DecodedJson16` se introdujo para `parser-fdr/fdr-source-v1`. Desde v0.7.2,
+`parser-json/json-source-v1` también lo usa para gzip. VPC Flow Logs usa
+`CompactFlow32`. Aplicar este perfil a otro decodificador requiere aprobación.
 
 La primera pasada abre el original en lectura, limita a 50 GiB tanto la entrada
 física como la decodificada y valida el CRC y el tamaño de cada miembro gzip.

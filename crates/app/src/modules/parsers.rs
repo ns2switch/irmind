@@ -18,10 +18,17 @@ pub struct DetectedParser {
     pub confidence: ParserConfidence,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, thiserror::Error)]
+pub enum NonEventSource {
+    #[error("CloudTrail integrity digest")]
+    CloudTrailDigest,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ParserChoice {
     Auto(DetectedParser),
     NeedsAnalyst(Vec<DetectedParser>),
+    NonEvent(NonEventSource),
     Unsupported,
 }
 
@@ -50,12 +57,20 @@ impl ParserCatalog {
     #[must_use]
     pub fn detect(&self, source_name: &str, sample: &[u8]) -> ParserChoice {
         let sample = &sample[..sample.len().min(64 * 1024)];
+        if let Some(kind) = self
+            .parsers
+            .values()
+            .find_map(|parser| parser.non_event_source(source_name, sample))
+        {
+            return ParserChoice::NonEvent(kind);
+        }
         let candidates = self
             .parsers
             .iter()
             .filter_map(|(id, parser)| {
                 parser
                     .detect(source_name, sample)
+                    .filter(|confidence| confidence.value() != 0)
                     .map(|confidence| DetectedParser {
                         id: id.clone(),
                         confidence,

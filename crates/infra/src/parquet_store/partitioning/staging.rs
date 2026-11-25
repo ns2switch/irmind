@@ -117,7 +117,13 @@ impl ParquetStore {
             Some(budget) => reserve_profile(id, budget)?,
             None => SourceReservation {
                 normalized_bytes: standard_allowance(physical)?,
-                decoded_byte_ceiling: None,
+                // An encoding change after reservation cannot expand a plain
+                // JSON source past the bytes already admitted for that file.
+                decoded_byte_ceiling: matches!(
+                    (id.name, id.version),
+                    ("parser-json", "json-source-v1")
+                )
+                .then_some(physical),
             },
         };
         Ok((physical, reservation))
@@ -247,7 +253,10 @@ fn reserve_profile(
     let decoded_byte_ceiling = match budget.profile() {
         NormalizedExpansionProfile::CompactFlow32 if id.name == "parser-vpc-flow" => None,
         NormalizedExpansionProfile::DecodedJson16
-            if id.name == "parser-fdr" && id.version == "fdr-source-v1" =>
+            if matches!(
+                (id.name, id.version),
+                ("parser-fdr", "fdr-source-v1") | ("parser-json", "json-source-v1")
+            ) =>
         {
             Some(budget.decoded_bytes())
         }

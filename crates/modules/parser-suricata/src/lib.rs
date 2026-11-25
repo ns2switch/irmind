@@ -35,6 +35,9 @@ impl Module for SuricataParser {
 }
 
 impl LogParser for SuricataParser {
+    fn description(&self) -> &'static str {
+        "Suricata EVE JSON logs"
+    }
     fn detect(&self, _source_name: &str, sample: &[u8]) -> Option<ParserConfidence> {
         mapping::detect(&sample[..sample.len().min(64 * 1024)])
             .and_then(|score| ParserConfidence::new(score).ok())

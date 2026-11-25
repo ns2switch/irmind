@@ -34,6 +34,9 @@ impl Module for EztoolsParser {
     }
 }
 impl LogParser for EztoolsParser {
+    fn description(&self) -> &'static str {
+        "EZ Tools CSV exports"
+    }
     fn time_context_requirement(
         &self,
         source: &str,

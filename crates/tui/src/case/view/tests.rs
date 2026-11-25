@@ -546,11 +546,16 @@ fn parser_prompt_hides_zero_confidence_unless_no_positive_candidates_exist() {
             ("csv".into(), 50),
             ("json".into(), 78),
         ],
-        std::collections::BTreeMap::new(),
+        std::collections::BTreeMap::from([
+            ("json".into(), "CloudTrail, JSON and NDJSON".into()),
+            ("csv".into(), "CSV exports".into()),
+        ]),
     );
     let shown = render_parser_prompt(&mut terminal, &prompt, body);
     assert!(shown.contains("> 1. json"));
     assert!(shown.contains("2. csv"));
+    assert!(shown.contains("json · 78% confidence · CloudTrail, JSON and NDJSON"));
+    assert!(shown.contains("csv · 50% confidence · CSV exports"));
     assert!(!shown.contains("unknown"));
     let prompt = ParserPrompt::new(
         "synthetic".into(),

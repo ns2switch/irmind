@@ -21,6 +21,11 @@ pub(crate) struct IngestRequest<'a> {
     pub default_cluster_context: Option<&'a irmind_app::SourceClusterContext>,
 }
 
+pub(crate) struct IngestSummary {
+    pub(crate) files: usize,
+    pub(crate) integrity_files: usize,
+}
+
 impl CaseWorkflow<'_, '_> {
     pub(crate) fn ingest_path(
         &self,
@@ -67,13 +72,14 @@ impl CaseWorkflow<'_, '_> {
             },
             &mut progress,
         )
+        .map(|summary| summary.files)
     }
 
     pub(crate) fn ingest_path_with_selections(
         &self,
         request: IngestRequest<'_>,
         mut progress: impl FnMut(usize, usize, &str),
-    ) -> Result<usize, AppError> {
+    ) -> Result<IngestSummary, AppError> {
         let path = request.path;
         let forced_parser = request.forced_parser;
         let files = self.io_ops.input_files(path).map_err(|_| {
@@ -93,6 +99,10 @@ impl CaseWorkflow<'_, '_> {
             return Err(AppError::Policy("parser override is unavailable".into()));
         }
         self.ingest_without_catalog(request, &files, &mut progress)
+            .map(|files| IngestSummary {
+                files,
+                integrity_files: 0,
+            })
     }
 
     fn ingest_without_catalog(
@@ -156,7 +166,7 @@ impl CaseWorkflow<'_, '_> {
         files: &[std::path::PathBuf],
         catalog: &ParserCatalog,
         progress: &mut impl FnMut(usize, usize, &str),
-    ) -> Result<usize, AppError> {
+    ) -> Result<IngestSummary, AppError> {
         let IngestRequest {
             id,
             path,
@@ -170,7 +180,8 @@ impl CaseWorkflow<'_, '_> {
             path.parent()
                 .ok_or(AppError::Policy("selected source has no parent".into()))?
         };
-        let selected = self.detect_sources(request, files, catalog)?;
+        let mut integrity_files = 0;
+        let selected = self.detect_sources(request, files, catalog, &mut integrity_files)?;
         let store = self.io_ops.large_case_store().ok_or(AppError::Policy(
             "signed Parquet ingestion is unavailable".into(),
         ))?;
@@ -229,7 +240,10 @@ impl CaseWorkflow<'_, '_> {
             }
             cursor = end;
         }
-        Ok(done)
+        Ok(IngestSummary {
+            files: done - integrity_files,
+            integrity_files,
+        })
     }
 
     fn detect_sources(
@@ -237,6 +251,7 @@ impl CaseWorkflow<'_, '_> {
         request: IngestRequest<'_>,
         files: &[std::path::PathBuf],
         catalog: &ParserCatalog,
+        integrity_files: &mut usize,
     ) -> Result<Vec<(String, ResolvedParserSelection)>, AppError> {
         let IngestRequest {
             id,
@@ -266,6 +281,9 @@ impl CaseWorkflow<'_, '_> {
             .collect::<BTreeMap<_, _>>();
         let mut selected = Vec::with_capacity(files.len());
         for file in files {
+            if cancel.is_cancelled() {
+                return Err(AppError::Cancelled);
+            }
             let source = self
                 .io_ops
                 .audit_source_name(path, file)
@@ -300,6 +318,10 @@ impl CaseWorkflow<'_, '_> {
                     .get(&source)
                     .or(request.default_cluster_context),
             });
+            if matches!(resolved, Err(AppError::NonEventSource { .. })) {
+                *integrity_files += 1;
+                continue;
+            }
             let resolved = resolved.map_err(|error| {
                 self.engine
                     .annotate_parser_time_error(id, error, catalog, cancel, true)

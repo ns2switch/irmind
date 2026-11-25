@@ -31,6 +31,9 @@ impl Module for PlasoParser {
     }
 }
 impl LogParser for PlasoParser {
+    fn description(&self) -> &'static str {
+        "plaso JSONL timelines"
+    }
     fn time_context_requirement(
         &self,
         source: &str,

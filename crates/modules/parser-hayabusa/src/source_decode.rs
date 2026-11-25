@@ -154,6 +154,7 @@ fn invalid() -> AppError {
 pub fn source_log_parser() -> Arc<dyn LogParser> {
     Arc::new(
         SourceDecoderSelection::new(Arc::new(HayabusaSourceDecoder))
+            .with_description(crate::HayabusaParser.description())
             .with_detector(|source, sample| super::HayabusaParser.detect(source, sample))
             .with_time_detector(|source, sample| {
                 super::HayabusaParser.time_context_requirement(source, sample)

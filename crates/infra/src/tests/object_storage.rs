@@ -113,9 +113,20 @@ fn object_proposal(tool: Tool, max_bytes: &str) -> ProposedCall {
 }
 
 #[test]
+fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
+    assert_scoped_object_custody(br#"{"Records":[{"eventTime":"2026-10-23T12:00:00Z","eventName":"AssumeRole","recipientAccountId":"123","awsRegion":"eu-west-1","sourceIPAddress":"203.0.113.8"}]}"#);
+}
+
+#[test]
+fn scoped_gzip_cloudtrail_object_keeps_and_verifies_the_compressed_original() {
+    assert_scoped_object_custody(include_bytes!(
+        "../../../testkit/fixtures/common/cloudtrail-delivery.json.gz"
+    ));
+}
+
 #[allow(clippy::too_many_lines)]
 #[allow(clippy::cognitive_complexity)]
-fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
+fn assert_scoped_object_custody(bytes: &[u8]) {
     let root = tempfile::tempdir().unwrap();
     let (store, parser_registry) = current_object_pipeline(root.path());
     let signer = Arc::new(LocalSigner {
@@ -125,7 +136,7 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
     let parser = Arc::new(JsonParser);
     let source = FakeObjectSource {
         uri: URI,
-        bytes: br#"{"Records":[{"eventTime":"2026-10-23T12:00:00Z","eventName":"AssumeRole","recipientAccountId":"123","awsRegion":"eu-west-1","sourceIPAddress":"203.0.113.8"}]}"#.to_vec(),
+        bytes: bytes.to_vec(),
         reads: AtomicUsize::new(0),
         stream_mode: AtomicUsize::new(0),
         spool_probe: std::sync::Mutex::new(None),
@@ -294,6 +305,11 @@ fn scoped_object_uses_signed_approval_streams_once_and_verifies_parquet() {
         .unwrap()
         .source;
     assert!(manifest.copied);
+    assert_eq!(
+        manifest.sha256.as_str(),
+        irmind_app::hex(&irmind_app::sha256(bytes))
+    );
+    assert_eq!(manifest.size, bytes.len() as u64);
     store
         .verify_copied_source(&copied_case.id, &manifest, &CancellationToken::new())
         .unwrap();

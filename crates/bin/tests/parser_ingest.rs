@@ -376,6 +376,191 @@ fn check_ground_truth(
     }
 }
 
+#[test]
+fn gzip_admission_validates_all_members_and_rejects_growth_after_preflight()
+-> Result<(), Box<dyn std::error::Error>> {
+    use irmind_app::{
+        FixedAppError, SourceDecoder as _,
+        source_mapping::{
+            DecodeBudget, DecodeInput, SourceFileInput, SourceMetadata, SourceReferenceV1,
+        },
+    };
+    use irmind_mod_parser_json::JsonSourceDecoder;
+
+    let root = tempfile::tempdir()?;
+    let path = root.path().join("renamed.evidence");
+    let event = include_str!("../../testkit/fixtures/common/cloudtrail-console-login.jsonl").trim();
+    let plain = format!("{{\"Records\":[{event}]}}");
+    let mut gzip = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+    gzip.write_all(plain.as_bytes())?;
+    let original = gzip.finish()?;
+    fs::write(&path, &original)?;
+    let cancel = CancellationToken::new();
+    let mut file = fs::File::open(&path)?;
+    let budget = JsonSourceDecoder
+        .normalized_source_budget(&mut file, &cancel)?
+        .unwrap();
+    assert_eq!(budget.decoded_bytes(), plain.len() as u64);
+    assert_eq!(
+        budget.allowance()?,
+        budget.decoded_bytes() * 16 + 64 * 1024 * 1024
+    );
+
+    let source = SourceReferenceV1::file("renamed.evidence")?;
+    let mut mutated = original.clone();
+    mutated.extend_from_slice(&original);
+    fs::write(&path, &mutated)?;
+    file.rewind()?;
+    let result = JsonSourceDecoder.decode_with_budget(
+        DecodeInput::File(SourceFileInput {
+            file: &mut file,
+            metadata: SourceMetadata {
+                source: &source,
+                cancel: &cancel,
+                evidence_hash: sha256(&original),
+                time_context: None,
+                cluster_context: None,
+            },
+        }),
+        DecodeBudget::sequential().with_decoded_byte_ceiling(Some(budget.decoded_bytes())),
+        &mut |_| Ok(()),
+    );
+    assert!(matches!(
+        result,
+        Err(AppError::Fixed(FixedAppError::SourceLimit))
+    ));
+    let counted = JsonSourceDecoder
+        .normalized_source_budget(&mut file, &cancel)?
+        .unwrap();
+    assert_eq!(counted.decoded_bytes(), budget.decoded_bytes() * 2);
+
+    let last_crc = mutated.len() - 8;
+    mutated[last_crc] ^= 1;
+    fs::write(&path, &mutated)?;
+    assert!(matches!(
+        JsonSourceDecoder.normalized_source_budget(&mut file, &cancel),
+        Err(AppError::Fixed(FixedAppError::SourceFormat))
+    ));
+    assert_eq!(fs::read_dir(root.path())?.count(), 1);
+    cancel.cancel();
+    assert!(matches!(
+        JsonSourceDecoder.normalized_source_budget(&mut file, &cancel),
+        Err(AppError::Cancelled)
+    ));
+    Ok(())
+}
+
+#[test]
+#[ignore = "manual paired 512 MiB CloudTrail ingestion benchmark"]
+fn benchmark_cloudtrail_plain_and_gzip() -> Result<(), Box<dyn std::error::Error>> {
+    use irmind_app::{SourceDecoder as _, modules::ParserSelectionRequest};
+
+    if cfg!(debug_assertions) {
+        return Err("benchmark requires an optimized release build".into());
+    }
+    let target = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target");
+    let root = tempfile::tempdir_in(target)?;
+    let paths = ["cloudtrail.json", "cloudtrail.json.gz"];
+    let (decoded_bytes, records) = write_cloudtrail_benchmark_pair(root.path(), paths)?;
+    let cancel = CancellationToken::new();
+    for (name, compressed) in paths.into_iter().zip([false, true]) {
+        let data = tempfile::tempdir_in(root.path())?;
+        let store = Arc::new(current_sources::open(data.path()));
+        let signer = Arc::new(SyntheticSigner(SigningKey::from_bytes(&[43; 32])));
+        let engine = Engine::new(
+            EnginePorts::new(
+                store.clone(),
+                store.clone(),
+                store.clone(),
+                store.clone(),
+                CryptoPorts::new(
+                    signer.clone(),
+                    Arc::new(LocalVerifier::from_signer(signer.as_ref())),
+                ),
+                Arc::new(MandatoryGuard::new()?),
+            ),
+            ExecutionMode::Attended,
+            Arc::new(SystemClock),
+        )?;
+        let case = engine.create_case("Synthetic CloudTrail benchmark", "local evidence only")?;
+        let mut file = fs::File::open(root.path().join(name))?;
+        let physical_bytes = file.metadata()?.len();
+        let mut sample = Vec::new();
+        (&mut file).take(64 * 1024).read_to_end(&mut sample)?;
+        let selection = current_sources::catalog().select_source(ParserSelectionRequest {
+            source: name,
+            sample: &sample,
+            parser_override: None,
+            forced: false,
+            time_context: None,
+            cluster_context: None,
+        })?;
+        assert_eq!(selection.selection.parser_id, "parser-json");
+        let started = Instant::now();
+        LargeCaseUseCases {
+            engine: &engine,
+            store: store.as_ref(),
+            parser: selection.parser.as_ref(),
+        }
+        .ingest_local_batch_selected(
+            &case.id,
+            root.path(),
+            &[name.into()],
+            false,
+            &BTreeMap::from([(name.into(), selection.selection)]),
+            &cancel,
+        )?;
+        let seconds = started.elapsed().as_secs_f64();
+        assert!(
+            store
+                .graph_summary(&case.id)?
+                .starts_with(&format!("Parquet records={records};"))
+        );
+        engine.verify(&case.id)?;
+        let start = Instant::now();
+        let preflight = irmind_mod_parser_json::JsonSourceDecoder
+            .normalized_source_budget(&mut file, &cancel)?;
+        let preflight_seconds = start.elapsed().as_secs_f64();
+        assert_eq!(
+            preflight.map(irmind_app::source_mapping::NormalizedSourceBudget::decoded_bytes),
+            compressed.then_some(decoded_bytes)
+        );
+        let mib = f64::from(u32::try_from(decoded_bytes)?) / 1_048_576.0;
+        println!(
+            "CLOUDTRAIL_PAIR encoding={name} physical_bytes={physical_bytes} decoded_bytes={decoded_bytes} records={records} seconds={seconds:.6} decoded_mib_per_second={:.3} separate_preflight_seconds={preflight_seconds:.6}",
+            mib / seconds
+        );
+    }
+    Ok(())
+}
+
+fn write_cloudtrail_benchmark_pair(
+    root: &std::path::Path,
+    paths: [&str; 2],
+) -> std::io::Result<(u64, usize)> {
+    let fixture =
+        include_str!("../../testkit/fixtures/common/cloudtrail-console-login.jsonl").trim();
+    let records = (512_usize << 20).div_ceil(fixture.len() + 1);
+    let mut plain = BufWriter::new(fs::File::create(root.join(paths[0]))?);
+    let mut gzip = flate2::write::GzEncoder::new(
+        BufWriter::new(fs::File::create(root.join(paths[1]))?),
+        flate2::Compression::fast(),
+    );
+    for writer in [&mut plain as &mut dyn std::io::Write, &mut gzip] {
+        writer.write_all(b"{\"Records\":[")?;
+        for index in 0..records {
+            if index != 0 {
+                writer.write_all(b",")?;
+            }
+            writer.write_all(fixture.as_bytes())?;
+        }
+        writer.write_all(b"]}")?;
+    }
+    plain.flush()?;
+    gzip.finish()?.flush()?;
+    Ok((plain.get_ref().metadata()?.len(), records))
+}
+
 /// Manual benchmark. Its temporary source and derived artifacts are removed
 /// when each parser finishes; CI runs only the small contract above.
 #[test]

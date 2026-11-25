@@ -5,7 +5,7 @@ mod record;
 mod web;
 use super::{bounds, time::Calendar};
 use irmind_app::{
-    AppError, ParseReport, ParserIdentity, SourceDecoder,
+    AppError, LogParser as _, ParseReport, ParserIdentity, SourceDecoder,
     source_mapping::{
         DecodeBudget, DecodeInput, SourceInput, SourceMetadata, SourceRecordV1,
         ordered_decode::decode_ordered,
@@ -208,6 +208,7 @@ pub fn source_log_parser() -> Arc<dyn irmind_app::LogParser> {
     }
     Arc::new(
         irmind_app::source_mapping::SourceDecoderSelection::new(Arc::new(LinuxSourceDecoder))
+            .with_description(crate::LinuxParser.description())
             .with_detector(detect)
             .with_time_detector(time),
     )

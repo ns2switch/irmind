@@ -4,6 +4,21 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+## 0.7.2 — CloudTrail gzip ingestion
+
+**Format impact:** Case marker 6, export V10, and the JSON reader identity
+are unchanged. Existing plain JSON sources keep their record offsets.
+
+- Ingest standard CloudTrail `Records` deliveries and generic JSON/NDJSON
+  compressed with gzip. Detection uses the magic bytes and a bounded decoded
+  sample. Admission validates all gzip members, counts at most 50 GiB of
+  decoded data per file, and reserves disk before staging. Custody records the
+  compressed original's hash.
+- Identify and skip CloudTrail integrity digests with an analyst notice. A
+  directory containing both logs and digests can be ingested in one operation.
+- Show a clear message when no parser recognizes a compressed input, and
+  label parser choices with the formats they cover.
+
 ## 0.7.1 — Local Sigma detection and signed reports
 
 This is the first published release in the 0.7 series. The workflow for tag

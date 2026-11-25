@@ -14,7 +14,10 @@ impl Engine<'_> {
         cancel: &CancellationToken,
         suggest: bool,
     ) -> AppError {
-        if matches!(error, AppError::ParserUnavailable { .. }) {
+        if matches!(
+            error,
+            AppError::ParserUnavailable { .. } | AppError::UnsupportedCompressedSource { .. }
+        ) {
             return match self.record_parser_selection_required(id, "unsupported") {
                 Ok(()) => error,
                 Err(audit_error) => audit_error,

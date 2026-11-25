@@ -44,6 +44,14 @@ pub enum AppError {
     PendingApproval(String),
     #[error("parser {parser_id} is unavailable: {reason}")]
     ParserUnavailable { parser_id: String, reason: String },
+    #[error(
+        "The file is compressed with {format}. No available parser detected support for this compressed input."
+    )]
+    UnsupportedCompressedSource { format: &'static str },
+    #[error("Recognized {kind}. Integrity files are skipped during event ingestion.")]
+    NonEventSource {
+        kind: crate::modules::NonEventSource,
+    },
     #[error("analyst must choose a parser for the source")]
     ParserSelection {
         source_name: String,

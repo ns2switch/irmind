@@ -186,6 +186,7 @@ fn limit() -> AppError {
 pub fn source_log_parser() -> Arc<dyn LogParser> {
     Arc::new(
         SourceDecoderSelection::new(Arc::new(ZeekSourceDecoder))
+            .with_description(crate::ZeekParser.description())
             .with_detector(|source, sample| crate::ZeekParser.detect(source, sample)),
     )
 }

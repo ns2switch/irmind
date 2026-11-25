@@ -13,6 +13,7 @@ use irmind_process_containment::{Mode, Program};
 use std::{fs::File, path::Path, sync::Arc, time::Duration};
 
 pub const VERSION: &str = "evtx-0.15.1-ndjson-v1";
+pub const DESCRIPTION: &str = "Windows EVTX (Security, System, PowerShell and Sysmon)";
 pub const MANIFEST: ModuleManifest = ModuleManifest {
     id: "parser-evtx",
     version: "0.1.0",
@@ -140,6 +141,10 @@ impl Module for EvtxParser {
     }
 }
 impl LogParser for EvtxParser {
+    fn description(&self) -> &'static str {
+        DESCRIPTION
+    }
+
     fn detect(&self, _: &str, sample: &[u8]) -> Option<ParserConfidence> {
         if !codec::detect(sample) {
             return None;

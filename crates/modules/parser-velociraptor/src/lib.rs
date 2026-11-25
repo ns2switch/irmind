@@ -31,6 +31,9 @@ impl Module for VelociraptorParser {
     }
 }
 impl LogParser for VelociraptorParser {
+    fn description(&self) -> &'static str {
+        "Velociraptor JSON exports"
+    }
     fn time_context_requirement(
         &self,
         source: &str,

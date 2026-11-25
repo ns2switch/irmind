@@ -3,6 +3,43 @@ use super::*;
 use irmind_app::mapped_ingest::CommittedArtifacts;
 
 #[test]
+fn cloudtrail_gzip_reserves_against_decoded_bytes_before_writing() {
+    let root = tempfile::tempdir().unwrap();
+    let store = crate::parquet_store::fixtures::store(root.path());
+    let name = "cloudtrail.gz";
+    let gz = include_bytes!("../../../../../testkit/fixtures/common/cloudtrail-delivery.json.gz");
+    std::fs::write(root.path().join(name), gz).unwrap();
+    let case = irmind_domain::CaseId::parse("11111111-1111-1111-1111-111111111111").unwrap();
+    let request = MappedIngestRequest {
+        case_id: &case,
+        source_root: root.path(),
+        relative_paths: &[name.into()],
+        copy_original: true,
+        parser: &irmind_mod_parser_json::JsonParser,
+        committed_artifacts: CommittedArtifacts::Slice(&[]),
+        limits: irmind_app::PartitionLimits::default(),
+    };
+    let decoded_bytes = 158;
+    let required = 2 * 16 * decoded_bytes + gz.len() as u64 + 5 * 64 * 1024 * 1024;
+    let cancel = CancellationToken::new();
+    assert!(matches!(
+        store.preflight_direct_group_with_space(&request, 1, &cancel, || Ok(required - 1)),
+        Err(AppError::Fixed(irmind_app::FixedAppError::StorageCaseStagingCapacity { required: reported, available }))
+            if reported == required && available == required - 1
+    ));
+    assert_eq!(
+        std::fs::read_dir(store.spool_dir(&case).unwrap())
+            .unwrap()
+            .count(),
+        0
+    );
+    let reservations = store
+        .preflight_direct_group_with_space(&request, 1, &cancel, || Ok(required))
+        .unwrap();
+    assert_eq!(reservations[name].decoded_byte_ceiling, Some(decoded_bytes));
+}
+
+#[test]
 fn azure_sort_space_is_checked_before_creating_normalized_files() {
     use irmind_app::{FixedAppError, source_mapping::MappingCatalog};
     use irmind_mod_parser_azure_flow::AzureFlowSourceDecoder;

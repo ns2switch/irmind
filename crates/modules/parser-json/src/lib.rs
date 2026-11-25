@@ -1,13 +1,15 @@
 #![forbid(unsafe_code)]
+mod digest;
+mod gzip;
 mod source_decode;
 pub use source_decode::JsonSourceDecoder;
 
 use irmind_app::{
     AppError, LogParser, ParserConfidence, StreamingEventParser,
-    modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry},
+    modules::{Module, ModuleConfig, ModuleManifest, ModulePort, ModuleRegistry, NonEventSource},
 };
 
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 pub struct JsonParser;
 
@@ -22,14 +24,21 @@ impl StreamingEventParser for JsonParser {
 }
 
 impl LogParser for JsonParser {
+    fn description(&self) -> &'static str {
+        "CloudTrail, JSON and NDJSON (plain or gzip)"
+    }
+    fn non_event_source(&self, source: &str, sample: &[u8]) -> Option<NonEventSource> {
+        non_event(source, sample)
+    }
     fn time_context_requirement(
         &self,
         source: &str,
         sample: &[u8],
     ) -> Result<Option<irmind_app::ParserTimeRequirement>, AppError> {
+        let sample = json_sample(sample);
         irmind_app::json_time_requirement(
             source,
-            sample,
+            &sample,
             &irmind_app::ParserTimeFields {
                 parser_id: "parser-json",
                 hosts: &["/host", "/hostname", "/hostName"],
@@ -44,6 +53,7 @@ impl LogParser for JsonParser {
         )
     }
     fn detect(&self, _source_name: &str, sample: &[u8]) -> Option<ParserConfidence> {
+        let sample = json_sample(sample);
         let first = sample
             .iter()
             .copied()
@@ -58,6 +68,21 @@ impl LogParser for JsonParser {
                 && (contains(b"provider") || (contains(b"account_id") && contains(b"principal"))));
         ParserConfidence::new(if known { 90 } else { 45 }).ok()
     }
+}
+
+fn json_sample(sample: &[u8]) -> Cow<'_, [u8]> {
+    let sample = &sample[..sample.len().min(gzip::SAMPLE_BYTES)];
+    if gzip::is_gzip(sample) {
+        Cow::Owned(gzip::sample(sample))
+    } else {
+        Cow::Borrowed(sample)
+    }
+}
+
+fn non_event(source: &str, sample: &[u8]) -> Option<NonEventSource> {
+    let decoded = json_sample(sample);
+    let clipped = sample.len() >= gzip::SAMPLE_BYTES || decoded.len() >= gzip::SAMPLE_BYTES;
+    digest::detect(source, &decoded, clipped).then_some(NonEventSource::CloudTrailDigest)
 }
 
 static MANIFEST: ModuleManifest = ModuleManifest {
@@ -87,7 +112,7 @@ impl Module for JsonParser {
 #[allow(clippy::unwrap_used, clippy::wildcard_imports)]
 mod tests;
 
-/// Experimental raw decoding preserves the normal detector and historical parser.
+/// Bind the bounded format checks to the registered original-field decoder.
 pub fn source_log_parser() -> std::sync::Arc<dyn irmind_app::LogParser> {
     fn detect(source: &str, sample: &[u8]) -> Option<irmind_app::ParserConfidence> {
         JsonParser.detect(source, sample)
@@ -96,6 +121,8 @@ pub fn source_log_parser() -> std::sync::Arc<dyn irmind_app::LogParser> {
         irmind_app::source_mapping::SourceDecoderSelection::new(std::sync::Arc::new(
             JsonSourceDecoder,
         ))
+        .with_description(crate::JsonParser.description())
+        .with_non_event_detector(non_event)
         .with_detector(detect),
     )
 }

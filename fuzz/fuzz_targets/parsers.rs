@@ -23,5 +23,6 @@ fuzz_target!(|bytes: &[u8]| {
             );
         }
         let _ = JsonParser.detect("fuzz.jsonl", bytes);
+        let _ = JsonParser.non_event_source("CloudTrail-Digest/fuzz.json.gz", bytes);
     }
 });

@@ -10,6 +10,8 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 
 `/ingest` abre el selector de archivos. `/ingest --parser <nombre> <ruta>` fuerza una elección que queda auditada. **Settings → Preferences** muestra nombres y versiones de los parsers compilados. Compilarlos no selecciona ningún modelo remoto.
 
+El selector muestra los formatos que cubre cada candidato. Si la muestra lleva una firma de compresión conocida y ningún parser reconoce su contenido, IRMind indica la compresión y omite la lista de candidatos al 0 %.
+
 | Parser | Entrada | Detección | Campos mapeados | Estado |
 | --- | --- | --- | --- | --- |
 | Microsoft 365 Unified Audit Log | CSV de Purview, JSON de Search-UnifiedAuditLog y Management Activity API | AuditData/Operation, CreationTime y workload originales; 98 | Instante UTC, actor, buzón objetivo explícito, recurso, IP de origen, user agent, workload y tablas de operación/resultado | experimental |
@@ -29,7 +31,7 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 | AWS VPC Flow Logs | Texto con cabecera/personalizado o v2, gzip y mensajes CloudWatch | Cabecera nativa: 98; v2 sin cabecera: 70 y confirmación del analista | Extremos y roles, resultado explícito, bytes/paquetes, cuenta/región y host de instancia explícito | experimental |
 | Azure flow logs | Contenedores JSON VNet y NSG | Categoría del proveedor y estructura de flujos: 98 | Tupla original, instante preciso, extremos, resultado, contadores, suscripción y regla | experimental |
 | GCP VPC Flow Logs | JSON/NDJSON de Cloud Logging y envolturas entries | logName de VPC, connection e instante: 98 | Roles de extremos, proyecto, VM observadora, bytes/paquetes; resultado ausente desconocido | experimental |
-| JSON y logs de nube exportados | JSON/NDJSON; AWS, GCP, Azure y HuntEval | Campos reconocidos del registro | Instante, identidades, cuentas, recursos e IP | experimental |
+| JSON y logs de nube exportados (`parser-json`) | Entregas `Records` de CloudTrail, JSON y NDJSON, en texto o gzip | Muestra acotada, descomprimida para gzip y con campos reconocidos de CloudTrail | Instante, identidades, cuentas, recursos e IP | experimental |
 | GCP Cloud Audit Logs | LogEntry JSON/NDJSON; exportaciones de GKE | Servicio/método protoPayload e instante originales | Nanosegundos UTC, estado explícito, roles de principal, recurso y extremos; clúster GKE confirmado | experimental |
 | Microsoft Entra ID | JSON/NDJSON de Azure Monitor y filas-objeto de Log Analytics | Categoría o Type documentado e instante original | Accesos y auditoría, resultado explícito, tenant, actor, objetivo e IP | experimental |
 | ECS | NDJSON | Versión de ECS e instante/campos característicos | Evento, host, usuario, origen, destino, proceso, archivo, URL | experimental |
@@ -43,6 +45,12 @@ El registro entrega como máximo los primeros 64 KiB a cada detector compilado. 
 | Auditoría Kubernetes | Event nativo `audit.k8s.io/v1`, JSON/NDJSON | Versión de API y tipo explícitos; 98 | Campos originales, nanosegundos y contexto firmado de clúster. La clasificación semántica corresponde a módulos de mapeo separados. | experimental |
 | Falco | Detecciones JSON/NDJSON | Regla, prioridad, instante y objeto output-fields; 98 | Regla y campos originales, tiempo preciso; los registros Kubernetes requieren contexto de clúster confirmado. Una detección de origen no es una confirmación del analista. | experimental |
 | Declarativo | CSV, JSON, NDJSON o regex acotada | Cabecera exacta, campos JSON o regex; máximo 70 % | Mapeo explícito descrito abajo | experimental |
+
+## Entregas de CloudTrail
+
+Ingiere un directorio `AWSLogs` descargado o ficheros `.json.gz` individuales directamente. El detector reconoce gzip por sus bytes mágicos y lee un prefijo descomprimido acotado. Antes de preparar Parquet, IRMind cuenta los bytes descomprimidos, verifica todos los miembros gzip y reserva disco según el recuento. El límite descomprimido es de 50 GiB por fichero. Las citas identifican el original comprimido por su SHA-256 y el número de registro. [Formato de los logs de AWS CloudTrail](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-log-file-examples.html)
+
+IRMind identifica y avisa de los ficheros de integridad de CloudTrail que omite en una entrega. Conserva los digests y sus metadatos originales de S3 para verificar la integridad. [Estructura de un digest de CloudTrail](https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-log-file-validation-digest-file-structure.html) · [Verificación prevista](https://github.com/ns2switch/irmind/issues/428)
 
 ## Contexto de clúster por ingesta
 
