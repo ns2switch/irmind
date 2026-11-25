@@ -139,6 +139,13 @@ impl CaseWorkflow<'_, '_> {
                 notices.release_mappings
             );
         }
+        if notices.sigma_coverage_limited != 0 {
+            let _ = write!(
+                message,
+                "\nSigma: {} signed runs had limited source-class coverage. Activity in skipped classes remains undetermined.",
+                notices.sigma_coverage_limited
+            );
+        }
         for notice in &notices.query_limits {
             let _ = write!(
                 message,

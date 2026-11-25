@@ -16,7 +16,29 @@ pub struct ResolvedReportCoverage {
     unknown_sources: Vec<String>,
     skill_gaps: Vec<ResolvedReportSkillGap>,
     query_limits: Vec<EvidenceHash>,
-    partial_sigma: Vec<(EvidenceHash, Option<bool>)>,
+    partial_sigma: Vec<(EvidenceHash, SigmaLimitation)>,
+}
+
+enum SigmaLimitation {
+    Historical,
+    ExactFields { stopped_early: bool },
+    SourceClasses,
+}
+
+impl SigmaLimitation {
+    fn from_run(run: &crate::v10_proofs::SigmaRunV1) -> Self {
+        use crate::v10_proofs::{SIGMA_EVALUATOR_V2, SIGMA_EVALUATOR_V3, SigmaRunStatusV1};
+        match (run.evaluator.as_str(), run.status) {
+            (SIGMA_EVALUATOR_V3, SigmaRunStatusV1::CoverageLimited) => Self::SourceClasses,
+            (SIGMA_EVALUATOR_V3, SigmaRunStatusV1::ExactFieldsUnavailable) => Self::ExactFields {
+                stopped_early: false,
+            },
+            (SIGMA_EVALUATOR_V2, status) => Self::ExactFields {
+                stopped_early: status != SigmaRunStatusV1::ExactFieldsUnavailable,
+            },
+            _ => Self::Historical,
+        }
+    }
 }
 
 impl ResolvedReportCoverage {
@@ -37,13 +59,8 @@ impl ResolvedReportCoverage {
             let run = crate::v10_proofs::sigma_execution(entry)?;
             if run.status != crate::v10_proofs::SigmaRunStatusV1::Complete {
                 proof.partial_sigma_runs.push(audit_reference(entry));
-                let v2 = run.evaluator == crate::v10_proofs::SIGMA_EVALUATOR_V2;
-                let stopped_early =
-                    run.status != crate::v10_proofs::SigmaRunStatusV1::ExactFieldsUnavailable;
-                partial_sigma.push((
-                    EvidenceHash::from_bytes(entry.hash),
-                    v2.then_some(stopped_early),
-                ));
+                let limitation = SigmaLimitation::from_run(&run);
+                partial_sigma.push((EvidenceHash::from_bytes(entry.hash), limitation));
             }
         }
         for entry in entries
@@ -129,12 +146,17 @@ impl ResolvedReportCoverage {
             .chain(
                 self.partial_sigma
                     .iter()
-                    .map(|(receipt, stopped_early)| match stopped_early {
-                        Some(stopped_early) => ReportLimitation::IndeterminateSigma {
-                            receipt,
-                            stopped_early: *stopped_early,
-                        },
-                        None => ReportLimitation::PartialSigma { receipt },
+                    .map(|(receipt, limitation)| match limitation {
+                        SigmaLimitation::ExactFields { stopped_early } => {
+                            ReportLimitation::IndeterminateSigma {
+                                receipt,
+                                stopped_early: *stopped_early,
+                            }
+                        }
+                        SigmaLimitation::Historical => ReportLimitation::PartialSigma { receipt },
+                        SigmaLimitation::SourceClasses => {
+                            ReportLimitation::SigmaSourceClasses { receipt }
+                        }
                     }),
             )
             .collect()

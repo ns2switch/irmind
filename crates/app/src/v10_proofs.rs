@@ -22,6 +22,7 @@ pub use sigma_objects::*;
 
 const ADMISSION: &[u8] = b"irmind-sigma-pack-admission-v1\0";
 pub const SIGMA_EVALUATOR_V2: &str = "irmind-sigma-evaluator-v2";
+pub const SIGMA_EVALUATOR_V3: &str = "irmind-sigma-evaluator-v3";
 const RUN: &[u8] = b"irmind-sigma-run-v1\0";
 const REPORT: &[u8] = b"irmind-report-published-v1\0";
 const MAX_LABEL: usize = 256;
@@ -163,6 +164,7 @@ pub enum SigmaRunStatusV1 {
     OversizedInput = 3,
     Cancelled = 4,
     ExactFieldsUnavailable = 5,
+    CoverageLimited = 6,
 }
 
 impl SigmaRunStatusV1 {
@@ -174,6 +176,7 @@ impl SigmaRunStatusV1 {
             3 => Ok(Self::OversizedInput),
             4 => Ok(Self::Cancelled),
             5 => Ok(Self::ExactFieldsUnavailable),
+            6 => Ok(Self::CoverageLimited),
             _ => Err(INVALID),
         }
     }
@@ -250,7 +253,11 @@ impl SigmaRunV1 {
     }
 
     fn validate(&self) -> Result<()> {
-        if self.start_utc_micros >= self.end_utc_micros || self.used_units > self.reserved_units {
+        if self.start_utc_micros >= self.end_utc_micros
+            || self.used_units > self.reserved_units
+            || (self.status == SigmaRunStatusV1::CoverageLimited
+                && self.evaluator != SIGMA_EVALUATOR_V3)
+        {
             return Err(INVALID);
         }
         Ok(())

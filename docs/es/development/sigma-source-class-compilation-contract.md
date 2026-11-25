@@ -120,3 +120,13 @@ respecto a V2. También se compararán ambos evaluadores en release
 sobre el corpus sintético de al menos 2.000 reglas y 1 GiB. Se medirán
 tiempo de planificación y escaneo, memoria pico, positivos esperados
 y detectados, falsos positivos y huecos de cobertura.
+
+## Lectura de las pruebas para el detalle del informe
+
+Se propone por separado el método opcional
+`LargeCaseStore::read_sigma_proof(case, kind, digest, cancel)`, con error
+por defecto. Lee del caso indicado la prueba a la que apunta el recibo
+autenticado y verifica su hash dentro del límite actual. El export usa
+su lector acotado existente. Así el informe puede resolver los mismos
+nombres de clase y recuentos en local y en el export. No cambia los
+bytes firmados ni introduce dependencias.

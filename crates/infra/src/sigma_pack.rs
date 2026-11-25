@@ -5,6 +5,10 @@ pub mod field_table;
 #[cfg(feature = "sigma")]
 mod runtime;
 #[cfg(feature = "sigma")]
+pub(crate) use runtime::{SigmaMatchCheck, verify_class_plan};
+#[cfg(feature = "sigma")]
+mod plan;
+#[cfg(feature = "sigma")]
 mod storage;
 use irmind_app::{
     AppError, CancellationToken,

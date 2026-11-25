@@ -239,3 +239,16 @@ confirmation is still required for each Sigma finding cited as a fact.
   exact hits as V2 restricted to those classes. Test resource limits
   and fuzz the result decoder and class-plan admission with
   AddressSanitizer for 10 minutes each before the release.
+
+## Proposed read-only proof access for report details
+
+Separate approval is requested for an optional
+`LargeCaseStore::read_sigma_proof(case, kind, digest, cancel)` method
+with the same default-unavailable behavior as the report proof reader.
+The local adapter opens an addressed proof in that case, enforces the
+existing body limit and authenticates its SHA-256 before returning
+the bytes. The caller obtains the digest from the authenticated run
+receipt. The V10 verifier already has its bounded object reader.
+This would let both report paths resolve the same class names, counts
+and row gaps from the signed field table and result. It introduces no
+new signed bytes or dependencies.

@@ -1,21 +1,20 @@
 //! Execute a reviewed field table over the active, signed case artifacts.
 use super::{
     LocalSigmaPack,
-    evaluation::{MAX_MATCHES, SigmaVariantPrograms, covers},
+    evaluation::{MAX_MATCHES, SigmaVariantPrograms},
     field_table::{ReviewedSigmaFieldTable, SigmaSourceVariant},
-    invalid,
+    invalid, plan,
 };
 use crate::LocalStore;
 use irmind_app::{
     AppError, AuditEventKind, AuditLog, CancellationToken, Engine,
     source_mapping::{MappingCatalog, MappingProvenance},
     v10_proofs::{
-        PreparedSigmaExecution, SigmaCompiledRuleV1, SigmaCompiledRulesV1, SigmaCoverageV1,
-        SigmaExecutionContext, SigmaExecutionSummary, SigmaFieldTableV1, SigmaFindingDraft,
-        SigmaMatchV1, SigmaRuleCoverageV1, SigmaRuleKeyV1, SigmaRunResultsV1, SigmaRunResultsV2,
-        SigmaRunV1, SigmaSourceScopeV1, V10ArtifactReference, V10AuditReference,
-        V10ProofDescriptor, V10ProofFamily, V10RowReference, V10SourceReference,
-        sigma_pack_operation, v10_proof_commitment,
+        PreparedSigmaExecution, SigmaCompiledRulesV1, SigmaCoverageV1, SigmaExecutionContext,
+        SigmaExecutionSummary, SigmaFieldTableV1, SigmaFindingDraft, SigmaMatchV1, SigmaRuleKeyV1,
+        SigmaRunResultsV1, SigmaRunResultsV2, SigmaRunResultsV3, SigmaRunV1, SigmaSourceScopeV1,
+        V10ArtifactReference, V10AuditReference, V10ProofDescriptor, V10ProofFamily,
+        V10RowReference, V10SourceReference, sigma_pack_operation, v10_proof_commitment,
     },
 };
 use irmind_domain::{
@@ -28,7 +27,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use irmind_app::v10_proofs::{SIGMA_EVALUATOR_V2, SigmaRunStatusV1};
+use irmind_app::v10_proofs::{SIGMA_EVALUATOR_V3, SigmaRunStatusV1};
 type RunObjects = Vec<(V10ProofDescriptor, Vec<u8>)>;
 
 impl LocalStore {
@@ -105,7 +104,13 @@ fn prepare(
         .map(|(file, bytes)| (file.rule.clone(), bytes.as_slice()))
         .collect::<Vec<_>>();
     rules.sort_unstable_by(|a, b| a.0.cmp(&b.0));
-    let (compiled, mut results) = rule_objects(&reviewed, &work.variants, &rules, cancel)?;
+    let (plan, compiled, mut results) = plan::compile(
+        &reviewed,
+        &work.variants,
+        &rules,
+        Instant::now() + Duration::from_secs(15),
+        cancel,
+    )?;
     let ScanOutcome {
         hits: hit_rows,
         status,
@@ -121,22 +126,18 @@ fn prepare(
         .filter(|rule| rule.status != SigmaCoverageV1::Eligible)
         .count();
     let findings = materialize_findings(scope.view.entries(), &rules, hit_rows, &mut results)?;
-    let source_counts = unavailable_by_source
-        .iter()
-        .map(|(source, count)| {
-            work.sources
-                .get(source.as_str())
-                .map(|signed| (signed.reference, *count))
-                .ok_or_else(invalid)
-        })
-        .collect::<Result<BTreeMap<_, _>, _>>()?;
+    let source_counts = work.signed_gap_counts(&unavailable_by_source)?;
     let indeterminate_by_rule = indeterminate_by_rule.into_iter().collect::<Vec<_>>();
     let v2 = SigmaRunResultsV2 {
         results,
-        unavailable_by_source: source_counts.into_iter().collect(),
+        unavailable_by_source: source_counts,
         indeterminate_by_rule: indeterminate_by_rule.clone(),
     };
-    let material = run_objects(&table, &work.scope(), &compiled, &v2)?;
+    let class_coverage = plan.coverage();
+    let skipped_classes = plan::skipped_classes(&plan, &reviewed, compiled.0.len())?;
+    let v3 = SigmaRunResultsV3 { scan: v2, plan };
+    let status = v3.status(status);
+    let material = run_objects(&table, &work.scope(), &compiled, &v3)?;
     let descriptors = material
         .iter()
         .map(|(descriptor, _)| *descriptor)
@@ -152,7 +153,7 @@ fn prepare(
         end_utc_micros: time.end,
         compiled_rules: descriptors[2].hash(),
         field_table: descriptors[0].hash(),
-        evaluator: SIGMA_EVALUATOR_V2.into(),
+        evaluator: SIGMA_EVALUATOR_V3.into(),
         reserved_units: scope.reserved,
         used_units,
         status,
@@ -165,6 +166,8 @@ fn prepare(
         material,
         findings,
         skipped_rules,
+        class_coverage,
+        skipped_classes,
         unavailable_by_source: work.named_gap_counts(unavailable_by_source)?,
         indeterminate_by_rule,
     })
@@ -388,7 +391,18 @@ impl Workset {
         catalog: &MappingCatalog,
     ) -> Result<Self, AppError> {
         let entries = scope.view.entries();
-        let (artifacts, chosen) = select_artifacts(entries, table, catalog)?;
+        let (artifacts, chosen) = select_artifacts(entries, table, |binding| {
+            binding.mapping().is_some_and(|mapping| {
+                catalog.manifests().any(|manifest| {
+                    manifest.identity() == mapping
+                        && matches!(
+                            manifest.provenance(),
+                            MappingProvenance::NativeBuild { .. }
+                                | MappingProvenance::BundledDefinition { .. }
+                        )
+                })
+            })
+        })?;
         let variants = artifacts
             .iter()
             .flat_map(|(_, _, variants)| variants.iter().copied())
@@ -437,6 +451,22 @@ impl Workset {
         })
     }
 
+    fn signed_gap_counts(
+        &self,
+        counts: &BTreeMap<irmind_domain::EvidenceHash, u64>,
+    ) -> Result<Vec<(V10SourceReference, u64)>, AppError> {
+        let counts = counts
+            .iter()
+            .map(|(source, count)| {
+                self.sources
+                    .get(source.as_str())
+                    .map(|signed| (signed.reference, *count))
+                    .ok_or_else(invalid)
+            })
+            .collect::<Result<BTreeMap<_, _>, _>>()?;
+        Ok(counts.into_iter().collect())
+    }
+
     fn named_gap_counts(
         &self,
         counts: BTreeMap<irmind_domain::EvidenceHash, u64>,
@@ -468,7 +498,7 @@ type SelectedArtifacts = (Vec<WorkArtifact>, BTreeMap<String, V10ArtifactReferen
 fn select_artifacts(
     entries: &[irmind_app::SignedEntry],
     table: &ReviewedSigmaFieldTable,
-    catalog: &MappingCatalog,
+    eligible: impl Fn(&MappingBindingV1) -> bool,
 ) -> Result<SelectedArtifacts, AppError> {
     let active = irmind_app::artifact_catalog(entries)?
         .active
@@ -494,17 +524,7 @@ fn select_artifacts(
         let Some(first) = bindings.first() else {
             return Err(invalid());
         };
-        let Some(mapping) = first.mapping() else {
-            continue;
-        };
-        if !catalog.manifests().any(|manifest| {
-            manifest.identity() == mapping
-                && matches!(
-                    manifest.provenance(),
-                    MappingProvenance::NativeBuild { .. }
-                        | MappingProvenance::BundledDefinition { .. }
-                )
-        }) {
+        if !eligible(first) {
             continue;
         }
         let variants = table
@@ -516,6 +536,13 @@ fn select_artifacts(
             .collect::<Vec<_>>();
         if variants.is_empty() {
             continue;
+        }
+        if bindings.iter().any(|binding| {
+            variants
+                .iter()
+                .any(|&index| !matches_binding(&table.variants[index], binding))
+        }) {
+            return Err(invalid());
         }
         let locator = V10ArtifactReference {
             entry: V10AuditReference {
@@ -546,12 +573,16 @@ fn digest(text: &str) -> Result<[u8; 32], AppError> {
     Ok(digest)
 }
 
-fn rule_objects(
+#[cfg(test)]
+pub(super) fn rule_objects(
     table: &ReviewedSigmaFieldTable,
     available: &BTreeSet<usize>,
     rules: &[(SigmaRuleKeyV1, &[u8])],
     cancel: &CancellationToken,
 ) -> Result<(SigmaCompiledRulesV1, SigmaRunResultsV1), AppError> {
+    use super::evaluation::covers;
+    use irmind_app::v10_proofs::{SigmaCompiledRuleV1, SigmaRuleCoverageV1};
+
     let mut variants_by_rule = vec![Vec::new(); rules.len()];
     let mut failures = vec![None; rules.len()];
     for &index in available {
@@ -647,7 +678,7 @@ fn run_objects(
     table: &SigmaFieldTableV1,
     scope: &SigmaSourceScopeV1,
     compiled: &SigmaCompiledRulesV1,
-    results: &SigmaRunResultsV2,
+    results: &SigmaRunResultsV3,
 ) -> Result<RunObjects, AppError> {
     [
         table.encode(),
@@ -685,6 +716,168 @@ pub(super) fn enrolled_field_table() -> SigmaFieldTableV1 {
             include_str!("endpoint-v1.toml"),
         )
         .into(),
+    }
+}
+
+pub(crate) fn verify_class_plan(
+    receipt: &SigmaRunV1,
+    materials: &irmind_app::v10_proofs::V10SigmaRunObjects,
+    table: &ReviewedSigmaFieldTable,
+    entries: &[irmind_app::SignedEntry],
+    rules: &[(SigmaRuleKeyV1, &[u8])],
+    deadline: Instant,
+    cancel: &CancellationToken,
+) -> Result<(), AppError> {
+    use irmind_app::v10_proofs::V10CheckpointView;
+    let view = V10CheckpointView::resolve(entries, &receipt.checkpoint)?;
+    let source_hashes = materials
+        .selected_sources
+        .0
+        .iter()
+        .map(|source| irmind_domain::EvidenceHash::from_bytes(source.evidence_sha256))
+        .collect::<BTreeSet<_>>();
+    let (artifacts, chosen) = select_artifacts(view.entries(), table, |_| true)?;
+    for source in &materials.selected_sources.0 {
+        let hash = irmind_domain::EvidenceHash::from_bytes(source.evidence_sha256);
+        let artifact = chosen.get(hash.as_str()).ok_or_else(invalid)?;
+        view.artifact(*source, *artifact)?;
+    }
+    let available = artifacts
+        .iter()
+        .filter(|(_, artifact, _)| {
+            let ParquetArtifact::V3(envelope) = artifact;
+            envelope
+                .pipeline()
+                .bindings()
+                .iter()
+                .any(|binding| source_hashes.contains(binding.input().source()))
+        })
+        .flat_map(|(_, _, variants)| variants.iter().copied())
+        .collect();
+    let (plan, compiled, output) = plan::compile(table, &available, rules, deadline, cancel)?;
+    if materials.class_plan.as_ref() != Some(&plan)
+        || materials.compiled_rules != compiled
+        || materials.results.coverage != output.coverage
+    {
+        return Err(invalid());
+    }
+    Ok(())
+}
+
+pub(crate) struct SigmaMatchCheck<'a> {
+    table: &'a ReviewedSigmaFieldTable,
+    matches: BTreeMap<V10RowReference, Vec<&'a SigmaRuleKeyV1>>,
+    rules: &'a [(SigmaRuleKeyV1, &'a [u8])],
+    compiled: &'a SigmaCompiledRulesV1,
+    deadline: Instant,
+    units: u64,
+    cancel: &'a CancellationToken,
+    cached: Option<(usize, &'a SigmaRuleKeyV1, SigmaVariantPrograms<'a>)>,
+}
+
+impl<'a> SigmaMatchCheck<'a> {
+    pub(crate) fn new(
+        table: &'a ReviewedSigmaFieldTable,
+        materials: &'a irmind_app::v10_proofs::V10SigmaRunObjects,
+        rules: &'a [(SigmaRuleKeyV1, &'a [u8])],
+        deadline: Instant,
+        units: u64,
+        cancel: &'a CancellationToken,
+    ) -> Self {
+        let mut matches = BTreeMap::<_, Vec<_>>::new();
+        for found in &materials.results.matches {
+            matches.entry(found.row).or_default().push(&found.rule);
+        }
+        Self {
+            table,
+            matches,
+            rules,
+            compiled: &materials.compiled_rules,
+            deadline,
+            units,
+            cancel,
+            cached: None,
+        }
+    }
+
+    pub(crate) fn units(&self) -> u64 {
+        self.units
+    }
+
+    pub(crate) fn check(
+        &mut self,
+        artifact: &ParquetArtifact,
+        row: V10RowReference,
+        common: &irmind_domain::CommonEventV1,
+        original: &str,
+    ) -> Result<(), AppError> {
+        let ParquetArtifact::V3(envelope) = artifact;
+        let origin = common.origin();
+        irmind_app::v10_proofs::verify_v10_row_identity(
+            row,
+            origin.source().as_str(),
+            origin.record(),
+        )?;
+        let binding = envelope
+            .pipeline()
+            .bindings()
+            .iter()
+            .find(|binding| {
+                binding.input().source() == origin.source()
+                    && binding.decoder().id() == origin.parser()
+                    && binding.decoder().version() == origin.parser_version()
+            })
+            .ok_or_else(invalid)?;
+        let keys = self.matches.get(&row).ok_or_else(invalid)?;
+        for &key in keys {
+            plan::check_budget(self.deadline, self.cancel)?;
+            let position = self
+                .rules
+                .binary_search_by(|(candidate, _)| candidate.cmp(key))
+                .map_err(|_| invalid())?;
+            let rule = self.compiled.0.get(position).ok_or_else(invalid)?;
+            let mut confirmed = false;
+            for &ordinal in &rule.variants {
+                let index = usize::try_from(ordinal).map_err(|_| invalid())?;
+                let variant = self.table.variants.get(index).ok_or_else(invalid)?;
+                if !matches_binding(variant, binding) {
+                    continue;
+                }
+                if self
+                    .cached
+                    .as_ref()
+                    .is_none_or(|(class, previous, _)| *class != index || previous != &key)
+                {
+                    let programs = SigmaVariantPrograms::compile(
+                        variant,
+                        [(key.clone(), self.rules[position].1)],
+                    )?;
+                    if programs.eligible() != 1 {
+                        return Err(invalid());
+                    }
+                    self.cached = Some((index, key, programs));
+                }
+                let (_, _, programs) = self.cached.as_ref().ok_or_else(invalid)?;
+                let mut attempt = programs.start_with_match_limit(self.units, 1);
+                if !attempt.row(common, Some(original), self.cancel, |_| {
+                    confirmed = true;
+                    Ok(())
+                })? {
+                    return Err(invalid());
+                }
+                self.units = self
+                    .units
+                    .checked_sub(attempt.used_units())
+                    .ok_or_else(invalid)?;
+                if confirmed {
+                    break;
+                }
+            }
+            if !confirmed {
+                return Err(invalid());
+            }
+        }
+        Ok(())
     }
 }
 

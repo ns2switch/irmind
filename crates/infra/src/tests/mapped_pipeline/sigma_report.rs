@@ -277,19 +277,65 @@ fn scan(store: &LocalStore, case: &CaseId, cancel: &CancellationToken) -> V10Row
             cancel,
             |physical_row, common, _| {
                 assert_eq!(common.origin().source(), &manifest.source.sha256);
-                matches.push(V10RowReference {
-                    source,
-                    artifact: artifact_ref,
-                    physical_row,
-                    record: common.origin().record(),
-                });
+                matches.push((
+                    V10RowReference {
+                        source,
+                        artifact: artifact_ref,
+                        physical_row,
+                        record: common.origin().record(),
+                    },
+                    common.clone(),
+                ));
                 Ok(())
             },
         )
         .unwrap();
     assert_eq!(matches.len(), 1);
-    verify_sigma_case_references(&entries, &base, matches[0], key, &root, cancel);
-    matches[0]
+    let (matched, event) = &matches[0];
+    verify_sigma_case_references(&entries, &base, *matched, key.clone(), &root, cancel);
+    verify_sigma_v3_binding(&entries, &base, &artifact, *matched, event, key, cancel);
+    *matched
+}
+
+fn verify_sigma_v3_binding(
+    entries: &[SignedEntry],
+    checkpoint: &CaseCheckpointV1,
+    artifact: &ParquetArtifact,
+    row: V10RowReference,
+    event: &irmind_domain::CommonEventV1,
+    rule: SigmaRuleKeyV1,
+    cancel: &CancellationToken,
+) {
+    use crate::sigma_pack::{SigmaMatchCheck, verify_class_plan};
+    use irmind_app::v10_proofs::{SigmaClassOutcome, SigmaClassPlan};
+
+    let (receipt, mut materials) = sigma_case_row_proofs(checkpoint, row, rule.clone(), cancel);
+    let table = ReviewedSigmaFieldTable::parse(&materials.field_table).unwrap();
+    let mut plan = SigmaClassPlan::new(vec![0], 1).unwrap();
+    plan.set(0, 0, SigmaClassOutcome::Eligible).unwrap();
+    materials.class_plan = Some(plan);
+    let rules = [(rule, SIGMA_RULE)];
+    let deadline = Instant::now() + Duration::from_secs(5);
+    verify_class_plan(
+        &receipt, &materials, &table, entries, &rules, deadline, cancel,
+    )
+    .unwrap();
+    SigmaMatchCheck::new(&table, &materials, &rules, deadline, 10_000, cancel)
+        .check(artifact, row, event, "{}")
+        .unwrap();
+
+    materials.compiled_rules.0[0].variants.clear();
+    assert!(
+        verify_class_plan(
+            &receipt, &materials, &table, entries, &rules, deadline, cancel
+        )
+        .is_err()
+    );
+    assert!(
+        SigmaMatchCheck::new(&table, &materials, &rules, deadline, 10_000, cancel)
+            .check(artifact, row, event, "{}")
+            .is_err()
+    );
 }
 
 fn verify_sigma_case_references(
@@ -333,6 +379,7 @@ fn sigma_case_row_proofs(
         V10ProofDescriptor, V10ProofFamily, v10_proof_commitment,
     };
     let objects = V10SigmaRunObjects {
+        class_plan: None,
         field_table: cloudtrail_definition(),
         selected_sources: SigmaSourceScopeV1(vec![row.source]),
         compiled_rules: SigmaCompiledRulesV1(vec![SigmaCompiledRuleV1 {
@@ -503,7 +550,20 @@ fn signed_sigma_run_and_admitted_rules_verify_in_the_actual_sealed_v10_export() 
         .run_sigma(&engine, &case.id, pack, range, &cancel)
         .unwrap();
     assert_eq!(receipt.receipt.matched_rows, 1);
-    assert_eq!(receipt.skipped_rules, 0);
+    assert_eq!(receipt.skipped_rules, 1);
+    assert_eq!(receipt.class_coverage.no_rules, 1);
+    assert_eq!(
+        receipt.receipt.status,
+        irmind_app::v10_proofs::SigmaRunStatusV1::CoverageLimited
+    );
+    let preview = store
+        .preview_cited_report(&engine, &case.id, ReportDocumentLanguage::English, &cancel)
+        .unwrap();
+    assert!(
+        preview
+            .markdown
+            .contains("Activity in those classes remains undetermined")
+    );
     let findings = engine.findings(&case.id).unwrap();
     assert_eq!(findings.len(), 1);
     assert!(!findings[0].confirmed);
@@ -539,6 +599,10 @@ fn admit_test_sigma_pack(
     let rules = root.join("rules");
     fs::create_dir(&rules).unwrap();
     fs::write(rules.join("auth.yml"), SIGMA_RULE).unwrap();
+    fs::write(
+        rules.join("unsupported.yml"),
+        "title: Synthetic unreviewed class\nlogsource: {product: synthetic-unreviewed}\ndetection: {selection: {Outcome: failure}, condition: selection}\n",
+    ).unwrap();
     let preview = crate::sigma_pack::inspect_local_sigma_pack(&rules, cancel).unwrap();
     let digest = sha256(&preview.manifest.encode().unwrap());
     store

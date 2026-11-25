@@ -63,6 +63,9 @@ pub enum ReportLimitation<'a> {
     PartialSigma {
         receipt: &'a EvidenceHash,
     },
+    SigmaSourceClasses {
+        receipt: &'a EvidenceHash,
+    },
     IndeterminateSigma {
         receipt: &'a EvidenceHash,
         stopped_early: bool,
@@ -296,6 +299,14 @@ impl Document {
                 );
                 format!("{reason} {explanation} {}", receipt.as_str())
             }
+            ReportLimitation::SigmaSourceClasses { receipt } => format!(
+                "{} {}",
+                language.text(
+                    "Sigma skipped rules or source classes without exact coverage. Activity in those classes remains undetermined.",
+                    "Sigma omitió reglas o clases de fuente sin cobertura exacta. La actividad en esas clases queda sin determinar.",
+                ),
+                receipt.as_str(),
+            ),
             ReportLimitation::PartialSigma { receipt } => format!(
                 "{} {}",
                 language.text(

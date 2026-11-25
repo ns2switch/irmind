@@ -3,8 +3,8 @@
 #![allow(clippy::unwrap_used)]
 
 use irmind_app::v10_proofs::{
-    ReportCitationsV1, ReportCoverageV2, ReportMediaV1, ReportPublishedV1, SIGMA_EVALUATOR_V2,
-    SigmaPackManifestV1, SigmaPackRuleV1, SigmaRuleKeyV1, SigmaRunResultsV2, SigmaRunV1,
+    ReportCitationsV1, ReportCoverageV2, ReportMediaV1, ReportPublishedV1, SIGMA_EVALUATOR_V3,
+    SigmaPackManifestV1, SigmaPackRuleV1, SigmaRuleKeyV1, SigmaRunResultsV3, SigmaRunV1,
     V10Citation,
 };
 use irmind_app::{SignerBackend, hex, sha256};
@@ -431,14 +431,16 @@ fn assert_package(bytes: &[u8], finding: &str, scenario: &Scenario) {
     let runs = payloads("sigma-run-v1").collect::<Vec<_>>();
     assert_eq!(runs.len(), 1);
     let run = SigmaRunV1::decode(runs[0]).unwrap();
-    assert_eq!(run.evaluator, SIGMA_EVALUATOR_V2);
+    assert_eq!(run.evaluator, SIGMA_EVALUATOR_V3);
     assert_eq!(run.matched_rows, 1);
     assert_eq!(
         run.status,
         irmind_app::v10_proofs::SigmaRunStatusV1::Complete
     );
     assert_ne!(run.pack_admission, [0; 32]);
-    let results = SigmaRunResultsV2::decode(&object(bytes, 5, &run.result_manifest)).unwrap();
+    let results = SigmaRunResultsV3::decode(&object(bytes, 5, &run.result_manifest)).unwrap();
+    assert_eq!(results.plan.coverage().eligible_pairs, 1);
+    let results = results.scan;
     assert!(results.unavailable_by_source.is_empty());
     assert!(results.indeterminate_by_rule.is_empty());
     assert_eq!(results.results.matches.len(), 1);
