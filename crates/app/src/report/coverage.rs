@@ -4,8 +4,8 @@ use crate::{
     SkillReceiptVerifier,
     source_queries::SourceQueryResultV1,
     v10_proofs::{
-        ReportCoverageV2, ReportSkillLoad, ResolvedReportSkillGap, V10AuditReference,
-        V10SourceAvailability, V10SourceReference,
+        ReportCoverageV2, ReportSkillLoad, ResolvedReportSkillGap, SigmaProofRead, SigmaV3Notice,
+        V10AuditReference, V10SourceAvailability, V10SourceReference,
     },
 };
 use irmind_domain::{EvidenceHash, SourceManifestV2};
@@ -22,17 +22,13 @@ pub struct ResolvedReportCoverage {
 enum SigmaLimitation {
     Historical,
     ExactFields { stopped_early: bool },
-    SourceClasses,
+    SourceClasses(SigmaV3Notice),
 }
 
 impl SigmaLimitation {
     fn from_run(run: &crate::v10_proofs::SigmaRunV1) -> Self {
-        use crate::v10_proofs::{SIGMA_EVALUATOR_V2, SIGMA_EVALUATOR_V3, SigmaRunStatusV1};
+        use crate::v10_proofs::{SIGMA_EVALUATOR_V2, SigmaRunStatusV1};
         match (run.evaluator.as_str(), run.status) {
-            (SIGMA_EVALUATOR_V3, SigmaRunStatusV1::CoverageLimited) => Self::SourceClasses,
-            (SIGMA_EVALUATOR_V3, SigmaRunStatusV1::ExactFieldsUnavailable) => Self::ExactFields {
-                stopped_early: false,
-            },
             (SIGMA_EVALUATOR_V2, status) => Self::ExactFields {
                 stopped_early: status != SigmaRunStatusV1::ExactFieldsUnavailable,
             },
@@ -47,6 +43,7 @@ impl ResolvedReportCoverage {
     pub fn resolve(
         entries: &[SignedEntry],
         skills: Option<(&SkillReceiptVerifier, &dyn SkillCompiler)>,
+        mut read_sigma: impl FnMut(u8, [u8; 32]) -> Result<SigmaProofRead, AppError>,
     ) -> Result<Self, AppError> {
         let mut proof = ReportCoverageV2::default();
         let mut captures = BTreeSet::new();
@@ -59,7 +56,10 @@ impl ResolvedReportCoverage {
             let run = crate::v10_proofs::sigma_execution(entry)?;
             if run.status != crate::v10_proofs::SigmaRunStatusV1::Complete {
                 proof.partial_sigma_runs.push(audit_reference(entry));
-                let limitation = SigmaLimitation::from_run(&run);
+                let limitation = SigmaV3Notice::resolve(entry, &mut read_sigma)?.map_or_else(
+                    || SigmaLimitation::from_run(&run),
+                    SigmaLimitation::SourceClasses,
+                );
                 partial_sigma.push((EvidenceHash::from_bytes(entry.hash), limitation));
             }
         }
@@ -154,8 +154,8 @@ impl ResolvedReportCoverage {
                             }
                         }
                         SigmaLimitation::Historical => ReportLimitation::PartialSigma { receipt },
-                        SigmaLimitation::SourceClasses => {
-                            ReportLimitation::SigmaSourceClasses { receipt }
+                        SigmaLimitation::SourceClasses(notice) => {
+                            ReportLimitation::SigmaSourceClasses(notice)
                         }
                     }),
             )
@@ -179,11 +179,14 @@ impl Engine<'_> {
         let _lock = self.repo.lock_case(id)?;
         self.verify_unlocked_cancelable(id, cancel)?;
         let entries = self.audit_log.entries(id)?;
-        Ok(self.resolve_cited_report_coverage(&entries, cancel)?.proof)
+        Ok(self
+            .resolve_cited_report_coverage(id, &entries, cancel)?
+            .proof)
     }
 
     pub(super) fn resolve_cited_report_coverage(
         &self,
+        id: &CaseId,
         entries: &[SignedEntry],
         cancel: &CancellationToken,
     ) -> Result<ResolvedReportCoverage, AppError> {
@@ -193,6 +196,7 @@ impl Engine<'_> {
             self.skills
                 .as_ref()
                 .map(|services| (&checked, services.compiler.as_ref())),
+            |kind, digest| self.read_sigma_notice_proof(id, kind, digest, cancel),
         )
     }
 }

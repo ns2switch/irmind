@@ -35,6 +35,23 @@ impl LargeCaseStore for crate::LocalStore {
         self.read_addressed_report_proof(case, kind, digest, cancel)
     }
 
+    fn read_sigma_proof(
+        &self,
+        case: &CaseId,
+        kind: u8,
+        digest: [u8; 32],
+        cancel: &CancellationToken,
+    ) -> Result<irmind_app::v10_proofs::SigmaProofRead, AppError> {
+        self.read_addressed_v10_proof(
+            case,
+            irmind_app::v10_proofs::V10ProofFamily::Sigma,
+            kind,
+            digest,
+            cancel,
+        )
+        .and_then(|body| crate::sigma_pack::sigma_proof_read(kind, body))
+    }
+
     fn verify_sigma_executions(
         &self,
         case: &CaseId,

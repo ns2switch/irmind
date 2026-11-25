@@ -2,8 +2,8 @@
 
 [English](../../development/sigma-source-class-compilation-contract.md)
 
-**Estado:** aprobado para v0.7.3. El lector de pruebas opcional al final
-del documento es una propuesta separada en revisión.
+**Estado:** aprobado para v0.7.3. El lector de pruebas opcional del final
+del documento también está aprobado.
 
 ## Qué cambia
 

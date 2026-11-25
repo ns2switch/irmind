@@ -3,7 +3,7 @@
 [Español](../es/development/sigma-source-class-compilation-contract.md)
 
 **Status:** approved for v0.7.3. The optional proof reader at the end of
-this document is a separate proposal under review.
+this document is approved.
 
 ## Scope
 
@@ -240,9 +240,9 @@ confirmation is still required for each Sigma finding cited as a fact.
   and fuzz the result decoder and class-plan admission with
   AddressSanitizer for 10 minutes each before the release.
 
-## Proposed read-only proof access for report details
+## Read-only proof access for report details
 
-Separate approval is requested for an optional
+This adds the optional
 `LargeCaseStore::read_sigma_proof(case, kind, digest, cancel)` method
 with the same default-unavailable behavior as the report proof reader.
 The local adapter opens an addressed proof in that case, enforces the

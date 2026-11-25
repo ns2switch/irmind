@@ -9,7 +9,7 @@ pub struct VerifiedCaseNotices {
     pub query_limits: Vec<crate::source_queries::SourceQueryLimitNotice>,
     pub provisional_mappings: usize,
     pub release_mappings: usize,
-    pub sigma_coverage_limited: usize,
+    pub sigma_runs: Vec<crate::v10_proofs::SigmaV3Notice>,
 }
 
 impl Engine<'_> {
@@ -156,15 +156,17 @@ impl Engine<'_> {
         let query_limits = crate::source_queries::result_limit_notices(&entries)?;
         let (provisional_mappings, release_mappings) =
             crate::source_mapping::native_mapping_build_counts(&entries)?;
-        let mut sigma_coverage_limited = 0;
+        let mut sigma_runs = Vec::new();
         for entry in entries
             .iter()
             .filter(|entry| entry.kind == crate::AuditEventKind::SigmaRunV1)
         {
-            if crate::v10_proofs::sigma_execution(entry)?.status
-                == crate::v10_proofs::SigmaRunStatusV1::CoverageLimited
+            if let Some(notice) =
+                crate::v10_proofs::SigmaV3Notice::resolve(entry, |kind, digest| {
+                    self.read_sigma_notice_proof(id, kind, digest, cancel)
+                })?
             {
-                sigma_coverage_limited += 1;
+                sigma_runs.push(notice);
             }
         }
         Ok(VerifiedCaseNotices {
@@ -172,7 +174,7 @@ impl Engine<'_> {
             query_limits,
             provisional_mappings,
             release_mappings,
-            sigma_coverage_limited,
+            sigma_runs,
         })
     }
 

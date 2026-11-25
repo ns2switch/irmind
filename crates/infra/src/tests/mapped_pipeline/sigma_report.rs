@@ -559,14 +559,31 @@ fn signed_sigma_run_and_admitted_rules_verify_in_the_actual_sealed_v10_export() 
     let preview = store
         .preview_cited_report(&engine, &case.id, ReportDocumentLanguage::English, &cancel)
         .unwrap();
-    assert!(
-        preview
-            .markdown
-            .contains("Activity in those classes remains undetermined")
-    );
+    assert!(preview.markdown.contains("remains undetermined"));
+    assert!(preview.markdown.contains(r"aws \/ cloudtrail \/"));
+    assert!(preview.markdown.contains("1 missing bindings"));
+    let notices = engine
+        .verify_with_mapping_and_query_notices(&case.id, &cancel)
+        .unwrap();
+    let notice = &notices.sigma_runs[0];
+    assert_eq!(notice.coverage.skipped_pairs, 1);
+    assert_eq!(notice.skipped_classes[0].1, 1);
+    assert!(notice.skipped_classes[0].0.contains("aws / cloudtrail /"));
     let findings = engine.findings(&case.id).unwrap();
     assert_eq!(findings.len(), 1);
     assert!(!findings[0].confirmed);
+    let plan = store
+        .plan_cited_report(
+            &engine,
+            &case.id,
+            ReportDocumentLanguage::English,
+            ReportDocumentFormat::Markdown,
+            &cancel,
+        )
+        .unwrap();
+    engine
+        .publish_cited_report(&case.id, plan, &cancel)
+        .unwrap();
     engine.verify(&case.id).unwrap();
     engine.seal(&case.id).unwrap();
     let package = root.path().join("sigma-executed.irmind");
@@ -601,7 +618,7 @@ fn admit_test_sigma_pack(
     fs::write(rules.join("auth.yml"), SIGMA_RULE).unwrap();
     fs::write(
         rules.join("unsupported.yml"),
-        "title: Synthetic unreviewed class\nlogsource: {product: synthetic-unreviewed}\ndetection: {selection: {Outcome: failure}, condition: selection}\n",
+        "title: Synthetic missing cloud field\nlogsource: {product: aws, service: cloudtrail}\ndetection: {selection: {SyntheticMissing: test}, condition: selection}\n",
     ).unwrap();
     let preview = crate::sigma_pack::inspect_local_sigma_pack(&rules, cancel).unwrap();
     let digest = sha256(&preview.manifest.encode().unwrap());

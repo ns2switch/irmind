@@ -63,9 +63,7 @@ pub enum ReportLimitation<'a> {
     PartialSigma {
         receipt: &'a EvidenceHash,
     },
-    SigmaSourceClasses {
-        receipt: &'a EvidenceHash,
-    },
+    SigmaSourceClasses(&'a crate::v10_proofs::SigmaV3Notice),
     IndeterminateSigma {
         receipt: &'a EvidenceHash,
         stopped_early: bool,
@@ -299,14 +297,9 @@ impl Document {
                 );
                 format!("{reason} {explanation} {}", receipt.as_str())
             }
-            ReportLimitation::SigmaSourceClasses { receipt } => format!(
-                "{} {}",
-                language.text(
-                    "Sigma skipped rules or source classes without exact coverage. Activity in those classes remains undetermined.",
-                    "Sigma omitió reglas o clases de fuente sin cobertura exacta. La actividad en esas clases queda sin determinar.",
-                ),
-                receipt.as_str(),
-            ),
+            ReportLimitation::SigmaSourceClasses(notice) => {
+                return self.sigma_coverage(language, notice);
+            }
             ReportLimitation::PartialSigma { receipt } => format!(
                 "{} {}",
                 language.text(
@@ -317,6 +310,63 @@ impl Document {
             ),
         };
         self.line(format!("- {text}"))
+    }
+
+    fn sigma_coverage(
+        &mut self,
+        language: ReportDocumentLanguage,
+        notice: &crate::v10_proofs::SigmaV3Notice,
+    ) -> Result<(), AppError> {
+        let counts = &notice.coverage;
+        self.line(format!(
+            "- {} {} · {}/{}/{} · {}/{}",
+            language.text(
+                "Sigma source-class plan (rules with all/some/no eligible classes, eligible/skipped pairs)",
+                "Plan de Sigma por clase (reglas con todas/algunas/ninguna clase apta, pares aptos/omitidos)",
+            ),
+            notice.receipt.as_str(),
+            counts.all_rules, counts.some_rules, counts.no_rules,
+            counts.eligible_pairs, counts.skipped_pairs,
+        ))?;
+        if counts.skipped_pairs != 0 || counts.no_rules != 0 {
+            self.line(format!(
+                "- {}",
+                language.text(
+                    "Activity covered by skipped rules or source classes remains undetermined.",
+                    "La actividad de las reglas o clases de fuente omitidas queda sin determinar.",
+                )
+            ))?;
+        }
+        for (label, missing, incompatible) in &notice.skipped_classes {
+            self.line(format!(
+                "- {} · {missing} {} · {incompatible} {}",
+                self.literal(label),
+                language.text("missing bindings", "correspondencias ausentes"),
+                language.text("incompatible types", "tipos incompatibles"),
+            ))?;
+        }
+        if notice.unavailable_rows != 0 {
+            self.line(format!(
+                "- {} · {} · {}",
+                language.text(
+                    "Rows with unavailable exact fields / rules with indeterminate rows",
+                    "Filas con campos exactos no disponibles / reglas con filas indeterminadas",
+                ),
+                notice.unavailable_rows,
+                notice.indeterminate_rules,
+            ))?;
+            self.line(format!("- {}", language.text(
+                "Sigma cannot decide results for those rows. Unexpected values may indicate source manipulation.",
+                "Sigma no puede decidir el resultado de esas filas. Los valores inesperados pueden indicar manipulación de la fuente.",
+            )))?;
+        }
+        if notice.stopped_early {
+            self.line(format!("- {}", language.text(
+                "The Sigma scan stopped early. The source-class counts describe the plan.",
+                "La búsqueda de Sigma se detuvo antes del final. Los recuentos por clase describen el plan.",
+            )))?;
+        }
+        Ok(())
     }
 
     fn finish(self) -> Result<Vec<u8>, AppError> {

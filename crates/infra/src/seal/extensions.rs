@@ -108,12 +108,21 @@ pub(super) fn verify(
         },
         cancel,
     )?;
+    let mut report_objects = input.try_clone().map_err(storage)?;
     let referenced = verify_report_history(
         context.title,
         context.entries,
         context.evidence,
         Some((context.skills, &crate::TomlSkillCompiler)),
-        |kind, hash| section.body(&mut objects, (kind, hash), cancel),
+        (
+            |kind, hash| section.body(&mut report_objects, (kind, hash), cancel),
+            |kind, hash| {
+                crate::sigma_pack::sigma_proof_read(
+                    kind,
+                    sigma.body(&mut objects, (kind, hash), cancel)?,
+                )
+            },
+        ),
         |artifact, row| {
             let offset = *context
                 .offsets
