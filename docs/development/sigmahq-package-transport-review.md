@@ -89,3 +89,8 @@ The reader authenticated all 3,303 members of the pinned SigmaHQ
 archive. It independently checks CRC and deflate stream completion,
 including the exact length consumed. It rejects gaps in the ZIP
 layout and retains only the explicitly selected, hash-pinned rules.
+
+Eight synthetic regression tests passed, including ZIP32 truncation,
+header mismatches, overlapping offsets, gaps, CRC mismatch and excess
+output. The full reader ran under AddressSanitizer with these seeds
+for 601 seconds and completed 13,429,713 inputs without a crash.
