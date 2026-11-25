@@ -610,3 +610,95 @@ fn admit_test_sigma_pack(
         .unwrap();
     digest
 }
+
+#[test]
+fn sigma_v3_signed_proofs_are_identical_across_ingest_worker_caps() {
+    use irmind_testkit::FixedClock;
+    use std::num::NonZeroU16;
+
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path();
+    let originals = root.join("originals");
+    fs::create_dir(&originals).unwrap();
+    let raw = include_bytes!("../../../../testkit/fixtures/common/cloudtrail-console-login.jsonl");
+    let mut event: serde_json::Value = serde_json::from_slice(raw).unwrap();
+    let paths = (0..4)
+        .map(|source| {
+            let name = format!("aws-{source}.json");
+            event["sourceIPAddress"] = format!("203.0.113.{source}").into();
+            event["eventID"] = format!("synthetic-console-failure-{source}").into();
+            let delivery = serde_json::json!({ "Records": [&event] });
+            fs::write(
+                originals.join(&name),
+                serde_json::to_vec(&delivery).unwrap(),
+            )
+            .unwrap();
+            name
+        })
+        .collect::<Vec<_>>();
+    let catalog = Arc::new(
+        MappingCatalog::freeze(
+            vec![Arc::new(JsonSourceDecoder)],
+            vec![Arc::new(
+                irmind_mod_mapping_cloudtrail::CloudTrailMapping::new().unwrap(),
+            )],
+        )
+        .unwrap(),
+    );
+    let seed = root.join("seed");
+    let (_, engine, _) = fixture_catalog(&seed, catalog.clone());
+    let case = engine
+        .create_case("Sigma worker determinism", "local only")
+        .unwrap();
+    drop(engine);
+    let clock = Arc::new(FixedClock::new(1_793_491_200));
+    let cancel = CancellationToken::new();
+    let mut expected = None;
+    for cap in [1, 4] {
+        let directory = root.join(format!("workers-{cap}"));
+        fs::create_dir(&directory).unwrap();
+        fs::copy(seed.join("irmind.db"), directory.join("irmind.db")).unwrap();
+        let (store, engine, catalog) =
+            fixture_with_clock(&directory, catalog.clone(), clock.clone());
+        let engine = engine.with_large_case_pipeline(store.clone(), Arc::new(json_source_parser()));
+        store.set_parallel_worker_limit(NonZeroU16::new(cap));
+        let parser = catalog
+            .decoder_selection("parser-json", "json-source-v1")
+            .unwrap();
+        let large = LargeCaseUseCases {
+            engine: &engine,
+            store: store.as_ref(),
+            parser: &parser,
+        };
+        assert_eq!(
+            large
+                .ingest_local_batch(&case.id, &originals, &paths, false, &cancel)
+                .unwrap()
+                .len(),
+            4
+        );
+        let pack = admit_test_sigma_pack(&store, &engine, &directory, &cancel);
+        let run = store
+            .run_sigma(&engine, &case.id, pack, 0..i64::MAX, &cancel)
+            .unwrap();
+        assert_eq!(run.receipt.matched_rows, 4);
+        engine.verify(&case.id).unwrap();
+        let entries = store.entries(&case.id).unwrap();
+        let execution = entries
+            .iter()
+            .position(|entry| entry.kind == AuditEventKind::SigmaRunV1)
+            .unwrap();
+        // Finding drafts have independent UUIDs. Compare the entire signed
+        // prefix through the run, which commits the exact rows and class plan.
+        let hashes = entries[..=execution]
+            .iter()
+            .map(|entry| entry.hash)
+            .collect::<Vec<_>>();
+        let actual = (run.receipt.encode().unwrap(), hashes);
+        if let Some(expected) = &expected {
+            assert_eq!(&actual, expected);
+        } else {
+            expected = Some(actual);
+        }
+    }
+}

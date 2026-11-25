@@ -2,8 +2,8 @@
 
 [Español](../es/development/sigma-source-class-compilation-contract.md)
 
-**Status:** proposed for v0.7.3. The evaluator identity, result proof and
-status code below require explicit approval before implementation.
+**Status:** approved for v0.7.3. The optional proof reader at the end of
+this document is a separate proposal under review.
 
 ## Scope
 
@@ -93,7 +93,7 @@ unenrolled sources stay outside the workset.
 When no class is available, the matrix has zero columns and no matches.
 The receipt identifies the run as coverage-limited.
 
-## Signed result proposed for approval
+## Signed result
 
 Keep case marker 6, the V10 header and sections, `SigmaRunV1`,
 `SigmaCompiledRulesV1`, the field table, source scope, pack admission,

@@ -2,9 +2,8 @@
 
 [English](../../development/sigma-source-class-compilation-contract.md)
 
-**Estado:** propuesta para v0.7.3. La nueva identidad del evaluador, el
-objeto de prueba y el código de estado requieren aprobación explícita
-antes de implementar.
+**Estado:** aprobado para v0.7.3. El lector de pruebas opcional al final
+del documento es una propuesta separada en revisión.
 
 ## Qué cambia
 

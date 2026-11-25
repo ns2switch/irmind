@@ -263,7 +263,14 @@ fn scan_matches<'a>(
             }
             let mut file = irmind_fs::open_regular_no_follow(directory, Path::new(artifact.path()))
                 .map_err(|_| invalid())?;
-            crate::verify_v10_artifact_rows(&mut file, 0, artifact, &[], cancel)?;
+            match crate::verify_v10_artifact_rows(&mut file, 0, artifact, &[], cancel) {
+                Ok(()) => {}
+                Err(AppError::Cancelled) => {
+                    scan.stop(deadline, cancel);
+                    break;
+                }
+                Err(error) => return Err(error),
+            }
             scan.scan_authenticated(
                 file,
                 time.clone(),
