@@ -2,7 +2,14 @@
 #[cfg(feature = "sigma")]
 mod archive;
 #[cfg(feature = "sigma")]
+mod bundle;
+#[cfg(feature = "sigma")]
 pub use archive::inspect_sigmahq_archive;
+#[cfg(feature = "sigma")]
+pub use bundle::{
+    SigmaPackageBundle, SigmaPackageMetadata, inspect_sigma_catalog_asset,
+    inspect_sigma_package_bundle,
+};
 #[cfg(feature = "sigma")]
 pub mod evaluation;
 pub mod field_table;
@@ -82,6 +89,24 @@ pub fn inspect_local_sigma_pack(
     cancel: &CancellationToken,
 ) -> Result<LocalSigmaPack, AppError> {
     read_local_sigma_pack(root, cancel, admit_rule_identity)
+}
+
+#[cfg(feature = "sigma")]
+fn validate_manifest_rule(entry: &SigmaPackRuleV1, bytes: &[u8]) -> Result<(), AppError> {
+    let digest = irmind_app::sha256(bytes);
+    let metadata = admit_rule_identity(bytes)?;
+    let id = metadata
+        .id
+        .unwrap_or_else(|| format!("sha256:{}", irmind_app::hex(&digest)));
+    if bytes.len() as u64 != entry.size
+        || digest != entry.rule.sha256
+        || id != entry.rule.id
+        || metadata.author != entry.author
+        || metadata.version != entry.version
+    {
+        return Err(invalid());
+    }
+    Ok(())
 }
 
 #[cfg(feature = "sigma")]

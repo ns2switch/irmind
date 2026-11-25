@@ -79,6 +79,24 @@ impl Ed25519CatalogIndexVerifier {
         }
         Ok(Self { keys })
     }
+    #[cfg(feature = "sigma")]
+    pub fn verify_sigma(
+        &self,
+        index: &[u8],
+        signature: &[u8],
+        expected_tag: &str,
+    ) -> Result<irmind_app::catalog::SigmaCatalogIndex, CatalogError> {
+        irmind_app::catalog::SigmaCatalogIndex::authenticate(
+            index,
+            signature,
+            expected_tag,
+            self.keys,
+            &crate::LocalVerifier {
+                trusted: std::collections::BTreeMap::new(),
+            },
+        )
+    }
+
     pub fn available(&self) -> bool {
         !self.keys.is_empty()
     }

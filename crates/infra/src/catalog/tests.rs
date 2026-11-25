@@ -351,3 +351,59 @@ fn catalog_admission_requires_publisher_proof_beyond_a_valid_analyst_signature()
             .is_err()
     );
 }
+
+#[cfg(feature = "sigma")]
+#[test]
+fn approved_sigma_catalog_vector_authenticates_in_its_own_domain() {
+    let vectors: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../docs/development/sigma-package-vectors/wire.json"
+    ))
+    .unwrap();
+    let read = |name: &str| hex::decode(vectors[name].as_str().unwrap()).unwrap();
+    let body = |name: &str| hex::decode(vectors[name]["bytes_hex"].as_str().unwrap()).unwrap();
+    let key: [u8; 32] = read("publisher_public_key").try_into().unwrap();
+    let verifier =
+        Ed25519CatalogIndexVerifier::from_release_keys(Box::leak(Box::new([key]))).unwrap();
+    let index = body("index");
+    let signature = read("sigma_index_signature");
+    let authenticated = verifier.verify_sigma(&index, &signature, "v1.0.0").unwrap();
+    assert_eq!(authenticated.proof(), body("v10_object_7"));
+    assert_eq!(authenticated.sequence(), 1);
+    let package = body("package");
+    let cancel = irmind_app::CancellationToken::new();
+    let bundle = crate::sigma_pack::inspect_sigma_catalog_asset(
+        &authenticated,
+        "synthetic",
+        &package,
+        &cancel,
+    )
+    .unwrap();
+    assert_eq!(bundle.pack.rules.len(), 1);
+    let mut wrong = package;
+    *wrong.last_mut().unwrap() ^= 1;
+    assert!(
+        crate::sigma_pack::inspect_sigma_catalog_asset(
+            &authenticated,
+            "synthetic",
+            &wrong,
+            &cancel
+        )
+        .is_err()
+    );
+
+    assert!(verifier.verify_sigma(&index, &signature, "v1.0.1").is_err());
+    assert!(matches!(
+        verifier.verify_sigma(
+            &body("skills_index"),
+            &read("skills_index_signature"),
+            "v1.0.0"
+        ),
+        Err(CatalogError::InvalidSignature)
+    ));
+    let raw = CatalogIndexBytes::new(index, &signature).unwrap();
+    assert!(
+        verifier
+            .verify(&raw, &FrozenCatalogRelease::new("v1.0.0").unwrap())
+            .is_err()
+    );
+}

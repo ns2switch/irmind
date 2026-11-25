@@ -18,7 +18,9 @@ pub use sigma_admission::*;
 mod sigma_execution;
 pub use sigma_execution::*;
 mod sigma_notice;
+mod sigma_package;
 pub use sigma_notice::*;
+pub use sigma_package::*;
 mod sigma_objects;
 pub use sigma_objects::*;
 

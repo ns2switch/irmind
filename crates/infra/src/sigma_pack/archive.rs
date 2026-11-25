@@ -1,5 +1,5 @@
 //! Bounded in-memory reading of a hash-pinned, single-volume ZIP32 release.
-use super::{LocalSigmaPack, MAX_PACK_BYTES, admit_rule_identity, check_cancel};
+use super::{LocalSigmaPack, MAX_PACK_BYTES, check_cancel};
 use irmind_app::{AppError, CancellationToken, sha256, v10_proofs::SigmaPackManifestV1};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -75,18 +75,8 @@ pub fn inspect_sigmahq_archive(
             .checked_sub(expected_size)
             .ok_or_else(|| invalid("decoded archive size"))?;
         if let Some(((slot, rule), bytes)) = selected.zip(body) {
-            let digest = sha256(&bytes);
-            let metadata = admit_rule_identity(&bytes)?;
-            let id = metadata
-                .id
-                .unwrap_or_else(|| format!("sha256:{}", irmind_app::hex(&digest)));
-            if digest != rule.rule.sha256
-                || id != rule.rule.id
-                || metadata.author != rule.author
-                || metadata.version != rule.version
-            {
-                return Err(invalid("rule selection SHA-256 or metadata"));
-            }
+            super::validate_manifest_rule(rule, &bytes)
+                .map_err(|_| invalid("rule selection SHA-256 or metadata"))?;
             found[slot] = Some(bytes);
         }
     }

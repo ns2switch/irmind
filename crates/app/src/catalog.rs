@@ -13,6 +13,8 @@ mod release_metadata;
 pub use release_metadata::CatalogReleaseMetadata;
 mod receipt;
 mod schema;
+mod sigma;
+pub use sigma::{SigmaCatalogEntry, SigmaCatalogIndex, SigmaCatalogSource};
 mod services;
 mod store;
 mod verified;
@@ -114,4 +116,8 @@ impl FrozenCatalogRelease {
     pub fn tag(&self) -> &str {
         &self.tag
     }
+}
+
+pub(crate) fn valid_sigma_package_version(version: &str) -> bool {
+    !version.contains('+') && version::Version::parse(version).is_ok()
 }
