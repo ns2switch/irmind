@@ -556,19 +556,7 @@ fn signed_sigma_run_and_admitted_rules_verify_in_the_actual_sealed_v10_export() 
         receipt.receipt.status,
         irmind_app::v10_proofs::SigmaRunStatusV1::CoverageLimited
     );
-    let preview = store
-        .preview_cited_report(&engine, &case.id, ReportDocumentLanguage::English, &cancel)
-        .unwrap();
-    assert!(preview.markdown.contains("remains undetermined"));
-    assert!(preview.markdown.contains(r"aws \/ cloudtrail \/"));
-    assert!(preview.markdown.contains("1 missing bindings"));
-    let notices = engine
-        .verify_with_mapping_and_query_notices(&case.id, &cancel)
-        .unwrap();
-    let notice = &notices.sigma_runs[0];
-    assert_eq!(notice.coverage.skipped_pairs, 1);
-    assert_eq!(notice.skipped_classes[0].1, 1);
-    assert!(notice.skipped_classes[0].0.contains("aws / cloudtrail /"));
+    assert_signed_coverage_notices(&store, &engine, &case.id, &cancel);
     let findings = engine.findings(&case.id).unwrap();
     assert_eq!(findings.len(), 1);
     assert!(!findings[0].confirmed);
@@ -605,6 +593,27 @@ fn signed_sigma_run_and_admitted_rules_verify_in_the_actual_sealed_v10_export() 
             .verify_export_details(&package, Some(&key))
             .is_err()
     );
+}
+
+fn assert_signed_coverage_notices(
+    store: &LocalStore,
+    engine: &Engine<'_>,
+    case: &CaseId,
+    cancel: &CancellationToken,
+) {
+    let preview = store
+        .preview_cited_report(engine, case, ReportDocumentLanguage::English, cancel)
+        .unwrap();
+    assert!(preview.markdown.contains("remains undetermined"));
+    assert!(preview.markdown.contains(r"aws \/ cloudtrail \/"));
+    assert!(preview.markdown.contains("1 missing bindings"));
+    let notices = engine
+        .verify_with_mapping_and_query_notices(case, cancel)
+        .unwrap();
+    let notice = &notices.sigma_runs[0];
+    assert_eq!(notice.coverage.skipped_pairs, 1);
+    assert_eq!(notice.skipped_classes[0].1, 1);
+    assert!(notice.skipped_classes[0].0.contains("aws / cloudtrail /"));
 }
 
 fn admit_test_sigma_pack(
