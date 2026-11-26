@@ -93,7 +93,10 @@ def select_scope(event: str, ref: str, changed: list[str], labels: set[str],
         raise ValueError("release dry run requires a manual workflow on a branch")
     pull_request = event == "pull_request"
     ignored = pull_request and action in LABEL_EVENTS and label != "full-ci"
-    docs_only = pull_request and bool(changed) and all(map(docs_path, changed))
+    full_ci = pull_request and not ignored and not draft and (
+        "full-ci" in labels or (action == "labeled" and label == "full-ci")
+    )
+    docs_only = pull_request and not full_ci and bool(changed) and all(map(docs_path, changed))
     tag = event == "push" and ref.startswith("refs/tags/v")
     nightly = event == "schedule" and (recent_commit or weekly or release_changed)
     return {
@@ -101,9 +104,10 @@ def select_scope(event: str, ref: str, changed: list[str], labels: set[str],
         "docs_only": not ignored and docs_only,
         "platforms": tag or nightly or event == "workflow_dispatch" or (
             not ignored and pull_request and not docs_only and (
-                ("full-ci" in labels and not draft) or any(map(platform_path, changed))
+                full_ci or any(map(platform_path, changed))
             )
         ),
+        "full_ci": full_ci,
         "cross_verify": tag or nightly or release_dry_run,
         "release_build": tag or release_dry_run or (nightly and (weekly or release_changed)),
     }
@@ -140,6 +144,22 @@ def run_data(run: int, kind: str) -> list[dict]:
         if not response[kind] or len(entries) >= response["total_count"]:
             return entries
         page += 1
+
+
+REVIEW_JOBS = {
+    "dco", "linux", "json_formats", "windows",
+    "evtx_linux_compatibility (ubuntu-22.04)",
+    "evtx_linux_compatibility (ubuntu-24.04)",
+    "macos (macos-15-intel, x86_64-apple-darwin, x86_64)",
+    "macos (macos-26, aarch64-apple-darwin, arm64)",
+}
+
+
+def missing_review_jobs(jobs: list[dict]) -> set[str]:
+    outcomes = {}
+    for job in sorted(jobs, key=lambda entry: entry.get("run_attempt", 1)):
+        outcomes[job["name"]] = job["conclusion"]
+    return {job for job in REVIEW_JOBS if outcomes.get(job) != "success"}
 
 
 def has_full_release_build(jobs: list[dict]) -> bool:
@@ -179,6 +199,23 @@ def docs_binary_run() -> int | None:
     return None
 
 
+def pr_matrix_context(payload: dict, live: dict) -> tuple[set[str], bool]:
+    """Combine transition facts and the current PR without trusting a stale label snapshot."""
+    snapshot = payload["pull_request"]
+    action = payload.get("action", "")
+    if snapshot["head"]["sha"] != live["head"]["sha"]:
+        raise ValueError("The PR head changed while selecting the matrix")
+    labels = {entry["name"] for entry in live["labels"]}
+    if action == "labeled" and payload.get("label", {}).get("name") == "full-ci":
+        labels.add("full-ci")
+    # On ready_for_review, retain the event's positive label evidence if
+    # GitHub has not yet reflected the transition in its live REST view.
+    if action == "ready_for_review" and any(entry["name"] == "full-ci" for entry in snapshot["labels"]):
+        labels.add("full-ci")
+    draft = live["draft"] and action != "ready_for_review"
+    return labels, draft
+
+
 def main() -> None:
     event = os.environ["GITHUB_EVENT_NAME"]
     payload = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
@@ -188,7 +225,12 @@ def main() -> None:
     changed = []
     if event == "pull_request" and (action not in LABEL_EVENTS or label == "full-ci"):
         changed = diff_names(f"{pull_request['base']['sha']}...{pull_request['head']['sha']}")
-    labels = {entry["name"] for entry in pull_request.get("labels", [])}
+    labels, draft = set(), False
+    if event == "pull_request" and (action not in LABEL_EVENTS or label == "full-ci"):
+        number = int(payload["number"])
+        repo = os.environ["GITHUB_REPOSITORY"]
+        current = json.loads(command("gh", "api", f"repos/{repo}/pulls/{number}"))
+        labels, draft = pr_matrix_context(payload, current)
     last_main_commit = int(command("git", "log", "-1", "--format=%ct"))
     recent_commit = 0 <= time.time() - last_main_commit < 86_400
     weekly = event == "schedule" and payload.get("schedule") == WEEKLY_RELEASE
@@ -205,7 +247,7 @@ def main() -> None:
             release_changed = True
     scope = select_scope(
         event, os.environ["GITHUB_REF"], changed, labels, recent_commit, release_dry_run,
-        action=action, label=label, draft=pull_request.get("draft", False), weekly=weekly,
+        action=action, label=label, draft=draft, weekly=weekly,
         release_changed=release_changed,
     )
     binary = None
