@@ -1,0 +1,32 @@
+# Caso 7 y exportación V11 · Contrato de la fase 0
+
+Propuesta pendiente de aprobación explícita. Referencia [v0.7.4](https://github.com/ns2switch/irmind/releases/tag/v0.7.4), commit `04f4b5dc`. La [especificación en inglés](../../development/case-7-export-v11-contract.md) fija el orden, los tipos, los límites y los dominios de los registros.
+
+## Inventario
+
+| Decisión | Elementos |
+| --- | --- |
+| Eliminar | Lectura, escritura y verificación de casos 6 y anteriores y de exportaciones V10 y anteriores. Evaluadores Sigma V1 a V4 y los dos identificadores de admisión de V3 y V4. Cuerpos de resultados V1 y V2 como objetos autónomos. Recibo `SigmaRunV1`, cobertura de informes V1 histórica, comprobación antigua de coincidencias de Sigma por fila sin plan, objetos de prueba y caminos exclusivos de los formatos retirados. Para estos formatos se conservan vectores de rechazo. |
+| Consolidar | Un evaluador `irmind-sigma-evaluator-v5` para todas las tablas aprobadas con compilación por clase. Recibo `SigmaRunV2` con la modalidad de admisión como campo propio. El clasificador de formatos comparte el mismo motivo tipado de rechazo en CLI, TUI y verificación de exportaciones. |
+| Mantener | Cuerpo Sigma V3 y matriz por clase, códigos de estado 0–6, cobertura de informes V2, citas autenticadas, Markdown y PDF, tabla de campos y demás objetos Sigma vigentes, índice y permisos de paquetes instalados, firma y sello, Parquet V3, capturas de consultas, skills, ramas de subagentes, presupuestos y recibos de importación de carpetas. |
+| Mantener con ámbito preciso | El manifiesto V2 sigue siendo el vigente para la identidad nativa de distribución. El manifiesto V1 provisional tiene un uso actual en desarrollo, también en Azure. El descriptor V1 anidado de la extracción declarativa sigue siendo un dato de producción. Se suprime la compatibilidad con el V1 nativo como receta de distribución. También se conserva el cuerpo del manifiesto de fuente V1 anidado en el V2 vigente. |
+
+## Escritura y verificación
+
+El nuevo registro firmado `sigma-run-v2` lleva un byte obligatorio justo después del identificador del evaluador. El valor `0` exige una admisión global de importación directa desde un directorio local. El valor `1` exige una instalación autenticada y un `SigmaCaseRunAdmissionV1` firmado inmediatamente antes del recibo. El checkpoint de la ejecución compromete la admisión, que a su vez compromete el checkpoint anterior. Deben coincidir caso, paquete, manifiesto, inventario, fuentes, intervalo, tabla, reglas, evaluador y reserva. Verificar un caso autentica las pruebas históricas de esa instalación. Cada ejecución instalada necesita su propia admisión. Una modalidad desconocida, una admisión fuera de lugar o un objeto de prueba sin referencia dan error.
+
+El cuerpo de resultados V3 conserva su codificación. La matriz por clase pasa a ser obligatoria. V5 conserva el decimal de `ResultType` solo para `Type == "SigninLogs"` y aplica las proyecciones aprobadas. Un campo exacto indeterminado, como una lista de 33 IP en Kubernetes, queda sin veredicto incluso en una regla negada. El resultado y el informe conservan el motivo de cobertura parcial. La verificación reconstruye el plan y resuelve los predicados y las filas citadas en el artefacto autenticado.
+
+El primer `CaseCreated` conserva su estructura y cambia el marcador de 6 a 7. El export usa la magia ASCII `IRMIND-EXPORT-V11` terminada por NUL y `version:11` en la cabecera JSON. Conserva las 12 secciones y sus contadores obligatorios, incluso vacíos. En orden, son auditoría, evidencias, originales, operaciones, pruebas de mapeo, Parquet, skills, pruebas del catálogo de skills, subagentes, capturas de consultas, pruebas de Sigma e informes. Se conserva el sello y se exige fin de fichero tras la última sección. Cambian únicamente los elementos dedicados al marcador y a la consolidación.
+
+## Actualización
+
+Usa el binario original de IRMind v0.7.x que creó el caso 6 o la exportación V10. Conserva el directorio de datos compatible y sus claves. Para seguir trabajando en v0.8, vuelve a ingerir los originales verificados en un caso nuevo. El mensaje explica la acción disponible. Por ejemplo, «El caso usa el formato 6. Usa el binario de IRMind v0.7.x que lo creó o vuelve a ingerir los originales verificados en un caso nuevo». El mensaje indica la serie deducible del marcador, con el binario productor como referencia si el marcador no identifica una sola serie. La comprobación acotada del marcador se aplica antes de procesar los registros o datos posteriores. La apertura, verificación, exportación, recuperación y limpieza dejan intactos los casos reconocidos como de otro formato.
+
+La receta del manifiesto V2 se mantiene. Si un fichero o dependencia alcanzable cambia, se atribuye el cambio de identidad a esa entrada. Se comparan las 19 identidades nativas en los cinco destinos de distribución. Se conserva la advertencia del manifiesto provisional de desarrollo. Los paquetes Sigma instalados conservan su admisión global, el hash, el índice firmado y la protección ante retroceso si se usa el mismo almacén global autenticado. Comprueba la versión mínima y revisa la cobertura con `/sigma info`. Ejecutar en un caso nuevo crea su propia admisión de caso.
+
+## Vectores y entrega
+
+El [generador independiente](../../development/case-7-export-v11-vectors/generate.py) reproduce los [vectores sintéticos](../../development/case-7-export-v11-vectors/wire.json) con Python 3 y OpenSSL 3. Incluye una exportación vacía sellada, ambas modalidades Sigma y rechazos de marcadores, recibos, cuerpos y enlaces. Las pruebas de implementación deberán resolver los objetos y filas del caso real de prueba además de reproducir los bytes.
+
+Tras la aprobación se integrarán los cambios de formato y la limpieza por PR con matriz completa. Se medirán líneas de producción, crates, tamaño por plataforma, compilación en frío y duración de matriz antes y después. La candidata exacta se ensayará con el binario de distribución y las verificaciones de firma, reproducibilidad, exportación e instalación. La entrega prevista es `v0.8.0-alpha.1`, con notas bilingües de formato y limpieza. Hooks, MCP y la API del motor quedan para fases posteriores.
