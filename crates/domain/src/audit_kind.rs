@@ -68,12 +68,13 @@ pub enum AuditEventKind {
     SubagentReservationV1,
     SubagentCheckpointV1,
     SubagentResultV1,
+    SigmaCaseRunAdmissionV1,
     SigmaRunV1,
     ReportPublishedV1,
 }
 
 impl AuditEventKind {
-    pub const ALL: [Self; 66] = [
+    pub const ALL: [Self; 67] = [
         Self::Allowed,
         Self::ApprovalDenied,
         Self::ApprovalGranted,
@@ -138,6 +139,7 @@ impl AuditEventKind {
         Self::SubagentReservationV1,
         Self::SubagentCheckpointV1,
         Self::SubagentResultV1,
+        Self::SigmaCaseRunAdmissionV1,
         Self::SigmaRunV1,
         Self::ReportPublishedV1,
     ];
@@ -208,6 +210,7 @@ impl AuditEventKind {
             Self::SubagentReservationV1 => "subagent-reservation-v1",
             Self::SubagentCheckpointV1 => "subagent-checkpoint-v1",
             Self::SubagentResultV1 => "subagent-result-v1",
+            Self::SigmaCaseRunAdmissionV1 => "sigma-case-run-admission-v1",
             Self::SigmaRunV1 => "sigma-run-v1",
             Self::ReportPublishedV1 => "report-published-v1",
         }

@@ -8,6 +8,8 @@ mod cli;
 mod configuration;
 #[cfg(all(feature = "keystore-file", feature = "parser-json"))]
 mod demo;
+#[cfg(feature = "sigma")]
+mod sigma_packages;
 #[cfg(not(all(feature = "keystore-file", feature = "parser-json")))]
 mod demo {
     pub(super) fn run(
@@ -173,6 +175,73 @@ impl RootWorkspaceIo {
 }
 
 impl WorkspaceIo for RootWorkspaceIo {
+    #[cfg(feature = "sigma")]
+    fn preview_sigma_package_change(
+        &self,
+        engine: &Engine<'_>,
+        source: &str,
+        update: Option<&str>,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<irmind_tui::SigmaPackagePreview, AppError> {
+        sigma_packages::preview(&self.store, engine, source, update, cancel)
+    }
+
+    #[cfg(feature = "sigma")]
+    fn apply_sigma_package_change(
+        &self,
+        engine: &Engine<'_>,
+        preview: &irmind_tui::SigmaPackagePreview,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, AppError> {
+        sigma_packages::apply(&self.store, engine, preview, cancel)
+    }
+
+    #[cfg(feature = "sigma")]
+    fn sigma_package_info(
+        &self,
+        engine: &Engine<'_>,
+        case: &irmind_app::CaseId,
+        name: &str,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, AppError> {
+        use irmind_app::v10_proofs::SigmaPackageOriginV1;
+        use std::fmt::Write as _;
+        let info = self
+            .store
+            .sigma_package_coverage(engine, case, name, cancel)?;
+        let receipt = info.receipt;
+        let origin = match receipt.origin {
+            SigmaPackageOriginV1::Local => "local",
+            SigmaPackageOriginV1::CatalogAsset(_) => "catalog",
+            SigmaPackageOriginV1::SigmaHqArchive(_) => "SigmaHQ reference",
+        };
+        let mut text = format!(
+            "{} {} · {} · {origin} · {}\nManifest SHA-256 {}",
+            receipt.name,
+            receipt.version,
+            if receipt.active { "active" } else { "inactive" },
+            receipt.license,
+            irmind_app::hex(&receipt.manifest)
+        );
+        if let (Some(coverage), Some(checkpoint)) = (info.coverage, info.checkpoint) {
+            let _ = write!(
+                text,
+                "\nCase checkpoint {}\nRules with all / some / no eligible classes: {} / {} / {}",
+                irmind_app::hex(&checkpoint),
+                coverage.all_rules,
+                coverage.some_rules,
+                coverage.no_rules
+            );
+            for (class, missing, incompatible) in info.skipped_classes {
+                let _ = write!(
+                    text,
+                    "\n{class} · {missing} missing bindings · {incompatible} incompatible types"
+                );
+            }
+        }
+        Ok(text)
+    }
+
     #[cfg(feature = "sigma")]
     fn inspect_sigma_pack(
         &self,

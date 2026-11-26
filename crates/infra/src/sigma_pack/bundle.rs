@@ -105,6 +105,59 @@ pub fn inspect_sigma_catalog_asset(
     Ok(bundle)
 }
 
+/// Authenticate a reviewed selection without storing or expanding unselected rules.
+pub fn inspect_sigmahq_catalog_reference(
+    index: &irmind_app::catalog::SigmaCatalogIndex,
+    name: &str,
+    archive: &[u8],
+    selection: &[u8],
+    cancel: &CancellationToken,
+) -> Result<SigmaPackageBundle, AppError> {
+    use irmind_app::catalog::{CatalogError, SigmaCatalogSource};
+
+    let entry = index
+        .entries()
+        .iter()
+        .find(|entry| entry.name == name)
+        .ok_or(CatalogError::InvalidData)?;
+    let SigmaCatalogSource::SigmahqArchive {
+        bytes,
+        sha256,
+        attribution,
+        selection_bytes,
+        ..
+    } = &entry.source
+    else {
+        return Err(CatalogError::InvalidData.into());
+    };
+    if selection.len() as u64 != *selection_bytes
+        || irmind_app::sha256(selection) != *entry.manifest_sha256.as_bytes()
+        || archive.len() as u64 != *bytes
+    {
+        return Err(CatalogError::AssetMismatch.into());
+    }
+    let manifest = SigmaPackManifestV1::decode(selection).map_err(|_| invalid())?;
+    let pack = super::inspect_sigmahq_archive(archive, *sha256.as_bytes(), &manifest, cancel)?;
+    let metadata = SigmaPackageMetadata {
+        format_version: 1,
+        name: entry.name.clone(),
+        version: entry.version.clone(),
+        license: entry.license.clone(),
+        attribution: attribution.clone(),
+    };
+    let canonical = serde_json::to_vec(&metadata).map_err(|_| invalid())?;
+    if canonical.len() > MAX_METADATA || !valid_metadata(&metadata) {
+        return Err(invalid());
+    }
+    Ok(SigmaPackageBundle {
+        metadata,
+        metadata_sha256: irmind_app::sha256(&canonical),
+        asset_sha256: *sha256.as_bytes(),
+        manifest_sha256: *entry.manifest_sha256.as_bytes(),
+        pack,
+    })
+}
+
 fn frame<'a>(body: &mut &'a [u8], limit: usize) -> Result<&'a [u8], AppError> {
     let (header, rest) = body.split_first_chunk::<8>().ok_or_else(invalid)?;
     let length = usize::try_from(u64::from_be_bytes(*header)).map_err(|_| invalid())?;

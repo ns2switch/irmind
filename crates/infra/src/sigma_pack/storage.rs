@@ -10,6 +10,7 @@ use irmind_app::{
     },
 };
 mod installation;
+pub use installation::CatalogSigmaInstallApproval;
 
 use std::{
     collections::{BTreeMap, BTreeSet},

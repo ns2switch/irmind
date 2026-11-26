@@ -8,13 +8,15 @@ pub use archive::inspect_sigmahq_archive;
 #[cfg(feature = "sigma")]
 pub use bundle::{
     SigmaPackageBundle, SigmaPackageMetadata, inspect_sigma_catalog_asset,
-    inspect_sigma_package_bundle,
+    inspect_sigma_package_bundle, inspect_sigmahq_catalog_reference,
 };
 #[cfg(feature = "sigma")]
 pub mod evaluation;
 pub mod field_table;
 #[cfg(feature = "sigma")]
 mod runtime;
+#[cfg(feature = "sigma")]
+pub use runtime::InstalledSigmaCoverage;
 #[cfg(feature = "sigma")]
 pub(crate) use runtime::{SigmaMatchCheck, verify_class_plan};
 #[cfg(feature = "sigma")]
@@ -31,7 +33,7 @@ use std::{
     path::{Path, PathBuf},
 };
 #[cfg(feature = "sigma")]
-pub use storage::AdmittedSigmaPack;
+pub use storage::{AdmittedSigmaPack, CatalogSigmaInstallApproval};
 
 pub(crate) fn sigma_proof_read(
     kind: u8,

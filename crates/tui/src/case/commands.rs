@@ -562,9 +562,40 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
     }
 
     fn sigma_pack_command(&mut self, prompt: &str) -> bool {
+        if let Some(source) = prompt.strip_prefix("/sigma install ") {
+            self.sigma_package_change(prompt, source.trim(), None);
+            return true;
+        }
+        if let Some(arguments) = prompt.strip_prefix("/sigma update ") {
+            let (name, source) = arguments
+                .trim()
+                .split_once(' ')
+                .unwrap_or((arguments.trim(), ""));
+            self.sigma_package_change(prompt, source.trim(), Some(name));
+            return true;
+        }
+        if prompt == "/sigma list" {
+            let engine = self.engine;
+            self.start_task("List Sigma packages", move |_| {
+                list_sigma_installations(engine)
+            });
+            return true;
+        }
+        if let Some(name) = prompt.strip_prefix("/sigma info ") {
+            let (engine, case, io) = (self.engine, self.id, self.io_ops);
+            let name = name.trim().to_owned();
+            self.start_task("Sigma package information", move |cancel| {
+                io.sigma_package_info(engine, case, &name, &cancel)
+            });
+            return true;
+        }
+        if let Some(name) = prompt.strip_prefix("/sigma remove ") {
+            self.sigma_remove(prompt, name.trim());
+            return true;
+        }
         if prompt == "/sigma" || prompt == "/sigma inspect" {
             self.state.messages.push(
-                "Use /sigma inspect <directory>, /sigma import --license <id> <directory>, or /sigma run <pack SHA-256> <start UTC> <end UTC>."
+                "Use /sigma list, /sigma info <name>, /sigma install <file|catalog:name>, /sigma update <name> [file|catalog:name], /sigma remove <name>, /sigma inspect <directory>, /sigma import --license <id> <directory>, or /sigma run <pack SHA-256> <start UTC> <end UTC>."
                     .into(),
             );
             return true;
@@ -586,6 +617,83 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             return true;
         }
         false
+    }
+
+    fn sigma_package_change(&mut self, prompt: &str, source: &str, update: Option<&str>) {
+        use super::Confirmation;
+        let (engine, io) = (self.engine, self.io_ops);
+        if let Some(Confirmation::SigmaPackageChange { command, preview }) =
+            self.state.confirmed_action.take()
+            && command == prompt
+        {
+            self.start_task("Apply Sigma package change", move |cancel| {
+                io.apply_sigma_package_change(engine, &preview, &cancel)
+            });
+            return;
+        }
+        let (command, source, update) = (
+            prompt.to_owned(),
+            source.to_owned(),
+            update.map(str::to_owned),
+        );
+        let sender = self.confirmation_tx.clone();
+        self.start_task("Prepare Sigma package", move |cancel| {
+            let preview =
+                io.preview_sigma_package_change(engine, &source, update.as_deref(), &cancel)?;
+            sender
+                .send(Confirmation::SigmaPackageChange {
+                    command,
+                    preview: Box::new(preview),
+                })
+                .map_err(|_| irmind_app::AppError::Cancelled)?;
+            Ok("Review the exact package before signing".into())
+        });
+    }
+
+    fn sigma_remove(&mut self, prompt: &str, name: &str) {
+        use super::Confirmation;
+        let engine = self.engine;
+        if let Some(Confirmation::SigmaRemove {
+            command,
+            name,
+            previous,
+            ..
+        }) = self.state.confirmed_action.take()
+            && command == prompt
+        {
+            self.start_task("Deactivate Sigma package", move |_| {
+                engine.deactivate_sigma_package(&name, previous)?;
+                Ok(format!("Sigma package {name} is inactive"))
+            });
+            return;
+        }
+        let name = name.to_owned();
+        let command = prompt.to_owned();
+        let sender = self.confirmation_tx.clone();
+        self.start_task("Prepare Sigma deactivation", move |_| {
+            let (receipt, head) = engine
+                .sigma_installations()?
+                .remove(&name)
+                .filter(|(receipt, _)| receipt.active)
+                .ok_or_else(|| {
+                    irmind_app::AppError::Policy("No active Sigma package with that name".into())
+                })?;
+            let detail = format!(
+                "Deactivate Sigma package {} {}?\nManifest SHA-256 {}",
+                receipt.name,
+                receipt.version,
+                irmind_app::hex(&receipt.manifest)
+            );
+            sender
+                .send(Confirmation::SigmaRemove {
+                    command,
+                    name,
+                    previous: head.hash,
+                    detail,
+                })
+                .map_err(|_| irmind_app::AppError::Cancelled)?;
+            Ok("Review the package deactivation before signing".into())
+        });
     }
 
     fn sigma_run(&mut self, arguments: &str) {
@@ -925,4 +1033,27 @@ mod tests {
             scope_expansion(current, "window 2026-10-24T00:00:00Z 2026-10-24T23:59:59Z").is_err()
         );
     }
+}
+
+fn list_sigma_installations(
+    engine: &irmind_app::Engine<'_>,
+) -> Result<String, irmind_app::AppError> {
+    use irmind_app::v10_proofs::SigmaPackageOriginV1;
+    let signed = engine.sigma_installations()?;
+    if signed.is_empty() {
+        return Ok("No signed Sigma package installations".into());
+    }
+    Ok(signed
+        .values()
+        .map(|(receipt, _)| {
+            let status = if receipt.active { "active" } else { "inactive" };
+            let source = match receipt.origin {
+                SigmaPackageOriginV1::Local => "local",
+                SigmaPackageOriginV1::CatalogAsset(_) => "catalog",
+                SigmaPackageOriginV1::SigmaHqArchive(_) => "SigmaHQ reference",
+            };
+            format!("{} {} · {source} · {status}", receipt.name, receipt.version)
+        })
+        .collect::<Vec<_>>()
+        .join("\n"))
 }

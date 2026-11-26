@@ -112,42 +112,33 @@ impl SigmaCatalogIndex {
         release_keys: &[[u8; 32]],
         verifier: &dyn Verifier,
     ) -> Result<Self, CatalogError> {
-        if proof.len() > PROOF.len() + 8 + super::MAX_CATALOG_INDEX_BYTES + 64
-            || crate::sha256(proof) != expected_digest
-        {
-            return Err(CatalogError::InvalidData);
-        }
-        let body = proof.strip_prefix(PROOF).ok_or(CatalogError::InvalidData)?;
-        let (size, body) = body
-            .split_first_chunk::<8>()
-            .ok_or(CatalogError::InvalidData)?;
-        let length =
-            usize::try_from(u64::from_be_bytes(*size)).map_err(|_| CatalogError::InvalidData)?;
-        let (index, signature) = body
-            .split_at_checked(length)
-            .ok_or(CatalogError::InvalidData)?;
+        let (index, signature) = split_proof(proof, expected_digest)?;
         Self::authenticate(index, signature, expected_tag, release_keys, verifier)
     }
 
-    /// Check against every uniquely authenticated earlier release retained by
-    /// the global installation history, including releases with no active packs.
-    pub fn check_release_history<'a>(
+    /// Check every earlier release bound by authenticated global operations.
+    pub fn check_release_history(
         &self,
-        history: impl IntoIterator<Item = &'a Self>,
+        history: impl IntoIterator<Item = SigmaCatalogReleaseStamp>,
     ) -> Result<(), CatalogError> {
-        let mut high = 0;
+        let stamp = self.release_stamp();
         for previous in history {
-            high = high.max(previous.sequence());
-            if (self.tag() == previous.tag() || self.sequence() == previous.sequence())
-                && self.proof != previous.proof
+            if (stamp.tag == previous.tag || stamp.sequence == previous.sequence)
+                && stamp != previous
+                || stamp.sequence < previous.sequence
             {
                 return Err(CatalogError::ReleaseMismatch);
             }
         }
-        if self.sequence() < high {
-            return Err(CatalogError::ReleaseMismatch);
-        }
         Ok(())
+    }
+
+    pub fn release_stamp(&self) -> SigmaCatalogReleaseStamp {
+        SigmaCatalogReleaseStamp {
+            tag: self.index.release_tag.clone(),
+            sequence: self.index.release_sequence,
+            proof: crate::sha256(&self.proof),
+        }
     }
 
     pub fn proof(&self) -> &[u8] {
@@ -165,6 +156,61 @@ impl SigmaCatalogIndex {
     pub fn commit(&self) -> &str {
         &self.index.release_commit
     }
+}
+
+#[derive(Eq, PartialEq)]
+pub struct SigmaCatalogReleaseStamp {
+    tag: String,
+    sequence: u64,
+    proof: [u8; 32],
+}
+
+impl SigmaCatalogReleaseStamp {
+    pub fn tag(&self) -> &str {
+        &self.tag
+    }
+
+    /// Recover the rollback floor from an already authenticated installation.
+    /// The receipt binds the bytes even after this publisher key is retired.
+    /// This stamp cannot authorize an installation or a publisher claim.
+    pub fn from_signed_installation(
+        proof: &[u8],
+        expected_digest: [u8; 32],
+    ) -> Result<Self, CatalogError> {
+        let (raw, _) = split_proof(proof, expected_digest)?;
+        limits::check(raw)?;
+        let index: Index = serde_json::from_slice(raw).map_err(|_| CatalogError::InvalidData)?;
+        index.validate()?;
+        if serde_json::to_vec(&index).map_err(|_| CatalogError::InvalidData)? != raw {
+            return Err(CatalogError::InvalidData);
+        }
+        Ok(Self {
+            tag: index.release_tag,
+            sequence: index.release_sequence,
+            proof: expected_digest,
+        })
+    }
+}
+
+fn split_proof(proof: &[u8], expected_digest: [u8; 32]) -> Result<(&[u8], &[u8]), CatalogError> {
+    if proof.len() > PROOF.len() + 8 + super::MAX_CATALOG_INDEX_BYTES + 64
+        || crate::sha256(proof) != expected_digest
+    {
+        return Err(CatalogError::InvalidData);
+    }
+    let body = proof.strip_prefix(PROOF).ok_or(CatalogError::InvalidData)?;
+    let (size, body) = body
+        .split_first_chunk::<8>()
+        .ok_or(CatalogError::InvalidData)?;
+    let length =
+        usize::try_from(u64::from_be_bytes(*size)).map_err(|_| CatalogError::InvalidData)?;
+    let (index, signature) = body
+        .split_at_checked(length)
+        .ok_or(CatalogError::InvalidData)?;
+    if signature.len() != 64 {
+        return Err(CatalogError::InvalidData);
+    }
+    Ok((index, signature))
 }
 
 impl Index {
@@ -198,6 +244,12 @@ impl Index {
 }
 
 impl SigmaCatalogEntry {
+    pub fn supports_irmind(&self, running: &str) -> Result<bool, CatalogError> {
+        let running = version::Version::parse(running)?;
+        let minimum = version::Version::parse(&self.minimum_irmind_version)?;
+        Ok(!running.compare(&minimum).is_lt())
+    }
+
     fn validate(&self) -> Result<&str, CatalogError> {
         if !valid_sigma_package_identity(&self.name, &self.version)
             || super::version::Version::parse(&self.minimum_irmind_version).is_err()

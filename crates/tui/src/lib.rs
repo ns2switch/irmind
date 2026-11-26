@@ -145,6 +145,17 @@ impl From<bool> for ResumeMode {
 
 /// Filesystem selection is presentation I/O. The composition root supplies the
 /// same bounded, no-follow reader used by the noninteractive ingest command.
+/// The analyst reviews this immutable package before the workspace may sign it.
+pub struct SigmaPackagePreview {
+    pub detail: String,
+    pub name: String,
+    pub bytes: Vec<u8>,
+    pub asset: [u8; 32],
+    pub previous: Option<[u8; 32]>,
+    pub catalog: Option<irmind_app::catalog::SigmaCatalogIndex>,
+    pub selection: Option<Vec<u8>>,
+}
+
 pub trait WorkspaceIo: Send + Sync {
     fn show_hints(&self) -> bool {
         true
@@ -191,6 +202,38 @@ pub trait WorkspaceIo: Send + Sync {
     fn save_evidence(&self, path: &Path, bytes: &[u8]) -> Result<()>;
     fn verify_export(&self, path: &Path, expected_key: &str) -> Result<String>;
     fn case_exporter(&self) -> &dyn irmind_app::CaseExporter;
+    fn preview_sigma_package_change(
+        &self,
+        _engine: &Engine<'_>,
+        _source: &str,
+        _update: Option<&str>,
+        _cancel: &irmind_app::CancellationToken,
+    ) -> Result<SigmaPackagePreview, irmind_app::AppError> {
+        Err(irmind_app::AppError::Policy(
+            "Sigma installation is unavailable in this workspace".into(),
+        ))
+    }
+    fn apply_sigma_package_change(
+        &self,
+        _engine: &Engine<'_>,
+        _preview: &SigmaPackagePreview,
+        _cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, irmind_app::AppError> {
+        Err(irmind_app::AppError::Policy(
+            "Sigma installation is unavailable in this workspace".into(),
+        ))
+    }
+    fn sigma_package_info(
+        &self,
+        _engine: &Engine<'_>,
+        _case: &irmind_app::CaseId,
+        _name: &str,
+        _cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, irmind_app::AppError> {
+        Err(irmind_app::AppError::Policy(
+            "Sigma package information is unavailable in this workspace".into(),
+        ))
+    }
     fn inspect_sigma_pack(
         &self,
         _directory: &Path,

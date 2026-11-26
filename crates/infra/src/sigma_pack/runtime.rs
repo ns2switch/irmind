@@ -30,7 +30,99 @@ use std::{
 use irmind_app::v10_proofs::{SIGMA_EVALUATOR_V3, SigmaRunStatusV1};
 type RunObjects = Vec<(V10ProofDescriptor, Vec<u8>)>;
 
+pub struct InstalledSigmaCoverage {
+    pub receipt: irmind_app::v10_proofs::SigmaPackageInstallationV1,
+    pub checkpoint: Option<[u8; 32]>,
+    pub coverage: Option<irmind_app::v10_proofs::SigmaClassCoverage>,
+    pub skipped_classes: Vec<(String, usize, usize)>,
+}
+
 impl LocalStore {
+    pub fn sigma_package_coverage(
+        &self,
+        engine: &Engine<'_>,
+        case: &CaseId,
+        name: &str,
+        cancel: &CancellationToken,
+    ) -> Result<InstalledSigmaCoverage, AppError> {
+        let mut installed = engine.sigma_installations()?;
+        let (receipt, operation) = installed
+            .remove(name)
+            .ok_or_else(|| AppError::Policy("No installed Sigma package with that name".into()))?;
+        if !receipt.active {
+            return Ok(InstalledSigmaCoverage {
+                receipt,
+                checkpoint: None,
+                coverage: None,
+                skipped_classes: Vec::new(),
+            });
+        }
+        let bundle = self
+            .open_local_sigma_package(engine, name, cancel)?
+            .ok_or_else(invalid)?;
+        if engine
+            .local_sigma_package_operation(name)?
+            .is_none_or(|head| head.hash != operation.hash)
+        {
+            return Err(AppError::Policy(
+                "Sigma package changed while computing coverage".into(),
+            ));
+        }
+        let entries = self.entries(case)?;
+        let head = entries.last().ok_or_else(invalid)?;
+        engine.verify_cancelable(case, cancel)?;
+        if self
+            .entries(case)?
+            .last()
+            .is_none_or(|entry| entry.hash != head.hash)
+        {
+            return Err(AppError::Policy(
+                "Case changed while computing Sigma coverage".into(),
+            ));
+        }
+        let checkpoint = irmind_app::v10_proofs::CaseCheckpointV1 {
+            case_id: case.clone(),
+            sequence: head.seq,
+            entry_hash: head.hash,
+        };
+        let view = irmind_app::v10_proofs::V10CheckpointView::resolve(&entries, &checkpoint)?;
+        let mapping = self.parquet.mapping_catalog().ok_or_else(invalid)?;
+        let (_, table) =
+            ReviewedSigmaFieldTable::materialize_native(enrolled_field_table(), mapping)?;
+        let work = Workset::resolve(
+            &SigmaExecutionContext {
+                view,
+                checkpoint: checkpoint.clone(),
+                reserved: 0,
+            },
+            &table,
+            mapping,
+        )?;
+        let mut rules = bundle
+            .pack
+            .manifest
+            .0
+            .iter()
+            .zip(&bundle.pack.rules)
+            .map(|(rule, raw)| (rule.rule.clone(), raw.as_slice()))
+            .collect::<Vec<_>>();
+        rules.sort_unstable_by(|left, right| left.0.cmp(&right.0));
+        let (plan, compiled, _) = plan::compile(
+            &table,
+            &work.variants,
+            &rules,
+            Instant::now() + Duration::from_secs(10),
+            cancel,
+        )?;
+        let skipped_classes = plan::skipped_classes(&plan, &table, compiled.0.len())?;
+        Ok(InstalledSigmaCoverage {
+            receipt,
+            checkpoint: Some(checkpoint.entry_hash),
+            coverage: Some(plan.coverage()),
+            skipped_classes,
+        })
+    }
+
     pub fn run_sigma(
         &self,
         engine: &Engine<'_>,

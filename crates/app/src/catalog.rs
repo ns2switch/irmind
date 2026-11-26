@@ -14,7 +14,9 @@ pub use release_metadata::CatalogReleaseMetadata;
 mod receipt;
 mod schema;
 mod sigma;
-pub use sigma::{SigmaCatalogEntry, SigmaCatalogIndex, SigmaCatalogSource};
+pub use sigma::{
+    SigmaCatalogEntry, SigmaCatalogIndex, SigmaCatalogReleaseStamp, SigmaCatalogSource,
+};
 mod services;
 mod store;
 mod verified;

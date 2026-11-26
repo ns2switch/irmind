@@ -283,6 +283,57 @@ impl SigmaCaseRunAdmissionV1 {
         Ok(receipt)
     }
 
+    /// Decode the record whose outer signature and case chain were authenticated.
+    pub fn from_case_entry(
+        entry: &crate::SignedEntry,
+    ) -> std::result::Result<Self, crate::AppError> {
+        use crate::{Actor, AppError, AuditEventKind};
+        let invalid = || AppError::InvalidChain(entry.seq);
+        if entry.kind != AuditEventKind::SigmaCaseRunAdmissionV1
+            || entry.actor != Actor::Analyst
+            || entry.origin != "analyst"
+            || entry.evidence.is_some()
+        {
+            return Err(invalid());
+        }
+        let body = super::decode_payload(&entry.payload, CASE_ADMISSION).map_err(|_| invalid())?;
+        let receipt = Self::decode(&body).map_err(|_| invalid())?;
+        if receipt.checkpoint.case_id.as_str() != entry.case_id
+            || receipt.checkpoint.sequence.checked_add(1) != Some(entry.seq)
+            || receipt.checkpoint.entry_hash != entry.prev
+        {
+            return Err(invalid());
+        }
+        Ok(receipt)
+    }
+
+    /// The signed run follows its admission and matches the exact approved
+    /// selection, field table, evaluator and reservation.
+    pub fn verify_following_run(
+        admission: &crate::SignedEntry,
+        run: &super::SigmaRunV1,
+        pack_manifest: Digest,
+    ) -> std::result::Result<Self, crate::AppError> {
+        let claim = Self::from_case_entry(admission)?;
+        if run.checkpoint.case_id != claim.checkpoint.case_id
+            || run.checkpoint.sequence != admission.seq
+            || run.checkpoint.entry_hash != admission.hash
+            || run.pack_admission != claim.pack_admission
+            || pack_manifest != claim.manifest
+            || run.artifact_inventory != claim.artifact_inventory
+            || run.selected_sources != claim.selected_sources
+            || run.start_utc_micros != claim.start_us
+            || run.end_utc_micros != claim.end_us
+            || run.field_table != claim.field_table
+            || run.compiled_rules != claim.compiled_rules
+            || run.evaluator != claim.evaluator
+            || run.reserved_units != claim.reserved_work
+        {
+            return Err(crate::AppError::InvalidChain(admission.seq));
+        }
+        Ok(claim)
+    }
+
     fn validate(&self) -> Result<()> {
         if self.start_us >= self.end_us
             || self.evaluator != SIGMA_EVALUATOR_V3_CASE_ADMISSION
@@ -350,30 +401,60 @@ impl crate::Engine<'_> {
         &self,
         name: &str,
     ) -> std::result::Result<Option<crate::SignedOperation>, crate::AppError> {
-        use crate::AppError;
+        Ok(self
+            .sigma_installations()?
+            .remove(name)
+            .map(|(_, entry)| entry))
+    }
 
+    /// List authenticated latest receipts, including deactivation tombstones.
+    pub fn sigma_installations(
+        &self,
+    ) -> std::result::Result<
+        std::collections::BTreeMap<String, (SigmaPackageInstallationV1, crate::SignedOperation)>,
+        crate::AppError,
+    > {
+        use crate::AppError;
         let entries = self.audit_log.global_operations()?;
         self.verify_global_operation_entries(&entries)?;
         let prefix = crate::hex(INSTALLATION);
-        let mut previous: Option<(SigmaPackageInstallationV1, crate::SignedOperation)> = None;
+        let mut latest = std::collections::BTreeMap::<
+            String,
+            (SigmaPackageInstallationV1, crate::SignedOperation),
+        >::new();
         for entry in entries {
             if !entry.operation.starts_with(&prefix) {
                 continue;
             }
-            let invalid = || AppError::InvalidChain(entry.seq);
             let receipt = decode_sigma_installation_operation(&entry)?;
-            if receipt.name == name {
-                receipt
-                    .validate_successor(
-                        previous
-                            .as_ref()
-                            .map(|(old, operation)| (old, operation.hash)),
-                    )
-                    .map_err(|_| invalid())?;
-                previous = Some((receipt, entry));
-            }
+            let old = latest
+                .get(&receipt.name)
+                .map(|(old, operation)| (old, operation.hash));
+            receipt
+                .validate_successor(old)
+                .map_err(|_| AppError::InvalidChain(entry.seq))?;
+            latest.insert(receipt.name.clone(), (receipt, entry));
         }
-        Ok(previous.map(|(_, operation)| operation))
+        Ok(latest)
+    }
+
+    pub fn deactivate_sigma_package(
+        &self,
+        name: &str,
+        expected: Digest,
+    ) -> std::result::Result<crate::SignedOperation, crate::AppError> {
+        use crate::AppError;
+        let mut history = self.sigma_installations()?;
+        let (mut receipt, head) = history
+            .remove(name)
+            .filter(|(receipt, operation)| receipt.active && operation.hash == expected)
+            .ok_or_else(|| AppError::Policy("Sigma package changed after preview".into()))?;
+        receipt.active = false;
+        receipt.previous_installation = Some(head.hash);
+        self.commit_local_sigma_package(&receipt, |signed, append| {
+            append()?;
+            Ok(signed.clone())
+        })
     }
 
     /// Commit a local installation or deactivation only after the caller has
@@ -389,12 +470,90 @@ impl crate::Engine<'_> {
     ) -> std::result::Result<T, crate::AppError> {
         use crate::AppError;
         self.require_attended_analyst("install or deactivate Sigma package")?;
-        if receipt.origin != SigmaPackageOriginV1::Local {
+        if receipt.active && receipt.origin != SigmaPackageOriginV1::Local {
             return Err(AppError::Policy(
                 "Catalog installation requires a verified catalog preview".into(),
             ));
         }
         let _lock = self.audit_log.lock_global_operations()?;
+        self.commit_sigma_package_unlocked(receipt, publish)
+    }
+
+    /// Serialize catalog and local operations under the same global lock.
+    /// Old publisher receipts supply the floor even after deactivation.
+    pub fn commit_catalog_sigma_package<T>(
+        &self,
+        receipt: &SigmaPackageInstallationV1,
+        index: &crate::catalog::SigmaCatalogIndex,
+        mut read_history: impl FnMut(
+            Digest,
+        ) -> std::result::Result<
+            crate::catalog::SigmaCatalogReleaseStamp,
+            crate::AppError,
+        >,
+        publish: impl FnOnce(
+            &crate::SignedOperation,
+            &dyn Fn() -> std::result::Result<(), crate::AppError>,
+        ) -> std::result::Result<T, crate::AppError>,
+    ) -> std::result::Result<T, crate::AppError> {
+        use crate::{
+            AppError,
+            catalog::{CatalogError, SigmaCatalogSource},
+        };
+        self.require_attended_analyst("install Sigma catalog package")?;
+        let entry = index
+            .entries()
+            .iter()
+            .find(|item| item.name == receipt.name)
+            .ok_or(CatalogError::InvalidData)?;
+        let proof = crate::sha256(index.proof());
+        let (expected_origin, asset) = match &entry.source {
+            SigmaCatalogSource::CatalogAsset { sha256, .. } => {
+                (SigmaPackageOriginV1::CatalogAsset(proof), sha256)
+            }
+            SigmaCatalogSource::SigmahqArchive { sha256, .. } => {
+                (SigmaPackageOriginV1::SigmaHqArchive(proof), sha256)
+            }
+        };
+        if !receipt.active
+            || receipt.origin != expected_origin
+            || receipt.manifest != *entry.manifest_sha256.as_bytes()
+            || receipt.asset != *asset.as_bytes()
+            || receipt.version != entry.version
+            || receipt.license != entry.license
+        {
+            return Err(CatalogError::AssetMismatch.into());
+        }
+        let _lock = self.audit_log.lock_global_operations()?;
+        let history = self.audit_log.global_operations()?;
+        self.verify_global_operation_entries(&history)?;
+        let mut checked = std::collections::BTreeSet::new();
+        let prefix = crate::hex(INSTALLATION);
+        for operation in &history {
+            if operation.operation.starts_with(&prefix) {
+                let old = decode_sigma_installation_operation(operation)?;
+                if let SigmaPackageOriginV1::CatalogAsset(old_proof)
+                | SigmaPackageOriginV1::SigmaHqArchive(old_proof) = old.origin
+                    && checked.insert(old_proof)
+                {
+                    index.check_release_history([read_history(old_proof)?]).map_err(|_| {
+                        AppError::Policy("Sigma catalog release would roll back or conflict with a signed installation".into())
+                    })?;
+                }
+            }
+        }
+        self.commit_sigma_package_unlocked(receipt, publish)
+    }
+
+    fn commit_sigma_package_unlocked<T>(
+        &self,
+        receipt: &SigmaPackageInstallationV1,
+        publish: impl FnOnce(
+            &crate::SignedOperation,
+            &dyn Fn() -> std::result::Result<(), crate::AppError>,
+        ) -> std::result::Result<T, crate::AppError>,
+    ) -> std::result::Result<T, crate::AppError> {
+        use crate::AppError;
         let previous = self.local_sigma_package_operation(&receipt.name)?;
         if let Some(old) = &previous {
             let old_receipt = decode_sigma_installation_operation(old)?;
