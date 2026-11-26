@@ -407,7 +407,7 @@ fn a_signed_case_budget_survives_sealing_and_public_export_verification() {
         std::fs::copy(
             destination,
             std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../fuzz/seeds/export/valid-v10-budget.irmind"),
+                .join("../../fuzz/seeds/export/valid-v11-budget.irmind"),
         )
         .unwrap();
     }

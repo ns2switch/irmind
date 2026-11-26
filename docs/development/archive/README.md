@@ -16,3 +16,8 @@ These pages record earlier contracts and implementation decisions. Use the [arch
 | [Retired graph port removal](retired-graph-port-removal.md) | Implemented for v0.3. The retired graph ports were removed; see the [current architecture](../architecture.md). |
 | [V1 to V2 precise-time migration](v2-precision-migration.md) | Retired analyst procedure for v0.2. |
 | [Early large-case custody format](parquet-custody-design.md) | V1 artifacts and V3/V4 exports, superseded by the mapped pipeline. |
+| [Sigma and reports in V10](../sigma-report-v10-wire.md) | Historical case 6 header, V10 archive and Sigma run V1. The case 7 contract supersedes them. |
+| [Sigma source classes](../sigma-source-class-compilation-contract.md) and [interactive Azure projection](../sigma-azure-result-type-contract.md) | Historical evaluator identities. The V3 result format, source classes and approved projections remain active in V5. |
+| [V4 Sigma package admission](../sigma-package-v4-admission.md) | Historical evaluator suffix. Case 7 represents admission in a distinct receipt field. |
+| [Original Sigma and report proof review](../sigma-report-proof-objects.md) | Historical V1 result and coverage examples. Current object encodings are covered by the case 7 contract. |
+| [V9 source-query contract](../source-queries-format-contract.md) | Historical archive framing. V11 retains the approved source-query receipts and captures. |

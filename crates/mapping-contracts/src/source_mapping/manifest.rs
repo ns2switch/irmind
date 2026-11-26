@@ -53,6 +53,8 @@ impl MappingManifest {
                 interpreter,
                 ..
             } => {
+                // A signed installation can be authenticated even when its
+                // interpreter is unavailable. Compilation requires V2.
                 if !matches!(
                     interpreter.as_str(),
                     "irmind-mapping-tables-v1" | "irmind-mapping-tables-v2"

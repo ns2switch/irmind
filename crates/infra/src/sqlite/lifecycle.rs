@@ -105,6 +105,7 @@ impl LocalStore {
     fn finish_deletion(
         &self,
         receipt: &CaseDeletedV1,
+        analyst_key: &[u8],
         cancel: &CancellationToken,
     ) -> Result<DeletionProgress, AppError> {
         let id = receipt.inventory()?.case_id;
@@ -117,7 +118,9 @@ impl LocalStore {
             )
             .map_err(storage)?;
         if exists {
-            self.check_stored_case_format(&id)?;
+            if self.check_stored_case_format(&id)? != analyst_key {
+                return Err(CaseLifecycleError::InvalidReceipt.into());
+            }
             self.require_unsealed_deletion(&id)?;
             inventory::check_tail(self, &id, receipt)?;
         }
@@ -233,7 +236,7 @@ impl CaseLifecycleStore for LocalStore {
         {
             return Err(CaseLifecycleError::InvalidReceipt.into());
         }
-        self.finish_deletion(receipt, cancel)
+        self.finish_deletion(receipt, &operation.public_key, cancel)
     }
 }
 impl PreparedCaseDeletion for Prepared<'_> {
@@ -257,7 +260,7 @@ impl PreparedCaseDeletion for Prepared<'_> {
         inventory::commit_intent(self.store, operation, &receipt)?;
         Ok(self
             .store
-            .finish_deletion(&receipt, &self.cancel)
+            .finish_deletion(&receipt, &operation.public_key, &self.cancel)
             .unwrap_or_else(|error| DeletionProgress {
                 case_id: self.inventory.case_id.clone(),
                 complete: false,

@@ -10,12 +10,11 @@ const PACK: &[u8] = b"irmind-sigma-pack-manifest-v1\0";
 const TABLE: &[u8] = b"irmind-sigma-field-table-v1\0";
 const SCOPE: &[u8] = b"irmind-sigma-source-scope-v1\0";
 const COMPILED: &[u8] = b"irmind-sigma-compiled-rules-v1\0";
-mod results_v2;
 mod results_v3;
-pub use results_v2::SigmaRunResultsV2;
+mod scan_results;
 pub use results_v3::*;
+pub use scan_results::SigmaScanResults;
 
-const RESULTS: &[u8] = b"irmind-sigma-run-results-v1\0";
 const MAX_RULES: usize = 4096;
 const MAX_RULE_BYTES: u64 = 64 * 1024;
 const MAX_TABLE_BYTES: usize = 512 * 1024;
@@ -289,19 +288,12 @@ pub struct SigmaMatchV1 {
 }
 
 #[derive(Clone, Eq, PartialEq)]
-pub struct SigmaRunResultsV1 {
+pub struct SigmaMatchedRows {
     pub coverage: Vec<SigmaRuleCoverageV1>,
     pub matches: Vec<SigmaMatchV1>,
 }
 
-impl SigmaRunResultsV1 {
-    pub fn decode(body: &[u8]) -> Result<Self> {
-        let mut wire = Wire::object(body, RESULTS)?;
-        let result = Self::read_lists(&mut wire)?;
-        wire.finish()?;
-        Ok(result)
-    }
-
+impl SigmaMatchedRows {
     fn read_lists(wire: &mut Wire<'_>) -> Result<Self> {
         let coverage = wire.bounded_list(MAX_RULES, 5 + 32 + 1 + 1, |wire| {
             Ok(SigmaRuleCoverageV1 {
@@ -327,12 +319,6 @@ impl SigmaRunResultsV1 {
         let result = Self { coverage, matches };
         result.validate()?;
         Ok(result)
-    }
-
-    pub fn encode(&self) -> Result<Vec<u8>> {
-        let mut out = RESULTS.to_vec();
-        self.write_lists(&mut out)?;
-        Ok(out)
     }
 
     fn write_lists(&self, out: &mut Vec<u8>) -> Result<()> {
@@ -464,14 +450,6 @@ mod tests {
                 .encode()
                 .unwrap(),
             compiled
-        );
-        let results = object("sigma_results");
-        assert_eq!(
-            SigmaRunResultsV1::decode(&results)
-                .unwrap()
-                .encode()
-                .unwrap(),
-            results
         );
     }
 }

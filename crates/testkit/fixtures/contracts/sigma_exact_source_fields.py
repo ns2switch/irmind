@@ -63,7 +63,7 @@ def projection(label, parser, action, input_record, original, unavailable=None, 
     return expected
 
 
-def partial_run_vectors(field_table):
+def partial_run_vectors():
     # A rule matches a healthy row and is indeterminate for two other rows.
     # A second source supplies a separate unavailable field to another rule.
     def sha(raw):
@@ -83,36 +83,19 @@ def partial_run_vectors(field_table):
     kubernetes = ref(2, b"synthetic Kubernetes manifest") + sha(b"synthetic Kubernetes original")
     gke = ref(4, b"synthetic GKE manifest") + sha(b"synthetic GKE original")
     row = kubernetes + u64(9) + ref(3, b"synthetic Kubernetes artifact") + sha(b"synthetic Parquet") + u64(5)
-    source_scope = b"irmind-sigma-source-scope-v1\0" + entries(kubernetes, gke)
-    compiled = b"irmind-sigma-compiled-rules-v1\0" + entries(ip + entries(u64(3)), status + entries(u64(6)))
-    prefix = (b"irmind-sigma-run-results-v2\0"
+    prefix = (b"irmind-sigma-run-results-v3\0"
               + entries(ip + bytes(2), status + bytes(2))
               + entries(ip + row + bytes(1)))
     rule_counts = entries(ip + u64(2), status + u64(1))
-    results = prefix + entries(kubernetes + u64(2), gke + u64(1)) + rule_counts
+    matrix = entries(u64(3), u64(6)) + u64(2) + bytes([1, 4])
+    tail = rule_counts + matrix
+    results = prefix + entries(kubernetes + u64(2), gke + u64(1)) + tail
 
-    descriptors = entries(*(
-        bytes([kind]) + sha(body) + u64(len(body))
-        for kind, body in [(2, field_table), (3, source_scope), (4, compiled), (5, results)]
-    ))
-    receipt = (
-        b"irmind-sigma-run-v1\0"
-        + text(b"00000000-0000-4000-8000-000000000010") + ref(7, b"synthetic checkpoint")
-        + sha(b"synthetic pack admission") + sha(b"synthetic artifact inventory") + sha(source_scope)
-        + struct.pack(">qq", 1795392000000000, 1795395600000000)
-        + sha(compiled) + sha(field_table) + text(b"irmind-sigma-evaluator-v2")
-        + u64(1500) + u64(1125) + bytes([5]) + u64(1) + sha(results)
-        + sha(b"irmind-sigma-proof-set-v1\0" + descriptors)
-    )
     return {
         "results": commitment(results),
-        "receipt": commitment(receipt),
-        "scope": commitment(source_scope),
-        "compiled_rules": commitment(compiled),
         "invalid_results": {
-            "duplicate_source": commitment(prefix + entries(kubernetes + u64(2), kubernetes + u64(1)) + rule_counts),
-            "zero_source_rows": commitment(prefix + entries(kubernetes + u64(0), gke + u64(1)) + rule_counts),
-            "out_of_scope_source": commitment(prefix + entries(ref(6, b"outside scope") + sha(b"other source") + u64(2)) + rule_counts),
+            "duplicate_source": commitment(prefix + entries(kubernetes + u64(2), kubernetes + u64(1)) + tail),
+            "zero_source_rows": commitment(prefix + entries(kubernetes + u64(0), gke + u64(1)) + tail),
         },
         "expected_coverage": {
             "one_valid_match": True,
@@ -181,7 +164,7 @@ def main():
                        {"protoPayload": {"status": {"code": -1}}},
                        {}, {"protoPayload.status.code": "overflow"}),
         ],
-        "partial_run_wire": partial_run_vectors(proof),
+        "partial_run_wire": partial_run_vectors(),
         "defender_bindings": [
             {
                 "case": "complete_paths",

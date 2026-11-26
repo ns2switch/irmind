@@ -4,6 +4,7 @@
 use irmind_app::{
     ReportDocument, ReportDocumentFormat as Format, ReportDocumentLanguage as Language,
     ReportLimitation, ReportLocator, ReportStatement, hex, sha256,
+    v10_proofs::{SigmaClassCoverage, SigmaV3Notice},
 };
 use irmind_domain::{CaseId, EvidenceHash};
 use std::{fmt::Write as _, fs, path::PathBuf};
@@ -30,9 +31,23 @@ fn report_bytes_match_on_each_platform() {
         citations: &citations,
     }];
     let notes = "Línea de alcance: (literal) [fixture].\n".repeat(55);
+    let sigma = SigmaV3Notice {
+        receipt: receipt.clone(),
+        coverage: SigmaClassCoverage {
+            all_rules: 1,
+            some_rules: 1,
+            no_rules: 0,
+            eligible_pairs: 2,
+            skipped_pairs: 1,
+        },
+        skipped_classes: vec![("synthetic".into(), 1, 0)],
+        unavailable_rows: 2,
+        indeterminate_rules: 1,
+        stopped_early: true,
+    };
     let limitations = [
         ReportLimitation::QueryLimit { receipt: &receipt },
-        ReportLimitation::PartialSigma { receipt: &receipt },
+        ReportLimitation::SigmaSourceClasses(&sigma),
         ReportLimitation::SkillCoverage {
             skill: "triage",
             gap: "sin DNS",

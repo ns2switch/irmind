@@ -185,30 +185,11 @@ def scenario(classes, decisions, coverage, status, hits=(), row_gap=False, matri
         for kind, body in [(2, TABLE), (3, scope), (4, compiled), (5, results)]
     ])
     proof_set = sha(b"irmind-sigma-proof-set-v1\0" + descriptors)
-    receipt = (
-        b"irmind-sigma-run-v1\0"
-        + text("00000000-0000-4000-8000-000000000010")
-        + audit_reference(12, "synthetic checkpoint")
-        + sha(b"synthetic pack admission")
-        + sha(b"synthetic artifact inventory")
-        + sha(scope)
-        + struct.pack(">qq", 1795392000000000, 1795395600000000)
-        + sha(compiled)
-        + sha(TABLE)
-        + text("irmind-sigma-evaluator-v3")
-        + u64(1500)
-        + u64(1125 if classes else 0)
-        + bytes([status])
-        + u64(len(hits))
-        + sha(results)
-        + proof_set
-    )
     return {
         "status_code": status,
         "scope": wire(scope),
         "compiled_rules": wire(compiled),
         "results": wire(results),
-        "receipt": wire(receipt),
         "proof_set_sha256": proof_set.hex(),
     }
 

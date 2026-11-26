@@ -121,12 +121,6 @@ impl Engine<'_> {
         if track_report {
             checked.track_report_loads();
         }
-        if entries
-            .iter()
-            .any(|entry| entry.kind == crate::AuditEventKind::RetiredSkillSnapshot)
-        {
-            return Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat));
-        }
         if !entries.iter().any(|e| {
             matches!(
                 e.kind,

@@ -1,5 +1,7 @@
 # Sigma compilation by source class
 
+> Historical V3 evaluator and receipt identity. The class matrix and its V3 result body remain active under the [case 7 and V11 contract](case-7-export-v11-contract.md).
+
 [Español](../es/development/sigma-source-class-compilation-contract.md)
 
 **Status:** approved for v0.7.3. The optional proof reader at the end of

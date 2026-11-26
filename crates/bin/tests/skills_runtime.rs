@@ -14,7 +14,7 @@ use irmind_domain::{Actor, AuditEventKind};
 use support::*;
 
 #[test]
-fn three_bundled_methods_complete_scripted_synthetic_investigations_and_v10_exports() {
+fn three_bundled_methods_complete_scripted_synthetic_investigations_and_v11_exports() {
     for (name, parser, fixture, term) in [
         (
             "windows-triage",
@@ -235,7 +235,7 @@ fn seal_export(
     if std::env::var_os("IRMIND_REFRESH_SKILL_EXPORT_SEEDS").is_some() {
         let seed = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../fuzz/seeds/export")
-            .join(format!("valid-v10-skill-{name}.irmind"));
+            .join(format!("valid-v11-skill-{name}.irmind"));
         std::fs::copy(&export, seed).unwrap();
     }
 }

@@ -3,9 +3,9 @@
 mod context;
 mod header;
 mod projection;
-mod roles;
 mod view;
 use irmind_domain::{COMMON_EVENT_V1, CommonEventV1, EvidenceHash};
+use irmind_mapping_contracts::source_mapping::{StructuredUserNamespace, structured_observations};
 use irmind_mapping_contracts::{
     IndexedGraphRecord, PartitionProfile, SourceMapper,
     modules::{MappingModule, ModuleManifest, ModulePort},
@@ -80,7 +80,7 @@ impl SourceMapper for EcsMapping {
         let view = view::View::for_source(source)?;
         let (header, mut diagnostics) = header::project(&view)?;
         let context = context::project(&view)?;
-        let observations = roles::project(source, &context)?;
+        let observations = structured_observations(StructuredUserNamespace::Ecs, source, &context)?;
         let common = CommonEventV1::try_new(
             source.origin().clone(),
             source.timestamp(),

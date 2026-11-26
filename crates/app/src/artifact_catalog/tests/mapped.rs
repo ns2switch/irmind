@@ -131,21 +131,6 @@ fn mapped_catalog_preserves_signed_order_and_receipt_gated_parent_retention() {
 }
 
 #[test]
-fn common_physical_schemas_require_the_mapped_envelope_and_receipts() {
-    let (entries, parents) = mapped_history();
-    let mut catalog = ArtifactCatalogBuilder::default();
-    catalog.accept(&entries[0]).unwrap();
-    for parent in parents {
-        let bare = entry(
-            AuditEventKind::ParquetArtifactV2,
-            parent.core().encode().unwrap(),
-        );
-        assert!(catalog.accept(&bare).is_err());
-    }
-    assert!(artifact_catalog(&entries).is_ok());
-}
-
-#[test]
 fn unsupported_common_contract_explains_using_the_creating_version_or_reingesting() {
     let (mut entries, _) = mapped_history();
     let old = crate::hex(
@@ -162,6 +147,8 @@ fn unsupported_common_contract_explains_using_the_creating_version_or_reingestin
     profile.payload = changed;
     assert!(matches!(
         artifact_catalog(&entries),
-        Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat))
+        Err(AppError::Fixed(crate::FixedAppError::CaseFormat(
+            crate::case_format::CaseFormatError::Case(None)
+        )))
     ));
 }

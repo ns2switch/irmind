@@ -320,57 +320,6 @@ fn hash_only_configuration_requires_fresh_signed_approval() {
 }
 
 #[test]
-fn retired_evidence_events_are_rejected_on_open_verify_and_seal() {
-    use irmind_domain::AuditEventKind;
-    for kind in [
-        AuditEventKind::SourceManifestV1,
-        AuditEventKind::GraphIndexed,
-        AuditEventKind::ParquetArtifactV1,
-        AuditEventKind::ParquetArtifactV2,
-        AuditEventKind::ParquetArtifactsMigrated,
-    ] {
-        let (_root, audit, engine, _file) = setup();
-        let case = engine
-            .create_case_with_severity("Retired evidence", Severity::Low, "local")
-            .unwrap();
-        let id = case.id;
-        let last = audit.last_entry(&id).unwrap().unwrap();
-        let signing = SigningKey::from_bytes(&[121u8; 32]);
-        let mut entry = irmind_app::SignedEntry {
-            seq: last.seq + 1,
-            case_id: id.as_str().into(),
-            at: last.at,
-            actor: Actor::Analyst,
-            origin: last.origin,
-            kind,
-            payload: String::new(),
-            evidence: None,
-            prev: last.hash,
-            hash: [0; 32],
-            sig: Vec::new(),
-            public_key: signing.verifying_key().to_bytes().to_vec(),
-        };
-        entry.hash = irmind_app::sha256(&entry.canonical());
-        entry.sig = signing.sign(&entry.hash).to_bytes().to_vec();
-        audit.append(&entry).unwrap();
-        let is_retired = |error| {
-            matches!(
-                error,
-                AppError::Fixed(irmind_app::FixedAppError::RetiredCaseFormat)
-            )
-        };
-        assert!(
-            engine
-                .open_case_verified(&id, &CancellationToken::new())
-                .is_err_and(is_retired),
-            "{kind:?}"
-        );
-        assert!(engine.verify(&id).is_err_and(is_retired), "{kind:?}");
-        assert!(engine.seal(&id).is_err_and(is_retired), "{kind:?}");
-    }
-}
-
-#[test]
 fn retired_writer_setting_requires_explicit_signed_configuration_restore() {
     let (root, audit, engine, file) = setup();
     let config = PersistentConfig::default();

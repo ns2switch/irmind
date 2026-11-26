@@ -148,9 +148,6 @@ impl SkillReceiptVerifier {
         compiler: &dyn SkillCompiler,
     ) -> Result<(), AppError> {
         match entry.kind {
-            AuditEventKind::RetiredSkillSnapshot => {
-                return Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat));
-            }
             AuditEventKind::SkillSnapshotV2 => {
                 if entry.actor != Actor::Analyst || entry.evidence.is_some() {
                     return Err(invalid());

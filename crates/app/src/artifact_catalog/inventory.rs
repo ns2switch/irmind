@@ -15,9 +15,6 @@ pub struct SealInventoryBuilder {
 impl SealInventoryBuilder {
     pub fn accept(&mut self, entry: &SignedEntry) -> Result<(), AppError> {
         let bad = || AppError::InvalidChain(entry.seq);
-        if entry.kind.is_retired_case_format() {
-            return Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat));
-        }
         match entry.kind {
             AuditEventKind::SourceManifestV2 => {
                 let source = SourceManifestV2::decode(&entry.payload).map_err(|_| bad())?;

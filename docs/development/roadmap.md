@@ -129,6 +129,8 @@ checks. [Manual validation record](manual-validation.md).
 
 ## v0.8: Extensibility, engine API, and validation
 
+Phase 0 consolidates [case format 7 and export V11](case-7-export-v11-contract.md) in `v0.8.0-alpha.1`. The subsequent blocks below remain separate.
+
 - Add signed local hooks around tool calls, including a status-bar script the
   analyst has explicitly admitted.
 - Offer an optional MCP client, disabled by default. Each MCP tool declares

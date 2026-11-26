@@ -1,4 +1,4 @@
-//! Canonical receipt bodies introduced by case marker 6.
+//! Canonical Sigma and report receipts for the current case format.
 use irmind_domain::{CaseId, DomainError};
 
 mod bindings;
@@ -472,7 +472,7 @@ mod tests {
 
     pub(super) fn vector(name: &str) -> String {
         let all: serde_json::Value = serde_json::from_str(include_str!(
-            "../../testkit/fixtures/contracts/sigma_report_v10.json"
+            "../../testkit/fixtures/contracts/sigma_report_receipts.json"
         ))
         .unwrap();
         all[name]["bytes_hex"].as_str().unwrap().to_owned()

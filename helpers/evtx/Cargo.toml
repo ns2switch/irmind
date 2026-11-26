@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 
 [package]
 name = "irmind-evtx"
-version = "0.7.4"
+version = "0.8.0-alpha.1"
 edition = "2024"
 rust-version = "1.95"
 license.workspace = true

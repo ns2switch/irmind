@@ -55,6 +55,12 @@ fn native_categories_outcomes_roles_and_precise_time_are_explicit() {
     assert_eq!(at(F::SourceIp).role(), EntityRole::Source);
     assert_eq!(at(F::DestinationIp).role(), EntityRole::Destination);
     assert_eq!(at(F::UserName).role(), EntityRole::Actor);
+    assert_eq!(
+        at(F::UserName).entity().scope(),
+        &EntityIdentityScope::Account(irmind_domain::EventText::identifier(
+            "ecs-user-v1:sha256=a1d88180f620026c59ccb0451b52fb9d5254bf12f3f0cd9e5671c795c44a78f2",
+        ).unwrap()),
+    );
     assert_eq!(at(F::UserTargetName).role(), EntityRole::Target);
     assert_ne!(at(F::UserName).entity(), at(F::UserTargetName).entity());
     for field in [F::ProcessPid, F::ProcessParentPid] {

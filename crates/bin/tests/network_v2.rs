@@ -116,11 +116,6 @@ fn detected_network_sources_write_precise_v3_and_reconstruct() {
         .map(|e| ParquetArtifactV3::decode(&e.payload).unwrap())
         .collect::<Vec<_>>();
     assert!(!artifacts.is_empty());
-    assert!(
-        !entries
-            .iter()
-            .any(|e| e.kind == AuditEventKind::ParquetArtifactV1)
-    );
     let timeline = store.timeline(&case.id, 20).unwrap();
     assert_eq!(timeline.len(), 5);
     assert!(timeline.iter().all(|row| row.at.contains(".12345")));

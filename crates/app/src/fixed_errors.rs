@@ -13,10 +13,6 @@ pub enum FixedAppError {
         "the selected source decoder or mapping pipeline is unavailable; enable the matching parser module before ingestion"
     )]
     PolicyMappedSourceDecoderUnavailable,
-    #[error(
-        "This case uses a retired format. Use the IRMind version that created it, or re-ingest the verified originals into a new case."
-    )]
-    RetiredCaseFormat,
     #[error(transparent)]
     CaseFormat(crate::case_format::CaseFormatError),
     #[error("invalid bounded source format")]

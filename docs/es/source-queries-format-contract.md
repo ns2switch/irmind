@@ -1,5 +1,7 @@
 Traducción de docs/development/source-queries-format-contract.md en el commit c9e704f109dc19e13786967e9c0cec0a4ead0db2; si hay diferencias, prevalece la versión en inglés.
 
+> Formato exterior V9 histórico. Los recibos y el encuadre de las capturas siguen vigentes en el [caso 7 y V11](development/case-7-export-v11-contract.md).
+
 # Puertos de consultas, adquisición firmada y export V9
 
 [English](../development/source-queries-format-contract.md)

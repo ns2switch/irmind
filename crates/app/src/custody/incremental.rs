@@ -152,9 +152,6 @@ impl Engine<'_> {
         self.verifier
             .verify(&entry.public_key, &entry.hash, &entry.sig)
             .map_err(|_| AppError::InvalidChain(entry.seq))?;
-        if entry.kind.is_retired_case_format() {
-            return Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat));
-        }
         crate::ingest_outcome::IngestFileOutcome::from_audit(entry)?;
         if index == 0 {
             crate::budget_status(std::slice::from_ref(entry), &self.policy)?;

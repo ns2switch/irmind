@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-"""Independent report coverage and V10 publication vectors."""
+"""Independent report coverage and V11 publication vectors."""
 import json
 
-from sigma_report_objects import descriptor, entries, generate, ref, sha, tag, text, u64, vector
+from sigma_report_objects import (descriptor, entries, generate, ref, report_coverage_prefix, sha, tag, text, u64, vector)
 
 
 def vectors():
     approved = {name: bytes.fromhex(value["bytes_hex"]) for name, value in generate().items()}
-    preceding_lists = approved["report_coverage"].removeprefix(tag("irmind-report-coverage-v1"))
-    prefix = tag("irmind-report-coverage-v2") + preceding_lists
+    prefix = report_coverage_prefix()
 
     def child(checkpoint, task, sequence=3):
         return (

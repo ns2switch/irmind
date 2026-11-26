@@ -135,6 +135,8 @@ documentar las comprobaciones pendientes. [Registro manual](manual-validation.md
 
 ## v0.8: extensibilidad, API del motor y validación
 
+La fase 0 consolida el [formato de caso 7 y la exportación V11](development/case-7-export-v11-contract.md) en `v0.8.0-alpha.1`. Los bloques siguientes se entregan aparte.
+
 - Añadir hooks locales firmados alrededor de las llamadas a herramientas,
   incluido un script de la barra de estado admitido expresamente por el analista.
 - Ofrecer un cliente MCP opcional y desactivado por defecto. Cada herramienta

@@ -1,5 +1,7 @@
 # Sigma decimal ResultType for Azure sign-in
 
+> Historical V4 evaluator and receipt identity. V5 retains the approved projection under the [case 7 and V11 contract](case-7-export-v11-contract.md).
+
 **Status:** proposed for review before implementation.
 
 ## Pinned admission and compile audit

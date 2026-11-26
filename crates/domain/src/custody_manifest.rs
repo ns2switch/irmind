@@ -156,7 +156,6 @@ impl SourceManifestV2 {
 impl SourceManifestV1 {
     pub fn decode_signed(kind: AuditEventKind, payload: &str) -> Result<Option<Self>, DomainError> {
         match kind {
-            AuditEventKind::SourceManifestV1 => Err(DomainError::InvalidManifest),
             AuditEventKind::SourceManifestV2 => {
                 SourceManifestV2::decode(payload).map(|manifest| Some(manifest.source))
             }
