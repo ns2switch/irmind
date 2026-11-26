@@ -36,11 +36,15 @@ fn walks_ingest_directory_in_stable_order() {
 
 #[cfg(unix)]
 #[test]
-fn rejects_symlink_inside_ingest_directory() {
+fn inventories_symlink_without_following_it_inside_an_ingest_directory() {
     let root = tempfile::tempdir().unwrap();
-    std::fs::write(root.path().join("real.json"), b"{}").unwrap();
-    std::os::unix::fs::symlink("real.json", root.path().join("link.json")).unwrap();
-    assert!(input_files_large(root.path()).is_err());
+    let outside = tempfile::tempdir().unwrap();
+    std::fs::write(outside.path().join("real.json"), b"{}").unwrap();
+    let link = root.path().join("link");
+    std::os::unix::fs::symlink(outside.path(), &link).unwrap();
+    assert_eq!(input_files_large(root.path()).unwrap(), [link]);
+    assert!(irmind_fs::open_regular_no_follow(root.path(), Path::new("link")).is_err());
+    assert!(irmind_fs::open_regular_no_follow(root.path(), Path::new("link/real.json")).is_err());
 }
 
 #[cfg(unix)]
@@ -62,7 +66,7 @@ fn ingest_errors_escape_control_characters_in_file_names() {
     std::fs::write(&target, b"synthetic").unwrap();
     let malicious = root.path().join("bad\u{1b}[31m.txt");
     std::os::unix::fs::symlink(&target, &malicious).unwrap();
-    let error = input_files_large(root.path()).unwrap_err().to_string();
+    let error = input_files_large(&malicious).unwrap_err().to_string();
     assert!(!error.contains('\u{1b}'));
     assert!(error.contains("\\u{1b}"));
 }

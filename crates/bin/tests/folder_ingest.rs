@@ -117,6 +117,12 @@ fn mixed_folder_custody_with_unicode_and_malicious_checksum_paths() {
     let evidence = scratch.path().join("delivery");
     fs::create_dir_all(evidence.join("collection")).unwrap();
     write_mixed_evidence(&evidence);
+    #[cfg(unix)]
+    {
+        let outside = scratch.path().join("outside.json");
+        fs::write(&outside, EVENT.replace("ConsoleLogin", "OutsideFolder")).unwrap();
+        std::os::unix::fs::symlink(outside, evidence.join("bad\u{1b}[31m.json")).unwrap();
+    }
 
     let case = cli(
         &home,
@@ -170,6 +176,19 @@ fn mixed_folder_custody_with_unicode_and_malicious_checksum_paths() {
     } if path == "same-bytes.json"))
     );
     assert!(result.contains("already have a mapped generation"));
+    #[cfg(unix)]
+    {
+        assert!(!result.contains('\u{1b}'), "{result}");
+        assert!(result.contains("\\u{1b}"), "{result}");
+        assert!(
+            outcomes
+                .iter()
+                .any(|outcome| matches!(outcome, IngestFileOutcome::Disposition {
+            path, identity: irmind_app::ingest_outcome::FileIdentity::Unavailable,
+            reason: FileReason::Unavailable,
+        } if path == "bad\u{1b}[31m.json"))
+        );
+    }
     assert!(evidence.join("opaque.bin").is_file());
     assert!(
         cli(&home, &["verify", case, "--source-root", root]).contains("WARNING: SHA-256 MISMATCH")
