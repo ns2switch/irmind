@@ -178,6 +178,9 @@ impl ProjectionInput {
 }
 
 fn sample(binding: &SigmaFieldBinding, hit: bool) -> Value {
+    if binding.projection.is_some() {
+        return Value::from(if hit { "50053" } else { "50054" });
+    }
     let text = if hit {
         "synthetic-match"
     } else {
@@ -228,6 +231,12 @@ fn condition(variant: &SigmaSourceVariant) -> String {
 }
 
 fn binding_selection(binding: &SigmaFieldBinding, value: &Value) -> String {
+    if binding.projection.is_some() {
+        return format!(
+            "{{ResultType: {}}}",
+            value.as_str().unwrap().parse::<u32>().unwrap()
+        );
+    }
     if matches!(
         binding.conversion,
         Some(SigmaConversion::EvtxEventId | SigmaConversion::EvtxLogonType)

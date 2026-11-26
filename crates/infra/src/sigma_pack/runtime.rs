@@ -27,7 +27,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use irmind_app::v10_proofs::{SIGMA_EVALUATOR_V3, SigmaRunStatusV1};
+use irmind_app::v10_proofs::SigmaRunStatusV1;
 type RunObjects = Vec<(V10ProofDescriptor, Vec<u8>)>;
 
 impl LocalStore {
@@ -153,7 +153,7 @@ fn prepare(
         end_utc_micros: time.end,
         compiled_rules: descriptors[2].hash(),
         field_table: descriptors[0].hash(),
-        evaluator: SIGMA_EVALUATOR_V3.into(),
+        evaluator: reviewed.evaluator().into(),
         reserved_units: scope.reserved,
         used_units,
         status,
@@ -248,7 +248,10 @@ fn scan_matches<'a>(
             .filter(|(_, rule)| rule.variants.binary_search(&(index as u64)).is_ok())
             .map(|(raw, _)| raw.clone())
             .collect::<Vec<_>>();
-        if rules.is_empty() && table.variants[index].exact_cluster_field().is_none() {
+        if rules.is_empty()
+            && table.variants[index].exact_cluster_field().is_none()
+            && !table.variants[index].has_decimal_projection()
+        {
             continue;
         }
         if cancel.is_cancelled() {
@@ -715,7 +718,7 @@ fn run_objects(
 pub(super) fn enrolled_field_table() -> SigmaFieldTableV1 {
     SigmaFieldTableV1 {
         id: "irmind-sigma-source-coverage".into(),
-        version: "v4".into(),
+        version: "v5".into(),
         toml: concat!(
             include_str!("cloudtrail-v1.toml"),
             "\n",

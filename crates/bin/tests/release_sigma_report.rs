@@ -4,8 +4,8 @@
 
 use irmind_app::v10_proofs::{
     ReportCitationsV1, ReportCoverageV2, ReportMediaV1, ReportPublishedV1, SIGMA_EVALUATOR_V3,
-    SigmaPackManifestV1, SigmaPackRuleV1, SigmaRuleKeyV1, SigmaRunResultsV3, SigmaRunV1,
-    V10Citation,
+    SIGMA_EVALUATOR_V4, SigmaPackManifestV1, SigmaPackRuleV1, SigmaRuleKeyV1, SigmaRunResultsV3,
+    SigmaRunV1, V10Citation,
 };
 use irmind_app::{SignerBackend, hex, sha256};
 use irmind_domain::{Actor, AuditEventKind, CaseId, SourceManifestV2};
@@ -431,7 +431,7 @@ fn assert_package(bytes: &[u8], finding: &str, scenario: &Scenario) {
     let runs = payloads("sigma-run-v1").collect::<Vec<_>>();
     assert_eq!(runs.len(), 1);
     let run = SigmaRunV1::decode(runs[0]).unwrap();
-    assert_eq!(run.evaluator, SIGMA_EVALUATOR_V3);
+    assert_eq!(run.evaluator, expected_evaluator());
     assert_eq!(run.matched_rows, 1);
     assert_eq!(
         run.status,
@@ -510,5 +510,13 @@ fn assert_report_objects(
                 .unwrap()
                 .contains(&escaped_title)
         );
+    }
+}
+
+fn expected_evaluator() -> &'static str {
+    if cfg!(feature = "parser-entra") {
+        SIGMA_EVALUATOR_V4
+    } else {
+        SIGMA_EVALUATOR_V3
     }
 }

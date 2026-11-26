@@ -1,11 +1,10 @@
 //! Bind the decoded proof bodies to their signed receipt before resolving material.
 use super::{
     ReportAnalystSectionsV1, ReportCitationsV1, ReportCoverageV2, ReportPublishedV1,
-    SIGMA_EVALUATOR_V2, SIGMA_EVALUATOR_V3, SigmaClassPlan, SigmaCompiledRulesV1, SigmaCoverageV1,
-    SigmaFieldTableV1, SigmaPackAdmissionV1, SigmaPackManifestV1, SigmaRuleKeyV1,
-    SigmaRunResultsV1, SigmaRunResultsV2, SigmaRunResultsV3, SigmaRunStatusV1, SigmaRunV1,
-    SigmaSourceScopeV1, V10ArtifactReference, V10CheckpointView, V10ObjectSection, V10RowReference,
-    V10SourceReference,
+    SIGMA_EVALUATOR_V2, SigmaClassPlan, SigmaCompiledRulesV1, SigmaCoverageV1, SigmaFieldTableV1,
+    SigmaPackAdmissionV1, SigmaPackManifestV1, SigmaRuleKeyV1, SigmaRunResultsV1,
+    SigmaRunResultsV2, SigmaRunResultsV3, SigmaRunStatusV1, SigmaRunV1, SigmaSourceScopeV1,
+    V10ArtifactReference, V10CheckpointView, V10ObjectSection, V10RowReference, V10SourceReference,
 };
 use crate::{AppError, CancellationToken, SignedEntry};
 use irmind_domain::ParquetArtifact;
@@ -182,7 +181,7 @@ fn read_sigma_results(
     receipt: &SigmaRunV1,
     body: &[u8],
 ) -> Result<(SigmaRunResultsV2, Option<SigmaClassPlan>), AppError> {
-    if receipt.evaluator == SIGMA_EVALUATOR_V3 {
+    if super::uses_sigma_class_plan(&receipt.evaluator) {
         let result = SigmaRunResultsV3::decode(body).map_err(|_| invalid())?;
         if result.status(receipt.status) != receipt.status {
             return Err(invalid());

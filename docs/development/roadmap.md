@@ -161,6 +161,9 @@ checks. [Manual validation record](manual-validation.md).
   plaso-compatible super-timeline CSV. Export indicators of compromise (IOCs)
   with provenance in STIX and MISP formats.
 - Extend local Sigma to correlation rules.
+- Evaluate bounded, same-item projections for GCP `authorizationInfo` and
+  Entra `targetResources` and `modifiedProperties`. The pinned compile audit
+  estimates one additional GCP rule and three Azure rules. [Audit and scope](sigma-azure-result-type-contract.md).
 - Ingest Volatility 3 outputs. [#158](https://github.com/ns2switch/irmind/issues/158).
 - Decide when signed formats stabilize and how long to retain parser versions.
 

@@ -1,7 +1,7 @@
 //! Presentation from the result and table bound to an authenticated execution.
 use super::{
-    SIGMA_EVALUATOR_V3, SigmaClassCoverage, SigmaClassOutcome, SigmaRunResultsV3, SigmaRunStatusV1,
-    V10ProofDescriptor, V10ProofFamily, sigma_execution,
+    SigmaClassCoverage, SigmaClassOutcome, SigmaRunResultsV3, SigmaRunStatusV1, V10ProofDescriptor,
+    V10ProofFamily, sigma_execution,
 };
 use crate::{AppError, SignedEntry};
 use irmind_domain::EvidenceHash;
@@ -44,7 +44,7 @@ impl SigmaV3Notice {
         mut read: impl FnMut(u8, [u8; 32]) -> Result<SigmaProofRead, AppError>,
     ) -> Result<Option<Self>, AppError> {
         let run = sigma_execution(entry)?;
-        if run.evaluator != SIGMA_EVALUATOR_V3 {
+        if !super::uses_sigma_class_plan(&run.evaluator) {
             return Ok(None);
         }
         let invalid = || AppError::InvalidChain(entry.seq);
