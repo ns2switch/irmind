@@ -30,14 +30,16 @@ impl Engine<'_> {
             .into_iter()
             .flatten()
             .collect::<Vec<_>>();
+        let folder = crate::ingest_outcome::FileOutcomeReview::read(&entries)?;
         let local_blobs = self.evidence_store.evidence_hashes(id)?.len();
         let totals = self.graph.graph_summary(id).unwrap_or_else(|_| {
             "Indexed event count and time range unavailable; use /verify for details.".to_owned()
         });
         let mut report = format!(
-            "Case evidence\nSources: {} · Local evidence blobs: {local_blobs} · Failed attempts: {}\n{totals}\nOmitted-file inventory unavailable for existing ingestion records.",
+            "Case evidence\nSources: {} · Local evidence blobs: {local_blobs} · Decoder rejections: {}\n{totals}\nFolder outcomes: {}",
             sources.len(),
-            failures.len()
+            failures.len(),
+            folder.summary()
         );
         for manifest in sources.iter().take(DISPLAYED_FILES) {
             let name = self.guard.screen(&manifest.source.source)?.text;
@@ -60,7 +62,20 @@ impl Engine<'_> {
                 failed.reason().description()
             );
         }
-        if sources.len() > DISPLAYED_FILES || failures.len() > DISPLAYED_FILES {
+        for notice in folder.limitations.iter().take(DISPLAYED_FILES) {
+            let (path, reason) = notice.description();
+            let path = visible_source(&self.guard.screen(path)?.text);
+            let fingerprint = notice.fingerprint_display();
+            let _ = write!(
+                report,
+                "\n{path} · {reason} · {fingerprint} · audit #{}",
+                notice.sequence
+            );
+        }
+        if sources.len() > DISPLAYED_FILES
+            || failures.len() > DISPLAYED_FILES
+            || folder.limitations.len() > DISPLAYED_FILES
+        {
             let _ = write!(
                 report,
                 "\nShowing up to {DISPLAYED_FILES} entries per list. Totals include every authenticated entry."

@@ -86,7 +86,7 @@ pub(super) fn experimental_parsers(
             catalog = catalog.with_source_parser(std::sync::Arc::new(selector))?;
         }
     }
-    Ok(catalog)
+    Ok(catalog.with_mapped_ingest(&mappings))
 }
 
 #[cfg(feature = "mapping-dfir")]

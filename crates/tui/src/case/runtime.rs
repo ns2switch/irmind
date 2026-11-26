@@ -225,19 +225,7 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
                     source_name,
                     candidates,
                 } => {
-                    self.state.parser_prompt = Some(super::state::ParserPrompt::new(
-                        source_name.clone(),
-                        candidates.clone(),
-                        candidates
-                            .iter()
-                            .filter_map(|(id, _)| {
-                                self.io_ops
-                                    .parser_catalog()
-                                    .and_then(|catalog| catalog.get(id).ok())
-                                    .map(|parser| (id.clone(), parser.description().to_owned()))
-                            })
-                            .collect(),
-                    ));
+                    self.present_parser_candidates(source_name.clone(), candidates.clone());
                     Some("Choose a parser and press Enter, or Esc to cancel.")
                 }
                 _ => None,
@@ -259,6 +247,43 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
         self.presentation_failed(&message);
         update(&mut self.state, CaseMessage::TaskFinished(message));
         false
+    }
+
+    fn present_parser_candidates(&mut self, source: String, mut candidates: Vec<(String, u8)>) {
+        let mut descriptions = std::collections::BTreeMap::new();
+        if let Some(catalog) = self.io_ops.parser_catalog() {
+            candidates.retain(|(id, _)| catalog.can_ingest(id));
+            descriptions.extend(candidates.iter().filter_map(|(id, _)| {
+                catalog
+                    .get(id)
+                    .ok()
+                    .map(|parser| (id.clone(), parser.description().to_owned()))
+            }));
+        }
+        self.state.parser_prompt = Some(super::state::ParserPrompt::new(
+            source,
+            candidates,
+            descriptions,
+        ));
+    }
+
+    pub(super) fn show_next_folder_prompt(&mut self) {
+        let Some(file) = self.state.folder_queue.pop_front() else {
+            return;
+        };
+        self.state.parser_prompt = None;
+        self.state.time_prompt = None;
+        self.state.cluster_prompt = None;
+        if matches!(
+            file.prompt,
+            irmind_app::AppError::UnsupportedCompressedSource { .. }
+        ) {
+            self.present_parser_candidates(file.path.clone(), Vec::new());
+            self.state.messages.push(file.prompt.to_string());
+        } else {
+            self.finish_task_error("Ingest", &file.prompt);
+        }
+        self.state.folder_current = Some(file);
     }
 
     fn task_failure(&self, label: &str, reason: &str) -> String {
@@ -287,7 +312,26 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
 
     fn finish_success(&mut self, label: &'static str, outcome: AnalystToolOutcome) -> Result<()> {
         let is_policy_notice = matches!(outcome, AnalystToolOutcome::PolicyNotice(_));
-        let text = outcome.into_text();
+        let mut text = outcome.into_text();
+        if label == "Ingest" {
+            let pass = self
+                .state
+                .pending_ingest
+                .as_ref()
+                .and_then(|pending| pending.folder_output.lock().ok()?.take());
+            if let Some(mut pass) = pass {
+                self.state.folder_current = None;
+                self.state
+                    .folder_queue
+                    .extend(std::mem::take(&mut pass.pending));
+                self.state.folder_totals.accumulate(pass);
+                if !self.state.folder_queue.is_empty() {
+                    self.show_next_folder_prompt();
+                    return Ok(());
+                }
+                text = std::mem::take(&mut self.state.folder_totals).summary();
+            }
+        }
         let text = if label == "Ingest" && self.io_ops.demo_mode() {
             super::demo_ingest_result(self.engine, self.id, 1)?
         } else {

@@ -142,23 +142,11 @@ pub(super) fn overlay_text(
     if let Some(editor) = &state.budget.editor {
         return Ok(Some(engine.guard.screen(&editor.text())?.text));
     }
-    if let Some(prompt) = &state.cluster_prompt {
-        return prompt
-            .screened_text(engine.guard.as_ref())
-            .map(Some)
-            .map_err(Into::into);
-    }
-    if let Some(prompt) = &state.time_prompt {
-        return prompt
-            .screened_text(engine.guard.as_ref())
-            .map(Some)
-            .map_err(Into::into);
-    }
-    if let Some(prompt) = &state.parser_prompt {
-        return parser_prompt_text(prompt, parser_body, |text| {
-            Ok(engine.guard.screen(text)?.text)
-        })
-        .map(Some);
+    if state.cluster_prompt.is_some()
+        || state.time_prompt.is_some()
+        || state.parser_prompt.is_some()
+    {
+        return ingest_overlay(state, engine, parser_body).map(Some);
     }
     if let Some(picker) = &state.picker {
         let mut lines = vec![
@@ -216,6 +204,54 @@ pub(super) fn overlay_text(
     Ok(None)
 }
 
+fn ingest_overlay(
+    state: &CaseState,
+    engine: &Engine<'_>,
+    parser_body: ratatui::layout::Rect,
+) -> Result<String> {
+    let controls = if state.pending_ingest.is_some() {
+        "Ctrl+S skip file · Ctrl+O skip all unresolved"
+    } else {
+        ""
+    };
+    let mut header = String::new();
+    if state.folder_current.is_some() {
+        header = format!("Folder queue · {} unresolved", state.folder_queue.len() + 1);
+        if let Some(next) = state.folder_queue.front() {
+            let safe = engine
+                .guard
+                .screen(&escape_display(&next.path))?
+                .text
+                .replace('\n', " ");
+            let _ = std::fmt::Write::write_fmt(
+                &mut header,
+                format_args!(" · next: {safe} · Ctrl+N cycle"),
+            );
+        }
+        header = single_row(&header, usize::from(parser_body.width));
+    }
+    let text = if let Some(prompt) = &state.cluster_prompt {
+        prompt.screened_text(engine.guard.as_ref())?
+    } else if let Some(prompt) = &state.time_prompt {
+        prompt.screened_text(engine.guard.as_ref())?
+    } else if let Some(prompt) = &state.parser_prompt {
+        let body = ratatui::layout::Rect {
+            height: parser_body
+                .height
+                .saturating_sub(u16::from(!header.is_empty()) + u16::from(!controls.is_empty())),
+            ..parser_body
+        };
+        parser_prompt_text(prompt, body, |text| Ok(engine.guard.screen(text)?.text))?
+    } else {
+        unreachable!("active ingestion prompt")
+    };
+    Ok([header.as_str(), controls, &text]
+        .into_iter()
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n"))
+}
+
 pub(in crate::case) fn parser_prompt_text(
     prompt: &ParserPrompt,
     body: ratatui::layout::Rect,
@@ -232,7 +268,7 @@ pub(in crate::case) fn parser_prompt_text(
     if body.height >= 7 {
         lines.push(format!("Choose parser for {}", prompt.source));
         lines.push(if end_limit == 0 {
-            "No parser candidates are available.".into()
+            "No selectable parser. Check enabled parsers and mappings in /settings.".into()
         } else if prompt.candidates[0].1 == 0 {
             "Detection found no positive match. Choose only if you know the format.".into()
         } else {

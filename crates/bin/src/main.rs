@@ -397,6 +397,9 @@ impl WorkspaceIo for RootWorkspaceIo {
     fn input_files(&self, root: &Path) -> Result<Vec<PathBuf>> {
         input_files_large(root)
     }
+    fn open_folder_member(&self, root: &Path, relative: &Path) -> Result<std::fs::File> {
+        Ok(irmind_fs::open_regular_no_follow(root, relative)?)
+    }
     fn read_evidence(&self, path: &Path) -> Result<Vec<u8>> {
         read_evidence(path)
     }

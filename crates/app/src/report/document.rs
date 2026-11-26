@@ -47,6 +47,7 @@ pub enum ReportLocator {
 
 pub enum ReportLimitation<'a> {
     UnavailableSource(&'a str),
+    FolderOutcome(&'a crate::ingest_outcome::FileOutcomeNotice),
     SourceAvailabilityUnknown(&'a str),
     SkillCoverage {
         skill: &'a str,
@@ -238,6 +239,9 @@ impl Document {
         language: ReportDocumentLanguage,
     ) -> Result<(), AppError> {
         let text = match limitation {
+            ReportLimitation::FolderOutcome(notice) => {
+                return self.folder_outcome(language, notice);
+            }
             ReportLimitation::UnavailableSource(source) => format!(
                 "{} {}",
                 language.text("Unavailable source", "Fuente no disponible"),
@@ -310,6 +314,22 @@ impl Document {
             ),
         };
         self.line(format!("- {text}"))
+    }
+
+    fn folder_outcome(
+        &mut self,
+        language: ReportDocumentLanguage,
+        notice: &crate::ingest_outcome::FileOutcomeNotice,
+    ) -> Result<(), AppError> {
+        let (path, reason) = notice.description();
+        self.line(format!(
+            "- {} {} · {} · #{} · SHA-256 {}",
+            language.text("Folder ingestion", "Ingesta de carpeta"),
+            self.literal(path),
+            reason,
+            notice.sequence,
+            notice.hash.as_str()
+        ))
     }
 
     fn sigma_coverage(

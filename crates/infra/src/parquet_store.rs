@@ -159,21 +159,9 @@ impl ParquetStore {
         cancel: &CancellationToken,
     ) -> Result<([u8; 32], u64), AppError> {
         reader.seek(SeekFrom::Start(0)).map_err(storage)?;
-        let mut hasher = Sha256::new();
-        let mut bytes = 0u64;
-        let mut chunk = vec![0u8; READ_CHUNK];
-        loop {
-            if cancel.is_cancelled() {
-                return Err(AppError::Cancelled);
-            }
-            let count = reader.read(&mut chunk).map_err(storage)?;
-            if count == 0 {
-                break;
-            }
-            hasher.update(&chunk[..count]);
-            bytes = bytes.checked_add(count as u64).ok_or_else(invalid_source)?;
-        }
-        Ok((hasher.finalize().into(), bytes))
+        let identity =
+            irmind_app::ingest_outcome::fingerprint_file(reader, u64::MAX, READ_CHUNK, cancel)?;
+        Ok((identity.sha256, identity.size))
     }
 
     fn finish_artifacts(

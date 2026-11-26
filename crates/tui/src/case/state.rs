@@ -24,6 +24,9 @@ pub(super) struct PendingIngest {
     pub default_time_context: Option<irmind_app::ParserTimeContext>,
     pub cluster_contexts: BTreeMap<String, irmind_app::SourceClusterContext>,
     pub default_cluster_context: Option<irmind_app::SourceClusterContext>,
+    pub folder_output: std::sync::Arc<std::sync::Mutex<Option<crate::FolderPass>>>,
+    pub folder_members: Option<std::collections::BTreeSet<String>>,
+    pub folder_skips: std::collections::BTreeSet<String>,
 }
 
 pub(super) struct ParserPrompt {
@@ -171,6 +174,9 @@ pub(super) struct CaseState {
     pub palette: Option<String>,
     pub picker: Option<PathPicker>,
     pub pending_ingest: Option<PendingIngest>,
+    pub folder_queue: std::collections::VecDeque<crate::workflow::folder::PendingFile>,
+    pub folder_current: Option<crate::workflow::folder::PendingFile>,
+    pub folder_totals: crate::FolderPass,
     pub parser_prompt: Option<ParserPrompt>,
     pub time_prompt: Option<super::time_prompt::TimePrompt>,
     pub cluster_prompt: Option<super::cluster_prompt::ClusterPrompt>,
@@ -430,6 +436,9 @@ mod tests {
             palette: None,
             picker: None,
             pending_ingest: None,
+            folder_queue: std::collections::VecDeque::new(),
+            folder_current: None,
+            folder_totals: crate::FolderPass::default(),
             parser_prompt: None,
             time_prompt: None,
             cluster_prompt: None,

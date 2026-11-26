@@ -429,6 +429,9 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             } else {
                 PathBuf::from(options.path)
             };
+            self.state.folder_queue.clear();
+            self.state.folder_current = None;
+            self.state.folder_totals = crate::FolderPass::default();
             self.state.pending_ingest = Some(super::state::PendingIngest {
                 path,
                 copy_original: options.copy_original,
@@ -438,6 +441,9 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
                 default_time_context: options.time_context,
                 cluster_contexts: std::collections::BTreeMap::new(),
                 default_cluster_context: options.cluster_context,
+                folder_output: std::sync::Arc::default(),
+                folder_members: None,
+                folder_skips: std::collections::BTreeSet::new(),
             });
             self.start_pending_ingest();
             return Ok(true);
@@ -448,6 +454,10 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         self.seal_or_export_command(prompt)
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Both ingest paths share the background task and completion handling."
+    )]
     pub(super) fn start_pending_ingest(&mut self) {
         let Some(pending) = self.state.pending_ingest.clone() else {
             return;
@@ -456,6 +466,41 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         let id = self.id;
         let progress = self.progress_tx.clone();
         self.start_task("Ingest", move |cancel| {
+            if pending.path.is_dir() {
+                let catalog = workflow.io_ops.parser_catalog().ok_or_else(|| {
+                    irmind_app::AppError::Policy("parser catalog unavailable".into())
+                })?;
+                let result = crate::import_folder(
+                    workflow.engine,
+                    &crate::FolderImport {
+                        id,
+                        root: &pending.path,
+                        io: workflow.io_ops,
+                        catalog,
+                        copy_original: pending.copy_original,
+                        forced_parser: pending.forced_parser.as_deref(),
+                        default_time: pending.default_time_context,
+                        default_cluster: pending.default_cluster_context.as_ref(),
+                        analyst_choices: &pending.analyst_choices,
+                        times: &pending.time_contexts,
+                        clusters: &pending.cluster_contexts,
+                        cancel: &cancel,
+                        interactive: true,
+                        members: pending.folder_members.as_ref(),
+                        skipped: &pending.folder_skips,
+                    },
+                    |done, count, source, _| {
+                        if done <= 5 || done.is_multiple_of(64) || done == count {
+                            let safe = super::escape_display(source);
+                            let _ = progress.send(format!("Processed {done}/{count}: {safe}"));
+                        }
+                    },
+                )?;
+                *pending.folder_output.lock().map_err(|_| {
+                    irmind_app::AppError::Storage("folder result unavailable".into())
+                })? = Some(result);
+                return Ok(String::new());
+            }
             let first_seq = workflow
                 .engine
                 .audit_log

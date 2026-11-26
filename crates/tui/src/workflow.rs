@@ -5,6 +5,7 @@ use irmind_app::{
 };
 use std::path::Path;
 
+pub(crate) mod folder;
 pub(crate) mod ingest;
 
 pub(crate) fn is_local_evidence_question(input: &str) -> bool {
@@ -158,6 +159,23 @@ impl CaseWorkflow<'_, '_> {
         notices: &irmind_app::VerifiedCaseNotices,
     ) -> String {
         use std::fmt::Write as _;
+        let folder = &notices.folder_outcomes;
+        if folder.skipped + folder.failed + folder.matched + folder.mismatched != 0 {
+            let _ = write!(message, "\nFolder outcomes: {}", folder.summary());
+            if folder.mismatched != 0 {
+                message.push_str("\nWARNING: SHA-256 mismatch. Inspect the affected originals.");
+            }
+            for notice in folder.limitations.iter().take(50) {
+                let (path, reason) = notice.description();
+                let _ = write!(
+                    message,
+                    "\n{} · {reason} · {} · audit #{}",
+                    crate::case::escape_display(path),
+                    notice.fingerprint_display(),
+                    notice.sequence
+                );
+            }
+        }
         if notices.provisional_mappings != 0 {
             let _ = write!(
                 message,

@@ -4,6 +4,17 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+## 0.7.4 — Folder ingestion and local evidence status
+
+**Format impact:** Case marker 6 and export V10 stay in use. Older binaries may
+reject cases and exports containing the new `ingest-file-outcome-v1` audit kind.
+
+- Commit recognized folder members before reviewing unresolved files in the TUI.
+  Signed skipped and failed outcomes and SHA-256 companion checks appear in
+  case verification and report limitations. The CLI skips unresolved inputs
+  and continues.
+- Answer “What have we ingested?” and show signed outcomes through `/evidence`
+  without invoking a model.
 - Accept GLM reasoning metadata around the SSE stop without exposing it as an answer. Add a bounded, redacted local capture for troubleshooting OpenAI-compatible streams.
 
 ## 0.7.3 — Sigma source-class coverage and signed packages

@@ -125,6 +125,10 @@ fn initial_context_hints(
     );
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "Initialize all case UI state before running the event loop."
+)]
 fn initial_state(
     engine: &Engine<'_>,
     id: &CaseId,
@@ -199,6 +203,9 @@ fn initial_state(
         palette: None,
         picker: None,
         pending_ingest: None,
+        folder_queue: std::collections::VecDeque::new(),
+        folder_current: None,
+        folder_totals: crate::FolderPass::default(),
         parser_prompt: None,
         time_prompt: None,
         cluster_prompt: None,

@@ -132,10 +132,7 @@ impl LargeCaseUseCases<'_, '_> {
         rejected.push(source);
         if rejected.len() > MAPPED_GROUP_EXCLUSIONS {
             self.audit_rejections(request.id, rejected)?;
-            return Err(AppError::Policy(format!(
-                "direct group rejected {} sources; the exclusion limit is 16; group rolled back",
-                rejected.len()
-            )));
+            return Err(AppError::SourceGroupExclusionLimit(rejected.len()));
         }
         Ok(())
     }

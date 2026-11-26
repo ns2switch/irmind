@@ -301,6 +301,9 @@ impl CaseRuntime<'_, '_, '_> {
         if let Some(exit) = self.handle_session_key(code, modifiers)? {
             return Ok(exit);
         }
+        if self.handle_ingest_queue_keys(code, modifiers) {
+            return Ok(false);
+        }
         let shortcut = command_registry::shortcut_name(code, modifiers);
         if self.handle_help_key(code, shortcut) {
             return Ok(false);
@@ -437,6 +440,75 @@ impl CaseRuntime<'_, '_, '_> {
         }
     }
 
+    fn handle_ingest_queue_keys(&mut self, code: KeyCode, modifiers: KeyModifiers) -> bool {
+        if !modifiers.contains(KeyModifiers::CONTROL)
+            || self.state.pending_ingest.is_none()
+            || !(self.state.cluster_prompt.is_some()
+                || self.state.time_prompt.is_some()
+                || self.state.parser_prompt.is_some())
+        {
+            return false;
+        }
+        match code {
+            KeyCode::Char('s' | 'o') => self.skip_ingest_sources(code == KeyCode::Char('o')),
+            KeyCode::Char('n') if !self.state.folder_queue.is_empty() => {
+                if let Some(current) = self.state.folder_current.take() {
+                    self.state.folder_queue.push_back(current);
+                }
+                self.show_next_folder_prompt();
+            }
+            _ => return false,
+        }
+        true
+    }
+
+    fn skip_ingest_sources(&mut self, all: bool) {
+        let source = self
+            .state
+            .folder_current
+            .as_ref()
+            .map(|file| file.path.clone())
+            .or_else(|| {
+                self.state
+                    .parser_prompt
+                    .as_ref()
+                    .map(|prompt| prompt.source.clone())
+            })
+            .or_else(|| {
+                self.state
+                    .time_prompt
+                    .as_ref()
+                    .map(|prompt| prompt.source.clone())
+            })
+            .or_else(|| {
+                self.state
+                    .cluster_prompt
+                    .as_ref()
+                    .map(|prompt| prompt.source.clone())
+            });
+        let (Some(source), Some(pending)) = (source, self.state.pending_ingest.as_mut()) else {
+            return;
+        };
+        if !pending.path.is_dir() {
+            pending.path = pending
+                .path
+                .parent()
+                .filter(|p| !p.as_os_str().is_empty())
+                .unwrap_or_else(|| std::path::Path::new("."))
+                .to_path_buf();
+        }
+        let mut selected = std::collections::BTreeSet::from([source]);
+        if all {
+            selected.extend(self.state.folder_queue.drain(..).map(|file| file.path));
+        }
+        pending.folder_skips.clone_from(&selected);
+        pending.folder_members = Some(selected);
+        self.state.parser_prompt = None;
+        self.state.time_prompt = None;
+        self.state.cluster_prompt = None;
+        self.start_pending_ingest();
+    }
+
     fn handle_cluster_prompt_key(&mut self, code: KeyCode, modifiers: KeyModifiers) -> Result<()> {
         if matches!(code, KeyCode::PageUp | KeyCode::PageDown) {
             self.state.overlay_scroll = self
@@ -459,6 +531,24 @@ impl CaseRuntime<'_, '_, '_> {
             }
             crate::case::cluster_prompt::ClusterPromptAction::Confirm { context, all_files } => {
                 if let Some(pending) = self.state.pending_ingest.as_mut() {
+                    if self.state.folder_current.is_some() {
+                        let mut members = std::collections::BTreeSet::from([prompt.source.clone()]);
+                        if all_files {
+                            self.state.folder_queue.retain(|file| {
+                                if matches!(
+                                    file.prompt,
+                                    irmind_app::AppError::ParserClusterContextRequired { .. }
+                                ) {
+                                    members.insert(file.path.clone());
+                                    false
+                                } else {
+                                    true
+                                }
+                            });
+                        }
+                        pending.folder_members = Some(members);
+                        pending.folder_skips.clear();
+                    }
                     if all_files {
                         pending.default_cluster_context = Some(context);
                     } else {
@@ -496,6 +586,24 @@ impl CaseRuntime<'_, '_, '_> {
             }
             crate::case::time_prompt::TimePromptAction::Confirm { context, all_files } => {
                 if let Some(pending) = self.state.pending_ingest.as_mut() {
+                    if self.state.folder_current.is_some() {
+                        let mut members = std::collections::BTreeSet::from([prompt.source.clone()]);
+                        if all_files {
+                            self.state.folder_queue.retain(|file| {
+                                if matches!(
+                                    file.prompt,
+                                    irmind_app::AppError::ParserTimeContextRequired { .. }
+                                ) {
+                                    members.insert(file.path.clone());
+                                    false
+                                } else {
+                                    true
+                                }
+                            });
+                        }
+                        pending.folder_members = Some(members);
+                        pending.folder_skips.clear();
+                    }
                     if all_files {
                         pending.default_time_context = Some(context);
                     } else {
@@ -531,6 +639,11 @@ impl CaseRuntime<'_, '_, '_> {
             }
             crate::case::state::ParserPromptAction::Select(parser) => {
                 if let Some(pending) = self.state.pending_ingest.as_mut() {
+                    if self.state.folder_current.is_some() {
+                        pending.folder_members =
+                            Some(std::collections::BTreeSet::from([prompt.source.clone()]));
+                        pending.folder_skips.clear();
+                    }
                     pending.analyst_choices.insert(prompt.source, parser);
                     self.start_pending_ingest();
                 }

@@ -96,3 +96,17 @@ can retain earlier content. Use full-disk encryption and an appropriate retentio
 policy for sensitive evidence; deleting a case does not guarantee physical erasure.
 
 See [configuration](configuration.md) for the status bar and case budgets.
+
+### Folder imports
+
+Folder ingestion commits recognized sources before asking about unresolved
+inputs. In the queue, select an available parser or use Ctrl+S to skip the
+current file, Ctrl+O to skip the remaining queue, or Ctrl+N to cycle.
+The CLI records an unresolved file as skipped and continues. To retry, use
+`irmind ingest <case-id> <file> --parser <parser-id>`.
+
+Checksum and signature companions and recognized collector logs remain on
+disk. A matching `.sha256` or `SHA256SUMS` declaration records consistency with
+the original bytes. Checksum files cannot authorize ingestion or access
+outside the import. Checksum mismatches are highlighted in the import result
+and `/verify`. The signed audit carries each disposition and integrity result.

@@ -25,6 +25,10 @@ struct PlanExecution<'a> {
 }
 
 impl AutomationContext<'_, '_> {
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Keep CLI ingestion and its shared option parsing in one dispatch arm."
+    )]
     pub(super) fn handle_ingest(self, command: Command) -> Result<bool> {
         let Self {
             engine,
@@ -55,6 +59,37 @@ impl AutomationContext<'_, '_> {
                 engine.verify_cancelable(&id, cancel)?;
                 if store.get_case(&id)?.sealed {
                     return Err(anyhow!("case is sealed"));
+                }
+                if path.is_dir() {
+                    let catalog = workspace_io
+                        .parser_catalog()
+                        .cloned()
+                        .unwrap_or_else(|| registry.parser_catalog());
+                    let result = irmind_tui::import_folder(
+                        engine,
+                        &irmind_tui::FolderImport {
+                            id: &id,
+                            root: &path,
+                            io: workspace_io,
+                            catalog: &catalog,
+                            copy_original,
+                            forced_parser: parser.as_deref(),
+                            default_time: time_context,
+                            default_cluster: cluster_context.as_ref(),
+                            analyst_choices: &BTreeMap::new(),
+                            times: &BTreeMap::new(),
+                            clusters: &BTreeMap::new(),
+                            cancel,
+                            interactive: false,
+                            members: None,
+                            skipped: &std::collections::BTreeSet::new(),
+                        },
+                        |_, _, source, hash| {
+                            println!("{} {}", hash, terminal_safe_path(&path.join(source)));
+                        },
+                    )?;
+                    println!("{}", result.summary());
+                    return Ok(false);
                 }
                 let files = input_files_large(&path)?;
                 let indexed = indexed_sources(store.as_ref(), &id)?;

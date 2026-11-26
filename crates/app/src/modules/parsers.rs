@@ -38,6 +38,7 @@ pub struct ParserCatalog {
     pub(super) unavailable: BTreeMap<String, String>,
     pub(super) source_selected: BTreeSet<String>,
     pub(super) resolver: Option<Arc<dyn ParserResolver>>,
+    pub(super) mapped_ingest: Option<BTreeSet<String>>,
 }
 
 impl ParserCatalog {
@@ -128,6 +129,28 @@ impl ParserCatalog {
             .filter(|(id, _)| !self.unavailable.contains_key(id.as_str()))
             .map(|(id, parser)| (id.clone(), parser.identity().version.to_owned()))
             .collect()
+    }
+
+    /// Filter the analyst's choices using the activated decoder registry, while
+    /// preserving detection of recognized sources whose pipeline is unavailable.
+    #[must_use]
+    pub fn with_mapped_ingest(mut self, mappings: &crate::source_mapping::MappingCatalog) -> Self {
+        self.mapped_ingest = Some(
+            self.available()
+                .into_iter()
+                .filter(|(id, version)| mappings.supports_decoder(id, version))
+                .map(|(id, _)| id)
+                .collect(),
+        );
+        self
+    }
+
+    pub fn can_ingest(&self, id: &str) -> bool {
+        self.get(id).is_ok()
+            && self
+                .mapped_ingest
+                .as_ref()
+                .is_none_or(|sources| sources.contains(id))
     }
 
     /// Rebuild with the decoder identity recorded in each current source manifest.

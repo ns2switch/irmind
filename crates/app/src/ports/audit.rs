@@ -12,6 +12,8 @@ pub enum AppError {
     SkillService(#[from] crate::SkillServiceError),
     #[error("source preparation rejected a file")]
     SourceFailure(crate::RejectedSource),
+    #[error("direct group rejected {0} sources; the exclusion limit is 16; group rolled back")]
+    SourceGroupExclusionLimit(usize),
     #[error(transparent)]
     Fixed(FixedAppError),
     #[error("module secret not found")]

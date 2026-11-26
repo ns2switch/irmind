@@ -99,3 +99,19 @@ modernos pueden conservar contenido anterior. Utiliza cifrado completo de disco 
 una política de retención adecuada; borrar no garantiza la eliminación física.
 
 Consulta [configuración](configuration.md) para la barra de estado y presupuestos.
+
+### Ingesta de carpetas
+
+La ingesta de carpetas confirma las fuentes reconocidas antes de preguntar
+por las pendientes. En la cola puedes elegir un parser disponible, pulsar
+Ctrl+S para omitir el fichero actual, Ctrl+O para omitir toda la cola o Ctrl+N
+para pasar al siguiente. La CLI registra como omitido cada fichero pendiente
+y continúa. Para reintentarlo, usa
+`irmind ingest <id-del-caso> <fichero> --parser <id-del-parser>`.
+
+Los acompañantes de sumas y firmas y los logs de recolectores reconocidos
+permanecen en disco. Una declaración coincidente en `.sha256` o `SHA256SUMS`
+registra que la suma concuerda con los bytes originales. Las sumas no
+autorizan la ingesta ni el acceso fuera de la carpeta. Las discrepancias se
+destacan en el resumen y en `/verify`. La auditoría firmada conserva cada
+disposición y cada resultado de integridad.
