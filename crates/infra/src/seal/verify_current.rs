@@ -478,6 +478,7 @@ impl ChainState {
                     entry.kind,
                     AuditEventKind::ReportPublishedV1
                         | AuditEventKind::SigmaRunV1
+                        | AuditEventKind::SigmaCaseRunAdmissionV1
                         | AuditEventKind::SourceManifestV2
                         | AuditEventKind::SourceQueryResultV1
                         | AuditEventKind::FindingProposed

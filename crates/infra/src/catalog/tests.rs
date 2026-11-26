@@ -351,3 +351,250 @@ fn catalog_admission_requires_publisher_proof_beyond_a_valid_analyst_signature()
             .is_err()
     );
 }
+
+#[cfg(feature = "sigma")]
+#[test]
+fn approved_sigma_catalog_vector_authenticates_in_its_own_domain() {
+    let vectors: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../docs/development/sigma-package-vectors/wire.json"
+    ))
+    .unwrap();
+    let read = |name: &str| hex::decode(vectors[name].as_str().unwrap()).unwrap();
+    let body = |name: &str| hex::decode(vectors[name]["bytes_hex"].as_str().unwrap()).unwrap();
+    let key: [u8; 32] = read("publisher_public_key").try_into().unwrap();
+    let verifier =
+        Ed25519CatalogIndexVerifier::from_release_keys(Box::leak(Box::new([key]))).unwrap();
+    let index = body("index");
+    let signature = read("sigma_index_signature");
+    let authenticated = verifier.verify_sigma(&index, &signature, "v1.0.0").unwrap();
+    assert_eq!(authenticated.proof(), body("v10_object_7"));
+    let proof = authenticated.proof();
+    let digest = irmind_app::sha256(proof);
+    let reopened = verifier
+        .verify_sigma_proof(proof, digest, "v1.0.0")
+        .unwrap();
+    assert!(
+        reopened
+            .check_release_history([authenticated.release_stamp()])
+            .is_ok()
+    );
+    assert!(
+        verifier
+            .verify_sigma_proof(proof, [0; 32], "v1.0.0")
+            .is_err()
+    );
+    let mut changed_proof = proof.to_vec();
+    changed_proof.push(0);
+    assert!(
+        verifier
+            .verify_sigma_proof(&changed_proof, irmind_app::sha256(&changed_proof), "v1.0.0")
+            .is_err()
+    );
+
+    assert_eq!(authenticated.sequence(), 1);
+    let package = body("package");
+    let cancel = irmind_app::CancellationToken::new();
+    let bundle = crate::sigma_pack::inspect_sigma_catalog_asset(
+        &authenticated,
+        "synthetic",
+        &package,
+        &cancel,
+    )
+    .unwrap();
+    assert_eq!(bundle.pack.rules.len(), 1);
+    let mut wrong = package;
+    *wrong.last_mut().unwrap() ^= 1;
+    assert!(
+        crate::sigma_pack::inspect_sigma_catalog_asset(
+            &authenticated,
+            "synthetic",
+            &wrong,
+            &cancel
+        )
+        .is_err()
+    );
+
+    assert!(verifier.verify_sigma(&index, &signature, "v1.0.1").is_err());
+    assert!(matches!(
+        verifier.verify_sigma(
+            &body("skills_index"),
+            &read("skills_index_signature"),
+            "v1.0.0"
+        ),
+        Err(CatalogError::InvalidSignature)
+    ));
+    let raw = CatalogIndexBytes::new(index, &signature).unwrap();
+    assert!(
+        verifier
+            .verify(&raw, &FrozenCatalogRelease::new("v1.0.0").unwrap())
+            .is_err()
+    );
+}
+
+#[cfg(feature = "sigma")]
+#[test]
+fn approved_sigma_installation_proof_checks_the_analyst_and_operation_digest() {
+    use irmind_app::v10_proofs::verify_sigma_installation_proof;
+    use irmind_domain::Actor;
+
+    let vectors: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../docs/development/sigma-package-vectors/wire.json"
+    ))
+    .unwrap();
+    let raw = hex::decode(vectors["v10_object_6"]["bytes_hex"].as_str().unwrap()).unwrap();
+    let entry: irmind_app::SignedOperation = serde_json::from_slice(&raw).unwrap();
+    let verifier = crate::LocalVerifier {
+        trusted: std::collections::BTreeMap::new(),
+    }
+    .with_trusted_key(&Actor::Analyst, &entry.public_key)
+    .unwrap();
+    let receipt = verify_sigma_installation_proof(&raw, entry.hash, &verifier).unwrap();
+    assert_eq!(receipt.name, "synthetic");
+    assert!(verify_sigma_installation_proof(&raw, [0; 32], &verifier).is_err());
+    let mut altered = entry.clone();
+    altered.sig[0] ^= 1;
+    assert!(
+        verify_sigma_installation_proof(
+            &serde_json::to_vec(&altered).unwrap(),
+            entry.hash,
+            &verifier
+        )
+        .is_err()
+    );
+}
+
+#[cfg(feature = "sigma")]
+#[expect(
+    clippy::too_many_lines,
+    reason = "covers an authenticated pair and invalid pair variants"
+)]
+#[test]
+fn approved_sigma_case_admission_binds_the_following_run() {
+    use irmind_app::{
+        Verifier,
+        v10_proofs::{CaseCheckpointV1, SigmaCaseRunAdmissionV1, SigmaRunStatusV1, SigmaRunV1},
+    };
+    use irmind_domain::Actor;
+
+    let vectors: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../docs/development/sigma-package-vectors/wire.json"
+    ))
+    .unwrap();
+    let raw = hex::decode(
+        vectors["signed_case_admission"]["bytes_hex"]
+            .as_str()
+            .unwrap(),
+    )
+    .unwrap();
+    let entry: irmind_app::SignedEntry = serde_json::from_slice(&raw).unwrap();
+    let key = crate::LocalVerifier {
+        trusted: std::collections::BTreeMap::new(),
+    }
+    .with_trusted_key(&Actor::Analyst, &entry.public_key)
+    .unwrap();
+    assert_eq!(
+        irmind_app::hex(&entry.canonical()),
+        vectors["case_admission_signing_preimage"]["bytes_hex"]
+    );
+    assert_eq!(irmind_app::sha256(&entry.canonical()), entry.hash);
+    key.verify(&entry.public_key, &entry.hash, &entry.sig)
+        .unwrap();
+    let admission = SigmaCaseRunAdmissionV1::from_case_entry(&entry).unwrap();
+    let mut run = SigmaRunV1 {
+        checkpoint: CaseCheckpointV1 {
+            case_id: admission.checkpoint.case_id.clone(),
+            sequence: entry.seq,
+            entry_hash: entry.hash,
+        },
+        pack_admission: admission.pack_admission,
+        artifact_inventory: admission.artifact_inventory,
+        selected_sources: admission.selected_sources,
+        start_utc_micros: admission.start_us,
+        end_utc_micros: admission.end_us,
+        compiled_rules: admission.compiled_rules,
+        field_table: admission.field_table,
+        evaluator: admission.evaluator.clone(),
+        reserved_units: admission.reserved_work,
+        used_units: 1,
+        status: SigmaRunStatusV1::Complete,
+        matched_rows: 0,
+        result_manifest: [97; 32],
+        proof_set: [98; 32],
+    };
+    assert!(
+        SigmaCaseRunAdmissionV1::verify_following_run(&entry, &run, admission.manifest).is_ok()
+    );
+    let mut following = entry.clone();
+    following.seq += 1;
+    following.kind = irmind_domain::AuditEventKind::SigmaRunV1;
+    following.prev = entry.hash;
+    following.payload = run.encode().unwrap();
+    assert!(
+        irmind_app::v10_proofs::verify_sigma_case_admission_pairs(&[
+            entry.clone(),
+            following.clone()
+        ])
+        .is_ok()
+    );
+    assert!(
+        irmind_app::v10_proofs::verify_sigma_case_admission_pairs(std::slice::from_ref(&following))
+            .is_err()
+    );
+    assert!(
+        irmind_app::v10_proofs::verify_sigma_case_admission_pairs(std::slice::from_ref(&entry))
+            .is_err()
+    );
+    let mut downgraded = following;
+    let mut ungated = run.clone();
+    ungated.evaluator = irmind_app::v10_proofs::SIGMA_EVALUATOR_V3.into();
+    downgraded.payload = ungated.encode().unwrap();
+    assert!(
+        irmind_app::v10_proofs::verify_sigma_case_admission_pairs(&[entry.clone(), downgraded])
+            .is_err()
+    );
+    assert!(SigmaCaseRunAdmissionV1::verify_following_run(&entry, &run, [0; 32]).is_err());
+    run.selected_sources[0] ^= 1;
+    assert!(
+        SigmaCaseRunAdmissionV1::verify_following_run(&entry, &run, admission.manifest).is_err()
+    );
+}
+
+#[cfg(feature = "sigma")]
+#[test]
+fn approved_v4_gate_vectors_round_trip_and_reject_ungated_run() {
+    use irmind_app::{
+        Verifier,
+        v10_proofs::{SIGMA_EVALUATOR_V4_CASE_ADMISSION, SigmaCaseRunAdmissionV1, SigmaRunV1},
+    };
+    let vectors: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../docs/development/sigma-package-vectors/v4-gate.json"
+    ))
+    .unwrap();
+    let raw = |key: &str| hex::decode(vectors[key]["bytes_hex"].as_str().unwrap()).unwrap();
+    let entry: irmind_app::SignedEntry = serde_json::from_slice(&raw("signed_admission")).unwrap();
+    let verifier = crate::LocalVerifier {
+        trusted: std::collections::BTreeMap::new(),
+    }
+    .with_trusted_key(&irmind_domain::Actor::Analyst, &entry.public_key)
+    .unwrap();
+    assert_eq!(entry.canonical(), raw("admission_challenge"));
+    verifier
+        .verify(&entry.public_key, &entry.hash, &entry.sig)
+        .unwrap();
+    let admit = SigmaCaseRunAdmissionV1::from_case_entry(&entry).unwrap();
+    assert_eq!(admit.encode().unwrap(), raw("admission"));
+    let run = SigmaRunV1::decode(&irmind_app::hex(&raw("following_run"))).unwrap();
+    assert_eq!(run.evaluator, SIGMA_EVALUATOR_V4_CASE_ADMISSION);
+    assert_eq!(
+        run.encode().unwrap(),
+        irmind_app::hex(&raw("following_run"))
+    );
+    assert!(SigmaCaseRunAdmissionV1::verify_following_run(&entry, &run, admit.manifest).is_ok());
+    let ungated = SigmaRunV1::decode(&irmind_app::hex(&raw(
+        "invalid_following_run_without_gate_identity",
+    )))
+    .unwrap();
+    assert!(
+        SigmaCaseRunAdmissionV1::verify_following_run(&entry, &ungated, admit.manifest).is_err()
+    );
+}

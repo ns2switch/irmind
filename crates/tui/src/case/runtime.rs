@@ -300,7 +300,14 @@ impl<'scope> CaseRuntime<'scope, '_, '_> {
             self.state.conversation.discard_preview();
             self.state.pending_final_reply = Some(self.engine.guard.screen(&text)?.text);
         }
-        if matches!(label, "Prepare seal" | "Prepare Sigma pack") {
+        if matches!(
+            label,
+            "Prepare seal"
+                | "Prepare Sigma pack"
+                | "Prepare Sigma package"
+                | "Prepare Sigma deactivation"
+                | "Prepare Sigma run"
+        ) {
             let preview = self
                 .confirmation_rx
                 .try_recv()

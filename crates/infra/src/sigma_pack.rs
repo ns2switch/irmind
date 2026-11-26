@@ -1,9 +1,22 @@
-//! Load analyst-selected regular YAML files under a single bounded local root.
+//! Inspect analyst-selected Sigma rules under a bounded transport.
+#[cfg(feature = "sigma")]
+mod archive;
+#[cfg(feature = "sigma")]
+mod bundle;
+#[cfg(feature = "sigma")]
+pub use archive::inspect_sigmahq_archive;
+#[cfg(feature = "sigma")]
+pub use bundle::{
+    SigmaPackageBundle, SigmaPackageMetadata, inspect_sigma_catalog_asset,
+    inspect_sigma_package_bundle, inspect_sigmahq_catalog_reference,
+};
 #[cfg(feature = "sigma")]
 pub mod evaluation;
 pub mod field_table;
 #[cfg(feature = "sigma")]
 mod runtime;
+#[cfg(feature = "sigma")]
+pub use runtime::InstalledSigmaCoverage;
 #[cfg(feature = "sigma")]
 pub(crate) use runtime::{SigmaMatchCheck, verify_class_plan};
 #[cfg(feature = "sigma")]
@@ -20,7 +33,7 @@ use std::{
     path::{Path, PathBuf},
 };
 #[cfg(feature = "sigma")]
-pub use storage::AdmittedSigmaPack;
+pub use storage::{AdmittedSigmaPack, CatalogSigmaInstallApproval};
 
 pub(crate) fn sigma_proof_read(
     kind: u8,
@@ -77,21 +90,42 @@ pub fn inspect_local_sigma_pack(
     root: &Path,
     cancel: &CancellationToken,
 ) -> Result<LocalSigmaPack, AppError> {
+    read_local_sigma_pack(root, cancel, admit_rule_identity)
+}
+
+#[cfg(feature = "sigma")]
+fn validate_manifest_rule(entry: &SigmaPackRuleV1, bytes: &[u8]) -> Result<(), AppError> {
+    let digest = irmind_app::sha256(bytes);
+    let metadata = admit_rule_identity(bytes)?;
+    let id = metadata
+        .id
+        .unwrap_or_else(|| format!("sha256:{}", irmind_app::hex(&digest)));
+    if bytes.len() as u64 != entry.size
+        || digest != entry.rule.sha256
+        || id != entry.rule.id
+        || metadata.author != entry.author
+        || metadata.version != entry.version
+    {
+        return Err(invalid());
+    }
+    Ok(())
+}
+
+#[cfg(feature = "sigma")]
+fn admit_rule_identity(raw: &[u8]) -> Result<SigmaRuleIdentity, AppError> {
     use irmind_sigma::RuleValue;
-    read_local_sigma_pack(root, cancel, |raw| {
-        let document = irmind_sigma::admit_rule(raw).map_err(|_| {
-            AppError::Policy("A Sigma rule is invalid or uses unsupported YAML syntax".into())
-        })?;
-        let text = |name| match document.fields().get(name) {
-            None => Ok(None),
-            Some(RuleValue::Text(value)) => Ok(Some(value.clone())),
-            Some(_) => Err(AppError::Policy("Sigma rule metadata must be text".into())),
-        };
-        Ok(SigmaRuleIdentity {
-            id: text("id")?,
-            version: text("version")?,
-            author: text("author")?,
-        })
+    let document = irmind_sigma::admit_rule(raw).map_err(|_| {
+        AppError::Policy("A Sigma rule is invalid or uses unsupported YAML syntax".into())
+    })?;
+    let text = |name| match document.fields().get(name) {
+        None => Ok(None),
+        Some(RuleValue::Text(value)) => Ok(Some(value.clone())),
+        Some(_) => Err(AppError::Policy("Sigma rule metadata must be text".into())),
+    };
+    Ok(SigmaRuleIdentity {
+        id: text("id")?,
+        version: text("version")?,
+        author: text("author")?,
     })
 }
 

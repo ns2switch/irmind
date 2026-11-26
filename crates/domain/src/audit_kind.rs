@@ -68,12 +68,13 @@ pub enum AuditEventKind {
     SubagentReservationV1,
     SubagentCheckpointV1,
     SubagentResultV1,
+    SigmaCaseRunAdmissionV1,
     SigmaRunV1,
     ReportPublishedV1,
 }
 
 impl AuditEventKind {
-    pub const ALL: [Self; 66] = [
+    pub const ALL: [Self; 67] = [
         Self::Allowed,
         Self::ApprovalDenied,
         Self::ApprovalGranted,
@@ -138,6 +139,7 @@ impl AuditEventKind {
         Self::SubagentReservationV1,
         Self::SubagentCheckpointV1,
         Self::SubagentResultV1,
+        Self::SigmaCaseRunAdmissionV1,
         Self::SigmaRunV1,
         Self::ReportPublishedV1,
     ];
@@ -208,6 +210,7 @@ impl AuditEventKind {
             Self::SubagentReservationV1 => "subagent-reservation-v1",
             Self::SubagentCheckpointV1 => "subagent-checkpoint-v1",
             Self::SubagentResultV1 => "subagent-result-v1",
+            Self::SigmaCaseRunAdmissionV1 => "sigma-case-run-admission-v1",
             Self::SigmaRunV1 => "sigma-run-v1",
             Self::ReportPublishedV1 => "report-published-v1",
         }
@@ -270,7 +273,7 @@ mod tests {
 
     #[test]
     fn wire_names_are_stable_and_unknown_names_fail() {
-        const EXPECTED: [&str; 66] = [
+        const EXPECTED: [&str; 67] = [
             "Allowed",
             "ApprovalDenied",
             "ApprovalGranted",
@@ -335,6 +338,7 @@ mod tests {
             "subagent-reservation-v1",
             "subagent-checkpoint-v1",
             "subagent-result-v1",
+            "sigma-case-run-admission-v1",
             "sigma-run-v1",
             "report-published-v1",
         ];

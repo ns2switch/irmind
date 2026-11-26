@@ -110,7 +110,7 @@ fn verify_custody(
 #[test]
 fn azure_decimal_projection_is_exact_in_signed_case_and_v10() {
     use irmind_app::{
-        ReportDocumentFormat, ReportDocumentLanguage, v10_proofs::SIGMA_EVALUATOR_V4,
+        ReportDocumentFormat, ReportDocumentLanguage, v10_proofs::SIGMA_EVALUATOR_V4_CASE_ADMISSION,
     };
     use serde_json::{Value, json};
 
@@ -168,10 +168,25 @@ fn azure_decimal_projection_is_exact_in_signed_case_and_v10() {
         .unwrap();
     }
     let pack = irmind_infra::sigma_pack::inspect_local_sigma_pack(&rules, &cancel).unwrap();
-    let digest = irmind_app::sha256(&pack.manifest.encode().unwrap());
-    store
-        .admit_local_sigma_pack(&engine, &rules, digest, "MIT", &cancel)
+    let manifest = pack.manifest.encode().unwrap();
+    let metadata = br#"{"format_version":1,"name":"synthetic-azure","version":"1.0.0","license":"MIT","attribution":"Synthetic example"}"#;
+    let mut bundle = b"irmind-sigma-package-v1\0".to_vec();
+    bundle.extend((metadata.len() as u64).to_be_bytes());
+    bundle.extend(metadata);
+    bundle.extend((manifest.len() as u64).to_be_bytes());
+    bundle.extend(&manifest);
+    for raw in &pack.rules {
+        bundle.extend(raw);
+    }
+    let activation = store
+        .install_local_sigma_package(&engine, &bundle, irmind_app::sha256(&bundle), None, &cancel)
         .unwrap();
+    let case_head = store.entries(&case.id).unwrap().last().unwrap().hash;
+    let selection = irmind_app::v10_proofs::InstalledSigmaRunSelection {
+        name: "synthetic-azure".into(),
+        installation: activation.hash,
+        case_head,
+    };
     let instant = |text| {
         irmind_app::IndexedTime::from_rfc3339(text, false)
             .unwrap()
@@ -179,15 +194,15 @@ fn azure_decimal_projection_is_exact_in_signed_case_and_v10() {
             .unix_micros()
     };
     let run = store
-        .run_sigma(
+        .run_installed_sigma(
             &engine,
             &case.id,
-            digest,
+            &selection,
             instant("2026-11-01T00:00:00Z")..instant("2026-11-01T00:01:00Z"),
             &cancel,
         )
         .unwrap();
-    assert_eq!(run.receipt.evaluator, SIGMA_EVALUATOR_V4);
+    assert_eq!(run.receipt.evaluator, SIGMA_EVALUATOR_V4_CASE_ADMISSION);
     assert_eq!(run.receipt.matched_rows, 4);
     assert_eq!(run.unavailable_by_source, [("signin.ndjson".into(), 1)]);
     assert_eq!(
@@ -216,6 +231,21 @@ fn azure_decimal_projection_is_exact_in_signed_case_and_v10() {
             .any(|finding| finding.value == "Synthetic negated")
     );
 
+    let entries = store.entries(&case.id).unwrap();
+    let admitted = entries
+        .iter()
+        .find(|entry| entry.kind == AuditEventKind::SigmaCaseRunAdmissionV1)
+        .unwrap();
+    irmind_app::v10_proofs::SigmaCaseRunAdmissionV1::verify_following_run(
+        admitted,
+        &run.receipt,
+        irmind_app::sha256(&manifest),
+    )
+    .unwrap();
+    engine
+        .deactivate_sigma_package("synthetic-azure", activation.hash)
+        .unwrap();
+    fs::remove_dir_all(root.path().join("data").join("sigma-packs")).unwrap();
     let preview = store
         .preview_cited_report(&engine, &case.id, ReportDocumentLanguage::Spanish, &cancel)
         .unwrap();

@@ -166,6 +166,7 @@ checks. [Manual validation record](manual-validation.md).
   estimates one additional GCP rule and three Azure rules. [Audit and scope](sigma-azure-result-type-contract.md).
 - Ingest Volatility 3 outputs. [#158](https://github.com/ns2switch/irmind/issues/158).
 - Decide when signed formats stabilize and how long to retain parser versions.
+- Record Sigma case admission separately from evaluator versions when stabilizing formats. A new projection will need one evaluator identifier and will reuse the admission verifier.
 
 ## Open decisions
 

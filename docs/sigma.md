@@ -4,7 +4,13 @@
 
 IRMind evaluates a bounded subset of Sigma detection rules over the authenticated local Parquet artifacts of an open case. The signed run records the admitted rule bytes, the source scope, the reviewed field table, skipped rules and exact evidence rows. Evaluation uses local evidence and runs without a model or network connection.
 
-## Run a pack
+## Install and run a package
+
+- Use `/sigma list` to list installations and `/sigma info <name>` to check coverage against the current case.
+- Run `/sigma install <package file>` or `/sigma install catalog:<name>`. Review the version, license and hashes before signing. The catalog command contacts the catalog only when you request it. An installed package can be reviewed with `/sigma update <name> [source]` or deactivated with `/sigma remove <name>`.
+- Run `/sigma run <name> <start UTC> <end UTC>` and review the case scope before signing admission. The run and the V10 export retain the approved version and its proofs, including after deactivation.
+
+## Run rules from a local directory
 
 1. Put your reviewed single-document YAML rules in a local directory. Establish the pack's provenance and license before importing third-party rules.
 2. Run `/sigma inspect <directory>` and review the manifest SHA-256. Use `/sigma import --license <license-id> <directory>` and confirm that hash to sign the admission.

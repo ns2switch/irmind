@@ -8,6 +8,8 @@ mod cli;
 mod configuration;
 #[cfg(all(feature = "keystore-file", feature = "parser-json"))]
 mod demo;
+#[cfg(feature = "sigma")]
+mod sigma_packages;
 #[cfg(not(all(feature = "keystore-file", feature = "parser-json")))]
 mod demo {
     pub(super) fn run(
@@ -174,6 +176,73 @@ impl RootWorkspaceIo {
 
 impl WorkspaceIo for RootWorkspaceIo {
     #[cfg(feature = "sigma")]
+    fn preview_sigma_package_change(
+        &self,
+        engine: &Engine<'_>,
+        source: &str,
+        update: Option<&str>,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<irmind_tui::SigmaPackagePreview, AppError> {
+        sigma_packages::preview(&self.store, engine, source, update, cancel)
+    }
+
+    #[cfg(feature = "sigma")]
+    fn apply_sigma_package_change(
+        &self,
+        engine: &Engine<'_>,
+        preview: &irmind_tui::SigmaPackagePreview,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, AppError> {
+        sigma_packages::apply(&self.store, engine, preview, cancel)
+    }
+
+    #[cfg(feature = "sigma")]
+    fn sigma_package_info(
+        &self,
+        engine: &Engine<'_>,
+        case: &irmind_app::CaseId,
+        name: &str,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, AppError> {
+        use irmind_app::v10_proofs::SigmaPackageOriginV1;
+        use std::fmt::Write as _;
+        let info = self
+            .store
+            .sigma_package_coverage(engine, case, name, cancel)?;
+        let receipt = info.receipt;
+        let origin = match receipt.origin {
+            SigmaPackageOriginV1::Local => "local",
+            SigmaPackageOriginV1::CatalogAsset(_) => "catalog",
+            SigmaPackageOriginV1::SigmaHqArchive(_) => "SigmaHQ reference",
+        };
+        let mut text = format!(
+            "{} {} · {} · {origin} · {}\nManifest SHA-256 {}",
+            receipt.name,
+            receipt.version,
+            if receipt.active { "active" } else { "inactive" },
+            receipt.license,
+            irmind_app::hex(&receipt.manifest)
+        );
+        if let (Some(coverage), Some(checkpoint)) = (info.coverage, info.checkpoint) {
+            let _ = write!(
+                text,
+                "\nCase checkpoint {}\nRules with all / some / no eligible classes: {} / {} / {}",
+                irmind_app::hex(&checkpoint),
+                coverage.all_rules,
+                coverage.some_rules,
+                coverage.no_rules
+            );
+            for (class, missing, incompatible) in info.skipped_classes {
+                let _ = write!(
+                    text,
+                    "\n{class} · {missing} missing bindings · {incompatible} incompatible types"
+                );
+            }
+        }
+        Ok(text)
+    }
+
+    #[cfg(feature = "sigma")]
     fn inspect_sigma_pack(
         &self,
         directory: &Path,
@@ -213,6 +282,20 @@ impl WorkspaceIo for RootWorkspaceIo {
     }
 
     #[cfg(feature = "sigma")]
+    fn run_installed_sigma_package(
+        &self,
+        engine: &Engine<'_>,
+        case: &irmind_app::CaseId,
+        selection: &irmind_app::v10_proofs::InstalledSigmaRunSelection,
+        time: std::ops::Range<i64>,
+        cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, AppError> {
+        Ok(format_sigma_run(self.store.run_installed_sigma(
+            engine, case, selection, time, cancel,
+        )?))
+    }
+
+    #[cfg(feature = "sigma")]
     fn run_sigma_pack(
         &self,
         engine: &Engine<'_>,
@@ -221,56 +304,9 @@ impl WorkspaceIo for RootWorkspaceIo {
         time: std::ops::Range<i64>,
         cancel: &irmind_app::CancellationToken,
     ) -> Result<String, AppError> {
-        use irmind_app::v10_proofs::SigmaRunStatusV1;
-        use std::fmt::Write as _;
-        let summary = self.store.run_sigma(engine, case, manifest, time, cancel)?;
-        let run = summary.receipt;
-        let status = match run.status {
-            SigmaRunStatusV1::Complete => "complete",
-            SigmaRunStatusV1::TimeLimit => "partial (time limit)",
-            SigmaRunStatusV1::WorkLimit => "partial (work limit)",
-            SigmaRunStatusV1::OversizedInput => "partial (oversized input)",
-            SigmaRunStatusV1::Cancelled => "partial (cancelled)",
-            SigmaRunStatusV1::ExactFieldsUnavailable => "partial (exact fields unavailable)",
-            SigmaRunStatusV1::CoverageLimited => "partial (source-class coverage)",
-        };
-        let mut text = format!(
-            "Sigma run {status} · {} unconfirmed matches · {} skipped rules · {} work units",
-            run.matched_rows, summary.skipped_rules, run.used_units
-        );
-        let coverage = summary.class_coverage;
-        let _ = write!(
-            text,
-            "\nSource-class plan · {} rules with all, {} with some, {} with no eligible classes · {} eligible and {} skipped pairs",
-            coverage.all_rules,
-            coverage.some_rules,
-            coverage.no_rules,
-            coverage.eligible_pairs,
-            coverage.skipped_pairs,
-        );
-        if coverage.some_rules > 0 || coverage.no_rules > 0 {
-            text.push_str("\nCoverage gaps leave activity in the skipped classes undetermined.");
-        }
-        for (class, missing, incompatible) in summary.skipped_classes {
-            let _ = write!(
-                text,
-                "\n  {class} · {missing} missing bindings, {incompatible} incompatible types"
-            );
-        }
-        if !summary.unavailable_by_source.is_empty() {
-            text.push_str("\nExamined rows with unavailable exact fields by source. This may indicate source manipulation. Inspect the original evidence.");
-            for (source, count) in summary.unavailable_by_source {
-                let source = cli::terminal_safe_path(Path::new(&source));
-                let _ = write!(text, "\n  {source}: {count}");
-            }
-        }
-        if !summary.indeterminate_by_rule.is_empty() {
-            text.push_str("\nIndeterminate rows are rows Sigma could not evaluate for that rule because an exact field was unavailable.");
-            for (rule, count) in summary.indeterminate_by_rule {
-                let _ = write!(text, "\n  {}: {count}", rule.id);
-            }
-        }
-        Ok(text)
+        Ok(format_sigma_run(
+            self.store.run_sigma(engine, case, manifest, time, cancel)?,
+        ))
     }
 
     fn publish_cited_report(
@@ -627,6 +663,58 @@ impl WorkspaceIo for RootWorkspaceIo {
 mod skills;
 mod startup;
 
+#[cfg(feature = "sigma")]
+fn format_sigma_run(summary: irmind_app::v10_proofs::SigmaExecutionSummary) -> String {
+    use irmind_app::v10_proofs::SigmaRunStatusV1;
+    use std::fmt::Write as _;
+    let run = summary.receipt;
+    let status = match run.status {
+        SigmaRunStatusV1::Complete => "complete",
+        SigmaRunStatusV1::TimeLimit => "partial (time limit)",
+        SigmaRunStatusV1::WorkLimit => "partial (work limit)",
+        SigmaRunStatusV1::OversizedInput => "partial (oversized input)",
+        SigmaRunStatusV1::Cancelled => "partial (cancelled)",
+        SigmaRunStatusV1::ExactFieldsUnavailable => "partial (exact fields unavailable)",
+        SigmaRunStatusV1::CoverageLimited => "partial (source-class coverage)",
+    };
+    let mut text = format!(
+        "Sigma run {status} · {} unconfirmed matches · {} skipped rules · {} work units",
+        run.matched_rows, summary.skipped_rules, run.used_units
+    );
+    let coverage = summary.class_coverage;
+    let _ = write!(
+        text,
+        "\nSource-class plan · {} rules with all, {} with some, {} with no eligible classes · {} eligible and {} skipped pairs",
+        coverage.all_rules,
+        coverage.some_rules,
+        coverage.no_rules,
+        coverage.eligible_pairs,
+        coverage.skipped_pairs,
+    );
+    if coverage.some_rules > 0 || coverage.no_rules > 0 {
+        text.push_str("\nCoverage gaps leave activity in the skipped classes undetermined.");
+    }
+    for (class, missing, incompatible) in summary.skipped_classes {
+        let _ = write!(
+            text,
+            "\n  {class} · {missing} missing bindings, {incompatible} incompatible types"
+        );
+    }
+    if !summary.unavailable_by_source.is_empty() {
+        text.push_str("\nExamined rows with unavailable exact fields by source. This may indicate source manipulation. Inspect the original evidence.");
+        for (source, count) in summary.unavailable_by_source {
+            let source = cli::terminal_safe_path(Path::new(&source));
+            let _ = write!(text, "\n  {source}: {count}");
+        }
+    }
+    if !summary.indeterminate_by_rule.is_empty() {
+        text.push_str("\nIndeterminate rows are rows Sigma could not evaluate for that rule because an exact field was unavailable.");
+        for (rule, count) in summary.indeterminate_by_rule {
+            let _ = write!(text, "\n  {}: {count}", rule.id);
+        }
+    }
+    text
+}
 fn main() -> Result<()> {
     let cancel = CancellationToken::new();
     let signal_cancel = cancel.clone();

@@ -18,7 +18,9 @@ pub use sigma_admission::*;
 mod sigma_execution;
 pub use sigma_execution::*;
 mod sigma_notice;
+mod sigma_package;
 pub use sigma_notice::*;
+pub use sigma_package::*;
 mod sigma_objects;
 pub use sigma_objects::*;
 
@@ -29,6 +31,7 @@ pub const SIGMA_EVALUATOR_V4: &str = "irmind-sigma-evaluator-v4";
 
 pub(crate) fn uses_sigma_class_plan(evaluator: &str) -> bool {
     matches!(evaluator, SIGMA_EVALUATOR_V3 | SIGMA_EVALUATOR_V4)
+        || requires_sigma_case_admission(evaluator)
 }
 
 const RUN: &[u8] = b"irmind-sigma-run-v1\0";

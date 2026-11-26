@@ -1,10 +1,26 @@
 //! Public catalog downloads, invoked only by an explicit Analyst request.
 mod transport;
+#[cfg(feature = "sigma")]
+pub(super) async fn fetch_sigmahq(
+    url: &str,
+    limit: usize,
+    cancel: &CancellationToken,
+) -> Result<Vec<u8>, AppError> {
+    transport::fetch_sigmahq(url, limit, cancel).await
+}
 use irmind_app::catalog::{
     AnalystCatalogRequest, BoundedPackageBytes, CatalogAsset, CatalogIndexBytes,
     CatalogReleaseMetadata, PortFuture, SkillCatalogSource, VerifiedCatalogRelease,
 };
 use irmind_app::{AppError, CancellationToken};
+#[cfg(feature = "sigma")]
+pub(super) async fn fetch_sigma_asset(
+    url: &str,
+    limit: usize,
+    cancel: &CancellationToken,
+) -> Result<Vec<u8>, AppError> {
+    transport::fetch(url, limit, cancel).await
+}
 pub(super) struct GitHubCatalogSource;
 const REPOSITORY: &str = "ns2switch/irmind-skills";
 impl SkillCatalogSource for GitHubCatalogSource {

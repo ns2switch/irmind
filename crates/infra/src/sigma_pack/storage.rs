@@ -9,6 +9,9 @@ use irmind_app::{
         write_v10_object_section,
     },
 };
+mod installation;
+pub use installation::CatalogSigmaInstallApproval;
+
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs::{self, File},
@@ -32,6 +35,25 @@ impl LocalStore {
         cancel: &CancellationToken,
     ) -> Result<(), AppError> {
         let pack = inspect_local_sigma_pack(directory, cancel)?;
+        self.admit_sigma_contents(
+            engine,
+            &pack,
+            confirmed_manifest,
+            license,
+            (SigmaPackOriginV1::LocalDirectory, "Local directory"),
+            cancel,
+        )
+    }
+
+    pub(super) fn admit_sigma_contents(
+        &self,
+        engine: &Engine<'_>,
+        pack: &LocalSigmaPack,
+        confirmed_manifest: [u8; 32],
+        license: &str,
+        origin: (SigmaPackOriginV1, &str),
+        cancel: &CancellationToken,
+    ) -> Result<(), AppError> {
         let manifest = pack.manifest.encode().map_err(|_| invalid())?;
         if irmind_app::sha256(&manifest) != confirmed_manifest {
             return Err(AppError::Policy(
@@ -51,8 +73,8 @@ impl LocalStore {
         let receipt = SigmaPackAdmissionV1 {
             pack_manifest: confirmed_manifest,
             proof_set: v10_proof_commitment(family, &descriptors).map_err(|_| invalid())?,
-            origin: SigmaPackOriginV1::LocalDirectory,
-            origin_label: "Local directory".into(),
+            origin: origin.0,
+            origin_label: origin.1.into(),
             license: license.to_owned(),
         };
         engine.admit_sigma_pack(&receipt, |_, append| {
