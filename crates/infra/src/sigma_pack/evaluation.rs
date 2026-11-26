@@ -23,6 +23,9 @@ mod benchmark;
 mod coverage_fixtures;
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
+mod decimal_vectors;
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod exact_fields;
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
@@ -79,11 +82,13 @@ impl<'a> SigmaVariantPrograms<'a> {
                 })
             })
         });
+        let decimal = variant.has_decimal_projection();
         let mut programs = Self {
             variant,
             eligible: Vec::new(),
             skipped: Vec::new(),
-            needs_original: exact_cluster_field.is_some()
+            needs_original: decimal
+                || exact_cluster_field.is_some()
                 || variant.events.iter().any(|filter| filter.path.is_some()),
             used_fields: BTreeSet::new(),
             exact_cluster_field,
@@ -111,7 +116,8 @@ impl<'a> SigmaVariantPrograms<'a> {
                         }
                     }
                     programs.uses_exact.push(
-                        exact_binding.is_some_and(|binding| fields.contains(binding.name.as_str())),
+                        exact_binding.is_some_and(|binding| fields.contains(binding.name.as_str()))
+                            || (decimal && fields.contains("ResultType")),
                     );
                     programs.used_fields.extend(fields);
                     programs.eligible.push((key, program));
@@ -243,12 +249,37 @@ impl SigmaEvaluation<'_> {
                 return Ok(true);
             }
         }
-        let fields = project_fields(
+        let decimal = if self.programs.variant.has_decimal_projection() {
+            if !self.charge(1) {
+                return Ok(false);
+            }
+            Some(decimal_result_type(
+                original.and_then(|row| row.get("ResultType")),
+            ))
+        } else {
+            None
+        };
+        let decimal_unavailable = decimal.is_some_and(DecimalResult::unavailable);
+        if decimal_unavailable {
+            let count = self
+                .unavailable_by_source
+                .entry(common.origin().source().clone())
+                .or_default();
+            *count = count.checked_add(1).ok_or_else(invalid)?;
+        }
+        let mut fields = project_fields(
             self.programs.variant,
             &self.programs.used_fields,
             common,
             original,
         )?;
+        if let Some(DecimalResult::Number(number)) = decimal {
+            fields.insert(
+                "ResultType",
+                Projection::Single(SigmaScalar::Integer(number)),
+            );
+        }
+        let exact_unavailable = exact_unavailable || decimal_unavailable;
         for (index, (key, program)) in self.programs.eligible.iter().enumerate() {
             if exact_unavailable && self.programs.uses_exact[index] {
                 let Some(remaining) = self.remaining_units.checked_sub(1) else {
@@ -444,6 +475,41 @@ fn event_matches(
         }))
 }
 
+#[derive(Clone, Copy)]
+enum DecimalResult {
+    Number(i64),
+    Absent,
+    WrongType,
+    Invalid,
+    Overflow,
+}
+
+impl DecimalResult {
+    const fn unavailable(self) -> bool {
+        !matches!(self, Self::Number(_) | Self::Absent)
+    }
+}
+
+fn decimal_result_type(value: Option<&Value>) -> DecimalResult {
+    let Some(value) = value.filter(|value| !value.is_null()) else {
+        return DecimalResult::Absent;
+    };
+    let Some(text) = value.as_str() else {
+        return DecimalResult::WrongType;
+    };
+    if text.len() > 6 {
+        return DecimalResult::Overflow;
+    }
+    if text.is_empty()
+        || (text.len() > 1 && text.starts_with('0'))
+        || !text.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return DecimalResult::Invalid;
+    }
+    text.parse()
+        .map_or(DecimalResult::Invalid, DecimalResult::Number)
+}
+
 fn project_fields<'a>(
     variant: &'a SigmaSourceVariant,
     used: &BTreeSet<&str>,
@@ -453,7 +519,7 @@ fn project_fields<'a>(
     variant
         .fields
         .iter()
-        .filter(|binding| used.contains(binding.name.as_str()))
+        .filter(|binding| binding.projection.is_none() && used.contains(binding.name.as_str()))
         .map(|binding| {
             let value = if let Some(column) = &binding.column {
                 project_common(common, column)?

@@ -7,7 +7,39 @@ mapping_id = "mapping-entra-signin-table"
 mapping_version = "@entra-v1-"
 dataset = "entra-signin-table"
 events = [
-  { path = ["Type"], one_of = ["SigninLogs", "AADNonInteractiveUserSignInLogs", "AADServicePrincipalSignInLogs", "AADManagedIdentitySignInLogs"] },
+  { path = ["Type"], equals = "SigninLogs" },
+]
+fields = [
+  { name = "ResultType", path = ["ResultType"], value_type = "integer", null_policy = "absent", projection = "azure_signin_result_type_decimal_v1" },
+  { name = "IPAddress", column = "source.ip", value_type = "ip", null_policy = "absent" },
+  { name = "UserPrincipalName", path = ["UserPrincipalName"], value_type = "text", null_policy = "absent" },
+  { name = "AppId", path = ["AppId"], value_type = "text", null_policy = "absent" },
+  { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "AuthenticationRequirement", path = ["AuthenticationRequirement"], value_type = "text", null_policy = "absent" },
+  { name = "ResultDescription", path = ["ResultDescription"], value_type = "text", null_policy = "absent" },
+  { name = "UserAgent", path = ["UserAgent"], value_type = "text", null_policy = "absent" },
+  { name = "userAgent", path = ["UserAgent"], value_type = "text", null_policy = "absent" },
+  { name = "ResourceDisplayName", path = ["ResourceDisplayName"], value_type = "text", null_policy = "absent" },
+  { name = "Location", path = ["Location"], value_type = "text", null_policy = "absent" },
+  { name = "ConditionalAccessStatus", path = ["ConditionalAccessStatus"], value_type = "text", null_policy = "absent" },
+  { name = "conditionalAccessStatus", path = ["ConditionalAccessStatus"], value_type = "text", null_policy = "absent" },
+  { name = "RiskState", path = ["RiskState"], value_type = "text", null_policy = "absent" },
+  { name = "DeviceDetail.trusttype", path = ["DeviceDetail", "trusttype"], value_type = "text", null_policy = "absent" },
+  { name = "DeviceDetail.operatingSystem", path = ["DeviceDetail", "operatingSystem"], value_type = "text", null_policy = "absent" },
+  { name = "Status.failureReason", path = ["Status", "failureReason"], value_type = "text", null_policy = "absent" },
+  { name = "Status.errorCode", path = ["Status", "errorCode"], value_type = "integer", null_policy = "absent" },
+]
+
+[[variants]]
+product = "azure"
+service = "signinlogs"
+parser_id = "parser-entra"
+parser_version = "entra-source-v1"
+mapping_id = "mapping-entra-signin-table"
+mapping_version = "@entra-v1-"
+dataset = "entra-signin-table"
+events = [
+  { path = ["Type"], one_of = ["AADNonInteractiveUserSignInLogs", "AADServicePrincipalSignInLogs", "AADManagedIdentitySignInLogs"] },
 ]
 fields = [
   { name = "ResultType", path = ["ResultType"], value_type = "text", null_policy = "absent" },

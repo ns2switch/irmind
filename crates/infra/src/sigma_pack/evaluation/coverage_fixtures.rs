@@ -356,8 +356,8 @@ const IDENTITY_EXAMPLES: [(&str, &str, &str, &str, EventCategory); 5] = [
     (
         "entra-signin-table",
         ENTRA,
-        "{ResultType: '50076', UserPrincipalName: analyst@example.invalid}",
-        "{ResultType: '0'}",
+        "{ResultType: 50076, UserPrincipalName: analyst@example.invalid}",
+        "{ResultType: 0}",
         EventCategory::Authentication,
     ),
     (
