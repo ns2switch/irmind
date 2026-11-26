@@ -261,6 +261,7 @@ impl Engine<'_> {
             }
             prev = self.verify_chain_entry(id, index, prev, entry)?;
         }
+        crate::v10_proofs::verify_sigma_case_admission_pairs(&entries)?;
         if entries
             .iter()
             .any(|entry| entry.kind == crate::AuditEventKind::SigmaRunV1)

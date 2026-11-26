@@ -520,6 +520,20 @@ fn approved_sigma_case_admission_binds_the_following_run() {
     assert!(
         SigmaCaseRunAdmissionV1::verify_following_run(&entry, &run, admission.manifest).is_ok()
     );
+    use irmind_app::v10_proofs::verify_sigma_case_admission_pairs;
+    let mut following = entry.clone();
+    following.seq += 1;
+    following.kind = irmind_domain::AuditEventKind::SigmaRunV1;
+    following.prev = entry.hash;
+    following.payload = run.encode().unwrap();
+    assert!(verify_sigma_case_admission_pairs(&[entry.clone(), following.clone()]).is_ok());
+    assert!(verify_sigma_case_admission_pairs(std::slice::from_ref(&following)).is_err());
+    assert!(verify_sigma_case_admission_pairs(std::slice::from_ref(&entry)).is_err());
+    let mut downgraded = following;
+    let mut ungated = run.clone();
+    ungated.evaluator = irmind_app::v10_proofs::SIGMA_EVALUATOR_V3.into();
+    downgraded.payload = ungated.encode().unwrap();
+    assert!(verify_sigma_case_admission_pairs(&[entry.clone(), downgraded]).is_err());
     assert!(SigmaCaseRunAdmissionV1::verify_following_run(&entry, &run, [0; 32]).is_err());
     run.selected_sources[0] ^= 1;
     assert!(

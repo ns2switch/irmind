@@ -395,6 +395,34 @@ pub fn decode_sigma_installation_operation(
     SigmaPackageInstallationV1::decode(&raw).map_err(|_| invalid())
 }
 
+/// Reject orphaned and misversioned case admissions after chain verification.
+pub fn verify_sigma_case_admission_pairs(
+    entries: &[crate::SignedEntry],
+) -> std::result::Result<(), crate::AppError> {
+    use crate::{AppError, AuditEventKind};
+    for (index, entry) in entries.iter().enumerate() {
+        if entry.kind == AuditEventKind::SigmaCaseRunAdmissionV1 {
+            let admission = SigmaCaseRunAdmissionV1::from_case_entry(entry)?;
+            let following = entries
+                .get(index + 1)
+                .ok_or(AppError::InvalidChain(entry.seq))?;
+            let run = super::sigma_execution(following)?;
+            SigmaCaseRunAdmissionV1::verify_following_run(entry, &run, admission.manifest)?;
+        } else if entry.kind == AuditEventKind::SigmaRunV1 {
+            let run = super::sigma_execution(entry)?;
+            if run.evaluator == SIGMA_EVALUATOR_V3_CASE_ADMISSION
+                && index
+                    .checked_sub(1)
+                    .and_then(|before| entries.get(before))
+                    .is_none_or(|before| before.kind != AuditEventKind::SigmaCaseRunAdmissionV1)
+            {
+                return Err(AppError::InvalidChain(entry.seq));
+            }
+        }
+    }
+    Ok(())
+}
+
 impl crate::Engine<'_> {
     /// Read the latest operation after authenticating the complete global chain.
     pub fn local_sigma_package_operation(

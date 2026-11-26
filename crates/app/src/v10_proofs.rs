@@ -27,6 +27,13 @@ pub use sigma_objects::*;
 const ADMISSION: &[u8] = b"irmind-sigma-pack-admission-v1\0";
 pub const SIGMA_EVALUATOR_V2: &str = "irmind-sigma-evaluator-v2";
 pub const SIGMA_EVALUATOR_V3: &str = "irmind-sigma-evaluator-v3";
+pub(crate) fn uses_sigma_class_plan(evaluator: &str) -> bool {
+    matches!(
+        evaluator,
+        SIGMA_EVALUATOR_V3 | SIGMA_EVALUATOR_V3_CASE_ADMISSION
+    )
+}
+
 const RUN: &[u8] = b"irmind-sigma-run-v1\0";
 const REPORT: &[u8] = b"irmind-report-published-v1\0";
 const MAX_LABEL: usize = 256;
@@ -260,7 +267,7 @@ impl SigmaRunV1 {
         if self.start_utc_micros >= self.end_utc_micros
             || self.used_units > self.reserved_units
             || (self.status == SigmaRunStatusV1::CoverageLimited
-                && self.evaluator != SIGMA_EVALUATOR_V3)
+                && !uses_sigma_class_plan(&self.evaluator))
         {
             return Err(INVALID);
         }

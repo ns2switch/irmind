@@ -18,6 +18,21 @@ pub struct SigmaPackageMetadata {
     pub attribution: String,
 }
 
+impl SigmaPackageMetadata {
+    pub fn decode_proof(bytes: &[u8]) -> Result<Self, AppError> {
+        if bytes.is_empty() || bytes.len() > MAX_METADATA {
+            return Err(invalid());
+        }
+        let metadata: Self = serde_json::from_slice(bytes).map_err(|_| invalid())?;
+        if !valid_metadata(&metadata)
+            || serde_json::to_vec(&metadata).map_err(|_| invalid())? != bytes
+        {
+            return Err(invalid());
+        }
+        Ok(metadata)
+    }
+}
+
 pub struct SigmaPackageBundle {
     pub metadata: SigmaPackageMetadata,
     pub metadata_sha256: [u8; 32],
@@ -35,13 +50,7 @@ pub fn inspect_sigma_package_bundle(
     check_cancel(cancel)?;
     let mut body = input.strip_prefix(DOMAIN).ok_or_else(invalid)?;
     let metadata_bytes = frame(&mut body, MAX_METADATA)?;
-    let metadata: SigmaPackageMetadata =
-        serde_json::from_slice(metadata_bytes).map_err(|_| invalid())?;
-    if !valid_metadata(&metadata)
-        || serde_json::to_vec(&metadata).map_err(|_| invalid())? != metadata_bytes
-    {
-        return Err(invalid());
-    }
+    let metadata = SigmaPackageMetadata::decode_proof(metadata_bytes)?;
     let manifest_bytes = frame(&mut body, MAX_MANIFEST)?;
     let manifest = SigmaPackManifestV1::decode(manifest_bytes).map_err(|_| invalid())?;
     let mut paths = BTreeSet::new();
