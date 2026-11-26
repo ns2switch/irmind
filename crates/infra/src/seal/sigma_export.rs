@@ -55,7 +55,29 @@ impl SigmaArchive {
                 let operation = signed
                     .get(&run.pack_admission)
                     .ok_or(AppError::InvalidChain(entry.seq))?;
-                archive.add_run(store, case, &run, operation, &verifier, cancel)?;
+                let install =
+                    if irmind_app::v10_proofs::requires_sigma_case_admission(&run.evaluator) {
+                        use irmind_app::v10_proofs::SigmaCaseRunAdmissionV1;
+                        let index = entries
+                            .binary_search_by_key(&run.checkpoint.sequence, |entry| entry.seq)
+                            .map_err(|_| AppError::InvalidChain(entry.seq))?;
+                        let pack = irmind_app::v10_proofs::sigma_pack_operation(operation)?
+                            .ok_or(AppError::InvalidChain(entry.seq))?;
+                        let claim = SigmaCaseRunAdmissionV1::verify_following_run(
+                            &entries[index],
+                            &run,
+                            pack.pack_manifest,
+                        )?;
+                        claim
+                            .installation
+                            .map(|digest| {
+                                signed.get(&digest).ok_or(AppError::InvalidChain(entry.seq))
+                            })
+                            .transpose()?
+                    } else {
+                        None
+                    };
+                archive.add_run(store, case, &run, operation, install, &verifier, cancel)?;
             }
             Ok(archive)
         }
@@ -79,12 +101,17 @@ impl SigmaArchive {
     }
 
     #[cfg(feature = "sigma")]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the export uses the authenticated case and operation readers"
+    )]
     fn add_run(
         &mut self,
         store: &LocalStore,
         case: &CaseId,
         run: &irmind_app::v10_proofs::SigmaRunV1,
         operation: &SignedOperation,
+        install: Option<&SignedOperation>,
         verifier: &crate::LocalVerifier,
         cancel: &CancellationToken,
     ) -> Result<(), AppError> {
@@ -92,7 +119,11 @@ impl SigmaArchive {
         use std::io::Read as _;
         let family = V10ProofFamily::Sigma;
         let invalid = || AppError::InvalidChain(run.checkpoint.sequence);
-        self.add_pack(store, operation, verifier, cancel)?;
+        if let Some(install) = install {
+            self.add_case_package(store, case, operation, install, verifier, cancel)?;
+        } else {
+            self.add_pack(store, operation, verifier, cancel)?;
+        }
         let fields = [
             (2, run.field_table),
             (3, run.selected_sources),
@@ -115,6 +146,58 @@ impl SigmaArchive {
         if v10_proof_commitment(family, &descriptors).map_err(|_| invalid())? != run.proof_set {
             return Err(invalid());
         }
+        Ok(())
+    }
+
+    #[cfg(feature = "sigma")]
+    fn add_case_package(
+        &mut self,
+        store: &LocalStore,
+        case: &CaseId,
+        operation: &SignedOperation,
+        installation: &SignedOperation,
+        verifier: &crate::LocalVerifier,
+        cancel: &CancellationToken,
+    ) -> Result<(), AppError> {
+        use irmind_app::v10_proofs::{
+            SigmaPackManifestV1, SigmaPackageOriginV1, verify_sigma_installation_proof,
+            verify_sigma_pack_operation,
+        };
+        let fail = || AppError::InvalidChain(0);
+        let proof = serde_json::to_vec(installation).map_err(|_| fail())?;
+        let installed = verify_sigma_installation_proof(&proof, installation.hash, verifier)?;
+        let admission = verify_sigma_pack_operation(operation, verifier)?;
+        if installed.manifest != admission.pack_manifest || installed.license != admission.license {
+            return Err(fail());
+        }
+        let family = V10ProofFamily::Sigma;
+        let manifest =
+            store.read_addressed_v10_proof(case, family, 0, installed.manifest, cancel)?;
+        let rules = SigmaPackManifestV1::decode(&manifest).map_err(|_| fail())?;
+        let mut keys = vec![
+            (0, installed.manifest),
+            (6, irmind_app::sha256(&proof)),
+            (8, installed.metadata),
+        ];
+        keys.extend(rules.0.iter().map(|entry| (1, entry.rule.sha256)));
+        if let SigmaPackageOriginV1::CatalogAsset(hash)
+        | SigmaPackageOriginV1::SigmaHqArchive(hash) = installed.origin
+        {
+            keys.push((7, hash));
+        }
+        for (kind, hash) in keys {
+            use std::io::Read as _;
+            let (descriptor, file) =
+                store.open_addressed_v10_proof(case, family, kind, hash, cancel)?;
+            self.insert(descriptor, || {
+                let mut body = Vec::new();
+                file.take(descriptor.size())
+                    .read_to_end(&mut body)
+                    .map_err(super::storage)?;
+                Ok(body)
+            })?;
+        }
+        self.operations.insert(operation.hash, operation.clone());
         Ok(())
     }
 

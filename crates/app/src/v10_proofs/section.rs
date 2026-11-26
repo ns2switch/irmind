@@ -60,6 +60,12 @@ impl V10ObjectSection {
             .ok_or_else(invalid)
     }
 
+    pub fn descriptors_of_kind(&self, kind: u8) -> impl Iterator<Item = V10ProofDescriptor> + '_ {
+        self.objects
+            .range((kind, [0; 32])..=(kind, [u8::MAX; 32]))
+            .map(|(_, (_, descriptor))| *descriptor)
+    }
+
     pub fn body(
         &self,
         input: &mut (impl Read + Seek),

@@ -3,9 +3,9 @@
 #![allow(clippy::unwrap_used)]
 
 use irmind_app::v10_proofs::{
-    ReportCitationsV1, ReportCoverageV2, ReportMediaV1, ReportPublishedV1, SIGMA_EVALUATOR_V3,
-    SIGMA_EVALUATOR_V4, SigmaPackManifestV1, SigmaPackRuleV1, SigmaRuleKeyV1, SigmaRunResultsV3,
-    SigmaRunV1, V10Citation,
+    ReportCitationsV1, ReportCoverageV2, ReportMediaV1, ReportPublishedV1, SIGMA_EVALUATOR_V4,
+    SIGMA_EVALUATOR_V4_CASE_ADMISSION, SigmaCaseRunAdmissionV1, SigmaPackManifestV1,
+    SigmaPackRuleV1, SigmaRuleKeyV1, SigmaRunResultsV3, SigmaRunV1, V10Citation,
 };
 use irmind_app::{SignerBackend, hex, sha256};
 use irmind_domain::{Actor, AuditEventKind, CaseId, SourceManifestV2};
@@ -303,18 +303,38 @@ fn evaluate(
     cli: &impl Fn(&[&str]) -> String,
 ) -> String {
     let mut ui = open_tui(binary, home, case);
-    ui.send(format!("/sigma inspect {}\r", pack.display()))
+    if scenario.name == "cloudtrail" {
+        let bundle = pack.join("synthetic.sigma");
+        write_installed_bundle(&bundle, scenario);
+        ui.send(format!("/sigma install {}\r", bundle.display()))
+            .unwrap();
+        ui.expect("Install Sigma package synthetic-release 1.0.0")
+            .unwrap();
+        ui.send("2\r").unwrap();
+        ui.expect("Sigma package synthetic-release is active")
+            .unwrap();
+        ui.send(format!(
+            "/sigma run synthetic-release {}\r",
+            scenario.time_range
+        ))
         .unwrap();
-    expect_result(&mut ui, "1 validated rules");
-    let digest = pack_digest(scenario);
-    ui.expect(&digest).unwrap();
-    ui.send(format!("/sigma import --license MIT {}\r", pack.display()))
-        .unwrap();
-    ui.expect("Sign Sigma pack admission").unwrap();
-    ui.send("2\r").unwrap();
-    ui.expect("Sigma pack admitted").unwrap();
-    ui.send(format!("/sigma run {digest} {}\r", scenario.time_range))
-        .unwrap();
+        ui.expect("Sign case admission for Sigma package synthetic-release")
+            .unwrap();
+        ui.send("2\r").unwrap();
+    } else {
+        ui.send(format!("/sigma inspect {}\r", pack.display()))
+            .unwrap();
+        expect_result(&mut ui, "1 validated rules");
+        let digest = hex(&sha256(&pack_manifest(scenario)));
+        ui.expect(&digest).unwrap();
+        ui.send(format!("/sigma import --license MIT {}\r", pack.display()))
+            .unwrap();
+        ui.expect("Sign Sigma pack admission").unwrap();
+        ui.send("2\r").unwrap();
+        ui.expect("Sigma pack admitted").unwrap();
+        ui.send(format!("/sigma run {digest} {}\r", scenario.time_range))
+            .unwrap();
+    }
     ui.expect("Sigma run complete").unwrap();
     quit(&mut ui);
 
@@ -332,8 +352,8 @@ fn evaluate(
     proposals[0].split_whitespace().next().unwrap().to_owned()
 }
 
-fn pack_digest(scenario: &Scenario) -> String {
-    let manifest = SigmaPackManifestV1(vec![SigmaPackRuleV1 {
+fn pack_manifest(scenario: &Scenario) -> Vec<u8> {
+    SigmaPackManifestV1(vec![SigmaPackRuleV1 {
         path: RULE_FILE.into(),
         rule: SigmaRuleKeyV1 {
             id: scenario.rule_id.into(),
@@ -342,8 +362,21 @@ fn pack_digest(scenario: &Scenario) -> String {
         version: None,
         author: None,
         size: scenario.rule.len() as u64,
-    }]);
-    hex(&sha256(&manifest.encode().unwrap()))
+    }])
+    .encode()
+    .unwrap()
+}
+
+fn write_installed_bundle(path: &Path, scenario: &Scenario) {
+    let metadata = br#"{"format_version":1,"name":"synthetic-release","version":"1.0.0","license":"MIT","attribution":"Release test"}"#;
+    let manifest = pack_manifest(scenario);
+    let mut bundle = b"irmind-sigma-package-v1\0".to_vec();
+    for frame in [metadata.as_slice(), manifest.as_slice()] {
+        bundle.extend((frame.len() as u64).to_be_bytes());
+        bundle.extend(frame);
+    }
+    bundle.extend(scenario.rule.as_bytes());
+    fs::write(path, bundle).unwrap();
 }
 
 fn publish(binary: &Path, home: &Path, case: &str) {
@@ -431,7 +464,11 @@ fn assert_package(bytes: &[u8], finding: &str, scenario: &Scenario) {
     let runs = payloads("sigma-run-v1").collect::<Vec<_>>();
     assert_eq!(runs.len(), 1);
     let run = SigmaRunV1::decode(runs[0]).unwrap();
-    assert_eq!(run.evaluator, expected_evaluator());
+    assert_evaluator(
+        &run,
+        scenario,
+        &payloads("sigma-case-run-admission-v1").collect::<Vec<_>>(),
+    );
     assert_eq!(run.matched_rows, 1);
     assert_eq!(
         run.status,
@@ -513,10 +550,26 @@ fn assert_report_objects(
     }
 }
 
-fn expected_evaluator() -> &'static str {
-    if cfg!(feature = "parser-entra") {
-        SIGMA_EVALUATOR_V4
+fn assert_evaluator(run: &SigmaRunV1, scenario: &Scenario, case_admissions: &[&str]) {
+    // The harness builds with minimal features. The staged release executable
+    // supplies Entra's field table and therefore uses the V4 evaluator.
+    if scenario.name == "cloudtrail" {
+        assert_eq!(run.evaluator, SIGMA_EVALUATOR_V4_CASE_ADMISSION);
+        assert_eq!(case_admissions.len(), 1);
+        let admission = SigmaCaseRunAdmissionV1::decode(&decode_hex(case_admissions[0])).unwrap();
+        assert_eq!(admission.evaluator, run.evaluator);
+        assert!(admission.installation.is_some());
+        assert_eq!(admission.manifest, sha256(&pack_manifest(scenario)));
     } else {
-        SIGMA_EVALUATOR_V3
+        assert_eq!(run.evaluator, SIGMA_EVALUATOR_V4);
+        assert!(case_admissions.is_empty());
     }
+}
+
+fn decode_hex(text: &str) -> Vec<u8> {
+    assert!(text.len().is_multiple_of(2));
+    text.as_bytes()
+        .chunks_exact(2)
+        .map(|chunk| u8::from_str_radix(std::str::from_utf8(chunk).unwrap(), 16).unwrap())
+        .collect()
 }

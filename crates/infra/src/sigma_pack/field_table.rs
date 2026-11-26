@@ -104,7 +104,11 @@ impl ReviewedSigmaFieldTable {
     ) -> Result<Self, AppError> {
         let table = Self::parse(object)?;
         if table.has_decimal_projection()
-            != (evaluator == irmind_app::v10_proofs::SIGMA_EVALUATOR_V4)
+            != matches!(
+                evaluator,
+                irmind_app::v10_proofs::SIGMA_EVALUATOR_V4
+                    | irmind_app::v10_proofs::SIGMA_EVALUATOR_V4_CASE_ADMISSION
+            )
         {
             return Err(invalid());
         }

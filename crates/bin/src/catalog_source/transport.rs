@@ -6,6 +6,24 @@ pub(super) async fn fetch(
     limit: usize,
     cancel: &CancellationToken,
 ) -> Result<Vec<u8>, AppError> {
+    fetch_with_scope(initial, limit, cancel, destination).await
+}
+
+#[cfg(feature = "sigma")]
+pub(super) async fn fetch_sigmahq(
+    initial: &str,
+    limit: usize,
+    cancel: &CancellationToken,
+) -> Result<Vec<u8>, AppError> {
+    fetch_with_scope(initial, limit, cancel, sigmahq_destination).await
+}
+
+async fn fetch_with_scope(
+    initial: &str,
+    limit: usize,
+    cancel: &CancellationToken,
+    permits: fn(&str, &str) -> bool,
+) -> Result<Vec<u8>, AppError> {
     let client = irmind_http::client_builder(Duration::from_secs(30), true)
         .build()
         .map_err(|_| failed())?;
@@ -38,7 +56,7 @@ pub(super) async fn fetch(
             || !url.username().is_empty()
             || url.password().is_some()
             || url.port().is_some_and(|port| port != 443)
-            || !destination(url.host_str().unwrap_or_default(), url.path())
+            || !permits(url.host_str().unwrap_or_default(), url.path())
         {
             return Err(failed());
         }
@@ -96,6 +114,18 @@ fn destination(host: &str, path: &str) -> bool {
         _ => false,
     }
 }
+#[cfg(feature = "sigma")]
+fn sigmahq_destination(host: &str, path: &str) -> bool {
+    if path.contains('%') || path.contains('\\') {
+        return false;
+    }
+    match host {
+        "github.com" => path.starts_with("/SigmaHQ/sigma/releases/download/"),
+        "release-assets.githubusercontent.com" | "objects.githubusercontent.com" => true,
+        _ => false,
+    }
+}
+
 fn failed() -> AppError {
     AppError::Policy("Catalog download failed its TLS, destination, timeout or size checks; retry or use an offline package.".into())
 }

@@ -142,6 +142,13 @@ pub(super) type SigmaRowPredicate<'a> = dyn FnMut(
     ) -> Result<(), AppError>
     + 'a;
 
+#[path = "sigma_package_proofs.rs"]
+mod package_proofs;
+
+#[expect(
+    clippy::too_many_lines,
+    reason = "authenticate all referenced proof material in one bounded pass"
+)]
 pub(super) fn verify_sigma(
     objects: &mut (impl Read + Seek),
     section: &V10ObjectSection,
@@ -155,6 +162,8 @@ pub(super) fn verify_sigma(
     ) -> Result<(), AppError>,
     cancel: &CancellationToken,
 ) -> Result<(), AppError> {
+    irmind_app::v10_proofs::verify_sigma_case_admission_pairs(entries)?;
+    let installations = package_proofs::collect(section, objects, operations, cancel)?;
     irmind_app::v10_proofs::sigma_remaining_work(entries)?;
     let mut referenced = BTreeSet::new();
     let mut admissions = BTreeSet::new();
@@ -187,6 +196,28 @@ pub(super) fn verify_sigma(
             .any(|variant| *variant >= table.variants.len() as u64)
         {
             return Err(AppError::InvalidChain(entry.seq));
+        }
+        if irmind_app::v10_proofs::requires_sigma_case_admission(&run.evaluator) {
+            let idx = entries
+                .binary_search_by_key(&run.checkpoint.sequence, |candidate| candidate.seq)
+                .map_err(|_| AppError::InvalidChain(entry.seq))?;
+            let manifest = admission.pack_manifest;
+            let claim = irmind_app::v10_proofs::SigmaCaseRunAdmissionV1::verify_following_run(
+                &entries[idx],
+                &run,
+                manifest,
+            )?;
+            if let Some(digest) = claim.installation {
+                package_proofs::verify(
+                    section,
+                    objects,
+                    &installations,
+                    digest,
+                    manifest,
+                    &mut referenced,
+                    cancel,
+                )?;
+            }
         }
         materials.verify_execution_scope(&run, operation, entries)?;
         #[cfg(feature = "sigma")]

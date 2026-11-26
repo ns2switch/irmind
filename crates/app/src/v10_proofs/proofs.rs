@@ -22,6 +22,9 @@ impl V10ProofFamily {
     fn body_limit(self, kind: u8) -> Result<u64> {
         match (self, kind) {
             (Self::Sigma, 1) => Ok(64 * 1024),
+            (Self::Sigma, 6) => Ok(32 * 1024),
+            (Self::Sigma, 7) => Ok(crate::catalog::MAX_CATALOG_INDEX_BYTES as u64 + 128),
+            (Self::Sigma, 8) => Ok(8 * 1024),
             (Self::Sigma, 2) => Ok(512 * 1024),
             (Self::Sigma, 0 | 3..=5) | (Self::Report, 0..=3) => Ok(MAX_OBJECT_BYTES),
             _ => Err(INVALID),

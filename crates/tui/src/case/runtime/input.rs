@@ -666,7 +666,10 @@ impl CaseRuntime<'_, '_, '_> {
                     Confirmation::RecoverSubagents(_) => "/subagents recover".into(),
                     Confirmation::Export(command, _)
                     | Confirmation::ObjectRead(command, _)
-                    | Confirmation::SigmaImport { command, .. } => command.clone(),
+                    | Confirmation::SigmaImport { command, .. }
+                    | Confirmation::SigmaPackageChange { command, .. }
+                    | Confirmation::SigmaRunInstalled { command, .. }
+                    | Confirmation::SigmaRemove { command, .. } => command.clone(),
                 };
                 self.state.confirmed_action = Some(pending);
                 return Ok(Some(KeyCode::Enter));

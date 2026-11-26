@@ -7,6 +7,7 @@ license = "MIT OR Apache-2.0"
 
 [features]
 export = ["dep:irmind-infra"]
+sigma-zip = ["export", "irmind-infra/sigma"]
 
 [package.metadata]
 cargo-fuzz = true
@@ -395,6 +396,15 @@ required-features = ["export"]
 test = false
 doc = false
 bench = false
+
+
+[[bin]]
+name = "sigma_catalog_zip"
+path = "fuzz_targets/sigma_catalog_zip.rs"
+test = false
+doc = false
+bench = false
+required-features = ["sigma-zip"]
 
 [[bin]]
 name = "sigma_run_results_v3"

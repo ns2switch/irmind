@@ -6,6 +6,22 @@ pub(super) enum Confirmation {
     Export(String, String),
     ObjectRead(String, String),
     RecoverSubagents(String),
+    SigmaPackageChange {
+        command: String,
+        preview: Box<crate::SigmaPackagePreview>,
+    },
+    SigmaRunInstalled {
+        command: String,
+        selection: irmind_app::v10_proofs::InstalledSigmaRunSelection,
+        time: std::ops::Range<i64>,
+        detail: String,
+    },
+    SigmaRemove {
+        command: String,
+        name: String,
+        previous: [u8; 32],
+        detail: String,
+    },
     SigmaImport {
         command: String,
         directory: std::path::PathBuf,
@@ -18,11 +34,14 @@ pub(super) enum Confirmation {
 impl Confirmation {
     pub(super) fn detail(&self) -> &str {
         match self {
+            Self::SigmaPackageChange { preview, .. } => &preview.detail,
             Self::Seal(_, detail)
             | Self::Export(_, detail)
             | Self::ObjectRead(_, detail)
             | Self::RecoverSubagents(detail)
-            | Self::SigmaImport { detail, .. } => detail,
+            | Self::SigmaImport { detail, .. }
+            | Self::SigmaRemove { detail, .. }
+            | Self::SigmaRunInstalled { detail, .. } => detail,
         }
     }
 }

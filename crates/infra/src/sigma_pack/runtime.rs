@@ -30,7 +30,245 @@ use std::{
 use irmind_app::v10_proofs::SigmaRunStatusV1;
 type RunObjects = Vec<(V10ProofDescriptor, Vec<u8>)>;
 
+pub struct InstalledSigmaCoverage {
+    pub receipt: irmind_app::v10_proofs::SigmaPackageInstallationV1,
+    pub checkpoint: Option<[u8; 32]>,
+    pub coverage: Option<irmind_app::v10_proofs::SigmaClassCoverage>,
+    pub skipped_classes: Vec<(String, usize, usize)>,
+}
+
 impl LocalStore {
+    pub fn sigma_package_coverage(
+        &self,
+        engine: &Engine<'_>,
+        case: &CaseId,
+        name: &str,
+        cancel: &CancellationToken,
+    ) -> Result<InstalledSigmaCoverage, AppError> {
+        let mut installed = engine.sigma_installations()?;
+        let (receipt, operation) = installed
+            .remove(name)
+            .ok_or_else(|| AppError::Policy("No installed Sigma package with that name".into()))?;
+        if !receipt.active {
+            return Ok(InstalledSigmaCoverage {
+                receipt,
+                checkpoint: None,
+                coverage: None,
+                skipped_classes: Vec::new(),
+            });
+        }
+        let bundle = self
+            .open_local_sigma_package(engine, name, cancel)?
+            .ok_or_else(invalid)?;
+        if engine
+            .local_sigma_package_operation(name)?
+            .is_none_or(|head| head.hash != operation.hash)
+        {
+            return Err(AppError::Policy(
+                "Sigma package changed while computing coverage".into(),
+            ));
+        }
+        let entries = self.entries(case)?;
+        let head = entries.last().ok_or_else(invalid)?;
+        engine.verify_cancelable(case, cancel)?;
+        if self
+            .entries(case)?
+            .last()
+            .is_none_or(|entry| entry.hash != head.hash)
+        {
+            return Err(AppError::Policy(
+                "Case changed while computing Sigma coverage".into(),
+            ));
+        }
+        let checkpoint = irmind_app::v10_proofs::CaseCheckpointV1 {
+            case_id: case.clone(),
+            sequence: head.seq,
+            entry_hash: head.hash,
+        };
+        let view = irmind_app::v10_proofs::V10CheckpointView::resolve(&entries, &checkpoint)?;
+        let mapping = self.parquet.mapping_catalog().ok_or_else(invalid)?;
+        let (_, table) =
+            ReviewedSigmaFieldTable::materialize_native(enrolled_field_table(), mapping)?;
+        let work = Workset::resolve(
+            &SigmaExecutionContext {
+                view,
+                checkpoint: checkpoint.clone(),
+                reserved: 0,
+            },
+            &table,
+            mapping,
+        )?;
+        let mut rules = bundle
+            .pack
+            .manifest
+            .0
+            .iter()
+            .zip(&bundle.pack.rules)
+            .map(|(rule, raw)| (rule.rule.clone(), raw.as_slice()))
+            .collect::<Vec<_>>();
+        rules.sort_unstable_by(|left, right| left.0.cmp(&right.0));
+        let (plan, compiled, _) = plan::compile(
+            &table,
+            &work.variants,
+            &rules,
+            Instant::now() + Duration::from_secs(10),
+            cancel,
+        )?;
+        let skipped_classes = plan::skipped_classes(&plan, &table, compiled.0.len())?;
+        Ok(InstalledSigmaCoverage {
+            receipt,
+            checkpoint: Some(checkpoint.entry_hash),
+            coverage: Some(plan.coverage()),
+            skipped_classes,
+        })
+    }
+
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the reviewed installation, retained proofs and signed case transaction are bound together"
+    )]
+    pub fn run_installed_sigma(
+        &self,
+        engine: &Engine<'_>,
+        case: &CaseId,
+        selection: &irmind_app::v10_proofs::InstalledSigmaRunSelection,
+        time: Range<i64>,
+        cancel: &CancellationToken,
+    ) -> Result<SigmaExecutionSummary, AppError> {
+        use irmind_app::v10_proofs::SigmaPackOriginV1;
+        if engine.repo.get_case(case)?.sealed {
+            return Err(AppError::Sealed);
+        }
+        if time.is_empty() {
+            return Err(AppError::Policy(
+                "Sigma requires an increasing UTC time range".into(),
+            ));
+        }
+        let installed = engine
+            .sigma_installations()?
+            .remove(&selection.name)
+            .filter(|(receipt, operation)| {
+                receipt.active && operation.hash == selection.installation
+            })
+            .ok_or_else(|| AppError::Policy("Sigma installation changed after review".into()))?;
+        let (receipt, installation) = installed;
+        let bundle = self
+            .open_local_sigma_package(engine, &selection.name, cancel)?
+            .ok_or_else(invalid)?;
+        if bundle.asset_sha256 != receipt.asset
+            || bundle.metadata_sha256 != receipt.metadata
+            || bundle.manifest_sha256 != receipt.manifest
+            || self
+                .entries(case)?
+                .last()
+                .is_none_or(|entry| entry.hash != selection.case_head)
+        {
+            return Err(invalid());
+        }
+        if engine.admitted_sigma_pack(receipt.manifest)?.is_none() {
+            self.admit_sigma_contents(
+                engine,
+                &bundle.pack,
+                receipt.manifest,
+                &receipt.license,
+                (
+                    SigmaPackOriginV1::PinnedReleaseArchive(receipt.asset),
+                    "Installed Sigma package",
+                ),
+                cancel,
+            )?;
+        }
+        let mut retained =
+            self.retain_sigma_package_material(&bundle, &receipt, &installation, cancel)?;
+        engine.execute_installed_sigma(
+            case,
+            receipt.manifest,
+            selection,
+            cancel,
+            |scope, operation| {
+                let admitted = sigma_pack_operation(operation)?.ok_or_else(invalid)?;
+                if admitted.license != receipt.license {
+                    return Err(AppError::Policy(
+                        "Installed license differs from the signed rule admission".into(),
+                    ));
+                }
+                let mapping = self.parquet.mapping_catalog().ok_or_else(invalid)?;
+                let mut candidate = prepare(
+                    scope,
+                    mapping,
+                    &bundle.pack,
+                    operation.hash,
+                    &self.parquet.owned_case_path(case),
+                    time,
+                    cancel,
+                )?;
+                candidate.material.append(&mut retained);
+                candidate
+                    .material
+                    .sort_unstable_by_key(|(descriptor, _)| *descriptor);
+                crate::seal::check_sigma_append(
+                    self,
+                    case,
+                    &candidate.receipt,
+                    &operation.public_key,
+                    &candidate.material,
+                    cancel,
+                )?;
+                Ok(candidate)
+            },
+            |material, entries, cancel| {
+                self.commit_sigma_material(case, &material, entries, cancel)
+            },
+        )
+    }
+
+    fn retain_sigma_package_material(
+        &self,
+        bundle: &super::SigmaPackageBundle,
+        receipt: &irmind_app::v10_proofs::SigmaPackageInstallationV1,
+        installation: &irmind_app::SignedOperation,
+        cancel: &CancellationToken,
+    ) -> Result<RunObjects, AppError> {
+        use irmind_app::v10_proofs::SigmaPackageOriginV1;
+        let mut retained = Vec::new();
+        let mut retain = |kind, bytes: Vec<u8>| -> Result<(), AppError> {
+            let descriptor = V10ProofDescriptor::from_body(V10ProofFamily::Sigma, kind, &bytes)
+                .map_err(|_| invalid())?;
+            retained.push((descriptor, bytes));
+            Ok(())
+        };
+        retain(0, bundle.pack.manifest.encode().map_err(|_| invalid())?)?;
+        for raw in &bundle.pack.rules {
+            retain(1, raw.clone())?;
+        }
+        retain(6, serde_json::to_vec(installation).map_err(|_| invalid())?)?;
+        if let SigmaPackageOriginV1::CatalogAsset(proof)
+        | SigmaPackageOriginV1::SigmaHqArchive(proof) = receipt.origin
+        {
+            retain(7, self.read_sigma_catalog_proof(proof, cancel)?)?;
+        }
+        retain(
+            8,
+            serde_json::to_vec(&bundle.metadata).map_err(|_| invalid())?,
+        )?;
+        Ok(retained)
+    }
+
+    fn commit_sigma_material(
+        &self,
+        case: &CaseId,
+        material: &RunObjects,
+        entries: &[irmind_app::SignedEntry],
+        cancel: &CancellationToken,
+    ) -> Result<(), AppError> {
+        let items = material
+            .iter()
+            .map(|(descriptor, bytes)| (*descriptor, bytes.as_slice()))
+            .collect::<Vec<_>>();
+        self.prepare_v10_case_objects(case, V10ProofFamily::Sigma, &items, cancel)?
+            .append_with(cancel, || self.append_batch(entries))
+    }
+
     pub fn run_sigma(
         &self,
         engine: &Engine<'_>,
@@ -50,6 +288,14 @@ impl LocalStore {
             cancel,
             |scope, operation| {
                 let admission = sigma_pack_operation(operation)?.ok_or_else(invalid)?;
+                if !matches!(
+                    admission.origin,
+                    irmind_app::v10_proofs::SigmaPackOriginV1::LocalDirectory
+                ) {
+                    return Err(AppError::Policy(
+                        "Run an installed Sigma package by name with case admission".into(),
+                    ));
+                }
                 let rules = self.read_signed_sigma_pack(&admission, cancel)?;
                 let catalog = self.parquet.mapping_catalog().ok_or_else(invalid)?;
                 let candidate = prepare(
@@ -73,12 +319,7 @@ impl LocalStore {
                 Ok(candidate)
             },
             |material, entries, cancel| {
-                let items = material
-                    .iter()
-                    .map(|(descriptor, bytes)| (*descriptor, bytes.as_slice()))
-                    .collect::<Vec<_>>();
-                self.prepare_v10_case_objects(case, V10ProofFamily::Sigma, &items, cancel)?
-                    .append_with(cancel, || self.append_batch(entries))
+                self.commit_sigma_material(case, &material, entries, cancel)
             },
         )
     }
