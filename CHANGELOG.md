@@ -4,6 +4,21 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+## 0.7.3 — Sigma source-class coverage and signed packages
+
+**Format impact:** Case marker 6 and export framing V10 stay in use. The
+new Sigma execution and package proofs require the v0.7.3 verifier.
+
+- Compile each Sigma rule independently per applicable source class. Signed
+  results distinguish coverage limited to certain classes from indeterminate rows.
+- Extend the reviewed field table for Windows, cloud audit, macOS, web and DNS.
+  Use an exact decimal `ResultType` projection for interactive Azure `SigninLogs`.
+- Review and sign installation of Sigma packages, including hash-pinned catalog
+  packages. Installed runs need a separate signed case admission and carry
+  their retained proofs in V10 exports.
+- Compile 2,228 of 3,302 rules for at least one enrolled class in the pinned
+  SigmaHQ audit, including 70 of 123 Azure rules.
+
 ## 0.7.2 — CloudTrail gzip ingestion
 
 **Format impact:** Case marker 6, export V10, and the JSON reader identity
