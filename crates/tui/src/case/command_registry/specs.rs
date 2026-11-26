@@ -111,7 +111,7 @@ pub(super) const COMMANDS: &[Command] = &[
     },
     Command {
         name: "evidence",
-        description: "Read local evidence by hash",
+        description: "Show case evidence or read a local blob by hash",
         shortcut: "",
         slash: true,
     },

@@ -7,6 +7,33 @@ use std::path::Path;
 
 pub(crate) mod ingest;
 
+pub(crate) fn is_local_evidence_question(input: &str) -> bool {
+    let normalized = input
+        .trim()
+        .trim_matches(['?', '¿', '.', '!', '¡'])
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase();
+    matches!(
+        normalized.as_str(),
+        "/evidence"
+            | "what have we ingested"
+            | "what has been ingested"
+            | "what evidence was ingested"
+            | "what evidence is in this case"
+            | "what sources are in this case"
+            | "show case evidence"
+            | "qué hemos ingerido"
+            | "que hemos ingerido"
+            | "qué se ha ingerido"
+            | "que se ha ingerido"
+            | "qué evidencia hay en el caso"
+            | "qué fuentes hay en el caso"
+            | "muestra la evidencia del caso"
+    )
+}
+
 /// Presentation controller shared by keyboard actions and `TestBackend` tests.
 #[derive(Clone, Copy)]
 pub(crate) struct CaseWorkflow<'a, 'ports> {
@@ -34,6 +61,9 @@ impl CaseWorkflow<'_, '_> {
         alert: &str,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
+        if is_local_evidence_question(alert) {
+            return self.engine.case_evidence_status(id, cancel);
+        }
         let model = self.model.ok_or({
             AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(
                 irmind_app::AdapterPolicyError::NoLLMSelected,
@@ -50,6 +80,9 @@ impl CaseWorkflow<'_, '_> {
         cancel: &CancellationToken,
         on_text: &(dyn Fn(irmind_app::ModelProgress) + Send + Sync),
     ) -> Result<String, AppError> {
+        if is_local_evidence_question(alert) {
+            return self.engine.case_evidence_status(id, cancel);
+        }
         let model = self
             .model
             .ok_or(AppError::Fixed(irmind_app::FixedAppError::AdapterPolicy(

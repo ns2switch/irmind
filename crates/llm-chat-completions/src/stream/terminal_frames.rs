@@ -80,10 +80,11 @@ fn rejects_effective_output_and_conflicting_reasons_after_finish() {
     let stop = json!({"choices":[{"index":0,"delta":{"content":"before"},"finish_reason":"stop"}]});
     for choice in [
         json!({"index":0,"delta":{"content":"late text"}}),
+        json!({"index":0,"delta":{"content":"late text","reasoning_content":"metadata"}}),
         json!({"index":0,"delta":{"tool_calls":[{"index":0}]}}),
         json!({"index":0,"delta":{"tool_calls":[]}}),
         json!({"index":0,"delta":{"function_call":{"name":"late"}}}),
-        json!({"index":0,"delta":{"reasoning_content":"late text"}}),
+        json!({"index":0,"delta":{"reasoning_content":{"content":"not a reasoning string"}}}),
         json!({"index":0,"delta":{"content":false}}),
         json!({"index":0,"delta":[]}),
         json!({"index":0,"delta":{},"message":{"content":"late text"}}),
@@ -128,4 +129,35 @@ fn content_filter_reports_the_provider_stop_and_omits_its_delta() {
                 .is_empty()
         );
     }
+}
+
+#[test]
+fn glm_reasoning_and_assistant_role_are_metadata_before_and_after_finish() {
+    // https://docs.z.ai/guides/capabilities/thinking
+    // The late frames exercise compatible gateways while retaining the
+    // documented separation between reasoning, answer text, and token usage.
+    let usage = json!({"prompt_tokens":7,"completion_tokens":19,"total_tokens":26,
+        "completion_tokens_details":{"reasoning_tokens":16}});
+    let sse = wire(&[
+        json!({"choices":[{"index":0,"delta":{"role":"assistant"}}]}),
+        json!({"choices":[{"index":0,"delta":{"reasoning_content":"synthetic prior reasoning"}}]}),
+        json!({"choices":[{"index":0,"delta":{"content":"visible answer"}}]}),
+        json!({"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}),
+        json!({"choices":[{"index":0,"delta":{"role":"assistant","reasoning_content":"synthetic late reasoning"},"finish_reason":"stop"}]}),
+        json!({"choices":[{"index":0,"delta":{"role":"assistant"}}]}),
+        json!({"choices":[],"usage":usage}),
+        json!({"choices":[],"usage":usage}),
+    ]);
+    let (answer, counts) = parse(sse.as_bytes()).unwrap();
+    assert_eq!(answer.text, "visible answer");
+    assert!(answer.calls.is_empty());
+    assert!(!answer.raw.contains("reasoning_content"));
+    assert!(!answer.raw.contains("synthetic prior reasoning"));
+    assert!(!answer.raw.contains("synthetic late reasoning"));
+    assert_eq!(
+        TextPreview::default().push(sse.as_bytes()).unwrap(),
+        ["visible answer"]
+    );
+    let counts = counts.unwrap();
+    assert_eq!((counts.input_tokens, counts.output_tokens), (7, 19));
 }
