@@ -8,6 +8,7 @@ use secrecy::{ExposeSecret, SecretString};
 use serde_json::json;
 use std::net::IpAddr;
 
+mod diagnostics;
 mod stream;
 
 #[derive(Clone, Copy, Debug)]
@@ -298,7 +299,7 @@ impl LlmPort for ChatCompletionsClient {
             _ => stream::UsageProfile::Compatible,
         };
         Ok(Box::pin(async_stream::try_stream! {
-            let mut raw = Vec::new();
+            let mut received = diagnostics::ReceivedStream::new();
             let mut preview = stream::TextPreview::default();
             loop {
                 let chunk = tokio::select! {
@@ -307,16 +308,18 @@ impl LlmPort for ChatCompletionsClient {
                     result = response.chunk() => result.map_err(|_| AppError::Fixed(irmind_app::FixedAppError::AdapterModel(irmind_app::AdapterModelError::ProviderResponseFailed))),
                 }?;
                 let Some(chunk) = chunk else { break };
-                if raw.len().saturating_add(chunk.len()) > 2_000_000 {
+                if received.bytes.len().saturating_add(chunk.len()) > 2_000_000 {
                     Err(AppError::Fixed(irmind_app::FixedAppError::AdapterModel(irmind_app::AdapterModelError::ProviderStreamExceeds2MB)))?;
                 }
-                raw.extend_from_slice(&chunk);
+                received.bytes.extend_from_slice(&chunk);
                 for text in preview.push(&chunk)? {
                     yield ModelEvent::TextDelta(text);
                 }
                 yield ModelEvent::Progress(chunk.len());
             }
-            let (response, usage) = stream::parse_profile(raw.as_slice(), usage_profile)?;
+            let result = stream::parse_profile(received.bytes.as_slice(), usage_profile);
+            drop(received);
+            let (response, usage) = result?;
             yield ModelEvent::Completed { response, usage };
         }))
     }

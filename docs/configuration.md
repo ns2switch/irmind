@@ -47,6 +47,22 @@ Native specifications: [OpenAI models](https://developers.openai.com/api/docs/mo
 Unknown models use omission or an analyst-declared maximum; context length is not
 an output maximum.
 
+### Local SSE diagnostics
+
+Set `IRMIND_SSE_DIAGNOSTICS_FILE` to the pathname of a new file before starting
+IRMind. In PowerShell, for example, run
+`$env:IRMIND_SSE_DIAGNOSTICS_FILE = "$PWD/irmind-provider.sse"` before starting
+the TUI. The OpenAI-style adapters save a single capture when the first
+response stream with bytes completes or fails. Remove the variable to disable
+capture. An existing file is never overwritten. Choose a new filename to
+capture another request.
+
+The bounded capture contains SSE frame order, protocol shapes and reported
+token counts. Replies, reasoning, arguments, provider identifiers, unknown
+fields and malformed bytes are replaced or omitted. Request messages,
+HTTP headers and credentials are outside the capture. The file stays local
+and is outside the case and its export. The diagnostic is off by default.
+
 ## Case scope
 
 A case can remain local-only. To permit remote reads, the TUI's new-case form asks for sources, accounts, projects, hosts, object prefixes, and a UTC start and end time. An object prefix looks like `s3://audit-bucket/AWSLogs/123/CloudTrail/`, `gs://bucket/export/`, or `az://container/export/`. Add one with `/scope add object <URI>`; the source ID must also be in the case scope. Other targets use `/scope add project <id>` (or `source`, `account`, `host`). Widen the window with `/scope window <from> <to>`. Changes are signed by the analyst. Object reads outside the case or organization prefix are denied. The automation encoding is documented in the [CLI reference](development/cli.md).

@@ -128,11 +128,21 @@ pub(super) fn parse_profile(
             state.done = true;
             break;
         }
-        state.raw.push_str(data);
-        state.raw.push('\n');
-        let chunk: Value = serde_json::from_str(data)
+        let mut chunk: Value = serde_json::from_str(data)
             .map_err(|error| AppError::Model(format!("invalid provider chunk: {error}")))?;
         state.apply_chunk(&chunk)?;
+        let removed_reasoning = chunk
+            .pointer_mut("/choices/0/delta")
+            .and_then(Value::as_object_mut)
+            .and_then(|delta| delta.remove("reasoning_content"))
+            .is_some();
+        if removed_reasoning {
+            chunk.sort_all_objects();
+            state.raw.push_str(&chunk.to_string());
+        } else {
+            state.raw.push_str(data);
+        }
+        state.raw.push('\n');
     }
     state.finish()
 }
@@ -203,6 +213,7 @@ impl StreamState {
                         fields.iter().all(|(field, value)| {
                             value.is_null()
                                 || (field == "role" && value.as_str() == Some("assistant"))
+                                || (field == "reasoning_content" && value.is_string())
                                 || (field != "tool_calls" && value.as_str() == Some(""))
                         })
                     })
