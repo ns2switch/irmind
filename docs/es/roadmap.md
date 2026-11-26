@@ -167,6 +167,9 @@ documentar las comprobaciones pendientes. [Registro manual](manual-validation.md
   de super timeline compatible con plaso. Exportar indicadores de compromiso
   (IOC) con procedencia en formatos STIX y MISP.
 - Ampliar Sigma local a reglas de correlación.
+- Evaluar proyecciones acotadas sobre un mismo elemento para `authorizationInfo`
+  de GCP y `targetResources` y `modifiedProperties` de Entra. La auditoría fijada
+  estima una regla adicional para GCP y tres para Azure. [Auditoría y alcance](../development/sigma-azure-result-type-contract.md).
 - Ingerir salidas de Volatility 3. [#158](https://github.com/ns2switch/irmind/issues/158).
 - Decidir cuándo estabilizar los formatos firmados y cuánto tiempo mantener
   las versiones de parsers.

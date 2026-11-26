@@ -55,6 +55,14 @@ pub struct SigmaFieldBinding {
     pub conversion: Option<SigmaConversion>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub basename_path: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub projection: Option<SigmaFieldProjection>,
+}
+
+#[derive(Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SigmaFieldProjection {
+    AzureSigninResultTypeDecimalV1,
 }
 
 #[derive(Clone, Copy, Deserialize, Serialize, Eq, PartialEq)]
@@ -88,6 +96,37 @@ pub enum SigmaNullPolicy {
 impl ReviewedSigmaFieldTable {
     pub fn parse(object: &SigmaFieldTableV1) -> Result<Self, AppError> {
         Self::read(object, false)
+    }
+
+    pub fn parse_for_evaluator(
+        object: &SigmaFieldTableV1,
+        evaluator: &str,
+    ) -> Result<Self, AppError> {
+        let table = Self::parse(object)?;
+        if table.has_decimal_projection()
+            != matches!(evaluator,
+                irmind_app::v10_proofs::SIGMA_EVALUATOR_V4
+                | irmind_app::v10_proofs::SIGMA_EVALUATOR_V4_CASE_ADMISSION)
+        {
+            return Err(invalid());
+        }
+        Ok(table)
+    }
+
+    pub fn has_decimal_projection(&self) -> bool {
+        self.variants
+            .iter()
+            .any(SigmaSourceVariant::has_decimal_projection)
+    }
+
+    #[cfg(feature = "sigma")]
+    pub(super) fn evaluator(&self) -> &'static str {
+        use irmind_app::v10_proofs::{SIGMA_EVALUATOR_V3, SIGMA_EVALUATOR_V4};
+        if self.has_decimal_projection() {
+            SIGMA_EVALUATOR_V4
+        } else {
+            SIGMA_EVALUATOR_V3
+        }
     }
 
     #[cfg(feature = "sigma")]
@@ -167,6 +206,12 @@ impl ReviewedSigmaFieldTable {
 }
 
 impl SigmaSourceVariant {
+    pub(super) fn has_decimal_projection(&self) -> bool {
+        self.fields
+            .iter()
+            .any(|binding| binding.projection.is_some())
+    }
+
     #[cfg(feature = "sigma")]
     pub(super) fn exact_cluster_field(&self) -> Option<irmind_app::cluster_audit::AuditExactField> {
         use irmind_app::cluster_audit::AuditExactField;
@@ -270,6 +315,30 @@ impl SigmaFieldBinding {
                 .as_deref()
                 .is_some_and(|actual| actual.iter().map(String::as_str).eq(path.iter().copied()))
         };
+        if self.projection.is_some() {
+            let singleton_signin = variant.events.iter().any(|selector| {
+                selector.column.is_none()
+                    && selector.path.as_deref().is_some_and(|path| path == ["Type"])
+                    && matches!(selector.values(), [SigmaLiteral::Text(value)] if value == "SigninLogs")
+            });
+            if self.name == "ResultType"
+                && self.value_type == SigmaBindingType::Integer
+                && matches!(self.null_policy, SigmaNullPolicy::Absent)
+                && path_is(&["ResultType"])
+                && self.conversion.is_none()
+                && self.basename_path.is_none()
+                && variant.product.as_deref() == Some("azure")
+                && variant.service.as_deref() == Some("signinlogs")
+                && variant.parser_id == "parser-entra"
+                && variant.parser_version == "entra-source-v1"
+                && variant.mapping_id == "mapping-entra-signin-table"
+                && variant.dataset.as_deref() == Some("entra-signin-table")
+                && singleton_signin
+            {
+                return Ok(());
+            }
+            return Err(invalid());
+        }
         let admitted = match self.conversion {
             None if self.value_type == SigmaBindingType::PairList => {
                 variant.mapping_id == "mapping-m365"

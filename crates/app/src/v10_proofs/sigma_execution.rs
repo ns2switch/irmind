@@ -121,6 +121,13 @@ pub struct SigmaExecutionContext<'a> {
     pub reserved: u64,
 }
 
+/// Values frozen by the attended installation/run preview.
+pub struct InstalledSigmaRunSelection {
+    pub name: String,
+    pub installation: [u8; 32],
+    pub case_head: [u8; 32],
+}
+
 impl crate::Engine<'_> {
     /// Hold the case's exclusive lock across the reservation, scan and append.
     /// Sigma work is local, and nothing is committed until the scan settles.
@@ -135,6 +142,31 @@ impl crate::Engine<'_> {
         ) -> Result<PreparedSigmaExecution<T>, AppError>,
         commit: impl FnOnce(T, &[SignedEntry], &crate::CancellationToken) -> Result<(), AppError>,
     ) -> Result<SigmaExecutionSummary, AppError> {
+        self.execute_sigma_inner(case, manifest, None, cancel, evaluate, commit)
+    }
+
+    pub fn execute_installed_sigma<T>(
+        &self,
+        case: &crate::CaseId,
+        manifest: [u8; 32],
+        selected: &InstalledSigmaRunSelection,
+        cancel: &crate::CancellationToken,
+        evaluate: impl FnOnce(SigmaExecutionContext<'_>, &SignedOperation) -> Result<PreparedSigmaExecution<T>, AppError>,
+        commit: impl FnOnce(T, &[SignedEntry], &crate::CancellationToken) -> Result<(), AppError>,
+    ) -> Result<SigmaExecutionSummary, AppError> {
+        self.execute_sigma_inner(case, manifest, Some(selected), cancel, evaluate, commit)
+    }
+
+    #[expect(clippy::too_many_arguments, clippy::too_many_lines, reason = "the case lock covers one signed transaction and its proof publication")]
+    fn execute_sigma_inner<T>(
+        &self,
+        case: &crate::CaseId,
+        manifest: [u8; 32],
+        selected: Option<&InstalledSigmaRunSelection>,
+        cancel: &crate::CancellationToken,
+        evaluate: impl FnOnce(SigmaExecutionContext<'_>, &SignedOperation) -> Result<PreparedSigmaExecution<T>, AppError>,
+        commit: impl FnOnce(T, &[SignedEntry], &crate::CancellationToken) -> Result<(), AppError>,
+    ) -> Result<SigmaExecutionSummary, AppError> {
         self.require_attended_analyst("execute Sigma")?;
         let _lock = self.repo.lock_case(case)?;
         if self.repo.get_case(case)?.sealed {
@@ -143,6 +175,19 @@ impl crate::Engine<'_> {
         self.verify_unlocked_cancelable(case, cancel)?;
         let entries = self.audit_log.entries(case)?;
         let edge = entries.last().ok_or(AppError::InvalidChain(0))?;
+        // The case lock comes first, as in source-query admission.
+        let _installation_lock = if let Some(selected) = selected {
+            let lock = self.audit_log.lock_global_operations()?;
+            let mut installed = self.sigma_installations()?;
+            if edge.hash != selected.case_head || !installed.remove(&selected.name).is_some_and(|(receipt, operation)| {
+                receipt.active && receipt.manifest == manifest && operation.hash == selected.installation
+            }) {
+                return Err(AppError::Policy("Sigma extraction scope or installation changed after review".into()));
+            }
+            Some(lock)
+        } else {
+            None
+        };
         let checkpoint = super::CaseCheckpointV1 {
             case_id: case.clone(),
             sequence: edge.seq,
@@ -162,7 +207,7 @@ impl crate::Engine<'_> {
             },
             &operation,
         )?;
-        let receipt = candidate.receipt;
+        let mut receipt = candidate.receipt;
         if receipt.checkpoint != checkpoint
             || receipt.pack_admission != operation.hash
             || receipt.artifact_inventory != expected_inventory
@@ -171,18 +216,25 @@ impl crate::Engine<'_> {
         {
             return Err(AppError::InvalidChain(edge.seq));
         }
+        let mut signed = Vec::new();
+        if let Some(selected) = selected {
+            let admission = self.sign_sigma_case_admission(case, edge, manifest, selected.installation, &mut receipt)?;
+            signed.push(admission);
+        } else if super::requires_sigma_case_admission(&receipt.evaluator) {
+            return Err(AppError::InvalidChain(edge.seq));
+        }
         let payload = receipt
             .encode()
             .map_err(|_| AppError::InvalidChain(edge.seq))?;
         let run = self.signed_entry_after(
             case,
-            Some(edge),
+            signed.last().or(Some(edge)),
             crate::AuditOrigin::Analyst,
             AuditEventKind::SigmaRunV1,
             &payload,
             None,
         )?;
-        let mut signed = vec![run];
+        signed.push(run);
         let view = V10CheckpointView::resolve(&entries, &checkpoint)?;
         for draft in candidate.findings {
             let finding = self.sigma_finding(draft, &view)?;
@@ -212,6 +264,38 @@ impl crate::Engine<'_> {
             unavailable_by_source: candidate.unavailable_by_source,
             indeterminate_by_rule: candidate.indeterminate_by_rule,
         })
+    }
+
+    fn sign_sigma_case_admission(
+        &self,
+        case: &crate::CaseId,
+        edge: &SignedEntry,
+        manifest: [u8; 32],
+        install: [u8; 32],
+        receipt: &mut SigmaRunV1,
+    ) -> Result<SignedEntry, AppError> {
+        use super::{SigmaCaseRunAdmissionV1, SIGMA_EVALUATOR_V3, SIGMA_EVALUATOR_V4,
+            SIGMA_EVALUATOR_V3_CASE_ADMISSION, SIGMA_EVALUATOR_V4_CASE_ADMISSION};
+        let evaluator = match receipt.evaluator.as_str() {
+            SIGMA_EVALUATOR_V3 => SIGMA_EVALUATOR_V3_CASE_ADMISSION,
+            SIGMA_EVALUATOR_V4 => SIGMA_EVALUATOR_V4_CASE_ADMISSION,
+            _ => return Err(AppError::InvalidChain(edge.seq)),
+        };
+        let claim = SigmaCaseRunAdmissionV1 {
+            checkpoint: receipt.checkpoint.clone(), installation: Some(install),
+            pack_admission: receipt.pack_admission, manifest, artifact_inventory: receipt.artifact_inventory,
+            selected_sources: receipt.selected_sources, start_us: receipt.start_utc_micros,
+            end_us: receipt.end_utc_micros, field_table: receipt.field_table, compiled_rules: receipt.compiled_rules,
+            evaluator: evaluator.into(), reserved_work: receipt.reserved_units,
+        };
+        let payload = crate::hex(&claim.encode().map_err(|_| AppError::InvalidChain(edge.seq))?);
+        let signed = self.signed_entry_after(
+            case, Some(edge), crate::AuditOrigin::Analyst, AuditEventKind::SigmaCaseRunAdmissionV1, &payload, None,
+        )?;
+        receipt.evaluator = evaluator.into();
+        receipt.checkpoint.sequence = signed.seq;
+        receipt.checkpoint.entry_hash = signed.hash;
+        Ok(signed)
     }
 
     fn sigma_finding(

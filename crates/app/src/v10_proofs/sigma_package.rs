@@ -3,6 +3,12 @@ use super::{CaseCheckpointV1, Digest, INVALID, Result, Wire, put_optional_hash, 
 const INSTALLATION: &[u8] = b"irmind-sigma-package-installation-v1\0";
 const CASE_ADMISSION: &[u8] = b"irmind-sigma-case-run-admission-v1\0";
 pub const SIGMA_EVALUATOR_V3_CASE_ADMISSION: &str = "irmind-sigma-evaluator-v3-case-admission-v1";
+pub const SIGMA_EVALUATOR_V4_CASE_ADMISSION: &str = "irmind-sigma-evaluator-v4-case-admission-v1";
+
+pub fn requires_sigma_case_admission(evaluator: &str) -> bool {
+    matches!(evaluator, SIGMA_EVALUATOR_V3_CASE_ADMISSION | SIGMA_EVALUATOR_V4_CASE_ADMISSION)
+}
+
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SigmaPackageOriginV1 {
@@ -336,7 +342,7 @@ impl SigmaCaseRunAdmissionV1 {
 
     fn validate(&self) -> Result<()> {
         if self.start_us >= self.end_us
-            || self.evaluator != SIGMA_EVALUATOR_V3_CASE_ADMISSION
+            || !requires_sigma_case_admission(&self.evaluator)
             || self.reserved_work == 0
         {
             return Err(INVALID);
@@ -410,7 +416,7 @@ pub fn verify_sigma_case_admission_pairs(
             SigmaCaseRunAdmissionV1::verify_following_run(entry, &run, admission.manifest)?;
         } else if entry.kind == AuditEventKind::SigmaRunV1 {
             let run = super::sigma_execution(entry)?;
-            if run.evaluator == SIGMA_EVALUATOR_V3_CASE_ADMISSION
+            if requires_sigma_case_admission(&run.evaluator)
                 && index
                     .checked_sub(1)
                     .and_then(|before| entries.get(before))

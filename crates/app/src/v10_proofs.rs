@@ -27,11 +27,11 @@ pub use sigma_objects::*;
 const ADMISSION: &[u8] = b"irmind-sigma-pack-admission-v1\0";
 pub const SIGMA_EVALUATOR_V2: &str = "irmind-sigma-evaluator-v2";
 pub const SIGMA_EVALUATOR_V3: &str = "irmind-sigma-evaluator-v3";
+pub const SIGMA_EVALUATOR_V4: &str = "irmind-sigma-evaluator-v4";
+
 pub(crate) fn uses_sigma_class_plan(evaluator: &str) -> bool {
-    matches!(
-        evaluator,
-        SIGMA_EVALUATOR_V3 | SIGMA_EVALUATOR_V3_CASE_ADMISSION
-    )
+    matches!(evaluator, SIGMA_EVALUATOR_V3 | SIGMA_EVALUATOR_V4)
+        || requires_sigma_case_admission(evaluator)
 }
 
 const RUN: &[u8] = b"irmind-sigma-run-v1\0";

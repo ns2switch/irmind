@@ -184,8 +184,10 @@ pub(super) fn verify_sigma(
             sigma_pack_operation(operation)?.ok_or(AppError::InvalidChain(entry.seq))?;
         let pack = read_v10_sigma_admission(section, objects, &admission, &mut referenced, cancel)?;
         let materials = read_v10_sigma_run(section, objects, &run, &pack, &mut referenced, cancel)?;
-        let table =
-            crate::sigma_pack::field_table::ReviewedSigmaFieldTable::parse(&materials.field_table)?;
+        let table = crate::sigma_pack::field_table::ReviewedSigmaFieldTable::parse_for_evaluator(
+            &materials.field_table,
+            &run.evaluator,
+        )?;
         if materials
             .compiled_rules
             .0
@@ -195,7 +197,7 @@ pub(super) fn verify_sigma(
         {
             return Err(AppError::InvalidChain(entry.seq));
         }
-        if run.evaluator == irmind_app::v10_proofs::SIGMA_EVALUATOR_V3_CASE_ADMISSION {
+        if irmind_app::v10_proofs::requires_sigma_case_admission(&run.evaluator) {
             let idx = entries
                 .binary_search_by_key(&run.checkpoint.sequence, |candidate| candidate.seq)
                 .map_err(|_| AppError::InvalidChain(entry.seq))?;
@@ -237,7 +239,7 @@ pub(super) fn verify_sigma(
         #[cfg(not(feature = "sigma"))]
         if materials.class_plan.is_some() {
             return Err(AppError::Policy(
-                "Sigma V3 verification requires a build with the Sigma evaluator".into(),
+                "Sigma source-class verification requires a build with the Sigma evaluator".into(),
             ));
         }
         if materials.class_plan.is_none() {
