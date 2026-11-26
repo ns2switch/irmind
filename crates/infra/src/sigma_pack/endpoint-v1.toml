@@ -185,6 +185,9 @@ fields = [
   { name = "Image", path = ["event", "exec", "target", "executable", "path"], value_type = "text", null_policy = "absent" },
   { name = "Arguments", path = ["event", "exec", "args"], value_type = "text_list", null_policy = "absent" },
   { name = "ProcessId", column = "process.pid", value_type = "integer", null_policy = "absent" },
+  { name = "SigningId", path = ["event", "exec", "target", "signing_id"], value_type = "text", null_policy = "absent" },
+  { name = "TeamId", path = ["event", "exec", "target", "team_id"], value_type = "text", null_policy = "absent" },
+  { name = "ParentProcessId", path = ["event", "exec", "target", "ppid"], value_type = "integer", null_policy = "absent" },
 ]
 
 [[variants]]
@@ -204,4 +207,7 @@ events = [
 fields = [
   { name = "TargetFilename", column = "file.path", value_type = "text", null_policy = "absent" },
   { name = "ActorExecutable", path = ["process", "executable", "path"], value_type = "text", null_policy = "absent" },
+  { name = "Image", path = ["process", "executable", "path"], value_type = "text", null_policy = "absent" },
+  { name = "SigningId", path = ["process", "signing_id"], value_type = "text", null_policy = "absent" },
+  { name = "TeamId", path = ["process", "team_id"], value_type = "text", null_policy = "absent" },
 ]

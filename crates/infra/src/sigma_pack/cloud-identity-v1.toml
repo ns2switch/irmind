@@ -15,6 +15,19 @@ fields = [
   { name = "UserPrincipalName", path = ["UserPrincipalName"], value_type = "text", null_policy = "absent" },
   { name = "AppId", path = ["AppId"], value_type = "text", null_policy = "absent" },
   { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "AuthenticationRequirement", path = ["AuthenticationRequirement"], value_type = "text", null_policy = "absent" },
+  { name = "ResultDescription", path = ["ResultDescription"], value_type = "text", null_policy = "absent" },
+  { name = "UserAgent", path = ["UserAgent"], value_type = "text", null_policy = "absent" },
+  { name = "userAgent", path = ["UserAgent"], value_type = "text", null_policy = "absent" },
+  { name = "ResourceDisplayName", path = ["ResourceDisplayName"], value_type = "text", null_policy = "absent" },
+  { name = "Location", path = ["Location"], value_type = "text", null_policy = "absent" },
+  { name = "ConditionalAccessStatus", path = ["ConditionalAccessStatus"], value_type = "text", null_policy = "absent" },
+  { name = "conditionalAccessStatus", path = ["ConditionalAccessStatus"], value_type = "text", null_policy = "absent" },
+  { name = "RiskState", path = ["RiskState"], value_type = "text", null_policy = "absent" },
+  { name = "DeviceDetail.trusttype", path = ["DeviceDetail", "trusttype"], value_type = "text", null_policy = "absent" },
+  { name = "DeviceDetail.operatingSystem", path = ["DeviceDetail", "operatingSystem"], value_type = "text", null_policy = "absent" },
+  { name = "Status.failureReason", path = ["Status", "failureReason"], value_type = "text", null_policy = "absent" },
+  { name = "Status.errorCode", path = ["Status", "errorCode"], value_type = "integer", null_policy = "absent" },
 ]
 
 [[variants]]
@@ -35,6 +48,18 @@ fields = [
   { name = "AppId", path = ["properties", "appId"], value_type = "text", null_policy = "absent" },
   { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
   { name = "StatusErrorCode", path = ["properties", "status", "errorCode"], value_type = "integer", null_policy = "absent" },
+  { name = "properties.message", path = ["properties", "message"], value_type = "text", null_policy = "absent" },
+  { name = "properties.status.failureReason", path = ["properties", "status", "failureReason"], value_type = "text", null_policy = "absent" },
+  { name = "properties.status.errorCode", path = ["properties", "status", "errorCode"], value_type = "integer", null_policy = "absent" },
+  { name = "AuthenticationRequirement", path = ["properties", "authenticationRequirement"], value_type = "text", null_policy = "absent" },
+  { name = "ResultDescription", path = ["resultDescription"], value_type = "text", null_policy = "absent" },
+  { name = "userAgent", path = ["properties", "userAgent"], value_type = "text", null_policy = "absent" },
+  { name = "UserAgent", path = ["properties", "userAgent"], value_type = "text", null_policy = "absent" },
+  { name = "ResourceDisplayName", path = ["properties", "resourceDisplayName"], value_type = "text", null_policy = "absent" },
+  { name = "conditionalAccessStatus", path = ["properties", "conditionalAccessStatus"], value_type = "text", null_policy = "absent" },
+  { name = "ConditionalAccessStatus", path = ["properties", "conditionalAccessStatus"], value_type = "text", null_policy = "absent" },
+  { name = "RiskState", path = ["properties", "riskState"], value_type = "text", null_policy = "absent" },
+  { name = "DeviceDetail.trusttype", path = ["properties", "deviceDetail", "trustType"], value_type = "text", null_policy = "absent" },
 ]
 
 [[variants]]
@@ -54,6 +79,14 @@ fields = [
   { name = "Result", path = ["Result"], value_type = "text", null_policy = "absent" },
   { name = "InitiatedBy.user.userPrincipalName", path = ["InitiatedBy", "user", "userPrincipalName"], value_type = "text", null_policy = "absent" },
   { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "operationName", path = ["OperationName"], value_type = "text", null_policy = "absent" },
+  { name = "Category", path = ["Category"], value_type = "text", null_policy = "absent" },
+  { name = "LoggedByService", path = ["LoggedByService"], value_type = "text", null_policy = "absent" },
+  { name = "ResultReason", path = ["ResultReason"], value_type = "text", null_policy = "absent" },
+  { name = "InitiatedBy.user.id", path = ["InitiatedBy", "user", "id"], value_type = "text", null_policy = "absent" },
+  { name = "InitiatedBy.user.ipAddress", path = ["InitiatedBy", "user", "ipAddress"], value_type = "text", null_policy = "absent" },
+  { name = "InitiatedBy.app.appId", path = ["InitiatedBy", "app", "appId"], value_type = "text", null_policy = "absent" },
+  { name = "InitiatedBy.app.displayName", path = ["InitiatedBy", "app", "displayName"], value_type = "text", null_policy = "absent" },
 ]
 
 [[variants]]
@@ -73,6 +106,17 @@ fields = [
   { name = "Result", path = ["properties", "result"], value_type = "text", null_policy = "absent" },
   { name = "InitiatedBy.user.userPrincipalName", path = ["properties", "initiatedBy", "user", "userPrincipalName"], value_type = "text", null_policy = "absent" },
   { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "operationName", path = ["operationName"], value_type = "text", null_policy = "absent" },
+  { name = "category", path = ["category"], value_type = "text", null_policy = "absent" },
+  { name = "properties.message", path = ["properties", "message"], value_type = "text", null_policy = "absent" },
+  { name = "properties.result", path = ["properties", "result"], value_type = "text", null_policy = "absent" },
+  { name = "Category", path = ["properties", "category"], value_type = "text", null_policy = "absent" },
+  { name = "LoggedByService", path = ["properties", "loggedByService"], value_type = "text", null_policy = "absent" },
+  { name = "ResultReason", path = ["properties", "resultReason"], value_type = "text", null_policy = "absent" },
+  { name = "InitiatedBy.user.id", path = ["properties", "initiatedBy", "user", "id"], value_type = "text", null_policy = "absent" },
+  { name = "InitiatedBy.user.ipAddress", path = ["properties", "initiatedBy", "user", "ipAddress"], value_type = "text", null_policy = "absent" },
+  { name = "InitiatedBy.app.appId", path = ["properties", "initiatedBy", "app", "appId"], value_type = "text", null_policy = "absent" },
+  { name = "InitiatedBy.app.displayName", path = ["properties", "initiatedBy", "app", "displayName"], value_type = "text", null_policy = "absent" },
 ]
 
 [[variants]]
@@ -92,6 +136,14 @@ fields = [
   { name = "CallerIpAddress", path = ["CallerIpAddress"], value_type = "text", null_policy = "absent" },
   { name = "Caller", path = ["Caller"], value_type = "text", null_policy = "absent" },
   { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "operationName", path = ["OperationNameValue"], value_type = "text", null_policy = "absent" },
+  { name = "CategoryValue", path = ["CategoryValue"], value_type = "text", null_policy = "absent" },
+  { name = "ResourceProviderValue", path = ["ResourceProviderValue"], value_type = "text", null_policy = "absent" },
+  { name = "ResourceId", path = ["ResourceId"], value_type = "text", null_policy = "absent" },
+  { name = "ActivitySubstatusValue", path = ["ActivitySubstatusValue"], value_type = "text", null_policy = "absent" },
+  { name = "CorrelationId", path = ["CorrelationId"], value_type = "text", null_policy = "absent" },
+  { name = "properties.message", path = ["Properties_d", "message"], value_type = "text", null_policy = "absent" },
+  { name = "properties.statusCode", path = ["Properties_d", "statusCode"], value_type = "text", null_policy = "absent" },
 ]
 
 [[variants]]
@@ -114,6 +166,15 @@ fields = [
   { name = "ObjectId", path = ["ObjectId"], value_type = "text", null_policy = "absent" },
   { name = "SourceIP", column = "source.ip", value_type = "ip", null_policy = "absent" },
   { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "ApplicationId", path = ["ApplicationId"], value_type = "text", null_policy = "absent" },
+  { name = "RequestType", path = ["RequestType"], value_type = "text", null_policy = "absent" },
+  { name = "DeliveryAction", path = ["DeliveryAction"], value_type = "text", null_policy = "absent" },
+  { name = "Directionality", path = ["Directionality"], value_type = "text", null_policy = "absent" },
+  { name = "UserAgent", path = ["UserAgent"], value_type = "text", null_policy = "absent" },
+  { name = "RecordType", path = ["RecordType"], value_type = "integer", null_policy = "absent" },
+  { name = "OrganizationId", path = ["OrganizationId"], value_type = "text", null_policy = "absent" },
+  { name = "UserType", path = ["UserType"], value_type = "integer", null_policy = "absent" },
+  { name = "UserKey", path = ["UserKey"], value_type = "text", null_policy = "absent" },
 ]
 
 [[variants]]
@@ -137,6 +198,15 @@ fields = [
   { name = "ObjectId", path = ["ObjectId"], value_type = "text", null_policy = "absent" },
   { name = "SourceIP", column = "source.ip", value_type = "ip", null_policy = "absent" },
   { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "ApplicationId", path = ["ApplicationId"], value_type = "text", null_policy = "absent" },
+  { name = "RequestType", path = ["RequestType"], value_type = "text", null_policy = "absent" },
+  { name = "DeliveryAction", path = ["DeliveryAction"], value_type = "text", null_policy = "absent" },
+  { name = "Directionality", path = ["Directionality"], value_type = "text", null_policy = "absent" },
+  { name = "UserAgent", path = ["UserAgent"], value_type = "text", null_policy = "absent" },
+  { name = "RecordType", path = ["RecordType"], value_type = "integer", null_policy = "absent" },
+  { name = "OrganizationId", path = ["OrganizationId"], value_type = "text", null_policy = "absent" },
+  { name = "UserType", path = ["UserType"], value_type = "integer", null_policy = "absent" },
+  { name = "UserKey", path = ["UserKey"], value_type = "text", null_policy = "absent" },
 ]
 
 [[variants]]
@@ -177,11 +247,23 @@ fields = [
   { name = "protoPayload.requestMetadata.callerIp", path = ["protoPayload", "requestMetadata", "callerIp"], value_type = "text", null_policy = "absent" },
   { name = "protoPayload.status.code", path = ["protoPayload", "status", "code"], value_type = "integer", null_policy = "absent" },
   { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "gcp.audit.method_name", path = ["protoPayload", "methodName"], value_type = "text", null_policy = "absent" },
+  { name = "data.protoPayload.methodName", path = ["protoPayload", "methodName"], value_type = "text", null_policy = "absent" },
+  { name = "data.protoPayload.serviceName", path = ["protoPayload", "serviceName"], value_type = "text", null_policy = "absent" },
+  { name = "protoPayload.resourceName", path = ["protoPayload", "resourceName"], value_type = "text", null_policy = "absent" },
+  { name = "protoPayload.authenticationInfo.principalSubject", path = ["protoPayload", "authenticationInfo", "principalSubject"], value_type = "text", null_policy = "absent" },
+  { name = "protoPayload.requestMetadata.callerSuppliedUserAgent", path = ["protoPayload", "requestMetadata", "callerSuppliedUserAgent"], value_type = "text", null_policy = "absent" },
+  { name = "protoPayload.status.message", path = ["protoPayload", "status", "message"], value_type = "text", null_policy = "absent" },
+  { name = "resource.type", path = ["resource", "type"], value_type = "text", null_policy = "absent" },
+  { name = "resource.labels.project_id", path = ["resource", "labels", "project_id"], value_type = "text", null_policy = "absent" },
+  { name = "logName", path = ["logName"], value_type = "text", null_policy = "absent" },
+  { name = "severity", path = ["severity"], value_type = "text", null_policy = "absent" },
 ]
 
 [[variants]]
 product = "kubernetes"
 service = "audit"
+category = "application"
 parser_id = "parser-kubernetes"
 parser_version = "kubernetes-source-v1"
 mapping_id = "mapping-kubernetes"
@@ -200,11 +282,20 @@ fields = [
   { name = "PrimarySourceIP", column = "source.ip", value_type = "ip", null_policy = "absent" },
   { name = "stage", column = "irmind.kubernetes.stage", value_type = "text", null_policy = "absent" },
   { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "objectRef.apiGroup", path = ["original", "objectRef", "apiGroup"], value_type = "text", null_policy = "absent" },
+  { name = "apiGroup", path = ["original", "objectRef", "apiGroup"], value_type = "text", null_policy = "absent" },
+  { name = "objectRef.subresource", path = ["original", "objectRef", "subresource"], value_type = "text", null_policy = "absent" },
+  { name = "objectRef.name", path = ["original", "objectRef", "name"], value_type = "text", null_policy = "absent" },
+  { name = "objectRef.apiVersion", path = ["original", "objectRef", "apiVersion"], value_type = "text", null_policy = "absent" },
+  { name = "requestURI", path = ["original", "requestURI"], value_type = "text", null_policy = "absent" },
+  { name = "userAgent", path = ["original", "userAgent"], value_type = "text", null_policy = "absent" },
+  { name = "user.groups", path = ["original", "user", "groups"], value_type = "text_list", null_policy = "absent" },
 ]
 
 [[variants]]
 product = "kubernetes"
 service = "audit"
+category = "application"
 parser_id = "parser-kubernetes"
 parser_version = "kubernetes-source-v1"
 mapping_id = "mapping-eks-audit"
@@ -223,11 +314,20 @@ fields = [
   { name = "PrimarySourceIP", column = "source.ip", value_type = "ip", null_policy = "absent" },
   { name = "stage", column = "irmind.kubernetes.stage", value_type = "text", null_policy = "absent" },
   { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "objectRef.apiGroup", path = ["original", "audit_event", "objectRef", "apiGroup"], value_type = "text", null_policy = "absent" },
+  { name = "apiGroup", path = ["original", "audit_event", "objectRef", "apiGroup"], value_type = "text", null_policy = "absent" },
+  { name = "objectRef.subresource", path = ["original", "audit_event", "objectRef", "subresource"], value_type = "text", null_policy = "absent" },
+  { name = "objectRef.name", path = ["original", "audit_event", "objectRef", "name"], value_type = "text", null_policy = "absent" },
+  { name = "objectRef.apiVersion", path = ["original", "audit_event", "objectRef", "apiVersion"], value_type = "text", null_policy = "absent" },
+  { name = "requestURI", path = ["original", "audit_event", "requestURI"], value_type = "text", null_policy = "absent" },
+  { name = "userAgent", path = ["original", "audit_event", "userAgent"], value_type = "text", null_policy = "absent" },
+  { name = "user.groups", path = ["original", "audit_event", "user", "groups"], value_type = "text_list", null_policy = "absent" },
 ]
 
 [[variants]]
 product = "kubernetes"
 service = "audit"
+category = "application"
 parser_id = "parser-kubernetes"
 parser_version = "kubernetes-source-v1"
 mapping_id = "mapping-aks-audit"
@@ -246,6 +346,14 @@ fields = [
   { name = "PrimarySourceIP", column = "source.ip", value_type = "ip", null_policy = "absent" },
   { name = "stage", column = "irmind.kubernetes.stage", value_type = "text", null_policy = "absent" },
   { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "objectRef.apiGroup", path = ["original", "audit_event", "objectRef", "apiGroup"], value_type = "text", null_policy = "absent" },
+  { name = "apiGroup", path = ["original", "audit_event", "objectRef", "apiGroup"], value_type = "text", null_policy = "absent" },
+  { name = "objectRef.subresource", path = ["original", "audit_event", "objectRef", "subresource"], value_type = "text", null_policy = "absent" },
+  { name = "objectRef.name", path = ["original", "audit_event", "objectRef", "name"], value_type = "text", null_policy = "absent" },
+  { name = "objectRef.apiVersion", path = ["original", "audit_event", "objectRef", "apiVersion"], value_type = "text", null_policy = "absent" },
+  { name = "requestURI", path = ["original", "audit_event", "requestURI"], value_type = "text", null_policy = "absent" },
+  { name = "userAgent", path = ["original", "audit_event", "userAgent"], value_type = "text", null_policy = "absent" },
+  { name = "user.groups", path = ["original", "audit_event", "user", "groups"], value_type = "text_list", null_policy = "absent" },
 ]
 
 [[variants]]
@@ -265,4 +373,8 @@ fields = [
   { name = "objectRef.namespace", column = "orchestrator.namespace", value_type = "text", null_policy = "absent" },
   { name = "protoPayload.methodName", column = "event.action", value_type = "text", null_policy = "absent" },
   { name = "Outcome", column = "event.outcome", value_type = "text", null_policy = "absent" },
+  { name = "protoPayload.serviceName", path = ["original", "protoPayload", "serviceName"], value_type = "text", null_policy = "absent" },
+  { name = "protoPayload.resourceName", path = ["original", "protoPayload", "resourceName"], value_type = "text", null_policy = "absent" },
+  { name = "protoPayload.authenticationInfo.principalEmail", path = ["original", "protoPayload", "authenticationInfo", "principalEmail"], value_type = "text", null_policy = "absent" },
+  { name = "protoPayload.requestMetadata.callerSuppliedUserAgent", path = ["original", "protoPayload", "requestMetadata", "callerSuppliedUserAgent"], value_type = "text", null_policy = "absent" },
 ]
