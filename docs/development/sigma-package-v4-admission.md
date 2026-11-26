@@ -1,6 +1,6 @@
 # Sigma V4 case admission for installed packages
 
-**Status** Proposed for review before signing this evaluator identity.
+**Status** Approved by the analyst, including the independent vectors.
 
 The approved package contract gives V3 runs that require case admission
 the distinct identity `irmind-sigma-evaluator-v3-case-admission-v1`. The

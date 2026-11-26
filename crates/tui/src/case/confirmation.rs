@@ -10,6 +10,12 @@ pub(super) enum Confirmation {
         command: String,
         preview: Box<crate::SigmaPackagePreview>,
     },
+    SigmaRunInstalled {
+        command: String,
+        selection: irmind_app::v10_proofs::InstalledSigmaRunSelection,
+        time: std::ops::Range<i64>,
+        detail: String,
+    },
     SigmaRemove {
         command: String,
         name: String,
@@ -34,7 +40,8 @@ impl Confirmation {
             | Self::ObjectRead(_, detail)
             | Self::RecoverSubagents(detail)
             | Self::SigmaImport { detail, .. }
-            | Self::SigmaRemove { detail, .. } => detail,
+            | Self::SigmaRemove { detail, .. }
+            | Self::SigmaRunInstalled { detail, .. } => detail,
         }
     }
 }

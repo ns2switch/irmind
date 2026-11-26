@@ -464,6 +464,10 @@ fn approved_sigma_installation_proof_checks_the_analyst_and_operation_digest() {
 }
 
 #[cfg(feature = "sigma")]
+#[expect(
+    clippy::too_many_lines,
+    reason = "covers an authenticated pair and invalid pair variants"
+)]
 #[test]
 fn approved_sigma_case_admission_binds_the_following_run() {
     use irmind_app::{
@@ -520,23 +524,77 @@ fn approved_sigma_case_admission_binds_the_following_run() {
     assert!(
         SigmaCaseRunAdmissionV1::verify_following_run(&entry, &run, admission.manifest).is_ok()
     );
-    use irmind_app::v10_proofs::verify_sigma_case_admission_pairs;
     let mut following = entry.clone();
     following.seq += 1;
     following.kind = irmind_domain::AuditEventKind::SigmaRunV1;
     following.prev = entry.hash;
     following.payload = run.encode().unwrap();
-    assert!(verify_sigma_case_admission_pairs(&[entry.clone(), following.clone()]).is_ok());
-    assert!(verify_sigma_case_admission_pairs(std::slice::from_ref(&following)).is_err());
-    assert!(verify_sigma_case_admission_pairs(std::slice::from_ref(&entry)).is_err());
+    assert!(
+        irmind_app::v10_proofs::verify_sigma_case_admission_pairs(&[
+            entry.clone(),
+            following.clone()
+        ])
+        .is_ok()
+    );
+    assert!(
+        irmind_app::v10_proofs::verify_sigma_case_admission_pairs(std::slice::from_ref(&following))
+            .is_err()
+    );
+    assert!(
+        irmind_app::v10_proofs::verify_sigma_case_admission_pairs(std::slice::from_ref(&entry))
+            .is_err()
+    );
     let mut downgraded = following;
     let mut ungated = run.clone();
     ungated.evaluator = irmind_app::v10_proofs::SIGMA_EVALUATOR_V3.into();
     downgraded.payload = ungated.encode().unwrap();
-    assert!(verify_sigma_case_admission_pairs(&[entry.clone(), downgraded]).is_err());
+    assert!(
+        irmind_app::v10_proofs::verify_sigma_case_admission_pairs(&[entry.clone(), downgraded])
+            .is_err()
+    );
     assert!(SigmaCaseRunAdmissionV1::verify_following_run(&entry, &run, [0; 32]).is_err());
     run.selected_sources[0] ^= 1;
     assert!(
         SigmaCaseRunAdmissionV1::verify_following_run(&entry, &run, admission.manifest).is_err()
+    );
+}
+
+#[cfg(feature = "sigma")]
+#[test]
+fn approved_v4_gate_vectors_round_trip_and_reject_ungated_run() {
+    use irmind_app::{
+        Verifier,
+        v10_proofs::{SIGMA_EVALUATOR_V4_CASE_ADMISSION, SigmaCaseRunAdmissionV1, SigmaRunV1},
+    };
+    let vectors: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../docs/development/sigma-package-vectors/v4-gate.json"
+    ))
+    .unwrap();
+    let raw = |key: &str| hex::decode(vectors[key]["bytes_hex"].as_str().unwrap()).unwrap();
+    let entry: irmind_app::SignedEntry = serde_json::from_slice(&raw("signed_admission")).unwrap();
+    let verifier = crate::LocalVerifier {
+        trusted: std::collections::BTreeMap::new(),
+    }
+    .with_trusted_key(&irmind_domain::Actor::Analyst, &entry.public_key)
+    .unwrap();
+    assert_eq!(entry.canonical(), raw("admission_challenge"));
+    verifier
+        .verify(&entry.public_key, &entry.hash, &entry.sig)
+        .unwrap();
+    let admit = SigmaCaseRunAdmissionV1::from_case_entry(&entry).unwrap();
+    assert_eq!(admit.encode().unwrap(), raw("admission"));
+    let run = SigmaRunV1::decode(&irmind_app::hex(&raw("following_run"))).unwrap();
+    assert_eq!(run.evaluator, SIGMA_EVALUATOR_V4_CASE_ADMISSION);
+    assert_eq!(
+        run.encode().unwrap(),
+        irmind_app::hex(&raw("following_run"))
+    );
+    assert!(SigmaCaseRunAdmissionV1::verify_following_run(&entry, &run, admit.manifest).is_ok());
+    let ungated = SigmaRunV1::decode(&irmind_app::hex(&raw(
+        "invalid_following_run_without_gate_identity",
+    )))
+    .unwrap();
+    assert!(
+        SigmaCaseRunAdmissionV1::verify_following_run(&entry, &ungated, admit.manifest).is_err()
     );
 }

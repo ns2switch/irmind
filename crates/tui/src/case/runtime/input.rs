@@ -668,6 +668,7 @@ impl CaseRuntime<'_, '_, '_> {
                     | Confirmation::ObjectRead(command, _)
                     | Confirmation::SigmaImport { command, .. }
                     | Confirmation::SigmaPackageChange { command, .. }
+                    | Confirmation::SigmaRunInstalled { command, .. }
                     | Confirmation::SigmaRemove { command, .. } => command.clone(),
                 };
                 self.state.confirmed_action = Some(pending);

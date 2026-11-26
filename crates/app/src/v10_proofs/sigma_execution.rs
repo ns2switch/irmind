@@ -151,20 +151,29 @@ impl crate::Engine<'_> {
         manifest: [u8; 32],
         selected: &InstalledSigmaRunSelection,
         cancel: &crate::CancellationToken,
-        evaluate: impl FnOnce(SigmaExecutionContext<'_>, &SignedOperation) -> Result<PreparedSigmaExecution<T>, AppError>,
+        evaluate: impl FnOnce(
+            SigmaExecutionContext<'_>,
+            &SignedOperation,
+        ) -> Result<PreparedSigmaExecution<T>, AppError>,
         commit: impl FnOnce(T, &[SignedEntry], &crate::CancellationToken) -> Result<(), AppError>,
     ) -> Result<SigmaExecutionSummary, AppError> {
         self.execute_sigma_inner(case, manifest, Some(selected), cancel, evaluate, commit)
     }
 
-    #[expect(clippy::too_many_arguments, clippy::too_many_lines, reason = "the case lock covers one signed transaction and its proof publication")]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the case lock covers one signed transaction and its proof publication"
+    )]
     fn execute_sigma_inner<T>(
         &self,
         case: &crate::CaseId,
         manifest: [u8; 32],
         selected: Option<&InstalledSigmaRunSelection>,
         cancel: &crate::CancellationToken,
-        evaluate: impl FnOnce(SigmaExecutionContext<'_>, &SignedOperation) -> Result<PreparedSigmaExecution<T>, AppError>,
+        evaluate: impl FnOnce(
+            SigmaExecutionContext<'_>,
+            &SignedOperation,
+        ) -> Result<PreparedSigmaExecution<T>, AppError>,
         commit: impl FnOnce(T, &[SignedEntry], &crate::CancellationToken) -> Result<(), AppError>,
     ) -> Result<SigmaExecutionSummary, AppError> {
         self.require_attended_analyst("execute Sigma")?;
@@ -179,10 +188,18 @@ impl crate::Engine<'_> {
         let _installation_lock = if let Some(selected) = selected {
             let lock = self.audit_log.lock_global_operations()?;
             let mut installed = self.sigma_installations()?;
-            if edge.hash != selected.case_head || !installed.remove(&selected.name).is_some_and(|(receipt, operation)| {
-                receipt.active && receipt.manifest == manifest && operation.hash == selected.installation
-            }) {
-                return Err(AppError::Policy("Sigma extraction scope or installation changed after review".into()));
+            if edge.hash != selected.case_head
+                || !installed
+                    .remove(&selected.name)
+                    .is_some_and(|(receipt, operation)| {
+                        receipt.active
+                            && receipt.manifest == manifest
+                            && operation.hash == selected.installation
+                    })
+            {
+                return Err(AppError::Policy(
+                    "Sigma extraction scope or installation changed after review".into(),
+                ));
             }
             Some(lock)
         } else {
@@ -218,7 +235,13 @@ impl crate::Engine<'_> {
         }
         let mut signed = Vec::new();
         if let Some(selected) = selected {
-            let admission = self.sign_sigma_case_admission(case, edge, manifest, selected.installation, &mut receipt)?;
+            let admission = self.sign_sigma_case_admission(
+                case,
+                edge,
+                manifest,
+                selected.installation,
+                &mut receipt,
+            )?;
             signed.push(admission);
         } else if super::requires_sigma_case_admission(&receipt.evaluator) {
             return Err(AppError::InvalidChain(edge.seq));
@@ -274,23 +297,41 @@ impl crate::Engine<'_> {
         install: [u8; 32],
         receipt: &mut SigmaRunV1,
     ) -> Result<SignedEntry, AppError> {
-        use super::{SigmaCaseRunAdmissionV1, SIGMA_EVALUATOR_V3, SIGMA_EVALUATOR_V4,
-            SIGMA_EVALUATOR_V3_CASE_ADMISSION, SIGMA_EVALUATOR_V4_CASE_ADMISSION};
+        use super::{
+            SIGMA_EVALUATOR_V3, SIGMA_EVALUATOR_V3_CASE_ADMISSION, SIGMA_EVALUATOR_V4,
+            SIGMA_EVALUATOR_V4_CASE_ADMISSION, SigmaCaseRunAdmissionV1,
+        };
         let evaluator = match receipt.evaluator.as_str() {
             SIGMA_EVALUATOR_V3 => SIGMA_EVALUATOR_V3_CASE_ADMISSION,
             SIGMA_EVALUATOR_V4 => SIGMA_EVALUATOR_V4_CASE_ADMISSION,
             _ => return Err(AppError::InvalidChain(edge.seq)),
         };
         let claim = SigmaCaseRunAdmissionV1 {
-            checkpoint: receipt.checkpoint.clone(), installation: Some(install),
-            pack_admission: receipt.pack_admission, manifest, artifact_inventory: receipt.artifact_inventory,
-            selected_sources: receipt.selected_sources, start_us: receipt.start_utc_micros,
-            end_us: receipt.end_utc_micros, field_table: receipt.field_table, compiled_rules: receipt.compiled_rules,
-            evaluator: evaluator.into(), reserved_work: receipt.reserved_units,
+            checkpoint: receipt.checkpoint.clone(),
+            installation: Some(install),
+            pack_admission: receipt.pack_admission,
+            manifest,
+            artifact_inventory: receipt.artifact_inventory,
+            selected_sources: receipt.selected_sources,
+            start_us: receipt.start_utc_micros,
+            end_us: receipt.end_utc_micros,
+            field_table: receipt.field_table,
+            compiled_rules: receipt.compiled_rules,
+            evaluator: evaluator.into(),
+            reserved_work: receipt.reserved_units,
         };
-        let payload = crate::hex(&claim.encode().map_err(|_| AppError::InvalidChain(edge.seq))?);
+        let payload = crate::hex(
+            &claim
+                .encode()
+                .map_err(|_| AppError::InvalidChain(edge.seq))?,
+        );
         let signed = self.signed_entry_after(
-            case, Some(edge), crate::AuditOrigin::Analyst, AuditEventKind::SigmaCaseRunAdmissionV1, &payload, None,
+            case,
+            Some(edge),
+            crate::AuditOrigin::Analyst,
+            AuditEventKind::SigmaCaseRunAdmissionV1,
+            &payload,
+            None,
         )?;
         receipt.evaluator = evaluator.into();
         receipt.checkpoint.sequence = signed.seq;

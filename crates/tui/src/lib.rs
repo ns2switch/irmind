@@ -264,6 +264,18 @@ pub trait WorkspaceIo: Send + Sync {
             "Sigma admission is unavailable in this workspace".into(),
         ))
     }
+    fn run_installed_sigma_package(
+        &self,
+        _engine: &Engine<'_>,
+        _case: &irmind_app::CaseId,
+        _selection: &irmind_app::v10_proofs::InstalledSigmaRunSelection,
+        _time: std::ops::Range<i64>,
+        _cancel: &irmind_app::CancellationToken,
+    ) -> Result<String, irmind_app::AppError> {
+        Err(irmind_app::AppError::Policy(
+            "Installed Sigma package execution is unavailable in this workspace".into(),
+        ))
+    }
     fn run_sigma_pack(
         &self,
         _engine: &Engine<'_>,

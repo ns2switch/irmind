@@ -601,7 +601,7 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
             return true;
         }
         if let Some(rest) = prompt.strip_prefix("/sigma run ") {
-            self.sigma_run(rest);
+            self.sigma_run(prompt, rest);
             return true;
         }
         if let Some(rest) = prompt.strip_prefix("/sigma import ") {
@@ -696,27 +696,69 @@ impl<'env, 'ports> CaseRuntime<'_, 'env, 'ports> {
         });
     }
 
-    fn sigma_run(&mut self, arguments: &str) {
-        let parts = arguments.split_ascii_whitespace().collect::<Vec<_>>();
-        if let [digest, start, end] = parts.as_slice()
-            && let (Ok(start), Ok(end)) = (
-                irmind_app::IndexedTime::from_rfc3339(start, false),
-                irmind_app::IndexedTime::from_rfc3339(end, false),
-            )
-            && let Some(manifest) = irmind_app::v10_proofs::parse_sigma_manifest_digest(digest)
+    fn sigma_run(&mut self, prompt: &str, arguments: &str) {
+        use super::Confirmation;
+        let (io, engine, id) = (self.io_ops, self.engine, self.id);
+        if let Some(Confirmation::SigmaRunInstalled {
+            command,
+            selection,
+            time,
+            ..
+        }) = self.state.confirmed_action.take()
+            && command == prompt
         {
-            let io = self.io_ops;
-            let engine = self.engine;
-            let id = self.id;
-            let time = start.instant().unix_micros()..end.instant().unix_micros();
+            self.start_task("Run admitted Sigma package", move |cancel| {
+                io.run_installed_sigma_package(engine, id, &selection, time, &cancel)
+            });
+            return;
+        }
+        let parts = arguments.split_ascii_whitespace().collect::<Vec<_>>();
+        let [pack, start_text, end_text] = parts.as_slice() else {
+            self.state.messages.push(
+                "Use /sigma run <package name or imported pack SHA-256> <start UTC> <end UTC>"
+                    .into(),
+            );
+            return;
+        };
+        let (Ok(start), Ok(end)) = (
+            irmind_app::IndexedTime::from_rfc3339(start_text, false),
+            irmind_app::IndexedTime::from_rfc3339(end_text, false),
+        ) else {
+            self.state
+                .messages
+                .push("Sigma requires valid UTC start and end times".into());
+            return;
+        };
+        let time = start.instant().unix_micros()..end.instant().unix_micros();
+        if time.is_empty() {
+            self.state
+                .messages
+                .push("Sigma requires an increasing UTC time range".into());
+            return;
+        }
+        if let Some(manifest) = irmind_app::v10_proofs::parse_sigma_manifest_digest(pack) {
             self.start_task("Run Sigma", move |cancel| {
                 io.run_sigma_pack(engine, id, manifest, time, &cancel)
             });
             return;
         }
-        self.state
-            .messages
-            .push("Use /sigma run <pack SHA-256> <start UTC> <end UTC>".into());
+        let (command, name) = (prompt.to_owned(), (*pack).to_owned());
+        let sender = self.confirmation_tx.clone();
+        let (start_text, end_text) = ((*start_text).to_owned(), (*end_text).to_owned());
+        self.start_task("Prepare Sigma run", move |cancel| {
+            use irmind_app::v10_proofs::InstalledSigmaRunSelection;
+            let (receipt, install) = engine.sigma_installations()?.remove(&name)
+                .filter(|(receipt, _)| receipt.active)
+                .ok_or_else(|| irmind_app::AppError::Policy("No active Sigma package with that name".into()))?;
+            let entries = engine.audit_log.entries(id)?;
+            let case_head = entries.last().ok_or(irmind_app::AppError::InvalidChain(0))?.hash;
+            let overview = io.sigma_package_info(engine, id, &name, &cancel)?;
+            let detail = format!("Sign case admission for Sigma package {}?\nUTC range {start_text} to {end_text}\nCase checkpoint {}\n{overview}", receipt.name, irmind_app::hex(&case_head));
+            let selection = InstalledSigmaRunSelection { name, installation: install.hash, case_head };
+            sender.send(Confirmation::SigmaRunInstalled { command, selection, time, detail })
+                .map_err(|_| irmind_app::AppError::Cancelled)?;
+            Ok("Review the installed package and scope before signing".into())
+        });
     }
 
     fn sigma_import(&mut self, prompt: &str, rest: &str) {

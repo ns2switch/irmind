@@ -6,9 +6,11 @@ pub const SIGMA_EVALUATOR_V3_CASE_ADMISSION: &str = "irmind-sigma-evaluator-v3-c
 pub const SIGMA_EVALUATOR_V4_CASE_ADMISSION: &str = "irmind-sigma-evaluator-v4-case-admission-v1";
 
 pub fn requires_sigma_case_admission(evaluator: &str) -> bool {
-    matches!(evaluator, SIGMA_EVALUATOR_V3_CASE_ADMISSION | SIGMA_EVALUATOR_V4_CASE_ADMISSION)
+    matches!(
+        evaluator,
+        SIGMA_EVALUATOR_V3_CASE_ADMISSION | SIGMA_EVALUATOR_V4_CASE_ADMISSION
+    )
 }
-
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SigmaPackageOriginV1 {

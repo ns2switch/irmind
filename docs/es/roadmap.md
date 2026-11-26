@@ -173,6 +173,7 @@ documentar las comprobaciones pendientes. [Registro manual](manual-validation.md
 - Ingerir salidas de Volatility 3. [#158](https://github.com/ns2switch/irmind/issues/158).
 - Decidir cuándo estabilizar los formatos firmados y cuánto tiempo mantener
   las versiones de parsers.
+- Al estabilizar los formatos, registrar la admisión de Sigma en el caso por separado de la versión del evaluador. Cada proyección nueva tendrá un solo identificador y reutilizará la verificación de la admisión.
 
 ## Decisiones abiertas
 

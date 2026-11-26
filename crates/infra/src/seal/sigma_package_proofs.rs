@@ -134,6 +134,10 @@ mod tests {
     use irmind_domain::Actor;
     use std::io::Cursor;
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the test signs and verifies the complete proof set"
+    )]
     #[test]
     fn v10_sigma_package_objects_bind_the_exact_installation_and_metadata() {
         let vectors: serde_json::Value = serde_json::from_str(include_str!(

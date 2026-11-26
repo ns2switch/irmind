@@ -184,8 +184,9 @@ the pre-admission checkpoint, time, sources, inventory, field table,
 compiled rules, evaluator and work to match. The new evaluator introduced
 by the source-class contract can run on its own before packages ship.
 Once this gate ships, use evaluator
-`irmind-sigma-evaluator-v3-case-admission-v1` so that removing an admission can never be interpreted as a
-historical ungated execution. The result proof encoding proposed in the
+`irmind-sigma-evaluator-v4-case-admission-v1` as approved in the
+[V4 case-admission amendment](sigma-package-v4-admission.md). Removing an admission
+cannot make the run a historical ungated execution. The result proof encoding proposed in the
 [class compilation contract](https://github.com/ns2switch/irmind/pull/431)
 can be reused. Existing case validation must reject a sealed case or stale
 checkpoint before append. Removing or updating a package cannot rewrite

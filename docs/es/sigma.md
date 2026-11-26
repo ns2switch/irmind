@@ -4,7 +4,13 @@
 
 IRMind evalúa un subconjunto acotado de reglas Sigma sobre los artefactos Parquet locales autenticados de un caso abierto. El análisis firmado registra los bytes de las reglas admitidas, el alcance de fuentes, la tabla de campos revisada, las reglas omitidas y las filas exactas de evidencia. Usa la evidencia local y se ejecuta sin modelo ni conexión de red.
 
-## Ejecutar un pack
+## Instalar y ejecutar un paquete
+
+- Usa `/sigma list` para ver las instalaciones y `/sigma info <nombre>` para consultar la cobertura frente a las fuentes del caso.
+- Ejecuta `/sigma install <fichero del paquete>` o `/sigma install catalog:<nombre>`. Revisa la versión, la licencia y los hashes antes de firmar. El comando solo contacta con el catálogo cuando lo solicitas. Puedes revisar una actualización con `/sigma update <nombre> [origen]` o desactivar un paquete con `/sigma remove <nombre>`.
+- Ejecuta `/sigma run <nombre> <inicio UTC> <fin UTC>` y revisa el alcance del caso antes de firmar la admisión. La ejecución y el export V10 conservan la versión aprobada y sus pruebas, incluso tras desactivarla.
+
+## Ejecutar reglas desde un directorio local
 
 1. Guarda las reglas YAML revisadas, con un solo documento por fichero, en un directorio local. Comprueba la procedencia y la licencia de las reglas de terceros antes de importarlas.
 2. Ejecuta `/sigma inspect <directorio>` y revisa el SHA-256 del manifiesto. Usa `/sigma import --license <id-licencia> <directorio>` y confirma ese hash para firmar la admisión.
