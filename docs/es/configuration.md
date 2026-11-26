@@ -46,6 +46,22 @@ Las fuentes oficiales de los perfiles figuran en la [versión inglesa](../config
 salida. La prueba no guarda ajustes ni credenciales ni firma una operación de
 configuración.
 
+### Diagnóstico local de SSE
+
+Antes de iniciar IRMind, asigna a `IRMIND_SSE_DIAGNOSTICS_FILE` la ruta de un
+fichero nuevo. En PowerShell, por ejemplo, ejecuta
+`$env:IRMIND_SSE_DIAGNOSTICS_FILE = "$PWD/irmind-provider.sse"` antes de abrir
+la TUI. Los adaptadores compatibles con OpenAI guardan una captura cuando
+finaliza o falla la primera respuesta que haya recibido bytes. Quita la
+variable para desactivarlo. Si el fichero ya existe, se conserva. Elige otro
+nombre para capturar una petición más.
+
+La captura acotada conserva el orden y la forma de los frames SSE y el uso
+de tokens informado. Sustituye u omite respuestas, razonamiento, argumentos,
+identificadores, campos desconocidos y bytes mal formados. Los mensajes de
+petición, cabeceras HTTP y credenciales quedan fuera de la captura. El fichero
+es local y queda fuera del caso y su exportación. Por defecto está desactivado.
+
 ## Alcance del caso
 
 Un caso puede ser solo local. Para permitir lecturas remotas, el formulario de caso nuevo pide fuentes, cuentas, proyectos, hosts, prefijos de objetos y una ventana UTC. Un prefijo tiene la forma `s3://bucket/AWSLogs/123/`, `gs://bucket/export/` o `az://contenedor/export/`. Añádelo con `/scope add object <URI>`; el ID de fuente también debe estar en el alcance. Los demás destinos usan `/scope add project <id>` (o `source`, `account`, `host`). Amplía la ventana con `/scope window <from> <to>`. El analista firma los cambios. Las lecturas de objetos fuera del prefijo del caso o de la organización se deniegan. La codificación para automatización está en la [referencia de la CLI](../development/cli.md).
