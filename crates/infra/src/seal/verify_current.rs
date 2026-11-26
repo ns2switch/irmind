@@ -1,4 +1,4 @@
-use super::export_current::{EXPORT_VERSION, HeaderV10, MAGIC_V10, v10_result};
+use super::export_current::{ExportHeader, export_result};
 use super::frames::{read_frame, read_hash, read_u64, verify_raw};
 use super::{
     AppError, CaseId, LocalVerifier, Path, Severity, hex, seal_challenge, sha256, storage,
@@ -8,13 +8,13 @@ use irmind_app::{ExportVerification, SignedEntry, SignedOperation, Verifier};
 use irmind_domain::{Actor, AuditEventKind, SourceManifestV2};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
-use std::io::{Read, Seek as _, SeekFrom};
+use std::io::{Seek as _, SeekFrom};
 
 const MAX_AUDIT_ENTRIES: u64 = 5_000_000;
 const MAX_SOURCE_MANIFESTS: usize = 1_000_000;
 const MAX_PACKAGE_FILE_BYTES: u64 = 2_000_000_000_000;
 
-pub(super) fn verify_export_v10(
+pub(super) fn verify_current_export(
     path: &Path,
     expected_key: Option<&str>,
 ) -> Result<ExportVerification, AppError> {
@@ -103,7 +103,7 @@ fn verify_open_export_with_catalog(
         },
         &cancel,
     )?;
-    let mut result = v10_result(
+    let mut result = export_result(
         fingerprint,
         usize::try_from(count).map_err(storage)?,
         chain.source_count,
@@ -116,23 +116,11 @@ fn verify_open_export_with_catalog(
     Ok(result)
 }
 
-fn read_header(input: &mut File) -> Result<(HeaderV10, CaseId), AppError> {
-    let mut magic = [0u8; MAGIC_V10.len()];
-    if input.read_exact(&mut magic).is_err() || magic != MAGIC_V10 {
-        return Err(AppError::Fixed(
-            irmind_app::FixedAppError::RetiredExportFormat,
-        ));
-    }
+fn read_header(input: &mut File) -> Result<(ExportHeader, CaseId), AppError> {
+    irmind_app::case_format::read_export_magic(input)?;
     let encoded_header = read_frame(input)?;
-    let header: HeaderV10 = serde_json::from_slice(&encoded_header).map_err(storage)?;
-    if header.version != EXPORT_VERSION {
-        return Err(AppError::Fixed(
-            irmind_app::FixedAppError::RetiredExportFormat,
-        ));
-    }
-    if serde_json::to_vec(&header).map_err(storage)? != encoded_header {
-        return Err(storage_reason("noncanonical export header"));
-    }
+    let header: ExportHeader = serde_json::from_slice(&encoded_header).map_err(storage)?;
+    irmind_app::case_format::check_export_header_version(header.version)?;
     let id = CaseId::parse(&header.case_id)
         .ok()
         .filter(|id| {
@@ -151,7 +139,7 @@ fn read_header(input: &mut File) -> Result<(HeaderV10, CaseId), AppError> {
 fn verify_methodology_tail(
     input: &mut File,
     chain: &mut ChainState,
-    header: &HeaderV10,
+    header: &ExportHeader,
     catalog: &dyn irmind_app::catalog::CatalogIndexVerifier,
 ) -> Result<(), AppError> {
     let proofs = super::skill_proofs::read(
@@ -196,7 +184,7 @@ struct ScopedOperations {
 fn verify_operation_frames(
     input: &mut File,
     chain: &ChainState,
-    header: &HeaderV10,
+    header: &ExportHeader,
 ) -> Result<ScopedOperations, AppError> {
     let count = read_u64(input)?;
     if count > MAX_AUDIT_ENTRIES {
@@ -622,7 +610,7 @@ impl ChainState {
         Ok(())
     }
 
-    fn verify_seal(&self, id: &CaseId, header: &HeaderV10) -> Result<(), AppError> {
+    fn verify_seal(&self, id: &CaseId, header: &ExportHeader) -> Result<(), AppError> {
         {
             self.catalog.validate()?;
         }
@@ -679,11 +667,59 @@ mod tests {
         let mut observer = input.try_clone().unwrap();
         assert!(matches!(
             verify_open_export(input, MAX_PACKAGE_FILE_BYTES, None),
-            Err(AppError::Fixed(
-                irmind_app::FixedAppError::RetiredExportFormat
-            ))
+            Err(AppError::Fixed(irmind_app::FixedAppError::CaseFormat(
+                irmind_app::case_format::CaseFormatError::InvalidExport
+            )))
         ));
         assert!(observer.stream_position().unwrap() > 0);
         assert!(super::super::verify_export(&path).is_err());
+    }
+
+    #[test]
+    fn v11_empty_archive_and_old_format_rejections_match_reviewed_vectors() {
+        let vectors: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../docs/development/case-7-export-v11-vectors/wire.json"
+        ))
+        .unwrap();
+        let archive = &vectors["case_and_export"];
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("case.irmind");
+        let verify = |sample: &serde_json::Value| {
+            std::fs::write(&path, hex::decode(sample["hex"].as_str().unwrap()).unwrap()).unwrap();
+            verify_current_export(&path, None)
+        };
+        let valid = verify(&archive["v11_empty_signed_case"]).unwrap();
+        assert_eq!((valid.format_version, valid.entries), (11, 2));
+        for version in 1..=10 {
+            let error =
+                verify(&archive["reject_legacy_magic_only"][version.to_string()]).unwrap_err();
+            assert!(matches!(
+                error,
+                AppError::Fixed(irmind_app::FixedAppError::CaseFormat(
+                    irmind_app::case_format::CaseFormatError::Export(found)
+                )) if found == version
+            ));
+            assert!(
+                error
+                    .to_string()
+                    .contains(irmind_app::case_format::FORMAT_GUIDE)
+            );
+        }
+        let mixed = verify(&archive["reject_signed_case_6_in_v11"]).unwrap_err();
+        assert!(matches!(
+            mixed,
+            AppError::Fixed(irmind_app::FixedAppError::CaseFormat(
+                irmind_app::case_format::CaseFormatError::Case(Some(6))
+            ))
+        ));
+        for key in [
+            "reject_header_version_mismatch",
+            "reject_missing_report_count",
+            "reject_trailing_byte",
+            "reject_noncanonical_magic",
+            "reject_truncated_magic",
+        ] {
+            assert!(verify(&archive[key]).is_err(), "{key}");
+        }
     }
 }

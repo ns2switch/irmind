@@ -117,6 +117,7 @@ impl LocalStore {
             )
             .map_err(storage)?;
         if exists {
+            self.check_stored_case_format(&id)?;
             self.require_unsealed_deletion(&id)?;
             inventory::check_tail(self, &id, receipt)?;
         }
@@ -188,6 +189,7 @@ impl CaseLifecycleStore for LocalStore {
         }
         let leases = self.deletion_leases(id)?;
         self.get_case(id)?;
+        self.check_stored_case_format(id)?;
         self.require_unsealed_deletion(id)?;
         let inventory = inventory::measure(self, id, cancel)?;
         Ok(Box::new(Prepared {

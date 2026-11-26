@@ -181,7 +181,7 @@ fn catalog_case_verification_and_v10_export_require_the_independent_case_copy() 
     f.store.export_case(&f.case.id, &path, &cancel).unwrap();
     let verified =
         crate::seal::verify_export_with_catalog(&path, None, &f.store.catalog_verifier).unwrap();
-    assert_eq!(verified.format_version, 10);
+    assert_eq!(verified.format_version, 11);
     assert!(crate::verify_export(&path).is_err()); // No production fixture key.
     std::fs::remove_file(&proof).unwrap();
     assert!(f.engine.verify(&f.case.id).is_err());

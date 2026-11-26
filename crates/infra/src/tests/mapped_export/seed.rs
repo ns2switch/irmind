@@ -7,9 +7,9 @@ fn verify_retired_golden(bytes: &[u8], digest: &str) {
     fs::write(&package, bytes).unwrap();
     assert!(matches!(
         verify_export(&package),
-        Err(AppError::Fixed(
-            irmind_app::FixedAppError::RetiredExportFormat
-        ))
+        Err(AppError::Fixed(irmind_app::FixedAppError::CaseFormat(
+            irmind_app::case_format::CaseFormatError::Export(_)
+        )))
     ));
 }
 #[test]
@@ -27,7 +27,7 @@ fn retired_installed_v8_package_preserves_its_historical_digest() {
     );
 }
 
-fn verify_v10_golden(bytes: &[u8], digest: &str, entries: usize) {
+fn verify_v11_golden(bytes: &[u8], digest: &str, entries: usize) {
     assert_eq!(hex(&sha256(bytes)), digest);
     let root = tempfile::tempdir().unwrap();
     let package = root.path().join("golden.irmind");
@@ -44,7 +44,7 @@ fn verify_v10_golden(bytes: &[u8], digest: &str, entries: usize) {
             verified.entries,
             verified.source_manifests
         ),
-        (10, entries, 1)
+        (11, entries, 1)
     );
     assert!(
         LocalExportVerifier
@@ -66,19 +66,31 @@ fn retired_v9_packages_preserve_their_historical_digests() {
 }
 
 #[test]
-fn synthetic_v10_package_authenticates_without_any_keystore() {
-    verify_v10_golden(
+fn retired_v10_packages_preserve_their_historical_digests() {
+    verify_retired_golden(
         include_bytes!("../../../../../fuzz/seeds/export/valid-v10-mapped.irmind"),
         "e066b8539092394868477607bd97cd421d1051f4ffddcd004952d024f97806fd",
+    );
+    verify_retired_golden(
+        include_bytes!("../../../../../fuzz/seeds/export/valid-v10-installed.irmind"),
+        "1bbbcb484b9832932d8555e1569325e67623768412e8277cc2cedbd149072d8e",
+    );
+}
+
+#[test]
+fn synthetic_v11_package_authenticates_without_any_keystore() {
+    verify_v11_golden(
+        include_bytes!("../../../../../fuzz/seeds/export/valid-v11-mapped.irmind"),
+        "58e2a4cdd47ec43db970591519d7adcb0ff543dc2693a8b8093708bc20f148ff",
         7,
     );
 }
 
 #[test]
-fn synthetic_installed_v10_retains_portable_mapping_authorization() {
-    verify_v10_golden(
-        include_bytes!("../../../../../fuzz/seeds/export/valid-v10-installed.irmind"),
-        "1bbbcb484b9832932d8555e1569325e67623768412e8277cc2cedbd149072d8e",
+fn synthetic_installed_v11_retains_portable_mapping_authorization() {
+    verify_v11_golden(
+        include_bytes!("../../../../../fuzz/seeds/export/valid-v11-installed.irmind"),
+        "bbd5eeb2dc8ceccfabdf35261d8458de67742b7609536208a71f9cfc08c7c8a3",
         8,
     );
 }

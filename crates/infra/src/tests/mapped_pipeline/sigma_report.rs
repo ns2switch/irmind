@@ -150,7 +150,7 @@ fn verify_signed_reports(
             .verify_export_details(&path, Some(&key))
             .unwrap()
             .format_version,
-        10
+        11
     );
     let mut tampered = fs::read(&path).unwrap();
     *tampered.last_mut().unwrap() ^= 1;
@@ -580,7 +580,7 @@ fn signed_sigma_run_and_admitted_rules_verify_in_the_actual_sealed_v10_export() 
     let result = LocalExportVerifier
         .verify_export_details(&package, Some(&key))
         .unwrap();
-    assert_eq!(result.format_version, 10);
+    assert_eq!(result.format_version, 11);
     let mut bytes = fs::read(&package).unwrap();
     let rule = bytes
         .windows(SIGMA_RULE.len())

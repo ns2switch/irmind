@@ -17,10 +17,8 @@ pub enum FixedAppError {
         "This case uses a retired format. Use the IRMind version that created it, or re-ingest the verified originals into a new case."
     )]
     RetiredCaseFormat,
-    #[error(
-        "This export uses a retired format. Verify it with the IRMind version that created it, or re-ingest the verified originals into a new case."
-    )]
-    RetiredExportFormat,
+    #[error(transparent)]
+    CaseFormat(crate::case_format::CaseFormatError),
     #[error("invalid bounded source format")]
     SourceFormat,
     #[error("source record limit exceeded")]

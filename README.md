@@ -22,7 +22,7 @@ No model setup, API key, account or cost. The real interface runs a synthetic in
 *Captured with IRMind v0.5.3. The complete presentation runs the real product with synthetic evidence, ephemeral keys and an offline scripted model. Enter advances; Space pauses; Esc exits.*
 
 > [!WARNING]
-> Pre-1.0: each minor version may change case, export and definition formats without migration. Keep the IRMind version that created a case to open, verify or export it, or re-ingest the verified originals into a new case.
+> Pre-1.0: each minor version may change case, export and definition formats without migration. Keep the IRMind version that created a case to open, verify or export it, or re-ingest the verified originals into a new case. If you have open v0.7.x cases, download their exact producing binaries from GitHub Releases before upgrading. Homebrew does not keep old versions. [Verify the SHA-256 checksum, Sigstore bundle, and GitHub attestation](docs/previous-versions.md).
 
 ## What you can do
 
@@ -112,7 +112,7 @@ You can ingest, inspect, and verify local evidence without a model. On later sta
 
 ## Modules
 
-Version 0.7 uses one source-decoder → identified mapping → V3 writer pipeline in the CLI, TUI and demo. It reads only CaseCreated version 6 and export V10; [earlier cases require their creating version or a new ingestion](docs/cases.md#cases-and-exports-from-an-earlier-version).
+Version 0.8 uses one source-decoder → identified mapping → V3 writer pipeline in the CLI, TUI and demo. It reads only CaseCreated version 7 and export V11. [Earlier cases require their creating version or a new ingestion](docs/cases.md#cases-and-exports-from-an-earlier-version).
 
 The normal build includes every current product module and both keystores. No remote connector or LLM is enabled until selected and configured. A smaller build uses `--no-default-features --features keystore-file` (at least one signer and secrets backend is required). All modules are experimental.
 

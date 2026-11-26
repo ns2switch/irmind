@@ -80,7 +80,7 @@ no cierra el plan automáticamente ni repite efectos remotos. Usa
 interferir con vistas previas o hijos activos en otras sesiones. No se fuerza.
 Se conservan el trabajo completado y el consumo incierto sin repetir llamadas.
 
-La versión 0.5 usa marcador de caso 4 y export V8. Conserva el ejecutable creador
+La versión 0.8 usa el marcador de caso 7 y exporta en V11. Conserva el ejecutable creador
 para casos anteriores o reingiere originales verificados en un caso nuevo; abrir
 no migra. Consulta [configuración](configuration.md), el
 [contrato de formato](subagents-format-contract.md) y la

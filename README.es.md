@@ -22,7 +22,7 @@ Sin configurar modelos, claves de API, cuentas ni coste. La interfaz real invest
 *Grabada con IRMind v0.5.3. La presentación completa usa el producto real con evidencia sintética, claves efímeras y un modelo guionizado sin red. Enter avanza; Espacio pausa; Esc sale.*
 
 > [!WARNING]
-> Antes de 1.0, cada versión menor puede cambiar los formatos de casos, exportaciones y definiciones sin migración. Conserva la versión de IRMind que creó un caso para abrirlo, verificarlo o exportarlo, o reingiere los originales verificados en un caso nuevo.
+> Antes de 1.0, cada versión menor puede cambiar los formatos de casos, exportaciones y definiciones sin migración. Conserva la versión de IRMind que creó un caso para abrirlo, verificarlo o exportarlo, o reingiere los originales verificados en un caso nuevo. Si tienes casos abiertos de v0.7.x, descarga antes de actualizar sus binarios productores desde GitHub Releases. Homebrew no conserva versiones anteriores. [Verifica el checksum SHA-256, el bundle de Sigstore y la attestation de GitHub](docs/es/previous-versions.md).
 
 ## Qué puedes hacer
 
@@ -116,7 +116,7 @@ Usa `/skills` para inspeccionar y gestionar los 23 métodos incluidos de nube, W
 
 ## Módulos
 
-La versión 0.7 usa una única cadena decodificador de origen → mapeo identificado → escritor V3 en la CLI, la TUI y la demo. Solo lee CaseCreated versión 6 y la exportación V10. [Los casos anteriores necesitan su versión creadora o una ingesta nueva](docs/es/cases.md#casos-y-exportaciones-de-una-versión-anterior).
+La versión 0.8 usa una única cadena decodificador de origen → mapeo identificado → escritor V3 en la CLI, la TUI y la demo. Solo lee CaseCreated versión 7 y la exportación V11. [Los casos anteriores necesitan su versión creadora o una ingesta nueva](docs/es/cases.md#casos-y-exportaciones-de-una-versión-anterior).
 
 La compilación normal incluye todos los módulos de producto actuales y ambos llaveros. Los modelos remotos y conectores permanecen desactivados hasta seleccionarlos y configurarlos. Los parsers locales se eligen por detección del contenido. Una compilación mínima usa `--no-default-features --features keystore-file` porque siempre se necesita firma y un backend de secretos. Todos siguen siendo experimentales.
 

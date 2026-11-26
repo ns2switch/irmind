@@ -352,47 +352,35 @@ pub(super) fn verify_empty(input: &mut impl Read) -> Result<(), AppError> {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use super::super::export_current::{HeaderV10, write_header};
-    use super::super::{CaseSeal, hex, sha256};
+    use super::super::export_current::{ExportHeader, write_header};
+    use super::super::{hex, sha256};
     use super::*;
     use std::io::SeekFrom;
 
     #[test]
-    fn export_v10_wire_matches_independent_header_and_count_vectors() {
-        let vectors: serde_json::Value = serde_json::from_slice(include_bytes!(
-            "../../../testkit/fixtures/contracts/sigma_report_v10.json"
+    fn export_v11_wire_matches_independent_header_and_count_vectors() {
+        let vectors: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../docs/development/case-7-export-v11-vectors/wire.json"
         ))
         .unwrap();
-        let key = (0..32).collect::<Vec<u8>>();
-        let header = HeaderV10 {
-            version: 10,
-            case_id: "00000000-0000-4000-8000-000000000010".into(),
-            title: "Synthetic V10 layout".into(),
-            severity: "low".into(),
-            scope: "synthetic case".into(),
-            seal: CaseSeal {
-                seq: 7,
-                hash: sha256(b"synthetic-audit-entry"),
-                sig: (0..64).collect(),
-                analyst_key_fingerprint: hex(&sha256(&key)),
-                public_key: key,
-            },
-        };
+        let vector = &vectors["case_and_export"]["v11_magic_and_header_frame"];
+        let expected = hex::decode(vector["hex"].as_str().unwrap()).unwrap();
+        let json_start = irmind_app::case_format::EXPORT_MAGIC.len() + 8;
+        let header: ExportHeader = serde_json::from_slice(&expected[json_start..]).unwrap();
         let mut file = tempfile::tempfile().unwrap();
         write_header(&mut file, &header).unwrap();
         let mut bytes = Vec::new();
         file.seek(SeekFrom::Start(0)).unwrap();
         file.read_to_end(&mut bytes).unwrap();
-        let vector = &vectors["export_v10_header_frame"];
-        assert_eq!(hex(&bytes), vector["bytes_hex"]);
+        assert_eq!(bytes, expected);
         assert_eq!(hex(&sha256(&bytes)), vector["sha256"]);
 
         bytes.clear();
         let cancel = CancellationToken::new();
         write_empty(&mut bytes, &cancel).unwrap();
-        let vector = &vectors["export_v10_empty_sigma_and_report_counts"];
-        assert_eq!(hex(&bytes), vector["bytes_hex"]);
-        assert_eq!(hex(&sha256(&bytes)), vector["sha256"]);
+        let complete = &vectors["case_and_export"]["v11_empty_signed_case"]["hex"];
+        let complete = hex::decode(complete.as_str().unwrap()).unwrap();
+        assert_eq!(bytes, complete[complete.len() - 16..]);
         verify_empty(&mut bytes.as_slice()).unwrap();
         for index in [7, 15] {
             bytes[index] = 1;

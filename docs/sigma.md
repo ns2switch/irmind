@@ -16,7 +16,7 @@ IRMind evaluates a bounded subset of Sigma detection rules over the authenticate
 2. Run `/sigma inspect <directory>` and review the manifest SHA-256. Use `/sigma import --license <license-id> <directory>` and confirm that hash to sign the admission.
 3. Run `/sigma run <manifest SHA-256> <start UTC> <end UTC>`. Use two increasing UTC timestamps, for example `2026-11-01T00:00:00Z 2026-11-02T00:00:00Z`.
 4. Review the proposed matches and their row references. Use `/confirm <finding-id>` to confirm an individual finding before publishing the case report.
-5. Run `/verify` to check the authenticated case and its Sigma material. Seal the case before exporting V10. The recipient can verify the export using the case's expected analyst key fingerprint.
+5. Run `/verify` to check the authenticated case and its Sigma material. Seal the case before exporting V11. The recipient can verify the export using the case's expected analyst key fingerprint.
 
 Sigma compiles the full rule independently for each applicable source class and runs it where all fields have exact bindings. The signed run records skipped class and rule pairs and distinguishes coverage gaps from indeterminate rows and interrupted scans. An empty result leaves activity in any skipped class undetermined.
 

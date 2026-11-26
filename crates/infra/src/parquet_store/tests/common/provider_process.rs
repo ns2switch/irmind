@@ -234,6 +234,6 @@ fn provider_process_namespaces_survive_parquet_compaction_rebuild_and_export() {
             .verify_export_details(&export, Some(&key))
             .unwrap()
             .format_version,
-        10
+        11
     );
 }

@@ -212,7 +212,7 @@ fn event_cache_reauthenticates_changed_prior_bytes_even_when_tip_hash_is_unchang
         .poll(initial, 1024, &CancellationToken::new())
         .unwrap();
     assert!(!batch.events.is_empty());
-    let prior_tip = store.entries(&history.case).unwrap().last().unwrap().hash;
+    let prior_tip = store.last_entry(&history.case).unwrap().unwrap().hash;
     {
         let db = store.db.lock().unwrap();
         db.execute_batch("DROP TRIGGER audit_no_update").unwrap();
@@ -223,7 +223,7 @@ fn event_cache_reauthenticates_changed_prior_bytes_even_when_tip_hash_is_unchang
         .unwrap();
     }
     assert_eq!(
-        store.entries(&history.case).unwrap().last().unwrap().hash,
+        store.last_entry(&history.case).unwrap().unwrap().hash,
         prior_tip
     );
     assert!(

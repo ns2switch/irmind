@@ -112,7 +112,7 @@ fn mapped_pipeline_binds_raw_inputs_and_maps_before_writing_and_exporting() {
             .verify_export_details(&path, Some(&key))
             .unwrap()
             .format_version,
-        10
+        11
     );
     let spool = store.parquet.case_dir(&case.id).unwrap().join("spool");
     assert_eq!(fs::read_dir(spool).unwrap().count(), 0);

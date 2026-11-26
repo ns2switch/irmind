@@ -11,13 +11,12 @@ use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::{Read, Write};
 
-pub(super) const EXPORT_VERSION: u32 = 10;
-pub(super) const MAGIC_V10: &[u8] = b"IRMIND-EXPORT-V10\0";
+use irmind_app::case_format::{EXPORT_MAGIC, EXPORT_VERSION};
 pub(super) const MAX_FRAME_BYTES: u64 = 1024 * 1024;
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct HeaderV10 {
+pub(super) struct ExportHeader {
     pub version: u32,
     pub case_id: String,
     pub title: String,
@@ -32,7 +31,7 @@ struct ExportRequest<'a> {
     source_root: Option<&'a Path>,
     include_originals: bool,
     cancel: &'a CancellationToken,
-    header: HeaderV10,
+    header: ExportHeader,
     entry_count: u64,
     evidence: Vec<String>,
     source_count: u64,
@@ -72,7 +71,7 @@ impl LocalStore {
             return Err(AppError::Sealed);
         }
         let seal = self.case_seal(id)?.ok_or(AppError::InvalidChain(0))?;
-        let header = HeaderV10 {
+        let header = ExportHeader {
             version: EXPORT_VERSION,
             case_id: id.as_str().into(),
             title: case.title,
@@ -312,8 +311,8 @@ pub(super) fn copy_verified(
     Ok(())
 }
 
-pub(super) fn write_header(out: &mut File, header: &HeaderV10) -> Result<(), AppError> {
-    out.write_all(MAGIC_V10).map_err(storage)?;
+pub(super) fn write_header(out: &mut File, header: &ExportHeader) -> Result<(), AppError> {
+    out.write_all(EXPORT_MAGIC).map_err(storage)?;
     write_frame(out, &serde_json::to_vec(header).map_err(storage)?)
 }
 
@@ -326,7 +325,7 @@ pub(super) fn write_frame(out: &mut File, bytes: &[u8]) -> Result<(), AppError> 
     out.write_all(bytes).map_err(storage)
 }
 
-pub(super) fn v10_result(
+pub(super) fn export_result(
     fingerprint: String,
     entries: usize,
     source_manifests: usize,

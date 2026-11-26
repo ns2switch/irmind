@@ -175,7 +175,7 @@ fn corrupt_sources_refill_groups_without_changing_clean_derived_bytes() {
             .verify_export_details(&export, Some(&key))
             .unwrap()
             .format_version,
-        10
+        11
     );
     assert_eq!(
         fs::read_dir(store.parquet.case_dir(&mixed.id).unwrap().join("spool"))

@@ -9,10 +9,9 @@ const CRASH_ROOT: &str = "IRMIND_TEST_QUERY_DISPATCH_CRASH_ROOT";
 const CRASH_ORDER: &str = "IRMIND_TEST_QUERY_DISPATCH_CRASH_ORDER";
 
 fn fixture() -> Vec<SignedEntry> {
-    let mut chain: Vec<SignedEntry> = serde_json::from_str(include_str!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../docs/development/source-query-format-vectors/signed-record-chain.json"
-    )))
+    let mut chain: Vec<SignedEntry> = serde_json::from_slice(include_bytes!(
+        "../../../../testkit/fixtures/contracts/signed-record-chain-case-v7.json"
+    ))
     .unwrap();
     chain.truncate(6);
     let signer = crate::LocalSigner {

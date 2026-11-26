@@ -8,7 +8,7 @@ IRMind evalúa un subconjunto acotado de reglas Sigma sobre los artefactos Parqu
 
 - Usa `/sigma list` para ver las instalaciones y `/sigma info <nombre>` para consultar la cobertura frente a las fuentes del caso.
 - Ejecuta `/sigma install <fichero del paquete>` o `/sigma install catalog:<nombre>`. Revisa la versión, la licencia y los hashes antes de firmar. El comando solo contacta con el catálogo cuando lo solicitas. Puedes revisar una actualización con `/sigma update <nombre> [origen]` o desactivar un paquete con `/sigma remove <nombre>`.
-- Ejecuta `/sigma run <nombre> <inicio UTC> <fin UTC>` y revisa el alcance del caso antes de firmar la admisión. La ejecución y el export V10 conservan la versión aprobada y sus pruebas, incluso tras desactivarla.
+- Ejecuta `/sigma run <nombre> <inicio UTC> <fin UTC>` y revisa el alcance del caso antes de firmar la admisión. La ejecución y el export V11 conservan la versión aprobada y sus pruebas, incluso tras desactivarla.
 
 ## Ejecutar reglas desde un directorio local
 
@@ -16,7 +16,7 @@ IRMind evalúa un subconjunto acotado de reglas Sigma sobre los artefactos Parqu
 2. Ejecuta `/sigma inspect <directorio>` y revisa el SHA-256 del manifiesto. Usa `/sigma import --license <id-licencia> <directorio>` y confirma ese hash para firmar la admisión.
 3. Ejecuta `/sigma run <SHA-256 del manifiesto> <inicio UTC> <fin UTC>` con dos instantes UTC crecientes, como `2026-11-01T00:00:00Z 2026-11-02T00:00:00Z`.
 4. Revisa los hallazgos propuestos y las referencias a sus filas. Confirma cada hallazgo con `/confirm <id-hallazgo>` antes de publicar el informe.
-5. Ejecuta `/verify` para verificar el caso y el material firmado de Sigma. Sella el caso antes de exportarlo en V10. El destinatario puede verificar el paquete con la huella esperada de la clave del analista.
+5. Ejecuta `/verify` para verificar el caso y el material firmado de Sigma. Sella el caso antes de exportarlo en V11. El destinatario puede verificar el paquete con la huella esperada de la clave del analista.
 
 Sigma compila la regla completa para cada clase de fuente aplicable y la ejecuta donde todos los campos tienen correspondencia exacta. La ejecución firmada registra los pares de regla y clase omitidos, y distingue los huecos de cobertura de las filas indeterminadas y los escaneos interrumpidos. Un resultado vacío deja sin determinar la actividad de las clases omitidas.
 

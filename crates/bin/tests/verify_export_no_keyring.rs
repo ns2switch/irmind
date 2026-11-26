@@ -119,7 +119,7 @@ fn synthetic_export(path: &std::path::Path) -> String {
         actor: Actor::Analyst,
         origin: "analyst".into(),
         kind: irmind_domain::AuditEventKind::CaseCreated,
-        payload: json!({"version": 6, "title": "Synthetic", "severity": "medium", "scope": scope, "budget": irmind_app::CaseBudgetLimits::default(), "source_queries": irmind_app::source_queries::SourceQueryAllocationV1::default()})
+        payload: json!({"version": 7, "title": "Synthetic", "severity": "medium", "scope": scope, "budget": irmind_app::CaseBudgetLimits::default(), "source_queries": irmind_app::source_queries::SourceQueryAllocationV1::default()})
             .to_string(),
         evidence: None,
         prev: [0; 32],
@@ -190,14 +190,14 @@ fn write_synthetic_package(
     seal: CaseSeal,
 ) {
     let header = Header {
-        version: 10,
+        version: 11,
         case_id: &created.case_id,
         title: "Synthetic",
         severity: "medium",
         scope,
         seal,
     };
-    let mut output = b"IRMIND-EXPORT-V10\0".to_vec();
+    let mut output = b"IRMIND-EXPORT-V11\0".to_vec();
     append_frame(&mut output, &header);
     output.extend_from_slice(&2u64.to_be_bytes());
     append_frame(&mut output, created);
