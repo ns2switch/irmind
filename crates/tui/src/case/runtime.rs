@@ -458,6 +458,7 @@ fn is_result_card_label(label: &str) -> bool {
             | "Graph neighbors"
             | "Entity timeline"
             | "Graph path"
+            | "Case evidence"
             | "Evidence search"
             | "Source record"
             | "Case timeline"

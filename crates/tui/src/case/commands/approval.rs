@@ -51,7 +51,12 @@ impl CaseRuntime<'_, '_, '_> {
     }
 
     pub(super) fn evidence_command(&mut self, prompt: &str) -> bool {
-        if let Some(rest) = prompt.strip_prefix("/evidence-save ") {
+        if crate::workflow::is_local_evidence_question(prompt) {
+            let (engine, id) = (self.engine, self.id);
+            self.start_task("Case evidence", move |cancel| {
+                engine.case_evidence_status(id, &cancel)
+            });
+        } else if let Some(rest) = prompt.strip_prefix("/evidence-save ") {
             if let Some((hash, path)) = rest.split_once(' ') {
                 let hash = hash.to_owned();
                 let path = PathBuf::from(path);

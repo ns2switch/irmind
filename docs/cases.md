@@ -4,6 +4,13 @@ A case contains its signed journal, evidence references, Parquet graph, skill
 snapshots and subagent branches. Originals outside IRMind's data directory remain
 at their recorded locations. Sealing makes a case immutable.
 
+## Check the evidence in a case
+
+Run `/evidence` or ask “What have we ingested?” to see the signed source list,
+known failed attempts and the indexed event count and time range. IRMind
+answers these questions locally. `/evidence <hash>` continues to display a
+stored evidence blob.
+
 ## Cases and exports from an earlier version
 
 Version 0.7 uses case marker 6, mapped V3 Parquet artifacts and export V10. Use

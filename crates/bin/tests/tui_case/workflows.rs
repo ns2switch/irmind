@@ -288,3 +288,71 @@ fn signed_mapped_rebuild_does_not_require_a_format_detector_for_its_decoder() {
     std::fs::write(&source, b"changed").unwrap();
     assert!(tui.verify_graph_with_source_root(&id, root.path()).is_err());
 }
+
+#[test]
+fn evidence_questions_read_the_case_even_when_the_model_refuses() {
+    let root = tempfile::tempdir().unwrap();
+    let store = Arc::new(current_sources::open(root.path()));
+    let signer = Arc::new(TestSigner(SigningKey::from_bytes(&[117; 32])));
+    let engine = Engine::new(
+        EnginePorts::new(
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            store.clone(),
+            CryptoPorts::new(
+                signer.clone(),
+                Arc::new(LocalVerifier::from_signer(signer.as_ref())),
+            ),
+            Arc::new(MandatoryGuard::new().unwrap()),
+        ),
+        ExecutionMode::Attended,
+        Arc::new(SystemClock),
+    )
+    .unwrap();
+    let io = TestIo(
+        store.clone(),
+        irmind_infra::TomlConfigurationStore::new(root.path()),
+        None,
+    );
+    let model = RefusingModel(AtomicUsize::new(0));
+    let terminal = Terminal::new(TestBackend::new(100, 32)).unwrap();
+    let tui = ScriptedWorkspace::new(terminal, &engine, Some(&model), &io);
+    let id = tui
+        .create_case("Synthetic evidence", Severity::Low, "local only")
+        .unwrap();
+    let source = root.path().join("synthetic.json");
+    std::fs::write(
+        &source,
+        br#"{"eventTime":"2026-10-23T10:10:00Z","eventName":"SyntheticLogin"}"#,
+    )
+    .unwrap();
+    assert_eq!(tui.ingest_path(&id, &source).unwrap(), 1);
+    let before = store.entries(&id).unwrap().len();
+    for question in [
+        "/evidence",
+        "¿Qué hemos ingerido?",
+        "What have we ingested?",
+    ] {
+        let status = tui.investigate(&id, question).unwrap();
+        assert!(status.contains("synthetic.json"));
+        assert!(status.contains("Parquet records=1"));
+        assert!(status.contains("2026-10-23T10:10:00"));
+    }
+    assert_eq!(store.entries(&id).unwrap().len(), before);
+    assert_eq!(model.0.load(Ordering::SeqCst), 0);
+}
+
+struct RefusingModel(AtomicUsize);
+
+#[irmind_app::async_trait]
+impl LlmPort for RefusingModel {
+    async fn complete(
+        &self,
+        _request: CompletionRequest,
+        _cancel: &CancellationToken,
+    ) -> Result<ModelStream, AppError> {
+        self.0.fetch_add(1, Ordering::SeqCst);
+        Err(AppError::Model("I refuse to discuss the case".into()))
+    }
+}
