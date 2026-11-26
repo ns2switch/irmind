@@ -4,7 +4,15 @@ import unittest
 from unittest.mock import patch
 
 from select_ci_scope import (
-    docs_binary_run, docs_path, has_full_release_build, nightly_release_changed, platform_path, select_scope,
+    REVIEW_JOBS,
+    docs_binary_run,
+    docs_path,
+    has_full_release_build,
+    missing_review_jobs,
+    nightly_release_changed,
+    platform_path,
+    pr_matrix_context,
+    select_scope,
 )
 
 
@@ -33,7 +41,7 @@ class ScopeTests(unittest.TestCase):
     def test_ordinary_rust_and_tui_prs_run_linux(self):
         for path in ("crates/app/src/lib.rs", "crates/tui/src/case/render/cards.rs"):
             self.assertEqual(self.pr([path]), dict(
-                run_ci=True, docs_only=False, platforms=False, cross_verify=False, release_build=False,
+                run_ci=True, docs_only=False, platforms=False, full_ci=False, cross_verify=False, release_build=False,
             ))
 
     def test_irrelevant_label_never_runs_even_on_native_or_full_ci_pr(self):
@@ -52,10 +60,46 @@ class ScopeTests(unittest.TestCase):
         self.assertTrue(self.pr([path], ["full-ci"], action="ready_for_review")["platforms"])
         self.assertTrue(self.pr(["crates/fs/src/lib.rs"], draft=True)["platforms"])
 
+    def test_label_ready_transitions_use_live_metadata(self):
+        label = {"name": "full-ci"}
+
+        def pr(draft, labels):
+            return {"draft": draft, "labels": labels, "head": {"sha": "a" * 40}}
+        for payload, live in (
+            ({"action": "ready_for_review", "pull_request": pr(False, [])}, pr(False, [label])),
+            ({"action": "ready_for_review", "pull_request": pr(False, [label])}, pr(True, [])),
+            ({"action": "labeled", "label": label, "pull_request": pr(True, [])}, pr(False, [])),
+        ):
+            labels, draft = pr_matrix_context(payload, live)
+            for path in ("crates/app/src/lib.rs", "README.md"):
+                outcome = self.pr([path], labels, draft=draft, action=payload["action"],
+                                  label=payload.get("label", {}).get("name", ""))
+                self.assertTrue(outcome["platforms"])
+                self.assertTrue(outcome["full_ci"])
+                self.assertFalse(outcome["docs_only"])
+
+    def test_matrix_context_rejects_stale_head(self):
+        payload = {"action": "labeled", "label": {"name": "full-ci"},
+                   "pull_request": {"head": {"sha": "a" * 40}}}
+        current = {"head": {"sha": "b" * 40}, "draft": False, "labels": []}
+        with self.assertRaisesRegex(ValueError, "PR head changed"):
+            pr_matrix_context(payload, current)
+
+    def test_labeling_a_draft_defers_until_ready(self):
+        self.assertFalse(self.pr(["crates/app/src/lib.rs"], ["full-ci"], draft=True,
+                                 action="labeled", label="full-ci")["full_ci"])
+
+    def test_review_gate_rejects_skipped_native_jobs_and_failed_retries(self):
+        jobs = [{"name": name, "conclusion": "success", "run_attempt": 1} for name in REVIEW_JOBS]
+        self.assertFalse(missing_review_jobs(jobs))
+        windows = {"name": "windows", "conclusion": "skipped", "run_attempt": 2}
+        self.assertEqual(missing_review_jobs(jobs + [windows]), {"windows"})
+        self.assertEqual(missing_review_jobs([job for job in jobs if job["name"] != "linux"]), {"linux"})
+
     def test_docs_only_runs_required_documentation_check(self):
-        doc_only = self.pr(["README.es.md", "CHANGELOG.md", "docs/demo/screen.png"], ["full-ci"])
+        doc_only = self.pr(["README.es.md", "CHANGELOG.md", "docs/demo/screen.png"])
         self.assertEqual(doc_only, dict(
-            run_ci=True, docs_only=True, platforms=False, cross_verify=False, release_build=False,
+            run_ci=True, docs_only=True, platforms=False, full_ci=False, cross_verify=False, release_build=False,
         ))
         self.assertFalse(self.pr([])["docs_only"])
 
@@ -129,14 +173,14 @@ class ScopeTests(unittest.TestCase):
     def test_tag_builds_and_verifies(self):
         scope = select_scope("push", "refs/tags/v0.1.0", [], set(), False)
         self.assertEqual(scope, dict(
-            run_ci=True, docs_only=False, platforms=True, cross_verify=True, release_build=True,
+            run_ci=True, docs_only=False, platforms=True, full_ci=False, cross_verify=True, release_build=True,
         ))
 
     def test_manual_release_dry_run_builds_and_verifies_without_a_tag(self):
         scope = select_scope("workflow_dispatch", "refs/heads/release-test", [], set(), False,
                              release_dry_run=True)
         self.assertEqual(scope, dict(
-            run_ci=True, docs_only=False, platforms=True, cross_verify=True, release_build=True,
+            run_ci=True, docs_only=False, platforms=True, full_ci=False, cross_verify=True, release_build=True,
         ))
         self.assertFalse(select_scope("workflow_dispatch", "refs/heads/release-test",
                                       [], set(), False)["release_build"])
