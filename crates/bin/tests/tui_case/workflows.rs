@@ -329,6 +329,7 @@ fn evidence_questions_read_the_case_even_when_the_model_refuses() {
     )
     .unwrap();
     assert_eq!(tui.ingest_path(&id, &source).unwrap(), 1);
+    assert_stale_companion_is_rejected(&engine, store.as_ref(), &id);
     let identity = FileIdentity::Complete(FileFingerprint {
         size: 12,
         sha256: [2; 32],
@@ -367,6 +368,28 @@ fn evidence_questions_read_the_case_even_when_the_model_refuses() {
     }
     assert_eq!(store.entries(&id).unwrap().len(), before);
     assert_eq!(model.0.load(Ordering::SeqCst), 0);
+}
+
+fn assert_stale_companion_is_rejected(engine: &Engine<'_>, store: &LocalStore, id: &CaseId) {
+    let before = store.entries(id).unwrap().len();
+    let stale = IngestFileOutcome::Integrity {
+        path: "synthetic.json".into(),
+        observed: FileFingerprint {
+            size: 12,
+            sha256: [2; 32],
+        },
+        companion: "synthetic.json.sha256".into(),
+        companion_identity: FileFingerprint {
+            size: 64,
+            sha256: [3; 32],
+        },
+        declared: [2; 32],
+    };
+    assert!(matches!(
+        engine.record_ingest_outcomes(id, &[stale], &CancellationToken::new()),
+        Err(AppError::EvidenceMismatch(_))
+    ));
+    assert_eq!(store.entries(id).unwrap().len(), before);
 }
 
 struct RefusingModel(AtomicUsize);

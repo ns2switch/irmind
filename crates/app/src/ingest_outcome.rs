@@ -240,7 +240,23 @@ impl Engine<'_> {
         let _lock = self.repo.lock_case(id)?;
         self.verify_ingest_checkpoint(id, cancel)?;
         if self.repo.get_case(id)?.sealed {
-            return Err(AppError::Policy("case is sealed".into()));
+            return Err(AppError::Sealed);
+        }
+        if outcomes
+            .iter()
+            .any(|outcome| matches!(outcome, IngestFileOutcome::Integrity { .. }))
+        {
+            // A second process may have ingested this path while the companion was
+            // read. Check its current signed identity while holding the case lock.
+            let originals = signed_originals(&self.audit_log.entries(id)?)?;
+            for outcome in outcomes {
+                if let IngestFileOutcome::Integrity { path, observed, .. } = outcome
+                    && let Some((_, manifest)) = originals.get(path)
+                    && !matches_original(observed, manifest)
+                {
+                    return Err(AppError::EvidenceMismatch(manifest.sha256.as_str().into()));
+                }
+            }
         }
         for chunk in outcomes.chunks(1024) {
             let events = chunk
@@ -356,6 +372,29 @@ pub struct FileOutcomeNotice {
     pub outcome: IngestFileOutcome,
 }
 
+fn signed_originals(
+    entries: &[SignedEntry],
+) -> Result<BTreeMap<String, (u64, irmind_domain::SourceManifestV1)>, AppError> {
+    let mut originals = BTreeMap::new();
+    for entry in entries
+        .iter()
+        .filter(|entry| entry.kind == AuditEventKind::SourceManifestV2)
+    {
+        let manifest = irmind_domain::SourceManifestV2::decode(&entry.payload)
+            .map_err(|_| AppError::InvalidChain(entry.seq))?;
+        originals.insert(manifest.source.source.clone(), (entry.seq, manifest.source));
+    }
+    Ok(originals)
+}
+
+fn matches_original(
+    fingerprint: &FileFingerprint,
+    manifest: &irmind_domain::SourceManifestV1,
+) -> bool {
+    fingerprint.size == manifest.size
+        && irmind_domain::EvidenceHash::from_bytes(fingerprint.sha256) == manifest.sha256
+}
+
 impl FileOutcomeReview {
     /// Derive coverage from the authenticated case prefix. Receipts stay in
     /// the audit even when a later manifest resolves the same original bytes.
@@ -366,15 +405,7 @@ impl FileOutcomeReview {
         {
             return Ok(Self::default());
         }
-        let mut originals = BTreeMap::new();
-        for entry in entries
-            .iter()
-            .filter(|entry| entry.kind == AuditEventKind::SourceManifestV2)
-        {
-            let manifest = irmind_domain::SourceManifestV2::decode(&entry.payload)
-                .map_err(|_| AppError::InvalidChain(entry.seq))?;
-            originals.insert(manifest.source.source.clone(), (entry.seq, manifest.source));
-        }
+        let originals = signed_originals(entries)?;
         let mut review = Self::default();
         let mut active_originals = BTreeMap::new();
         for entry in entries {
@@ -399,13 +430,17 @@ impl FileOutcomeReview {
                     } else {
                         review.skipped += 1;
                     }
-                    !matches!(reason, FileReason::ChecksumCompanion | FileReason::SignatureCompanion
-                        | FileReason::CollectorLog | FileReason::IntegrityDigest)
-                        && !originals.get(path).is_some_and(|(seq, manifest)| {
-                            *seq > entry.seq && matches!(identity, FileIdentity::Complete(known)
-                                if known.size == manifest.size
-                                    && irmind_domain::EvidenceHash::from_bytes(known.sha256) == manifest.sha256)
-                        })
+                    !matches!(
+                        reason,
+                        FileReason::ChecksumCompanion
+                            | FileReason::SignatureCompanion
+                            | FileReason::CollectorLog
+                            | FileReason::IntegrityDigest
+                    ) && !originals.get(path).is_some_and(|(seq, manifest)| {
+                        *seq > entry.seq
+                            && matches!(identity, FileIdentity::Complete(known)
+                                if matches_original(known, manifest))
+                    })
                 }
                 IngestFileOutcome::Integrity {
                     path,
