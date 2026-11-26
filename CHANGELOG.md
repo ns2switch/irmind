@@ -4,6 +4,8 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+- Accept GLM reasoning metadata around the SSE stop without exposing it as an answer. Add a bounded, redacted local capture for troubleshooting OpenAI-compatible streams.
+
 ## 0.7.3 — Sigma source-class coverage and signed packages
 
 **Format impact:** Case marker 6 and export framing V10 stay in use. The
