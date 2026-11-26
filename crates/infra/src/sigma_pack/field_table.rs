@@ -185,6 +185,7 @@ impl ReviewedSigmaFieldTable {
 }
 
 impl SigmaSourceVariant {
+    #[cfg(feature = "sigma")]
     pub(super) fn has_decimal_projection(&self) -> bool {
         self.fields
             .iter()
