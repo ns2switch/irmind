@@ -71,10 +71,11 @@ pub enum AuditEventKind {
     SigmaCaseRunAdmissionV1,
     SigmaRunV1,
     ReportPublishedV1,
+    IngestFileOutcomeV1,
 }
 
 impl AuditEventKind {
-    pub const ALL: [Self; 67] = [
+    pub const ALL: [Self; 68] = [
         Self::Allowed,
         Self::ApprovalDenied,
         Self::ApprovalGranted,
@@ -142,6 +143,7 @@ impl AuditEventKind {
         Self::SigmaCaseRunAdmissionV1,
         Self::SigmaRunV1,
         Self::ReportPublishedV1,
+        Self::IngestFileOutcomeV1,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -213,6 +215,7 @@ impl AuditEventKind {
             Self::SigmaCaseRunAdmissionV1 => "sigma-case-run-admission-v1",
             Self::SigmaRunV1 => "sigma-run-v1",
             Self::ReportPublishedV1 => "report-published-v1",
+            Self::IngestFileOutcomeV1 => "ingest-file-outcome-v1",
         }
     }
 
@@ -273,7 +276,7 @@ mod tests {
 
     #[test]
     fn wire_names_are_stable_and_unknown_names_fail() {
-        const EXPECTED: [&str; 67] = [
+        const EXPECTED: [&str; 68] = [
             "Allowed",
             "ApprovalDenied",
             "ApprovalGranted",
@@ -341,6 +344,7 @@ mod tests {
             "sigma-case-run-admission-v1",
             "sigma-run-v1",
             "report-published-v1",
+            "ingest-file-outcome-v1",
         ];
         assert_eq!(AuditEventKind::ALL.len(), EXPECTED.len());
         for (kind, expected) in AuditEventKind::ALL.into_iter().zip(EXPECTED) {

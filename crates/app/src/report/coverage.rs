@@ -17,6 +17,7 @@ pub struct ResolvedReportCoverage {
     skill_gaps: Vec<ResolvedReportSkillGap>,
     query_limits: Vec<EvidenceHash>,
     partial_sigma: Vec<(EvidenceHash, SigmaLimitation)>,
+    folder: crate::ingest_outcome::FileOutcomeReview,
 }
 
 enum SigmaLimitation {
@@ -118,6 +119,7 @@ impl ResolvedReportCoverage {
             skill_gaps,
             query_limits,
             partial_sigma,
+            folder: crate::ingest_outcome::FileOutcomeReview::read(entries)?,
         })
     }
 
@@ -125,6 +127,12 @@ impl ResolvedReportCoverage {
         self.unknown_sources
             .iter()
             .map(|source| ReportLimitation::SourceAvailabilityUnknown(source))
+            .chain(
+                self.folder
+                    .limitations
+                    .iter()
+                    .map(ReportLimitation::FolderOutcome),
+            )
             .chain(self.skill_gaps.iter().map(|gap| match &gap.load {
                 ReportSkillLoad::Main(_) => ReportLimitation::SkillCoverage {
                     skill: &gap.skill,

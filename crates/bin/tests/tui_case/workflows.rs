@@ -1,5 +1,6 @@
 use super::support::*;
 use super::*;
+use irmind_app::ingest_outcome::{FileFingerprint, FileIdentity, FileReason, IngestFileOutcome};
 
 #[test]
 #[allow(clippy::too_many_lines)]
@@ -328,6 +329,28 @@ fn evidence_questions_read_the_case_even_when_the_model_refuses() {
     )
     .unwrap();
     assert_eq!(tui.ingest_path(&id, &source).unwrap(), 1);
+    let identity = FileIdentity::Complete(FileFingerprint {
+        size: 12,
+        sha256: [2; 32],
+    });
+    engine
+        .record_ingest_outcomes(
+            &id,
+            &[
+                IngestFileOutcome::Disposition {
+                    path: "unrecognized.bin".into(),
+                    identity,
+                    reason: FileReason::AnalystSkipped,
+                },
+                IngestFileOutcome::Disposition {
+                    path: "damaged.json.gz".into(),
+                    identity,
+                    reason: FileReason::InvalidFormat,
+                },
+            ],
+            &CancellationToken::new(),
+        )
+        .unwrap();
     let before = store.entries(&id).unwrap().len();
     for question in [
         "/evidence",
@@ -337,6 +360,9 @@ fn evidence_questions_read_the_case_even_when_the_model_refuses() {
         let status = tui.investigate(&id, question).unwrap();
         assert!(status.contains("synthetic.json"));
         assert!(status.contains("Parquet records=1"));
+        assert!(status.contains("1 skipped · 1 failed"));
+        assert!(status.contains("unrecognized.bin"));
+        assert!(status.contains("damaged.json.gz"));
         assert!(status.contains("2026-10-23T10:10:00"));
     }
     assert_eq!(store.entries(&id).unwrap().len(), before);

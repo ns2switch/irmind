@@ -264,13 +264,14 @@ fn enumerate_input_files(
     while let Some((path, depth)) = pending.pop() {
         let metadata = std::fs::symlink_metadata(&path)
             .with_context(|| format!("inspect {}", terminal_safe_path(&path)))?;
-        if metadata.file_type().is_symlink() {
+        let link = irmind_fs::is_source_link(&metadata);
+        if link && depth == 0 {
             return Err(anyhow!(
                 "symlink ingestion is not allowed: {}",
                 terminal_safe_path(&path)
             ));
         }
-        if metadata.is_dir() {
+        if metadata.is_dir() && !link {
             if depth >= 16 {
                 return Err(anyhow!("ingest directory exceeds depth 16"));
             }
@@ -279,7 +280,7 @@ fn enumerate_input_files(
                 .collect::<std::io::Result<Vec<_>>>()?;
             children.sort();
             pending.extend(children.into_iter().rev().map(|child| (child, depth + 1)));
-        } else if metadata.is_file() {
+        } else if metadata.is_file() || link {
             if metadata.len() > max_file {
                 return Err(anyhow!(
                     "evidence exceeds configured size limit: {}",

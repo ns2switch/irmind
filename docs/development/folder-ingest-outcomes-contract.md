@@ -1,6 +1,6 @@
 # Local folder ingestion outcomes
 
-**Status** Proposed for explicit analyst approval before implementation.
+**Status** Approved for v0.7.4.
 
 An ingest request currently resolves the entire detection plan before any source
 is committed. The old signed rejection payload stores a source reference, a
@@ -16,7 +16,10 @@ file, or establish what an unsigned checksum declared.
   per-file atomicity and the existing bounded group retry. A source-local
   detection, pipeline or parse error is a failed or unresolved file. Disk,
   case lock, custody, signature and cancellation failures stop the operation.
-  Successfully committed inputs remain available.
+  Successfully committed inputs remain available. If another path already
+  has a mapped generation for the exact same bytes, the current pipeline
+  cannot ingest that duplicate. The folder records a failed pipeline outcome
+  and continues, preserving the original and the existing generation.
 - Present unresolved files in a single end-of-ingest TUI queue. The analyst
   can assign an available parser, skip the selected file or skip all thus far
   unresolved files. A parser-specific date or cluster question has both skip
@@ -33,6 +36,15 @@ file, or establish what an unsigned checksum declared.
   and can choose a parser. A new ingested manifest with the same reference
   and SHA-256 resolves the previous coverage gap. Signed attempts remain in
   history. A different digest at the same reference leaves the gap visible.
+
+Collector recognition inspects at most 64 KiB and 128 lines. A
+`Collection-*.log` file needs both Velociraptor collector startup and
+container markers. KAPE `*_ConsoleLog.txt` needs timestamped version and
+command-line entries. Recognized EZTools console logs need the tool name in
+the basename and the author and command-line markers in the body. Unrecognized
+variants remain eligible for normal detection or analyst selection.
+[Velociraptor log example](https://github.com/Velocidex/velociraptor/issues/4509)
+[KAPE log example](https://github.com/EricZimmerman/Issues/issues/168)
 
 ## Signed outcome
 
@@ -119,3 +131,18 @@ mixed folder containing good, ambiguous, unknown, unavailable, malformed,
 checksum, signature and collector files. Include positive and mismatch
 checksums and a malicious path. Verify and export a sealed case, reconstruct
 an older report unchanged, and confirm retry resolution for identical bytes.
+
+## Release-build scale check
+
+On Linux x86-64, the synthetic corpus has 100 distinct CloudTrail files,
+8,000 signature companions and 1,900 unresolved files. At 100×40 columns,
+the TUI reached the queue in 1.965 s, allowed cycling it, and committed all
+remaining skips in 1.347 s. CLI verification of the case with 9,900 signed
+dispositions and 100 originals took 1.285 s. The receipt encoding is the
+approved per-file encoding.
+
+Run the scale check with:
+
+```sh
+cargo test --release --locked -p irmind --test folder_ingest folder_ingest_ten_thousand_files -- --ignored --nocapture
+```

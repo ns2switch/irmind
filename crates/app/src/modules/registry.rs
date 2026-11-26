@@ -293,6 +293,7 @@ impl ModuleRegistry {
             unavailable: self.unavailable_parsers.clone(),
             source_selected: BTreeSet::new(),
             resolver: None,
+            mapped_ingest: None,
         }
     }
 

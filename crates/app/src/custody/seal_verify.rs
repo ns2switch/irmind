@@ -10,6 +10,7 @@ pub struct VerifiedCaseNotices {
     pub provisional_mappings: usize,
     pub release_mappings: usize,
     pub sigma_runs: Vec<crate::v10_proofs::SigmaV3Notice>,
+    pub folder_outcomes: crate::ingest_outcome::FileOutcomeReview,
 }
 
 impl Engine<'_> {
@@ -175,6 +176,7 @@ impl Engine<'_> {
             provisional_mappings,
             release_mappings,
             sigma_runs,
+            folder_outcomes: crate::ingest_outcome::FileOutcomeReview::read(&entries)?,
         })
     }
 
@@ -261,6 +263,7 @@ impl Engine<'_> {
             }
             prev = self.verify_chain_entry(id, index, prev, entry)?;
         }
+        crate::ingest_outcome::FileOutcomeReview::read(&entries)?;
         crate::v10_proofs::verify_sigma_case_admission_pairs(&entries)?;
         if entries
             .iter()

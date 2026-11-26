@@ -227,7 +227,7 @@ impl ParquetStore {
         let mut sort_sizes = Vec::new();
         let mut total = 0u64;
         for source in request.relative_paths {
-            let mut file = Self::open_source(request.source_root, source)?;
+            let mut file = open_group_source(request.source_root, source)?;
             let (physical, reservation) =
                 self.normalized_allowance(&mut file, request.parser, source, cancel)?;
             // Preserve the historical group formula for default decoders, while
@@ -272,7 +272,7 @@ impl ParquetStore {
             if cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
             }
-            let size = Self::open_source(request.source_root, path)?
+            let size = open_group_source(request.source_root, path)?
                 .metadata()
                 .map_err(crate::parquet_store::storage)?
                 .len();
@@ -285,6 +285,21 @@ impl ParquetStore {
         }
         Ok(paths)
     }
+}
+
+fn open_group_source(root: &std::path::Path, source: &str) -> Result<std::fs::File, AppError> {
+    ParquetStore::open_source(root, source).or_else(|error| match error {
+        AppError::Storage(_) | AppError::Fixed(irmind_app::FixedAppError::AdapterStorage(_)) => {
+            Err(AppError::SourceFailure(
+                irmind_app::RejectedSource::try_new(
+                    source.to_owned(),
+                    irmind_app::SourceFailureReason::Hash,
+                    Vec::new(),
+                )?,
+            ))
+        }
+        _ => Err(error),
+    })
 }
 
 fn sum_largest(sizes: &mut [u64], workers: usize) -> Result<u64, AppError> {

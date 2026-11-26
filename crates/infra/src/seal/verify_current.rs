@@ -332,6 +332,7 @@ struct ChainState {
     previous: [u8; 32],
     verifier: LocalVerifier,
     metadata_entries: Vec<SignedEntry>,
+    ingest_originals: BTreeMap<String, (u64, irmind_domain::EvidenceHash)>,
     query_hashes: BTreeSet<String>,
     last: Option<SignedEntry>,
     referenced_evidence: BTreeSet<String>,
@@ -360,6 +361,7 @@ impl ChainState {
                 trusted: BTreeMap::new(),
             },
             metadata_entries: Vec::new(),
+            ingest_originals: BTreeMap::new(),
             query_hashes: BTreeSet::new(),
             last: None,
             referenced_evidence: BTreeSet::new(),
@@ -417,6 +419,7 @@ impl ChainState {
             .accept(&entry, &self.verifier)?;
         super::mapping_proofs::collect(&entry, &mut self.mapping_installations)?;
         self.skills.accept(&entry, &crate::TomlSkillCompiler)?;
+        self.accept_ingest_outcome(&entry)?;
         self.accept_metadata(&entry)?;
         if entry.kind == AuditEventKind::SigmaRunV1 {
             self.proof_checkpoints.insert(
@@ -479,6 +482,7 @@ impl ChainState {
                     AuditEventKind::ReportPublishedV1
                         | AuditEventKind::SigmaRunV1
                         | AuditEventKind::SigmaCaseRunAdmissionV1
+                        | AuditEventKind::IngestFileOutcomeV1
                         | AuditEventKind::SourceManifestV2
                         | AuditEventKind::SourceQueryResultV1
                         | AuditEventKind::FindingProposed
@@ -498,6 +502,30 @@ impl ChainState {
         }
         input.seek(SeekFrom::Start(resume)).map_err(storage)?;
         Ok(history)
+    }
+
+    fn accept_ingest_outcome(&mut self, entry: &SignedEntry) -> Result<(), AppError> {
+        use irmind_app::ingest_outcome::IngestFileOutcome;
+        if let Some(IngestFileOutcome::Integrity { path, observed, .. }) =
+            IngestFileOutcome::from_audit(entry)?
+            && self
+                .ingest_originals
+                .get(&path)
+                .is_some_and(|(size, hash)| {
+                    *size != observed.size
+                        || *hash != irmind_domain::EvidenceHash::from_bytes(observed.sha256)
+                })
+        {
+            return Err(AppError::InvalidChain(entry.seq));
+        }
+        if entry.kind == AuditEventKind::SourceManifestV2 {
+            let manifest = SourceManifestV2::decode(&entry.payload)
+                .map_err(|_| AppError::InvalidChain(entry.seq))?
+                .source;
+            self.ingest_originals
+                .insert(manifest.source, (manifest.size, manifest.sha256));
+        }
+        Ok(())
     }
 
     fn accept_metadata(&mut self, entry: &SignedEntry) -> Result<(), AppError> {

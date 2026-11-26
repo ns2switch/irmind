@@ -71,8 +71,15 @@ impl AutomationContext<'_, '_> {
         };
         let id = parse_id(&case_id)?;
         let entries = engine.verify_cancelable(&id, cancel)?;
-        let has_sources = store
-            .entries(&id)?
+        let signed = store.entries(&id)?;
+        let folder = irmind_app::ingest_outcome::FileOutcomeReview::read(&signed)?;
+        if folder.skipped + folder.failed + folder.matched + folder.mismatched != 0 {
+            println!("Folder outcomes: {}", folder.summary());
+            if folder.mismatched != 0 {
+                println!("WARNING: SHA-256 MISMATCH");
+            }
+        }
+        let has_sources = signed
             .iter()
             .any(|entry| entry.kind == irmind_domain::AuditEventKind::SourceManifestV2);
         if has_sources {

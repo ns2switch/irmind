@@ -227,7 +227,11 @@ impl CaseRuntime<'_, '_, '_> {
     pub(super) fn parser_prompt_page(&self) -> Result<usize> {
         let input = self.engine.guard.screen(&self.state.input)?.text;
         let body = self.parser_prompt_body(&input, self.demo_guide_text()?.is_some())?;
-        Ok(super::state::ParserPrompt::page_size(body.height))
+        let height = body.height.saturating_sub(
+            u16::from(self.state.folder_current.is_some())
+                + u16::from(self.state.pending_ingest.is_some()),
+        );
+        Ok(super::state::ParserPrompt::page_size(height))
     }
 
     fn active_overlay(&self, input: &str, guide: bool) -> Result<Option<String>> {

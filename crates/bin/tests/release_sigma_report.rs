@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 #![allow(clippy::unwrap_used)]
 
+use irmind_app::ingest_outcome::{FileReason, IngestFileOutcome};
 use irmind_app::v10_proofs::{
     ReportCitationsV1, ReportCoverageV2, ReportMediaV1, ReportPublishedV1, SIGMA_EVALUATOR_V4,
     SIGMA_EVALUATOR_V4_CASE_ADMISSION, SigmaCaseRunAdmissionV1, SigmaPackManifestV1,
@@ -110,19 +111,18 @@ fn run_scenario(binary: &Path, output: &Path, scenario: &Scenario) {
     if let Some(parser) = scenario.parser {
         ingest.extend(["--parser", parser]);
     }
-    let ingested = cli_output(binary, &home, &ingest);
     if source.is_dir() {
-        assert_eq!(
-            String::from_utf8(ingested.stdout).unwrap().lines().count(),
-            2
-        );
-        let stderr = String::from_utf8(ingested.stderr).unwrap();
-        assert!(stderr.contains("CloudTrail integrity digest"), "{stderr}");
-        assert!(stderr.contains("CloudTrail-Digest"), "{stderr}");
         let mut ui = open_tui(binary, &home, case);
         ui.send(format!("/ingest {}\r", source.display())).unwrap();
-        ui.expect("Skipped 1 CloudTrail integrity digest").unwrap();
+        ui.expect("Folder queue").unwrap();
+        ui.expect("skip file").unwrap();
+        ui.send("\u{13}").unwrap();
+        ui.expect("Ingested 2 files").unwrap();
         quit(&mut ui);
+        let verified = cli(&["verify", case, "--source-root", source.to_str().unwrap()]);
+        assert!(verified.contains("1 SHA-256 matches"), "{verified}");
+    } else {
+        cli(&ingest);
     }
 
     let finding = evaluate(binary, &home, case, &pack, scenario, &cli);
@@ -224,6 +224,13 @@ fn write_cloudtrail(root: &Path) -> PathBuf {
     let path = delivery.join(DIGEST);
     fs::create_dir_all(path.parent().unwrap()).unwrap();
     write_gzip_members(&path, [digest.to_string().as_bytes()]);
+    let original = logs.join(FAILED_LOG);
+    fs::write(
+        logs.join(format!("{FAILED_LOG}.sha256")),
+        hex(&sha256(&fs::read(original).unwrap())),
+    )
+    .unwrap();
+    fs::write(delivery.join("unknown-ñ.bin"), [1, 2, 3]).unwrap();
     delivery
 }
 
@@ -422,11 +429,33 @@ fn assert_cloudtrail_originals(bytes: &[u8], delivery: &Path) {
     let mut reader = Cursor::new(bytes.strip_prefix(b"IRMIND-EXPORT-V10\0").unwrap());
     read_frame(&mut reader);
     let count = read_count(&mut reader);
-    let sources = (0..count)
+    let entries = (0..count)
         .map(|_| read_frame(&mut reader))
+        .collect::<Vec<_>>();
+    let sources = entries
+        .iter()
         .filter(|entry| entry["kind"] == AuditEventKind::SourceManifestV2.as_str())
         .map(|entry| SourceManifestV2::decode(entry["payload"].as_str().unwrap()).unwrap())
         .collect::<Vec<_>>();
+    let outcomes = entries
+        .iter()
+        .filter(|entry| entry["kind"] == "ingest-file-outcome-v1")
+        .map(|entry| IngestFileOutcome::decode(entry["payload"].as_str().unwrap()).unwrap())
+        .collect::<Vec<_>>();
+    assert!(
+        outcomes
+            .iter()
+            .any(|outcome| matches!(outcome, IngestFileOutcome::Disposition {
+        path, reason: FileReason::AnalystSkipped, ..
+    } if path == "unknown-ñ.bin"))
+    );
+    assert!(
+        outcomes
+            .iter()
+            .any(|outcome| matches!(outcome, IngestFileOutcome::Integrity {
+        observed, declared, ..
+    } if observed.sha256 == *declared))
+    );
     assert_eq!(sources.len(), 2);
     for name in [FAILED_LOG, SUCCESS_LOG] {
         let relative = format!("{LOG_DIRECTORY}/{name}");
@@ -542,11 +571,12 @@ fn assert_report_objects(
         );
     } else {
         let escaped_title = title.replace('-', r"\-");
-        assert!(
-            String::from_utf8(document)
-                .unwrap()
-                .contains(&escaped_title)
-        );
+        let markdown = String::from_utf8(document).unwrap();
+        assert!(markdown.contains(&escaped_title));
+        if title == SCENARIOS[0].title {
+            assert!(markdown.contains("Folder ingestion"));
+            assert!(markdown.contains(r"unknown\-ñ.bin"));
+        }
     }
 }
 

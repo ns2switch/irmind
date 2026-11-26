@@ -16,6 +16,7 @@ mod status_bar;
 mod theme;
 mod utc_display;
 mod workflow;
+pub use workflow::folder::{FolderImport, FolderPass, import_folder};
 
 use anyhow::Result;
 use crossterm::{
@@ -196,6 +197,10 @@ pub trait WorkspaceIo: Send + Sync {
     }
     fn read_format_sample(&self, _path: &Path) -> Result<Vec<u8>> {
         anyhow::bail!("bounded parser sampling is unavailable")
+    }
+    /// Opens a folder member using the same selected root as Parquet ingestion.
+    fn open_folder_member(&self, _root: &Path, _relative: &Path) -> Result<std::fs::File> {
+        anyhow::bail!("rooted folder reads are unavailable")
     }
     fn read_evidence(&self, path: &Path) -> Result<Vec<u8>>;
     fn audit_source_name(&self, root: &Path, file: &Path) -> Result<String>;

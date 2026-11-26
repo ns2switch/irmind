@@ -38,7 +38,7 @@ pub fn regular_file_has_single_link(file: &fs::File) -> io::Result<bool> {
 /// replacement by another process with the same user privileges.
 pub fn open_regular_no_follow(root: &Path, relative: &Path) -> io::Result<fs::File> {
     let root_meta = fs::symlink_metadata(root)?;
-    if !root_meta.is_dir() || root_meta.file_type().is_symlink() {
+    if !root_meta.is_dir() || is_source_link(&root_meta) {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "invalid source root",
@@ -61,7 +61,7 @@ pub fn open_regular_no_follow(root: &Path, relative: &Path) -> io::Result<fs::Fi
         }
         path.push(part);
         let metadata = fs::symlink_metadata(&path)?;
-        if metadata.file_type().is_symlink() {
+        if is_source_link(&metadata) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "symlink source rejected",
@@ -111,6 +111,19 @@ pub fn open_regular_no_follow(root: &Path, relative: &Path) -> io::Result<fs::Fi
             ));
         }
         Ok(opened)
+    }
+}
+
+/// Link-like entries are never traversable source paths, including Windows junctions.
+pub fn is_source_link(metadata: &fs::Metadata) -> bool {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt as _;
+        metadata.file_attributes() & 0x400 != 0
+    }
+    #[cfg(not(windows))]
+    {
+        metadata.file_type().is_symlink()
     }
 }
 
