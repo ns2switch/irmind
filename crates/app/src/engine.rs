@@ -11,6 +11,7 @@ mod budgets;
 pub(crate) use budgets::BudgetReplay;
 pub use budgets::budget_status;
 mod cases;
+mod evidence_status;
 mod investigation;
 mod model_request;
 

@@ -6,6 +6,13 @@ Un caso contiene su cadena firmada, referencias a evidencia, grafo Parquet,
 snapshots de skills y ramas de subagentes. Los originales externos al directorio
 de datos permanecen en sus ubicaciones registradas. Sellar hace inmutable el caso.
 
+## Consultar la evidencia de un caso
+
+Ejecuta `/evidence` o pregunta «¿Qué hemos ingerido?» para ver la lista firmada
+de fuentes, los intentos fallidos registrados, el número de eventos indexados
+y su intervalo temporal. IRMind responde en local. `/evidence <hash>` sigue
+abriendo una copia de evidencia guardada.
+
 ## Casos y exportaciones de una versión anterior
 
 La versión 0.7 usa el marcador de caso 6, artefactos Parquet V3 con mapeo y la
