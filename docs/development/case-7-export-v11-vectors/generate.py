@@ -30,8 +30,13 @@ def frame(data):
     return u64(len(data)) + data
 
 
-def text(value):
+def audit_text(value):
     return frame(value.encode("utf-8"))
+
+
+def sigma_text(value):
+    raw = value.encode("utf-8")
+    return struct.pack(">I", len(raw)) + raw
 
 
 def json_bytes(value):
@@ -84,8 +89,8 @@ class SyntheticAnalyst:
         prev = ZERO if predecessor is None else bytes(predecessor["hash"])
         at = AT + seq
         challenge = (
-            b"irmind-audit-v2\0" + u64(seq) + text(CASE) + u64(at)
-            + text("analyst") + text("analyst") + text(kind) + text(payload)
+            b"irmind-audit-v2\0" + u64(seq) + audit_text(CASE) + u64(at)
+            + audit_text("analyst") + audit_text("analyst") + audit_text(kind) + audit_text(payload)
             + b"\0" + prev + frame(self.key)
         )
         digest = sha(challenge)
@@ -98,8 +103,8 @@ class SyntheticAnalyst:
     def global_admission(self, body):
         payload = body.hex()
         challenge = (
-            b"irmind-operation-v1\0" + text("global") + u64(1) + u64(AT)
-            + text("analyst") + text(payload) + ZERO + frame(self.key)
+            b"irmind-operation-v1\0" + audit_text("global") + u64(1) + u64(AT)
+            + audit_text("analyst") + audit_text(payload) + ZERO + frame(self.key)
         )
         digest = sha(challenge)
         return dict(
@@ -111,7 +116,7 @@ class SyntheticAnalyst:
     def sealed_empty(self, root):
         sealed = self.entry("CaseSealed", "", root)
         digest = bytes(sealed["hash"])
-        challenge = b"irmind-seal-v1\0" + text(CASE) + u64(2) + digest + text("")
+        challenge = b"irmind-seal-v1\0" + audit_text(CASE) + u64(2) + digest + audit_text("")
         seal = dict(
             seq=2, hash=list(digest), sig=list(self.sign(challenge)), public_key=list(self.key),
             analyst_key_fingerprint=sha(self.key).hex(),
@@ -133,7 +138,7 @@ def case_payload(version):
 
 
 def checkpoint(entry):
-    return text(CASE) + u64(entry["seq"]) + bytes(entry["hash"])
+    return sigma_text(CASE) + u64(entry["seq"]) + bytes(entry["hash"])
 
 
 def magic(version):
@@ -175,9 +180,9 @@ def archive_vectors(analyst, root):
 
 
 def sigma_vectors(analyst, root):
-    rule = text("synthetic-rule") + sha(b"synthetic YAML rule bytes")
+    rule = sigma_text("synthetic-rule") + sha(b"synthetic YAML rule bytes")
     unavailable_detail = "No signed event artifact matches the rule's reviewed source classes"
-    scan = u64(1) + rule + b"\x03\x01" + text(unavailable_detail) + u64(0)
+    scan = u64(1) + rule + b"\x03\x01" + sigma_text(unavailable_detail) + u64(0)
     count_scan = scan + u64(0) + u64(0)
     results = b"irmind-sigma-run-results-v3\0" + count_scan + u64(0) + u64(1)
     selected_sources = b"irmind-sigma-source-scope-v1\0" + u64(0)
@@ -194,8 +199,8 @@ def sigma_vectors(analyst, root):
     def pack_admission(pinned):
         body = (
             b"irmind-sigma-pack-admission-v1\0" + manifest + proofs
-            + bytes([pinned]) + text("synthetic pack") + bytes([pinned])
-            + (sha(b"synthetic pinned release archive") if pinned else b"") + text("MIT")
+            + bytes([pinned]) + sigma_text("synthetic pack") + bytes([pinned])
+            + (sha(b"synthetic pinned release archive") if pinned else b"") + sigma_text("MIT")
         )
         return analyst.global_admission(body)
 
@@ -207,7 +212,7 @@ def sigma_vectors(analyst, root):
         body = (
             b"irmind-sigma-case-run-admission-v1\0" + checkpoint(root)
             + installation_field + op + manifest + inventory + selected + times
-            + table + compiled + text(EVALUATOR) + reserve
+            + table + compiled + sigma_text(EVALUATOR) + reserve
         )
         return analyst.entry("sigma-case-run-admission-v1", body.hex(), root)
 
@@ -221,7 +226,7 @@ def sigma_vectors(analyst, root):
         anchor = after if declared_checkpoint is None else declared_checkpoint
         body = (
             tag + checkpoint(anchor) + op + inventory + selected + times
-            + compiled_digest + table + text(evaluator) + mode
+            + compiled_digest + table + sigma_text(evaluator) + mode
             + reserve + u64(7) + b"\x06" + u64(0) + result_digest + proofs
         )
         kind = "sigma-run-v2" if tag == RUN else "sigma-run-v1"
