@@ -273,7 +273,7 @@ mod tests {
 
     #[test]
     fn wire_names_are_stable_and_unknown_names_fail() {
-        const EXPECTED: [&str; 66] = [
+        const EXPECTED: [&str; 67] = [
             "Allowed",
             "ApprovalDenied",
             "ApprovalGranted",
@@ -338,6 +338,7 @@ mod tests {
             "subagent-reservation-v1",
             "subagent-checkpoint-v1",
             "subagent-result-v1",
+            "sigma-case-run-admission-v1",
             "sigma-run-v1",
             "report-published-v1",
         ];
