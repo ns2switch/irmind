@@ -177,18 +177,7 @@ fn mixed_folder_custody_with_unicode_and_malicious_checksum_paths() {
     );
     assert!(result.contains("already have a mapped generation"));
     #[cfg(unix)]
-    {
-        assert!(!result.contains('\u{1b}'), "{result}");
-        assert!(result.contains("\\u{1b}"), "{result}");
-        assert!(
-            outcomes
-                .iter()
-                .any(|outcome| matches!(outcome, IngestFileOutcome::Disposition {
-            path, identity: irmind_app::ingest_outcome::FileIdentity::Unavailable,
-            reason: FileReason::Unavailable,
-        } if path == "bad\u{1b}[31m.json"))
-        );
-    }
+    assert_signed_link_rejection(&result, &outcomes);
     assert!(evidence.join("opaque.bin").is_file());
     assert!(
         cli(&home, &["verify", case, "--source-root", root]).contains("WARNING: SHA-256 MISMATCH")
@@ -197,6 +186,20 @@ fn mixed_folder_custody_with_unicode_and_malicious_checksum_paths() {
     let package = scratch.path().join("mixed.v10");
     cli(&home, &["export", case, package.to_str().unwrap()]);
     irmind_app::verify_export(&irmind_infra::LocalExportVerifier, &package, Some(&key)).unwrap();
+}
+
+#[cfg(unix)]
+fn assert_signed_link_rejection(result: &str, outcomes: &[IngestFileOutcome]) {
+    assert!(!result.contains('\u{1b}'), "{result}");
+    assert!(result.contains("\\u{1b}"), "{result}");
+    assert!(
+        outcomes
+            .iter()
+            .any(|outcome| matches!(outcome, IngestFileOutcome::Disposition {
+        path, identity: irmind_app::ingest_outcome::FileIdentity::Unavailable,
+        reason: FileReason::Unavailable,
+    } if path == "bad\u{1b}[31m.json"))
+    );
 }
 
 #[cfg(unix)]
