@@ -1051,6 +1051,29 @@ fn command_destination(prompt: &str) -> Option<super::CaseExit> {
     }
 }
 
+fn list_sigma_installations(
+    engine: &irmind_app::Engine<'_>,
+) -> Result<String, irmind_app::AppError> {
+    use irmind_app::v10_proofs::SigmaPackageOriginV1;
+    let signed = engine.sigma_installations()?;
+    if signed.is_empty() {
+        return Ok("No signed Sigma package installations".into());
+    }
+    Ok(signed
+        .values()
+        .map(|(receipt, _)| {
+            let status = if receipt.active { "active" } else { "inactive" };
+            let source = match receipt.origin {
+                SigmaPackageOriginV1::Local => "local",
+                SigmaPackageOriginV1::CatalogAsset(_) => "catalog",
+                SigmaPackageOriginV1::SigmaHqArchive(_) => "SigmaHQ reference",
+            };
+            format!("{} {} · {source} · {status}", receipt.name, receipt.version)
+        })
+        .collect::<Vec<_>>()
+        .join("\n"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::{retired_keystore_command, scope_expansion};
@@ -1075,27 +1098,4 @@ mod tests {
             scope_expansion(current, "window 2026-10-24T00:00:00Z 2026-10-24T23:59:59Z").is_err()
         );
     }
-}
-
-fn list_sigma_installations(
-    engine: &irmind_app::Engine<'_>,
-) -> Result<String, irmind_app::AppError> {
-    use irmind_app::v10_proofs::SigmaPackageOriginV1;
-    let signed = engine.sigma_installations()?;
-    if signed.is_empty() {
-        return Ok("No signed Sigma package installations".into());
-    }
-    Ok(signed
-        .values()
-        .map(|(receipt, _)| {
-            let status = if receipt.active { "active" } else { "inactive" };
-            let source = match receipt.origin {
-                SigmaPackageOriginV1::Local => "local",
-                SigmaPackageOriginV1::CatalogAsset(_) => "catalog",
-                SigmaPackageOriginV1::SigmaHqArchive(_) => "SigmaHQ reference",
-            };
-            format!("{} {} · {source} · {status}", receipt.name, receipt.version)
-        })
-        .collect::<Vec<_>>()
-        .join("\n"))
 }
