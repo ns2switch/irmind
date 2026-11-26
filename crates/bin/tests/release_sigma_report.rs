@@ -575,7 +575,7 @@ fn assert_report_objects(
         assert!(markdown.contains(&escaped_title));
         if title == SCENARIOS[0].title {
             assert!(markdown.contains("Folder ingestion"));
-            assert!(markdown.contains(r"unknown\-ñ.bin"));
+            assert!(markdown.contains(r"unknown\-ñ\[\.\]bin"));
         }
     }
 }
