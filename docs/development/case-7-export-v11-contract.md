@@ -1,6 +1,6 @@
 # Case 7 and export V11 · Phase 0 contract
 
-Status: the design was approved at `74c25388`. This revision requests explicit approval of the Sigma text-width correction. The existing Rust Sigma codecs use u32 lengths. The first generator used u64 for Sigma text as well as for audit text. The corrected vectors preserve the existing Sigma objects and use u32 in the new receipt. Baseline: [v0.7.4](https://github.com/ns2switch/irmind/releases/tag/v0.7.4), commit `04f4b5dc0de45070a533d61ec32e12af546ff980`. This phase consolidates the format before v0.8 work begins. [Versión en español](../es/development/case-7-export-v11-contract.md).
+Status: approved, including the Sigma text-width correction in `6375a5ca`. The existing Rust Sigma codecs use u32 lengths. The first generator used u64 for Sigma text as well as for audit text. The corrected vectors preserve the existing Sigma objects and use u32 in the new receipt. Baseline: [v0.7.4](https://github.com/ns2switch/irmind/releases/tag/v0.7.4), commit `04f4b5dc0de45070a533d61ec32e12af546ff980`. This phase consolidates the format before v0.8 work begins. [Versión en español](../es/development/case-7-export-v11-contract.md).
 
 ## Format inventory
 

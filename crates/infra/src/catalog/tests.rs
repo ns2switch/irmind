@@ -464,137 +464,120 @@ fn approved_sigma_installation_proof_checks_the_analyst_and_operation_digest() {
 }
 
 #[cfg(feature = "sigma")]
+#[test]
 #[expect(
     clippy::too_many_lines,
-    reason = "covers an authenticated pair and invalid pair variants"
+    reason = "the signed positive and negative fixture table shares one trust root"
 )]
-#[test]
-fn approved_sigma_case_admission_binds_the_following_run() {
+fn case_7_admission_vectors_bind_each_signed_run_to_its_predecessor() {
     use irmind_app::{
-        Verifier,
-        v10_proofs::{CaseCheckpointV1, SigmaCaseRunAdmissionV1, SigmaRunStatusV1, SigmaRunV1},
-    };
-    use irmind_domain::Actor;
-
-    let vectors: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../../docs/development/sigma-package-vectors/wire.json"
-    ))
-    .unwrap();
-    let raw = hex::decode(
-        vectors["signed_case_admission"]["bytes_hex"]
-            .as_str()
-            .unwrap(),
-    )
-    .unwrap();
-    let entry: irmind_app::SignedEntry = serde_json::from_slice(&raw).unwrap();
-    let key = crate::LocalVerifier {
-        trusted: std::collections::BTreeMap::new(),
-    }
-    .with_trusted_key(&Actor::Analyst, &entry.public_key)
-    .unwrap();
-    assert_eq!(
-        irmind_app::hex(&entry.canonical()),
-        vectors["case_admission_signing_preimage"]["bytes_hex"]
-    );
-    assert_eq!(irmind_app::sha256(&entry.canonical()), entry.hash);
-    key.verify(&entry.public_key, &entry.hash, &entry.sig)
-        .unwrap();
-    let admission = SigmaCaseRunAdmissionV1::from_case_entry(&entry).unwrap();
-    let mut run = SigmaRunV1 {
-        checkpoint: CaseCheckpointV1 {
-            case_id: admission.checkpoint.case_id.clone(),
-            sequence: entry.seq,
-            entry_hash: entry.hash,
+        SignedEntry, Verifier,
+        v10_proofs::{
+            SIGMA_EVALUATOR_V5, SigmaAdmissionMode, SigmaCaseRunAdmissionV1, SigmaRunV2,
+            sigma_execution, verify_sigma_case_admission_pairs,
         },
-        pack_admission: admission.pack_admission,
-        artifact_inventory: admission.artifact_inventory,
-        selected_sources: admission.selected_sources,
-        start_utc_micros: admission.start_us,
-        end_utc_micros: admission.end_us,
-        compiled_rules: admission.compiled_rules,
-        field_table: admission.field_table,
-        evaluator: admission.evaluator.clone(),
-        reserved_units: admission.reserved_work,
-        used_units: 1,
-        status: SigmaRunStatusV1::Complete,
-        matched_rows: 0,
-        result_manifest: [97; 32],
-        proof_set: [98; 32],
     };
-    assert!(
-        SigmaCaseRunAdmissionV1::verify_following_run(&entry, &run, admission.manifest).is_ok()
-    );
-    let mut following = entry.clone();
-    following.seq += 1;
-    following.kind = irmind_domain::AuditEventKind::SigmaRunV1;
-    following.prev = entry.hash;
-    following.payload = run.encode().unwrap();
-    assert!(
-        irmind_app::v10_proofs::verify_sigma_case_admission_pairs(&[
-            entry.clone(),
-            following.clone()
-        ])
-        .is_ok()
-    );
-    assert!(
-        irmind_app::v10_proofs::verify_sigma_case_admission_pairs(std::slice::from_ref(&following))
-            .is_err()
-    );
-    assert!(
-        irmind_app::v10_proofs::verify_sigma_case_admission_pairs(std::slice::from_ref(&entry))
-            .is_err()
-    );
-    let mut downgraded = following;
-    let mut ungated = run.clone();
-    ungated.evaluator = irmind_app::v10_proofs::SIGMA_EVALUATOR_V3.into();
-    downgraded.payload = ungated.encode().unwrap();
-    assert!(
-        irmind_app::v10_proofs::verify_sigma_case_admission_pairs(&[entry.clone(), downgraded])
-            .is_err()
-    );
-    assert!(SigmaCaseRunAdmissionV1::verify_following_run(&entry, &run, [0; 32]).is_err());
-    run.selected_sources[0] ^= 1;
-    assert!(
-        SigmaCaseRunAdmissionV1::verify_following_run(&entry, &run, admission.manifest).is_err()
-    );
-}
 
-#[cfg(feature = "sigma")]
-#[test]
-fn approved_v4_gate_vectors_round_trip_and_reject_ungated_run() {
-    use irmind_app::{
-        Verifier,
-        v10_proofs::{SIGMA_EVALUATOR_V4_CASE_ADMISSION, SigmaCaseRunAdmissionV1, SigmaRunV1},
-    };
     let vectors: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../../docs/development/sigma-package-vectors/v4-gate.json"
+        "../../../../docs/development/case-7-export-v11-vectors/wire.json"
     ))
     .unwrap();
-    let raw = |key: &str| hex::decode(vectors[key]["bytes_hex"].as_str().unwrap()).unwrap();
-    let entry: irmind_app::SignedEntry = serde_json::from_slice(&raw("signed_admission")).unwrap();
+    let sigma = &vectors["sigma"];
+    let decode = |value: &serde_json::Value| hex::decode(value["hex"].as_str().unwrap()).unwrap();
+    let first: SignedEntry = serde_json::from_slice(&decode(
+        &vectors["case_and_export"]["case_created_signed_entry"],
+    ))
+    .unwrap();
     let verifier = crate::LocalVerifier {
         trusted: std::collections::BTreeMap::new(),
     }
-    .with_trusted_key(&irmind_domain::Actor::Analyst, &entry.public_key)
+    .with_trusted_key(&irmind_domain::Actor::Analyst, &first.public_key)
     .unwrap();
-    assert_eq!(entry.canonical(), raw("admission_challenge"));
-    verifier
-        .verify(&entry.public_key, &entry.hash, &entry.sig)
-        .unwrap();
-    let admit = SigmaCaseRunAdmissionV1::from_case_entry(&entry).unwrap();
-    assert_eq!(admit.encode().unwrap(), raw("admission"));
-    let run = SigmaRunV1::decode(&irmind_app::hex(&raw("following_run"))).unwrap();
-    assert_eq!(run.evaluator, SIGMA_EVALUATOR_V4_CASE_ADMISSION);
-    assert_eq!(
-        run.encode().unwrap(),
-        irmind_app::hex(&raw("following_run"))
-    );
-    assert!(SigmaCaseRunAdmissionV1::verify_following_run(&entry, &run, admit.manifest).is_ok());
-    let ungated = SigmaRunV1::decode(&irmind_app::hex(&raw(
-        "invalid_following_run_without_gate_identity",
-    )))
-    .unwrap();
-    assert!(
-        SigmaCaseRunAdmissionV1::verify_following_run(&entry, &ungated, admit.manifest).is_err()
-    );
+    let authenticate = |entry: &SignedEntry| {
+        assert_eq!(irmind_app::sha256(&entry.canonical()), entry.hash);
+        assert_eq!(entry.public_key, first.public_key);
+        verifier
+            .verify(&entry.public_key, &entry.hash, &entry.sig)
+            .unwrap();
+    };
+    authenticate(&first);
+    let entry = |name: &str| {
+        let entry: SignedEntry = serde_json::from_slice(&decode(&sigma[name])).unwrap();
+        authenticate(&entry);
+        entry
+    };
+    for (claim, run, mode) in [
+        (None, "direct_run_v2_entry", SigmaAdmissionMode::DirectLocal),
+        (
+            Some("installed_case_admission"),
+            "installed_run_v2_entry",
+            SigmaAdmissionMode::InstalledPackage,
+        ),
+        (
+            Some("installed_local_case_admission"),
+            "installed_local_run_v2_entry",
+            SigmaAdmissionMode::InstalledPackage,
+        ),
+    ] {
+        let run = entry(run);
+        let receipt = sigma_execution(&run).unwrap();
+        assert_eq!(receipt.evaluator, SIGMA_EVALUATOR_V5);
+        assert_eq!(receipt.admission_mode, mode);
+        assert_eq!(receipt.encode().unwrap(), run.payload);
+        let mut chain = vec![first.clone()];
+        if let Some(name) = claim {
+            let claim = entry(name);
+            assert_eq!(
+                SigmaCaseRunAdmissionV1::from_case_entry(&claim)
+                    .unwrap()
+                    .encode()
+                    .unwrap(),
+                hex::decode(&claim.payload).unwrap()
+            );
+            chain.push(claim);
+        }
+        chain.push(run);
+        assert!(verify_sigma_case_admission_pairs(&chain).is_ok());
+    }
+
+    for (claim, run) in [
+        (None, "reject_installed_mode_without_admission"),
+        (
+            Some("installed_local_case_admission"),
+            "reject_direct_mode_with_admission",
+        ),
+        (
+            Some("case_admission_without_installation"),
+            "reject_installed_mode_without_installation_binding",
+        ),
+        (
+            Some("installed_case_admission"),
+            "reject_installed_mode_compiled_rule_mismatch",
+        ),
+        (
+            Some("installed_case_admission"),
+            "reject_detached_checkpoint",
+        ),
+    ] {
+        let mut chain = vec![first.clone()];
+        chain.extend(claim.map(entry));
+        chain.push(entry(run));
+        assert!(verify_sigma_case_admission_pairs(&chain).is_err(), "{run}");
+    }
+    for name in ["reject_missing_mode", "reject_unknown_mode"] {
+        assert!(sigma_execution(&entry(name)).is_err(), "{name}");
+    }
+    for negative in sigma["reject_retired_evaluator_ids"]
+        .as_object()
+        .unwrap()
+        .values()
+    {
+        let entry: SignedEntry = serde_json::from_slice(&decode(negative)).unwrap();
+        authenticate(&entry);
+        assert!(sigma_execution(&entry).is_err());
+    }
+    let raw = decode(&sigma["reject_v1_receipt_even_with_v5_evaluator"]);
+    let legacy: serde_json::Value = serde_json::from_slice(&raw).unwrap();
+    assert!(serde_json::from_slice::<SignedEntry>(&raw).is_err());
+    assert!(SigmaRunV2::decode(legacy["payload"].as_str().unwrap()).is_err());
 }

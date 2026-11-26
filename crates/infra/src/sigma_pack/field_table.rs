@@ -102,33 +102,10 @@ impl ReviewedSigmaFieldTable {
         object: &SigmaFieldTableV1,
         evaluator: &str,
     ) -> Result<Self, AppError> {
-        let table = Self::parse(object)?;
-        if table.has_decimal_projection()
-            != matches!(
-                evaluator,
-                irmind_app::v10_proofs::SIGMA_EVALUATOR_V4
-                    | irmind_app::v10_proofs::SIGMA_EVALUATOR_V4_CASE_ADMISSION
-            )
-        {
+        if evaluator != irmind_app::v10_proofs::SIGMA_EVALUATOR_V5 {
             return Err(invalid());
         }
-        Ok(table)
-    }
-
-    pub fn has_decimal_projection(&self) -> bool {
-        self.variants
-            .iter()
-            .any(SigmaSourceVariant::has_decimal_projection)
-    }
-
-    #[cfg(feature = "sigma")]
-    pub(super) fn evaluator(&self) -> &'static str {
-        use irmind_app::v10_proofs::{SIGMA_EVALUATOR_V3, SIGMA_EVALUATOR_V4};
-        if self.has_decimal_projection() {
-            SIGMA_EVALUATOR_V4
-        } else {
-            SIGMA_EVALUATOR_V3
-        }
+        Self::parse(object)
     }
 
     #[cfg(feature = "sigma")]

@@ -20,6 +20,13 @@ fn retained_sigma_objects_decode_and_reproduce_the_case_7_vectors() {
     let decoded = SigmaRunResultsV3::decode(&results).unwrap();
     assert_eq!(decoded.encode().unwrap(), results);
 
+    for name in [
+        "reject_standalone_results_v1",
+        "reject_standalone_results_v2",
+    ] {
+        assert!(SigmaRunResultsV3::decode(&body(name)).is_err());
+    }
+
     let compiled = body("compiled_rules");
     let rules = SigmaCompiledRulesV1::decode(&compiled).unwrap();
     assert_eq!(rules.encode().unwrap(), compiled);

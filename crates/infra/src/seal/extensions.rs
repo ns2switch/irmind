@@ -163,6 +163,18 @@ pub(super) fn verify_sigma(
     cancel: &CancellationToken,
 ) -> Result<(), AppError> {
     irmind_app::v10_proofs::verify_sigma_case_admission_pairs(entries)?;
+    #[cfg(not(feature = "sigma"))]
+    {
+        let _ = &mut verify_rows;
+        if entries
+            .iter()
+            .any(|entry| entry.kind == AuditEventKind::SigmaRunV2)
+        {
+            return Err(AppError::Policy(
+                "Sigma source-class verification requires a build with the Sigma evaluator".into(),
+            ));
+        }
+    }
     let installations = package_proofs::collect(section, objects, operations, cancel)?;
     irmind_app::v10_proofs::sigma_remaining_work(entries)?;
     let mut referenced = BTreeSet::new();
@@ -174,7 +186,7 @@ pub(super) fn verify_sigma(
     );
     for entry in entries
         .iter()
-        .filter(|entry| entry.kind == AuditEventKind::SigmaRunV1)
+        .filter(|entry| entry.kind == AuditEventKind::SigmaRunV2)
     {
         let run = sigma_execution(entry)?;
         let operation = operations
@@ -197,7 +209,7 @@ pub(super) fn verify_sigma(
         {
             return Err(AppError::InvalidChain(entry.seq));
         }
-        if irmind_app::v10_proofs::requires_sigma_case_admission(&run.evaluator) {
+        if run.admission_mode == irmind_app::v10_proofs::SigmaAdmissionMode::InstalledPackage {
             let idx = entries
                 .binary_search_by_key(&run.checkpoint.sequence, |candidate| candidate.seq)
                 .map_err(|_| AppError::InvalidChain(entry.seq))?;
@@ -207,22 +219,22 @@ pub(super) fn verify_sigma(
                 &run,
                 manifest,
             )?;
-            if let Some(digest) = claim.installation {
-                package_proofs::verify(
-                    section,
-                    objects,
-                    &installations,
-                    digest,
-                    manifest,
-                    &mut referenced,
-                    cancel,
-                )?;
-            }
+            package_proofs::verify(
+                section,
+                objects,
+                &installations,
+                claim
+                    .installation
+                    .ok_or(AppError::InvalidChain(entry.seq))?,
+                manifest,
+                &mut referenced,
+                cancel,
+            )?;
         }
         materials.verify_execution_scope(&run, operation, entries)?;
         #[cfg(feature = "sigma")]
-        if materials.class_plan.is_some() {
-            units = verify_sigma_v3(
+        {
+            units = verify_sigma_run(
                 &run,
                 &materials,
                 &table,
@@ -234,21 +246,6 @@ pub(super) fn verify_sigma(
                 units,
                 cancel,
                 &mut verify_rows,
-            )?;
-        }
-        #[cfg(not(feature = "sigma"))]
-        if materials.class_plan.is_some() {
-            return Err(AppError::Policy(
-                "Sigma source-class verification requires a build with the Sigma evaluator".into(),
-            ));
-        }
-        if materials.class_plan.is_none() {
-            let time = run.start_utc_micros..run.end_utc_micros;
-            materials.verify_case_rows(
-                entries,
-                &run,
-                |artifact, rows| verify_rows(artifact, rows, &time, None),
-                cancel,
             )?;
         }
         admissions.insert(run.pack_admission);
@@ -264,8 +261,8 @@ pub(super) fn verify_sigma(
     clippy::too_many_arguments,
     reason = "the verifier binds one run to the same bounded readers and authenticated prefix"
 )]
-fn verify_sigma_v3(
-    run: &irmind_app::v10_proofs::SigmaRunV1,
+fn verify_sigma_run(
+    run: &irmind_app::v10_proofs::SigmaRunV2,
     materials: &irmind_app::v10_proofs::V10SigmaRunObjects,
     table: &crate::sigma_pack::field_table::ReviewedSigmaFieldTable,
     pack: &irmind_app::v10_proofs::SigmaPackManifestV1,

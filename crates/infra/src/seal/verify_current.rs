@@ -409,7 +409,7 @@ impl ChainState {
         self.skills.accept(&entry, &crate::TomlSkillCompiler)?;
         self.accept_ingest_outcome(&entry)?;
         self.accept_metadata(&entry)?;
-        if entry.kind == AuditEventKind::SigmaRunV1 {
+        if entry.kind == AuditEventKind::SigmaRunV2 {
             self.proof_checkpoints.insert(
                 irmind_app::v10_proofs::sigma_execution(&entry)?
                     .checkpoint
@@ -468,7 +468,7 @@ impl ChainState {
                 || matches!(
                     entry.kind,
                     AuditEventKind::ReportPublishedV1
-                        | AuditEventKind::SigmaRunV1
+                        | AuditEventKind::SigmaRunV2
                         | AuditEventKind::SigmaCaseRunAdmissionV1
                         | AuditEventKind::IngestFileOutcomeV1
                         | AuditEventKind::SourceManifestV2

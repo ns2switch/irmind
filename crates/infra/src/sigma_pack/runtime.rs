@@ -12,7 +12,7 @@ use irmind_app::{
     v10_proofs::{
         PreparedSigmaExecution, SigmaCompiledRulesV1, SigmaCoverageV1, SigmaExecutionContext,
         SigmaExecutionSummary, SigmaFieldTableV1, SigmaFindingDraft, SigmaMatchV1, SigmaRuleKeyV1,
-        SigmaRunResultsV1, SigmaRunResultsV2, SigmaRunResultsV3, SigmaRunV1, SigmaSourceScopeV1,
+        SigmaRunResultsV1, SigmaRunResultsV2, SigmaRunResultsV3, SigmaRunV2, SigmaSourceScopeV1,
         V10ArtifactReference, V10AuditReference, V10ProofDescriptor, V10ProofFamily,
         V10RowReference, V10SourceReference, sigma_pack_operation, v10_proof_commitment,
     },
@@ -385,7 +385,7 @@ fn prepare(
         .collect::<Vec<_>>();
     let proof_set =
         v10_proof_commitment(V10ProofFamily::Sigma, &descriptors).map_err(|_| invalid())?;
-    let receipt = SigmaRunV1 {
+    let receipt = SigmaRunV2 {
         checkpoint: scope.checkpoint,
         pack_admission: admission,
         artifact_inventory: scope.view.active_artifact_inventory()?,
@@ -394,7 +394,8 @@ fn prepare(
         end_utc_micros: time.end,
         compiled_rules: descriptors[2].hash(),
         field_table: descriptors[0].hash(),
-        evaluator: reviewed.evaluator().into(),
+        evaluator: irmind_app::v10_proofs::SIGMA_EVALUATOR_V5.into(),
+        admission_mode: irmind_app::v10_proofs::SigmaAdmissionMode::DirectLocal,
         reserved_units: scope.reserved,
         used_units,
         status,
@@ -978,7 +979,7 @@ pub(super) fn enrolled_field_table() -> SigmaFieldTableV1 {
 }
 
 pub(crate) fn verify_class_plan(
-    receipt: &SigmaRunV1,
+    receipt: &SigmaRunV2,
     materials: &irmind_app::v10_proofs::V10SigmaRunObjects,
     table: &ReviewedSigmaFieldTable,
     entries: &[irmind_app::SignedEntry],
@@ -1013,7 +1014,7 @@ pub(crate) fn verify_class_plan(
         .flat_map(|(_, _, variants)| variants.iter().copied())
         .collect();
     let (plan, compiled, output) = plan::compile(table, &available, rules, deadline, cancel)?;
-    if materials.class_plan.as_ref() != Some(&plan)
+    if materials.class_plan != plan
         || materials.compiled_rules != compiled
         || materials.results.coverage != output.coverage
     {
