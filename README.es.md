@@ -80,13 +80,13 @@ Empieza por [la instalación verificada](docs/es/platforms.md#verificar-una-vers
 
 
 
-La [versión preliminar v0.7.2](https://github.com/ns2switch/irmind/releases/tag/v0.7.2) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. La [guía de plataformas](docs/es/platforms.md) da los comandos. Tras verificar una copia descargada de [install.sh](install.sh) o [install.ps1](install.ps1), el instalador puede hacer esas comprobaciones.
+La [última release estable](https://github.com/ns2switch/irmind/releases/latest) ofrece bundles Sigstore sin claves permanentes, procedencia de GitHub, un SBOM y hashes. Descarga el binario y `SHA256SUMS`, verifica sus hashes y la identidad exacta del firmante con cosign 3.1.3 o posterior y comprueba `gh attestation verify`. Los scripts actuales [install.sh](install.sh) e [install.ps1](install.ps1) seleccionan la release estable por defecto. Para las copias firmadas incluidas en v0.7.4 o anteriores, indica la etiqueta exacta como explica la [guía de plataformas](docs/es/platforms.md#verificar-una-versión-antes-de-instalar).
 
 Conserva la versión de IRMind que creó cada caso. Consulta la [nota de formatos](CHANGELOG.md) y la [política de versiones](docs/development/decisions.md#pre-10-format-policy).
 
 ```sh
-# Tras descargar el binario, SHA256SUMS y ambos bundles .sigstore.json:
-tag=v0.7.2; binary=irmind-linux-x86_64
+# Usa la etiqueta que muestra la página de la release estable para verificar sus archivos.
+tag=v0.7.4; binary=irmind-linux-x86_64
 for file in "$binary" SHA256SUMS; do
   cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done
