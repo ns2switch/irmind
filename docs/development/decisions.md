@@ -1,5 +1,11 @@
 # Design decisions
 
+## Contract approval
+
+An implementation contract is approved when the maintainer explicitly approves
+that contract. A design decision, reviewer comment or passing check does not
+approve a later encoding, vector, dependency, credential or control change.
+
 ## Pre-1.0 fix publication
 
 Context: security-advisory and temporary-fork coordination delayed development fixes.
