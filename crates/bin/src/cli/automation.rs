@@ -46,7 +46,7 @@ impl AutomationContext<'_, '_> {
     }
 
     fn handle_serve(self, case_id: &str, protocol_version: u8) -> Result<bool> {
-        use irmind_app::engine_rpc::{canonical_case_id, serve, serve_v2};
+        use irmind_app::engine_rpc::{ApprovalAuthenticators, canonical_case_id, serve, serve_v2};
         let admitted = canonical_case_id(case_id)?;
         if protocol_version == 1 {
             serve(
@@ -80,7 +80,10 @@ impl AutomationContext<'_, '_> {
                 admitted,
                 self.selected_model,
                 self.cancel,
-                verifier,
+                ApprovalAuthenticators {
+                    passphrase: verifier,
+                    windows_hello: None,
+                },
                 unbuffered_rpc_input()?,
                 std::io::stdout(),
             )?;

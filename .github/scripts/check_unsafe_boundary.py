@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Keep first-party unsafe Rust in the cfg(windows) native containment boundary."""
+"""Keep first-party unsafe Rust in the reviewed platform-specific adapters."""
 from pathlib import Path
 import re
 
@@ -48,10 +48,10 @@ def inspect(path, text):
     offsets=unsafe_offsets(text)
     if not offsets:return []
     relative=path.as_posix()
-    allowed=relative.startswith('crates/process-containment/src/windows/') or relative=='crates/process-containment/src/windows.rs'
+    allowed=relative.startswith('crates/process-containment/src/windows/') or relative=='crates/process-containment/src/windows.rs' or relative=='crates/native-approval/src/windows_hello.rs'
     cfg=bool(re.search(r'^\s*#!\s*\[\s*cfg\s*\(\s*windows\s*\)\s*\]',text,re.M))
     if allowed and cfg:return []
-    return [f'{relative}:{text.count(chr(10),0,offset)+1}: unsafe outside cfg(windows) containment' for offset in offsets]
+    return [f'{relative}:{text.count(chr(10),0,offset)+1}: unsafe outside the approved native platform boundary' for offset in offsets]
 
 
 def main():

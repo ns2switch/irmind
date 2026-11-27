@@ -1,4 +1,4 @@
-use super::{Fault, Method, Request, Session, params, wire};
+use super::{ApprovalAuthenticators, Fault, Method, Request, Session, params, wire};
 use crate::{
     CancellationToken,
     approvals::gui::{DecisionState, GuiApproval, GuiApprovalGate},
@@ -18,7 +18,7 @@ const LIFETIME: Duration = Duration::from_mins(1);
 #[derive(Clone, Copy)]
 pub(super) enum Protocol<'a> {
     V1,
-    V2(Option<&'a super::PassphraseVerifier<'a>>),
+    V2(ApprovalAuthenticators<'a>),
 }
 
 impl Protocol<'_> {
@@ -123,7 +123,7 @@ impl<'scope, 'env: 'scope> Session<'scope, 'env, '_> {
         scope: &'scope Scope<'scope, 'env>,
         request: Request,
     ) -> Result<Value, Fault> {
-        let Protocol::V2(Some(verify)) = self.protocol else {
+        let Protocol::V2(authenticators) = self.protocol else {
             return Err(if self.protocol.v2() {
                 Fault::ReviewInTui
             } else {
@@ -131,10 +131,14 @@ impl<'scope, 'env: 'scope> Session<'scope, 'env, '_> {
             });
         };
         match request.method {
-            Method::ApprovalPrepare => self.prepare_approval(&params(request.params)?),
-            Method::ApprovalSubmit => {
-                self.submit_approval(scope, request.submission.ok_or(Fault::Invalid)?, verify)
+            Method::ApprovalPrepare => {
+                self.prepare_approval(&params(request.params)?, authenticators)
             }
+            Method::ApprovalSubmit => self.submit_approval(
+                scope,
+                request.submission.ok_or(Fault::Invalid)?,
+                authenticators,
+            ),
             Method::ApprovalStatus | Method::ApprovalCancel => self.approval_state(
                 &params(request.params)?,
                 matches!(request.method, Method::ApprovalCancel),
@@ -143,8 +147,16 @@ impl<'scope, 'env: 'scope> Session<'scope, 'env, '_> {
         }
     }
 
-    fn prepare_approval(&mut self, input: &Prepare) -> Result<Value, Fault> {
+    fn prepare_approval(
+        &mut self,
+        input: &Prepare,
+        authenticators: ApprovalAuthenticators<'_>,
+    ) -> Result<Value, Fault> {
         self.require_open(&input.case_id)?;
+        let methods = authenticators.names();
+        if methods.is_empty() {
+            return Err(Fault::ReviewInTui);
+        }
         if input
             .request_id
             .as_ref()
@@ -182,6 +194,7 @@ impl<'scope, 'env: 'scope> Session<'scope, 'env, '_> {
             self.id,
             now,
             self.shutdown.child_token(),
+            &methods,
         )?);
         let reply = presentation.reply.clone();
         self.approvals.live = Some(presentation);
@@ -192,11 +205,18 @@ impl<'scope, 'env: 'scope> Session<'scope, 'env, '_> {
         &mut self,
         scope: &'scope Scope<'scope, 'env>,
         input: wire::Submission,
-        verify: &'env super::PassphraseVerifier<'env>,
+        authenticators: ApprovalAuthenticators<'env>,
     ) -> Result<Value, Fault> {
         self.require_open(&input.case_id)?;
         if self.active.is_some() || self.approvals.busy() {
             return Err(Fault::Busy);
+        }
+        let method_available = match &input.credential {
+            wire::Credential::Passphrase(_) => authenticators.passphrase.is_some(),
+            wire::Credential::WindowsHello => authenticators.windows_hello.is_some(),
+        };
+        if !method_available {
+            return Err(Fault::ReviewInTui);
         }
         let live = self.presentation(&input.presentation)?.clone();
         let now = self.engine.clock.now().map_err(Fault::from)?;
@@ -219,10 +239,8 @@ impl<'scope, 'env: 'scope> Session<'scope, 'env, '_> {
         let verify_key = thread::Builder::new()
             .name("irmind-rpc-approval".into())
             .spawn_scoped(scope, move || {
-                let passphrase = input.passphrase;
                 let verified = !worker.gate.cancel.is_cancelled()
-                    && verify(&passphrase, &worker.prepared.analyst_key);
-                drop(passphrase);
+                    && authenticators.verify(input.credential, &worker);
                 if verified {
                     let _ = engine.commit_gui_approval(
                         &admitted,
@@ -293,6 +311,7 @@ impl Presentation {
         session: Uuid,
         now: u64,
         cancel: CancellationToken,
+        methods: &[&'static str],
     ) -> Result<Self, Fault> {
         let expires_at = prepared
             .expires_at
@@ -317,7 +336,7 @@ impl Presentation {
         )?;
         let reply = json!({
             "presentation":id.to_string(), "view":view, "view_sha256":digest,
-            "code":&code[..16], "methods":["keystore_passphrase"],
+            "code":&code[..16], "methods":methods,
         });
         wire::frame(json!({"id":u32::MAX,"result":reply,"error":null}))
             .map_err(|_| Fault::ReviewInTui)?;
@@ -336,6 +355,96 @@ impl Presentation {
             reply,
         })
     }
+}
+
+impl ApprovalAuthenticators<'_> {
+    fn names(&self) -> Vec<&'static str> {
+        let mut names = Vec::new();
+        if self.passphrase.is_some() {
+            names.push("keystore_passphrase");
+        }
+        if self.windows_hello.is_some() {
+            names.push("windows_hello");
+        }
+        names
+    }
+
+    fn verify(&self, credential: wire::Credential, presentation: &Presentation) -> bool {
+        match credential {
+            wire::Credential::Passphrase(phrase) => self
+                .passphrase
+                .is_some_and(|verify| verify(&phrase, &presentation.prepared.analyst_key)),
+            wire::Credential::WindowsHello => self.windows_hello.is_some_and(|verify| {
+                let view = &presentation.reply["view"];
+                let Some(code) = presentation.reply["code"].as_str() else {
+                    return false;
+                };
+                let code = code
+                    .as_bytes()
+                    .chunks(4)
+                    .filter_map(|group| std::str::from_utf8(group).ok())
+                    .collect::<Vec<_>>()
+                    .join("-");
+                let message = format!(
+                    "IRMind: {} {} ({code})",
+                    view["decision"].as_str().unwrap_or_default(),
+                    presentation.prepared.request.tool.as_str()
+                );
+                let Some(review) = windows_review(view, &code) else {
+                    return false;
+                };
+                verify(
+                    &review,
+                    &message,
+                    presentation.gate.end,
+                    &presentation.gate.cancel,
+                )
+            }),
+        }
+    }
+}
+
+fn windows_review(view: &Value, code: &str) -> Option<String> {
+    use std::fmt::Write as _;
+    let mut rendered = String::new();
+    for field in ["action", "case_id", "decision", "effective_scope"] {
+        writeln!(rendered, "{field}: {}\r", quoted(view[field].as_str()?)).ok()?;
+    }
+    writeln!(
+        rendered,
+        "expires_at (UTC): {}\r",
+        view["expires_at"].as_u64()?
+    )
+    .ok()?;
+    for (key, arg) in view["args"].as_object()? {
+        writeln!(rendered, "{}: {}\r", quoted(key), quoted(arg.as_str()?)).ok()?;
+    }
+    write!(rendered, "Verification code: {code}").ok()?;
+    Some(rendered)
+}
+
+fn quoted(value: &str) -> String {
+    use std::fmt::Write as _;
+    let mut escaped = String::from('"');
+    for ch in value.chars() {
+        match ch {
+            '"' => escaped.push_str("\\\""),
+            '\\' => escaped.push_str("\\\\"),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            ch if ch.is_control()
+                || matches!(ch,
+                '\u{061c}' | '\u{200b}'..='\u{200f}' | '\u{2028}'..='\u{202e}'
+                | '\u{2060}'..='\u{206f}' | '\u{feff}') =>
+            {
+                let _ = write!(escaped, "\\u{:04x}", u32::from(ch));
+            }
+            ch => escaped.push(ch),
+        }
+    }
+    escaped.push('"');
+    escaped
 }
 
 fn digest_of(domain: &[u8], json: &mut Value) -> Result<String, Fault> {

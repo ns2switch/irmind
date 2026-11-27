@@ -52,6 +52,16 @@ pub fn serve(
 /// The host binds this verifier to the active encrypted file keystore.
 pub type PassphraseVerifier<'a> = dyn Fn(&secrecy::SecretString, &[u8]) -> bool + Sync + 'a;
 
+/// IRMind-only callbacks. A protocol client cannot supply an authenticator.
+#[derive(Clone, Copy, Default)]
+pub struct ApprovalAuthenticators<'a> {
+    pub passphrase: Option<&'a PassphraseVerifier<'a>>,
+    pub windows_hello: Option<&'a WindowsHelloVerifier<'a>>,
+}
+
+pub type WindowsHelloVerifier<'a> =
+    dyn Fn(&str, &str, Instant, &CancellationToken) -> bool + Sync + 'a;
+
 /// RPC V2 is selected before either peer writes the protocol magic. The
 /// caller must give this transport unbuffered private inherited pipes.
 pub fn serve_v2(
@@ -59,7 +69,7 @@ pub fn serve_v2(
     admitted: CaseId,
     model: Option<&dyn LlmPort>,
     shutdown: &CancellationToken,
-    verify: Option<&PassphraseVerifier<'_>>,
+    authenticators: ApprovalAuthenticators<'_>,
     input: impl Read + Send + 'static,
     output: impl Write + Send + 'static,
 ) -> io::Result<()> {
@@ -68,7 +78,7 @@ pub fn serve_v2(
         admitted,
         model,
         shutdown,
-        Protocol::V2(verify),
+        Protocol::V2(authenticators),
         input,
         output,
     )
