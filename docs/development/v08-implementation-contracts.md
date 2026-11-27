@@ -4,9 +4,10 @@
 
 **Status.** The shared J encoding, record bodies, case marker 8, export V12
 and the independent vectors are approved. The initial stdio API ships with
-case 7/V11 and leaves decisions in the existing TUI. Its proposed local
-presentation flow remains open for review. Source queries from children
-follow the API. Enable MCP only on targets where native containment proves
+case 7/V11 and leaves decisions in the existing TUI. The
+[graphical approval contract](v08-graphical-approvals-contract.md) replaces
+the separate-TUI proposal and remains open for review. Source queries
+from children follow the API. Enable MCP only on targets where native containment proves
 all required denials. Hook implementation waits for review of the measured
 native-versus-Wasm comparison on all five distribution targets. This follows the
 [extensibility designs](https://github.com/ns2switch/irmind/pull/391) and the
@@ -77,9 +78,10 @@ rejects older formats up front and directs the analyst to the creating build.
 No migration is proposed.
 
 The engine protocol alone adds no signed case record and can ship against
-case 7/V11 after approval of its transport and local approval port. The
-protocol's version evolves independently. Subagent query bindings and plans
-use the existing audit, branch and capture sections of the proposed V12.
+case 7/V11 with decisions in the TUI. The protocol's version evolves
+independently, including the proposed approval extension. Subagent query
+bindings and plans use the existing audit, branch and capture sections
+of the proposed V12.
 
 ## Order and acceptance
 

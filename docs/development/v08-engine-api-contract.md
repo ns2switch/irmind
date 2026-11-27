@@ -1,9 +1,9 @@
 # Local engine API and trusted approval contract
 
-**Status.** Approved stdio transport, handshake and five case methods. The
-local approval presentation described below still requires review. Unix
-sockets and Windows named pipes can follow after their native identity tests.
-TCP is outside this contract.
+**Status.** Approved stdio transport, handshake and five case methods. The graphical
+approval design has been selected by the analyst, and its implementation
+contract is for review. Unix sockets and Windows named pipes require a
+separate contract and native identity tests.
 
 ## Protocol
 
@@ -34,8 +34,8 @@ Initial methods and exact params:
 | `start_turn` | `{case_id,text}` | `{operation}`; existing attended case turn validation, limit 8 KiB input. |
 | `cancel` | `{case_id,operation}` | `{accepted}`; only the operation's admitted case and session. |
 
-Case IDs are canonical UUIDs. Operation and request are random UUIDs emitted by
-the engine. Proposal is an authenticated case digest. After, cursor and anchor
+Case IDs are canonical UUIDs. The engine emits random operation UUIDs.
+After, cursor and anchor
 are nonnegative u64 stream sequences. The cursor binds the admitted case/session
 and starts at 0. Reuse the engine's existing turn state and TUI actions.
 One admitted case, one active turn and at most four pending requests per
@@ -50,67 +50,15 @@ refresh plus new subscription. A slow or disconnected client cannot hold
 case locks or retain a reservation indefinitely. Use existing cancellation
 and settlement for any in-flight operation.
 
-## Local approval surface for review
+## Approvals
 
-The first stdio implementation accepts only `hello` and the five methods
-above. A tool requiring approval remains pending under the usual custody
-rules. The client tells the analyst to open the matching case in the IRMind
-TUI and review the request there. The client cannot request a prompt, see
-approval arguments or submit a decision over the protocol.
+The implemented V1 transport accepts only `hello` and the five methods
+above. A tool requiring approval stays pending, with the decision taken
+inside IRMind through the existing TUI at `/approvals`. The client receives
+a guarded status notification.
 
-For the follow-up, use a separate IRMind TUI in a terminal launched by the
-analyst. The graphical client opens a local instructions panel. It shows the
-case UUID and confirmation code and offers to copy `irmind tui <case_uuid>`.
-Only the canonical UUID is substituted. The terminal and installed IRMind
-executable are selected by the analyst. The client never runs a shell command,
-types into a terminal or forwards the copied code as confirmation.
-
-| Platform | Trusted surface and opening sequence |
-| --- | --- |
-| Linux | The analyst opens their usual desktop terminal or an existing local TTY, runs `irmind tui <case_uuid>` and opens `/approvals`. No dependency on a desktop portal or terminal emulator API. |
-| macOS | The analyst opens Terminal.app from Applications or Spotlight, runs `irmind tui <case_uuid>` and opens `/approvals`. No AppleScript, terminal injection, or native plug-in. |
-| Windows | The analyst opens Windows Terminal from Start, runs `irmind tui <case_uuid>` in PowerShell and opens `/approvals`. No Windows Hello, console injection or client-controlled credential dialog. |
-
-The TUI verifies the case and acquires the existing case and operation
-locks. A client-started turn commits the pending request and yields before
-an approval is reviewed. The approval is signed by the local IRMind process
-using the existing Analyst key and audit records. If the client is slow,
-closed or no longer owns the presentation lease, the TUI still uses its
-normal approval workflow and the pending signed record. The GUI receives
-only a guarded state change. Deliberate denial or disconnect cannot be
-turned into approval by the client.
-
-In a separately approved revision, `request_approval_prompt` can register
-one pending presentation and `approval_status` can read its guarded state.
-The proposed `LocalApprovalPresenter` exposes presentation status only.
-Default unavailable leaves decisions pending until expiry. The IPC interface
-contains no approve, sign, unlock or import-credentials method. The IRMind
-TUI shows the exact action, case, arguments, effective scope, expiry and
-matching code before local confirmation. Passphrase entry happens inside
-IRMind. A native Touch ID or Windows Hello path needs a separate decision.
-Peer credentials and a matching code alone grant no authority.
-
-Each request is single-use, tied to one authenticated pending proposal,
-case, local session and fresh 32-byte random engine nonce. The displayed
-code is the first 16 lowercase hex characters of
-`SHA-256("irmind-local-approval-v1" || 00 || J({case_id,session,proposal,nonce}))`,
-grouped every four characters. The code is a cross-check, with no authority.
-Expiry is the earlier of the proposal deadline and 60 s measured by the
-engine. A local confirmation rechecks authorization, bound arguments and
-active proposal under the case lock. On process restart all pending
-presentations expire. Only the existing signed approval record commits a
-decision. This adds no signed format or export dependency.
-
-A launch with stdio admits the initiating local analyst explicitly and
-keeps the approval surface separate from protocol pipes. For sockets
-verify Unix private directory/socket permissions and peer UID. For a pipe
-use a current-user DACL, reject remote clients and check the peer SID
-before case operations. No TCP listener, forwarded credentials or
-unattended scope grant. Run cross-user and stale endpoint tests before
-enabling either native transport.
-
-Tests cover handshake version and length, out-of-order IDs, unexpected
-methods (including fabricated approvals), two competing clients, stale
-case anchors, cancellation, a substituted action, lease expiry, keyboard
-input via the trusted local prompt and a slow IPC reader. A local mock GUI
-must reproduce the guarded Windows/AWS/Kubernetes TUI event sequence.
+The analyst chose approval from the GUI that launched IRMind over private
+stdio. Review the [graphical approval contract](v08-graphical-approvals-contract.md)
+for the proposed V2 methods, per-decision reauthentication, native
+dependency review and threat model. Enable the extension only after
+approval and native validation.
