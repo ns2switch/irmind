@@ -194,7 +194,6 @@ pub const GLOBAL_OPERATION_SCOPE: &str = "global";
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CancelledOperation {
     Ingest,
-    GraphRebuild,
     Verify,
     Investigation,
     Approval,
@@ -207,7 +206,6 @@ impl CancelledOperation {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Ingest => "ingest",
-            Self::GraphRebuild => "graph-rebuild",
             Self::Verify => "verify",
             Self::Investigation => "investigation",
             Self::Approval => "approval",

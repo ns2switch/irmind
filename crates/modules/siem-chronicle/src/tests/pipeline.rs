@@ -96,6 +96,15 @@ fn authorized_response_becomes_signed_mapped_evidence_and_queryable_roles() {
     assert_eq!(server.finish().unwrap().len(), 1);
     assert_eq!(oauth.finish().unwrap().len(), 1);
     let entries = store.entries(&case.id).unwrap();
+    let source_set = entries
+        .iter()
+        .find(|entry| entry.kind == AuditEventKind::SourceRecordSetV1)
+        .unwrap();
+    let source_set = irmind_domain::SourceRecordSetV1::decode(&source_set.payload).unwrap();
+    assert_eq!(
+        source_set.records_commitment().as_str(),
+        "8e350cde23210786d2c3b56d43a8876ee8f2c3256c3fb5e60e72ad51a02bea02"
+    );
     for kind in [
         AuditEventKind::ToolResult,
         AuditEventKind::SourceManifestV2,

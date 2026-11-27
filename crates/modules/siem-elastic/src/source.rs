@@ -3,13 +3,11 @@ use irmind_app::{
     AppError, ParseReport, ParserIdentity, SourceDecoder,
     source_mapping::{
         SourceInput,
+        framed::{DecodedSourceFrame, SourceFrameEmitter},
         json::{SourceJsonLimits, decode_json_fields},
     },
 };
-use irmind_domain::{
-    DecodeAnnotationsV1, EventOrigin, EvidenceHash, IndexedTime, Provenance, SourceFormatV1,
-    SourceMemberV1, SourceRecordV1, SourceValue, Tainted,
-};
+use irmind_domain::{IndexedTime, SourceFormatV1, SourceRecordV1, SourceValue, Tainted};
 use std::{collections::BTreeMap, io::Read as _};
 pub struct ElasticSourceDecoder;
 impl SourceDecoder for ElasticSourceDecoder {
@@ -61,16 +59,15 @@ impl SourceDecoder for ElasticSourceDecoder {
             rejected: 0,
             samples: vec![],
         };
+        let frames = SourceFrameEmitter::new(input.metadata, self.identity());
         for (ordinal, hit) in hits.iter().enumerate() {
             if input.metadata.cancel.is_cancelled() {
                 return Err(AppError::Cancelled);
             }
-            match record(
-                hit.clone(),
-                report.accepted as u64,
-                ordinal as u64,
-                input.metadata,
-            ) {
+            let record = decode_hit(hit.clone()).and_then(|frame| {
+                frames.record_at(frame, None, report.accepted as u64, ordinal as u64)
+            });
+            match record {
                 Ok(record) => {
                     emit(record)?;
                     report.accepted += 1;
@@ -83,12 +80,7 @@ impl SourceDecoder for ElasticSourceDecoder {
         Ok(report)
     }
 }
-fn record(
-    fields: SourceValue,
-    index: u64,
-    ordinal: u64,
-    metadata: irmind_app::source_mapping::SourceMetadata<'_>,
-) -> Result<Tainted<SourceRecordV1>, AppError> {
+fn decode_hit(fields: SourceValue) -> Result<DecodedSourceFrame, AppError> {
     let data = fields
         .field("_source")
         .or_else(|| fields.field("fields"))
@@ -101,38 +93,13 @@ fn record(
         })
         .ok_or_else(invalid)?;
     let time = IndexedTime::from_rfc3339(timestamp, false).map_err(|_| invalid())?;
-    let origin = EventOrigin::try_new(
-        EvidenceHash::from_bytes(metadata.evidence_hash),
-        index,
-        None,
-        "siem-elastic",
-        "elastic-source-v1",
-    )
-    .map_err(|_| invalid())?;
     let format = SourceFormatV1::try_new("elastic-search", "elastic-source-v1", BTreeMap::new())
         .map_err(|_| invalid())?;
-    let annotations = DecodeAnnotationsV1::try_new(
-        false,
-        vec![SourceMemberV1 {
-            ordinal,
-            offset: None,
-        }],
-        None,
-    )
-    .map_err(|_| invalid())?;
-    let record = SourceRecordV1::try_from_source(
-        origin,
-        metadata.source.clone(),
-        Some(time),
-        format,
+    Ok(DecodedSourceFrame {
         fields,
-        annotations,
-    )
-    .map_err(|_| invalid())?;
-    Ok(Tainted::from_external(
-        record,
-        Provenance::new(metadata.evidence_hash, Some(index), metadata.source.kind()),
-    ))
+        timestamp: Some(time),
+        format,
+    })
 }
 fn invalid() -> AppError {
     AppError::Fixed(irmind_app::FixedAppError::SourceFormat)
