@@ -753,11 +753,16 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: github.event_name == 'workflow_dispatch' && inputs.release_dry_run == true
         with: {name: signed-release-dry-run, path: release/, if-no-files-found: error, retention-days: 30}
-      - name: Publish the signed prerelease only for an existing tag
+      - name: Publish the signed release only for an existing tag
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          release_kind=$(python3 -B .github/scripts/release_version.py "$GITHUB_REF_NAME")
+          release_flags=()
+          if [ "$release_kind" = prerelease ]; then
+            release_flags=(--prerelease --latest=false)
+          fi
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" release/* --clobber
           else
@@ -766,7 +771,7 @@ jobs:
             if test -f "$notes_file"; then
               notes=(--notes-file "$notes_file")
             fi
-            gh release create "$GITHUB_REF_NAME" release/* --verify-tag --prerelease "${notes[@]}" --title "IRMind $GITHUB_REF_NAME"
+            gh release create "$GITHUB_REF_NAME" release/* --verify-tag "${release_flags[@]}" "${notes[@]}" --title "IRMind $GITHUB_REF_NAME"
           fi
       - name: Add the public code signing policy to release notes
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')

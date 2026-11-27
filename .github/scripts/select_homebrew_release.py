@@ -1,13 +1,17 @@
 """Select published stable SemVer tags for the protected Homebrew deployment."""
 import json
-import re
 import sys
+
+from release_version import release_kind
 
 
 def eligible(tag, release):
+    try:
+        kind = release_kind(tag)
+    except ValueError:
+        return False
     return (
-        re.fullmatch(r"v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)", tag)
-        is not None
+        kind == "stable"
         and type(release) is dict
         and release.get("tagName") == tag
         and release.get("isDraft") is False

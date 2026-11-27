@@ -58,19 +58,19 @@ gh attestation verify "<BINARY>" -R ns2switch/irmind
 
 For Windows PowerShell, use the same `cosign verify-blob` and `gh attestation verify` commands with Windows paths. Check the certificate identity against the **tag you intended to install**; checking only that a signature exists is insufficient. The attestation binds the binary digest to this repository's build workflow. [Sigstore's verification guide](https://docs.sigstore.dev/cosign/verifying/verify/) and [GitHub's attestation guide](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations) explain the checks.
 
-The source tree contains [install.sh](../install.sh) and [install.ps1](../install.ps1). Download the script and its matching `SHA256SUMS`. First verify the `SHA256SUMS` Sigstore bundle against the expected tag and workflow identity using the command above; then check the **script's exact checksum line** before running it. On Linux or macOS, set `binary=install.sh` in the checksum example above. On Windows, compare `Get-FileHash .\install.ps1 -Algorithm SHA256` with its single matching line. The scripts detect your system, verify the selected binary's checksum, and, when available, use `cosign` and a current `gh` to verify its signature and provenance. A failed verification stops the installation. They never request administrator privileges or change `PATH`.
+The source tree contains the current [install.sh](../install.sh) and [install.ps1](../install.ps1). Run them from a trusted checkout or review the saved source before running it. To use an installer bundled with a GitHub release, download its matching `SHA256SUMS` and verify the Sigstore bundle against that exact tag and workflow identity. Then verify the **script's exact checksum line**. On Linux or macOS, set `binary=install.sh` in the checksum example above. On Windows, compare `Get-FileHash .\install.ps1 -Algorithm SHA256` with its single matching line. The scripts detect your system, verify the selected binary's checksum, and, when available, use `cosign` and a current `gh` to verify its signature and provenance. A failed verification stops the installation. They never request administrator privileges or change `PATH`.
 
 ```sh
-# Linux or macOS, after checking install.sh against the release SHA256SUMS:
+# Linux or macOS, using the current installer:
 sh ./install.sh
 ```
 
 ```powershell
-# Windows, after checking install.ps1 against the release SHA256SUMS:
+# Windows, using the current installer:
 & .\install.ps1
 ```
 
-Omit the version to select the latest published stable release. If none is available, the installer stops. To opt in to a prerelease, pass its exact tag as the first POSIX argument or with PowerShell’s `-Version`. The same verification applies. An optional second POSIX argument or `-InstallDir` PowerShell argument chooses another user-owned directory. By default the binary goes to `~/.local/bin` on Linux and macOS or `%LOCALAPPDATA%\IRMind\bin` on Windows. If it is outside `PATH`, the script prints the path to add manually.
+The current scripts select the latest published stable release when the version is omitted. If none is available, the installer stops. The signed scripts bundled with v0.8.0-alpha.1, v0.7.4 and earlier releases predate that change. With one of those scripts, use `sh ./install.sh v0.7.4` or `& .\install.ps1 -Version v0.7.4` to install v0.7.4. Use an exact tag the same way to opt in to a prerelease. The same binary verification applies. An optional second POSIX argument or `-InstallDir` PowerShell argument chooses another user-owned directory. By default the binary goes to `~/.local/bin` on Linux and macOS or `%LOCALAPPDATA%\IRMind\bin` on Windows. If it is outside `PATH`, the script prints the path to add manually.
 
 CI also produces test artifacts on relevant nightly runs; these are not GitHub Releases. Pull requests and merges to `main` do not publish binaries. Apple notarization and Windows Authenticode are not available yet, so those systems may still warn after verification.
 

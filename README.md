@@ -79,13 +79,13 @@ Start with the [verified release instructions](docs/platforms.md#verify-a-releas
 
 
 
-The [v0.7.2 pre-release](https://github.com/ns2switch/irmind/releases/tag/v0.7.2) provides keyless Sigstore bundles, GitHub provenance, an SBOM, and checksums. Download a binary and `SHA256SUMS`, verify their exact signer identity and checksums with cosign 3.1.3 or newer, then check `gh attestation verify`. The [platform guide](docs/platforms.md#verify-a-release-before-installing) has the commands. After verifying a downloaded copy of [install.sh](install.sh) or [install.ps1](install.ps1), the installer can perform these checks for you.
+The [latest stable release](https://github.com/ns2switch/irmind/releases/latest) provides keyless Sigstore bundles, GitHub provenance, an SBOM, and checksums. Download a binary and `SHA256SUMS`, verify their exact signer identity and checksums with cosign 3.1.3 or newer, then check `gh attestation verify`. The current [install.sh](install.sh) and [install.ps1](install.ps1) select the stable release by default. For signed installer copies bundled with v0.7.4 or earlier, pass the exact tag as described in the [platform guide](docs/platforms.md#verify-a-release-before-installing).
 
 Keep the IRMind version that created each case. See the [format-impact note](CHANGELOG.md) and [version policy](docs/development/decisions.md#pre-10-format-policy).
 
 ```sh
-# After downloading the binary, SHA256SUMS, and both .sigstore.json bundles:
-tag=v0.7.2; binary=irmind-linux-x86_64
+# Use the tag shown on the stable release page to verify its downloaded assets.
+tag=v0.7.4; binary=irmind-linux-x86_64
 for file in "$binary" SHA256SUMS; do
   cosign verify-blob "$file" --bundle "$file.sigstore.json" --certificate-identity "https://github.com/ns2switch/irmind/.github/workflows/ci.yml@refs/tags/$tag" --certificate-oidc-issuer https://token.actions.githubusercontent.com
 done
