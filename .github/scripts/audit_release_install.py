@@ -14,10 +14,10 @@ from release_version import release_kind
 
 
 def command(args):
-    result = subprocess.run([str(x) for x in args], capture_output=True, text=True, timeout=600)
+    result = subprocess.run([str(x) for x in args], capture_output=True, timeout=600)
     if result.returncode:
         raise SystemExit('Verified installation audit failed; no raw environment diagnostics published.')
-    return result.stdout.strip()
+    return result.stdout.decode('utf-8').strip()
 
 
 def verified_installer(tag, installer, root):
@@ -36,7 +36,8 @@ def verified_installer(tag, installer, root):
 
 
 def stable_tag():
-    release = json.loads(command(['gh', 'api', 'repos/ns2switch/irmind/releases/latest']))
+    release = json.loads(command(['gh', 'api', 'repos/ns2switch/irmind/releases/latest',
+                                  '--jq', '{tag_name, draft, prerelease}']))
     tag = release['tag_name']
     if release_kind(tag) != 'stable' or release['draft'] is not False or release['prerelease'] is not False:
         raise SystemExit('Expected a published stable release')
