@@ -87,7 +87,7 @@ class MacOSReleaseTests(unittest.TestCase):
 
     def test_full_rehearsal_keeps_verified_assets_and_skips_release_writes(self):
         release = WORKFLOW.read_text().split('  release:\n', 1)[1].split('  post_release:', 1)[0]
-        shared, publication = release.split('      - name: Publish the signed prerelease', 1)
+        shared, publication = release.split('      - name: Publish the signed release', 1)
         self.assertIn("github.event_name == 'workflow_dispatch' && inputs.release_dry_run == true", shared)
         self.assertLess(shared.index('cosign verify-blob'), shared.index('name: signed-release-dry-run'))
         self.assertNotIn('gh release ', shared)

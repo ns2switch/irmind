@@ -13,6 +13,7 @@ function Download-Https([string]$Url, [string]$Destination, [long]$MaximumBytes)
     $handler = [System.Net.Http.HttpClientHandler]::new()
     $handler.AllowAutoRedirect = $false
     $client = [System.Net.Http.HttpClient]::new($handler)
+    $client.DefaultRequestHeaders.UserAgent.ParseAdd('IRMind-Installer/1.0')
     $client.Timeout = [TimeSpan]::FromSeconds(90)
     try {
         $current = [System.Uri]::new($Url)
