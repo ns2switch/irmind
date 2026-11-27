@@ -82,3 +82,75 @@ Report the commit, executable hashes, OS build, display resolution,
 accessibility scale, locale and the result of each step. Include any
 clipped text or unexpected completion. Keep PINs, biometric material and
 personal information out of reports and screenshots.
+## macOS Touch ID boundary
+
+On both macOS architectures, the system dialog shows IRMind's action, case
+UUID, decision and code. Review the exact arguments and scope in the GUI.
+A compromised GUI could show different arguments. The strict route is
+IRMind's TUI. Touch ID is omitted when the complete system text does not
+fit the validated display configuration. Test limits in this crate are
+fixtures. A distribution binary has no approved display limit yet.
+
+| LocalAuthentication operation | Safety invariant |
+| --- | --- |
+| `LAContext::new` | The context is new for this request and remains on its creating thread, inside an autorelease pool. |
+| `canEvaluatePolicy:error:`, `biometryType` | Require the biometric-only policy and Touch ID. Check before starting and in the same live context. |
+| `setLocalizedFallbackTitle:` | Pass a retained empty NSString to suppress the OS fallback control. |
+| `setTouchIDAuthenticationAllowableReuseDuration:` | Zero disables reuse for each new context. |
+| `evaluatePolicy:localizedReason:reply:` | Pass the complete bounded title and a sendable block that captures only the bounded result channel. Ignore the OS error pointer. |
+| `invalidate` | Invalidate before releasing the live context. A late callback cannot reach signing or any case state. |
+
+### Manual macOS witness
+
+Use an Intel or Apple Silicon Mac with Touch ID enrolled, an interactive
+desktop and the Rust toolchain pinned by the candidate. Use an isolated
+checkout and synthetic cases only.
+
+1. Open [PR #451](https://github.com/ns2switch/irmind/pull/451), copy the
+   full candidate commit from its **Commits** tab and confirm the matrix is
+   green for that commit. Fetch `refs/pull/451/head` from the official GitHub
+   repository, check out that commit detached and compare `git rev-parse HEAD`
+   to the copied hash. Check that `git status --porcelain` is empty.
+2. Build the native trial executables from that checkout with the pinned
+   dependency checksums. `cargo test --no-run` prints their paths. Record
+   each SHA-256 with `shasum -a 256 <path>`. Use only the locally built
+   executables. These are separate from the published IRMind packages.
+
+   ```sh
+   cargo test --release --locked -p irmind-native-approval --no-run
+   cargo test --release --locked -p irmind-infra --lib --no-run
+   ```
+
+3. Run the `irmind_infra` trial executable. It creates temporary keys and
+   two synthetic cases with a simulated provider. Complete Touch ID for
+   the approval and then for the denial. The test verifies one Analyst
+   signature each, one dispatch after the approval commit and zero
+   dispatches on denial.
+
+   ```sh
+   ./<infra-executable> engine_rpc_native_touch_id_signed_decision --ignored --test-threads 1 --nocapture
+   ```
+
+4. Compare the system dialog with the expected synthetic title printed by
+   the executable. Check the complete action, case UUID, decision and code.
+   Record whether it truncates any field,
+   including the final digits of the code. The full arguments and scope
+   belong in the GUI. The standalone witness has no separate GUI, so use
+   the synthetic arguments in the tests for comparison. The title length
+   fixture is for testing. It is not a display capacity for production.
+5. Run `touch_id_native_cancel_dialog` on the `irmind_native_approval`
+   trial executable with `--ignored --test-threads 1`. Confirm the prompt
+   appears, then cancel it. Repeat and try letting it expire while the
+   prompt is open. If practical, try unsuccessful verifications and check
+   that none gives success or offers a passphrase fallback in the OS dialog.
+6. Run `engine_rpc_v2_discards_a_late_authentication_after_cancellation`
+   and `engine_rpc_v2_rechecks_the_deadline_and_competing_decisions_under_lock`
+   on `irmind_infra` with `--test-threads 1`. The synthetic callbacks
+   prove that late success cannot sign or dispatch. If the OS allows late
+   confirmation after expiry, also try it in the native prompt and record
+   its behavior.
+
+Report the commit, executable hashes, architecture, macOS build, display
+resolution and scaling, locale and outcomes. Include clipped text or any
+unexpected completion. Keep biometric and personal information out of the
+report and screenshots.

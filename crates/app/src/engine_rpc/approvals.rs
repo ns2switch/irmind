@@ -153,8 +153,10 @@ impl<'scope, 'env: 'scope> Session<'scope, 'env, '_> {
         authenticators: ApprovalAuthenticators<'_>,
     ) -> Result<Value, Fault> {
         self.require_open(&input.case_id)?;
-        let methods = authenticators.names();
-        if methods.is_empty() {
+        if authenticators.passphrase.is_none()
+            && authenticators.windows_hello.is_none()
+            && authenticators.touch_id.is_none()
+        {
             return Err(Fault::ReviewInTui);
         }
         if input
@@ -194,7 +196,7 @@ impl<'scope, 'env: 'scope> Session<'scope, 'env, '_> {
             self.id,
             now,
             self.shutdown.child_token(),
-            &methods,
+            authenticators,
         )?);
         let reply = presentation.reply.clone();
         self.approvals.live = Some(presentation);
@@ -211,14 +213,18 @@ impl<'scope, 'env: 'scope> Session<'scope, 'env, '_> {
         if self.active.is_some() || self.approvals.busy() {
             return Err(Fault::Busy);
         }
-        let method_available = match &input.credential {
-            wire::Credential::Passphrase(_) => authenticators.passphrase.is_some(),
-            wire::Credential::WindowsHello => authenticators.windows_hello.is_some(),
+        let live = self.presentation(&input.presentation)?.clone();
+        let name = match &input.credential {
+            wire::Credential::Passphrase(_) => "keystore_passphrase",
+            wire::Credential::WindowsHello => "windows_hello",
+            wire::Credential::TouchId => "touch_id",
         };
-        if !method_available {
+        if !live.reply["methods"]
+            .as_array()
+            .is_some_and(|methods| methods.iter().any(|method| method == name))
+        {
             return Err(Fault::ReviewInTui);
         }
-        let live = self.presentation(&input.presentation)?.clone();
         let now = self.engine.clock.now().map_err(Fault::from)?;
         let mut state = live.gate.state.lock().map_err(|_| Fault::Expired)?;
         if live.gate.expired(now) || *state != DecisionState::Ready {
@@ -311,7 +317,7 @@ impl Presentation {
         session: Uuid,
         now: u64,
         cancel: CancellationToken,
-        methods: &[&'static str],
+        authenticators: ApprovalAuthenticators<'_>,
     ) -> Result<Self, Fault> {
         let expires_at = prepared
             .expires_at
@@ -334,6 +340,10 @@ impl Presentation {
                 "session":session.to_string(), "view_sha256":digest,
             }),
         )?;
+        let methods = authenticators.methods(&view, &code[..16]);
+        if methods.is_empty() {
+            return Err(Fault::ReviewInTui);
+        }
         let reply = json!({
             "presentation":id.to_string(), "view":view, "view_sha256":digest,
             "code":&code[..16], "methods":methods,
@@ -358,13 +368,20 @@ impl Presentation {
 }
 
 impl ApprovalAuthenticators<'_> {
-    fn names(&self) -> Vec<&'static str> {
+    fn methods(&self, view: &Value, code: &str) -> Vec<&'static str> {
         let mut names = Vec::new();
         if self.passphrase.is_some() {
             names.push("keystore_passphrase");
         }
         if self.windows_hello.is_some() {
             names.push("windows_hello");
+        }
+        if self.touch_id.is_some_and(|adapter| {
+            touch_title(view, code).is_some_and(|title| {
+                title.encode_utf16().count() <= usize::from(adapter.title_limit_utf16)
+            })
+        }) {
+            names.push("touch_id");
         }
         names
     }
@@ -400,8 +417,34 @@ impl ApprovalAuthenticators<'_> {
                     &presentation.gate.cancel,
                 )
             }),
+            wire::Credential::TouchId => self.touch_id.is_some_and(|adapter| {
+                let view = &presentation.reply["view"];
+                let Some(code) = presentation.reply["code"].as_str() else {
+                    return false;
+                };
+                let Some(title) = touch_title(view, code) else {
+                    return false;
+                };
+                title.encode_utf16().count() <= usize::from(adapter.title_limit_utf16)
+                    && (adapter.verify)(&title, presentation.gate.end, &presentation.gate.cancel)
+            }),
         }
     }
+}
+
+fn touch_title(view: &Value, code: &str) -> Option<String> {
+    let code = code
+        .as_bytes()
+        .chunks(4)
+        .filter_map(|group| std::str::from_utf8(group).ok())
+        .collect::<Vec<_>>()
+        .join("-");
+    Some(format!(
+        "{} {} {} {code}",
+        view["decision"].as_str()?,
+        view["action"].as_str()?,
+        view["case_id"].as_str()?
+    ))
 }
 
 fn windows_review(view: &Value, code: &str) -> Option<String> {
@@ -463,4 +506,35 @@ fn nonce() -> [u8; 32] {
         }
     }
     nonce
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn touch_id_is_omitted_if_the_complete_title_does_not_fit() {
+        let view = json!({
+            "action":"ti_lookup_external",
+            "decision":"approve",
+            "case_id":"10000000-0000-4000-8000-000000000001",
+        });
+        let code = "a12b34c56d78e901";
+        let mut methods = ApprovalAuthenticators {
+            passphrase: Some(&|_, _| false),
+            touch_id: Some(super::super::TouchIdAuthenticator {
+                title_limit_utf16: 64,
+                verify: &|_, _, _| false,
+            }),
+            ..Default::default()
+        };
+        assert_eq!(methods.methods(&view, code), ["keystore_passphrase"]);
+        if let Some(touch_id) = methods.touch_id.as_mut() {
+            touch_id.title_limit_utf16 = 128;
+        }
+        assert_eq!(
+            methods.methods(&view, code),
+            ["keystore_passphrase", "touch_id"]
+        );
+    }
 }

@@ -125,6 +125,7 @@ fn engine_rpc_v2_requires_reauthentication_then_commits_once() {
                 ApprovalAuthenticators {
                     passphrase: Some(verify),
                     windows_hello: None,
+                    touch_id: None,
                 },
                 input,
                 output,
@@ -206,6 +207,7 @@ fn engine_rpc_v2_discards_a_late_authentication_after_cancellation() {
                 ApprovalAuthenticators {
                     passphrase: Some(verify),
                     windows_hello: None,
+                    touch_id: None,
                 },
                 input,
                 output,
@@ -270,6 +272,7 @@ fn engine_rpc_v2_rechecks_the_deadline_and_competing_decisions_under_lock() {
                     ApprovalAuthenticators {
                         passphrase: Some(verify),
                         windows_hello: None,
+                        touch_id: None,
                     },
                     input,
                     output,
@@ -319,8 +322,9 @@ fn engine_rpc_v2_rechecks_the_deadline_and_competing_decisions_under_lock() {
     }
 }
 
-fn run_windows_hello_case(
-    verify: &irmind_app::engine_rpc::WindowsHelloVerifier<'_>,
+fn run_native_approval_case(
+    authenticators: ApprovalAuthenticators<'_>,
+    method: &str,
     approve: bool,
 ) {
     let (decision, state, kind) = if approve {
@@ -344,21 +348,18 @@ fn run_windows_hello_case(
                 id.clone(),
                 Some(&model),
                 &CancellationToken::new(),
-                ApprovalAuthenticators {
-                    passphrase: None,
-                    windows_hello: Some(verify),
-                },
+                authenticators,
                 input,
                 output,
             )
         });
         open_pending(&mut client, &id);
         let view = prepare(&mut client, &id, decision);
-        assert_eq!(view["methods"], json!(["windows_hello"]));
+        assert_eq!(view["methods"], json!([method]));
         let result = client.call(
             "approval_submit",
             json!({"case_id":id.as_str(), "presentation":view["presentation"],
-                "view_sha256":view["view_sha256"], "method":"windows_hello", "passphrase_hex":null}),
+                "view_sha256":view["view_sha256"], "method":method, "passphrase_hex":null}),
         );
         assert_eq!(result["result"]["state"], "authenticating");
         assert_eq!(
@@ -391,8 +392,8 @@ fn run_windows_hello_case(
 
 #[test]
 fn engine_rpc_windows_hello_adapter_uses_the_authenticated_review() {
-    run_windows_hello_case(
-        &|exact, prompt, deadline, cancel| {
+    let verify =
+        |exact: &str, prompt: &str, deadline: std::time::Instant, cancel: &CancellationToken| {
             assert!(exact.contains("ti_lookup_external"));
             assert!(exact.contains("attacker.example"));
             assert!(exact.contains("effective_scope:"));
@@ -403,7 +404,13 @@ fn engine_rpc_windows_hello_adapter_uses_the_authenticated_review() {
             assert!(std::time::Instant::now() < deadline);
             assert!(!cancel.is_cancelled());
             true
+        };
+    run_native_approval_case(
+        ApprovalAuthenticators {
+            windows_hello: Some(&verify),
+            ..Default::default()
         },
+        "windows_hello",
         false,
     );
 }
@@ -412,10 +419,68 @@ fn engine_rpc_windows_hello_adapter_uses_the_authenticated_review() {
 #[test]
 #[ignore = "requires Windows 11 build 22000+ with Hello configured and an interactive desktop"]
 fn engine_rpc_native_windows_hello_signed_decision() {
-    let verify = |exact: &str, message: &str, deadline, cancel: &CancellationToken| {
-        irmind_native_approval::verify(exact, message, deadline, || cancel.is_cancelled())
-    };
     for approve in [true, false] {
-        run_windows_hello_case(&verify, approve);
+        run_native_approval_case(
+            ApprovalAuthenticators {
+                windows_hello: Some(&|exact, message, deadline, cancel| {
+                    irmind_native_approval::verify(exact, message, deadline, || {
+                        cancel.is_cancelled()
+                    })
+                }),
+                ..Default::default()
+            },
+            "windows_hello",
+            approve,
+        );
+    }
+}
+
+#[test]
+fn engine_rpc_touch_id_adapter_displays_only_the_approved_fields() {
+    let verify = |title: &str, deadline: std::time::Instant, cancel: &CancellationToken| {
+        let parts: Vec<_> = title.split_ascii_whitespace().collect();
+        assert_eq!(parts.len(), 4);
+        assert_eq!(&parts[..2], ["deny", "ti_lookup_external"]);
+        assert!(CaseId::parse(parts[2]).is_ok());
+        assert_eq!(parts[3].len(), 19);
+        assert!(!title.contains("attacker.example"));
+        assert!(!cancel.is_cancelled());
+        assert!(std::time::Instant::now() < deadline);
+        true
+    };
+    run_native_approval_case(
+        ApprovalAuthenticators {
+            touch_id: Some(irmind_app::engine_rpc::TouchIdAuthenticator {
+                title_limit_utf16: 128,
+                verify: &verify,
+            }),
+            ..Default::default()
+        },
+        "touch_id",
+        false,
+    );
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+#[ignore = "requires an interactive desktop and enrolled Touch ID on physical macOS"]
+fn engine_rpc_native_touch_id_signed_decision() {
+    for approve in [true, false] {
+        run_native_approval_case(
+            ApprovalAuthenticators {
+                touch_id: Some(irmind_app::engine_rpc::TouchIdAuthenticator {
+                    title_limit_utf16: 128,
+                    verify: &|title, deadline, cancel| {
+                        eprintln!("Expected synthetic Touch ID title: {title}");
+                        irmind_native_approval::verify_touch_id(title, 128, deadline, || {
+                            cancel.is_cancelled()
+                        })
+                    },
+                }),
+                ..Default::default()
+            },
+            "touch_id",
+            approve,
+        );
     }
 }

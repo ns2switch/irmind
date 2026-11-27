@@ -278,3 +278,12 @@ their MIT OR Apache-2.0 licenses. See the upstream
 [MIT license](https://github.com/microsoft/windows-rs/blob/master/license-mit)
 and [Apache-2.0 license](https://github.com/microsoft/windows-rs/blob/master/license-apache-2.0).
 Windows Hello and WinRT are operating-system services supplied by Windows.
+
+## macOS Touch ID native approval adapter
+
+The macOS-only adapter uses the [objc2 project](https://github.com/madsmtm/objc2),
+including `objc2-local-authentication` 0.3.2 (Zlib OR Apache-2.0 OR MIT),
+`objc2-foundation` 0.3.2 (MIT), `objc2` 0.6.5 (MIT),
+`block2` 0.6.2 (MIT), and `objc2-encode` 4.1.0 (MIT).
+The upstream license notices accompany their published packages.
+LocalAuthentication and Foundation are operating-system frameworks.
