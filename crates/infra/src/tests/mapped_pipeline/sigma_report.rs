@@ -592,7 +592,7 @@ fn signed_sigma_run_and_admitted_rules_verify_in_the_actual_sealed_v11_export() 
     let result = LocalExportVerifier
         .verify_export_details(&package, Some(&key))
         .unwrap();
-    assert_eq!(result.format_version, 11);
+    assert_eq!(result.format_version, 12);
     let mut bytes = fs::read(&package).unwrap();
     let rule = bytes
         .windows(SIGMA_RULE.len())

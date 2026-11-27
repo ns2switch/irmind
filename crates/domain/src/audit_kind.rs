@@ -57,6 +57,8 @@ pub enum AuditEventKind {
     SubagentSourceSetV1,
     SubagentTypeSnapshotV1,
     SubagentPlanV1,
+    SubagentPlanV2,
+    ChildSourceQueryV1,
     SubagentPlanApprovalV1,
     SubagentReservationV1,
     SubagentCheckpointV1,
@@ -68,7 +70,7 @@ pub enum AuditEventKind {
 }
 
 impl AuditEventKind {
-    pub const ALL: [Self; 62] = [
+    pub const ALL: [Self; 64] = [
         Self::Allowed,
         Self::ApprovalDenied,
         Self::ApprovalGranted,
@@ -123,6 +125,8 @@ impl AuditEventKind {
         Self::SubagentSourceSetV1,
         Self::SubagentTypeSnapshotV1,
         Self::SubagentPlanV1,
+        Self::SubagentPlanV2,
+        Self::ChildSourceQueryV1,
         Self::SubagentPlanApprovalV1,
         Self::SubagentReservationV1,
         Self::SubagentCheckpointV1,
@@ -189,6 +193,8 @@ impl AuditEventKind {
             Self::SubagentSourceSetV1 => "subagent-source-set-v1",
             Self::SubagentTypeSnapshotV1 => "subagent-type-v1",
             Self::SubagentPlanV1 => "subagent-plan-v1",
+            Self::SubagentPlanV2 => "irmind-subagent-plan-v2",
+            Self::ChildSourceQueryV1 => "irmind-child-source-query-v1",
             Self::SubagentPlanApprovalV1 => "subagent-plan-approval-v1",
             Self::SubagentReservationV1 => "subagent-reservation-v1",
             Self::SubagentCheckpointV1 => "subagent-checkpoint-v1",
@@ -300,6 +306,8 @@ mod tests {
             "subagent-source-set-v1",
             "subagent-type-v1",
             "subagent-plan-v1",
+            "irmind-subagent-plan-v2",
+            "irmind-child-source-query-v1",
             "subagent-plan-approval-v1",
             "subagent-reservation-v1",
             "subagent-checkpoint-v1",

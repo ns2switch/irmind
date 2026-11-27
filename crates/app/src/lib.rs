@@ -25,6 +25,7 @@ pub use tokio_util::sync::CancellationToken;
 mod adapter_storage_errors;
 mod approvals;
 mod audit_origin;
+mod canonical_j;
 mod case_budget;
 pub mod case_format;
 mod case_lifecycle;

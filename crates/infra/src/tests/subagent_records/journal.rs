@@ -37,7 +37,7 @@ impl History {
         };
         value.append(
             AuditEventKind::CaseCreated,
-            r#"{"version":7,"title":"Contract synthetic case","severity":"medium","scope":"local","budget":{"model_tokens":2000000,"tool_calls":1000,"cloud_bytes":536870912000},"source_queries":{"enabled":false,"analytics_allowed":false,"scan_bytes":null,"retained_rows":0,"retained_bytes":0}}"#.into(),
+            r#"{"version":8,"title":"Contract synthetic case","severity":"medium","scope":"local","budget":{"model_tokens":2000000,"tool_calls":1000,"cloud_bytes":536870912000},"source_queries":{"enabled":false,"analytics_allowed":false,"scan_bytes":null,"retained_rows":0,"retained_bytes":0}}"#.into(),
             true,
         );
         value
@@ -1119,7 +1119,7 @@ fn subagent_case_verification_seal_and_offline_v10_keep_every_committed_chunk() 
     let fingerprint = hex(&sha256(&history.analyst.public_key()));
     verify_export_expected(&output, Some(&fingerprint)).unwrap();
     let bytes = fs::read(&output).unwrap();
-    assert!(bytes.starts_with(b"IRMIND-EXPORT-V11\0"));
+    assert!(bytes.starts_with(b"IRMIND-EXPORT-V12\0"));
     assert!(bytes.ends_with(&0u64.to_be_bytes()));
     let chunk = chunks[1].bytes();
     let position = bytes

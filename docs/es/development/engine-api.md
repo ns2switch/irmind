@@ -26,7 +26,7 @@ Un cliente desconectado cancela su turno por la ruta normal del motor.
 Si V1 indica `review_in_tui`, abre el caso en la TUI de IRMind y
 usa `/approvals`. Solo IRMind firma la decisión. La API transmite el estado
 con ContentGuard y carece de operaciones para aprobar, firmar o gestionar
-credenciales. Esta implementación usa el caso 7 y la exportación V11.
+credenciales. Esta implementación usa el caso 8 y la exportación V12.
 
 ## Aprobaciones gráficas
 

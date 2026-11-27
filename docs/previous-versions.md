@@ -2,13 +2,12 @@
 
 [Español](es/previous-versions.md)
 
-Case format 7 and export V11 require an IRMind 0.8 build that supports them.
-To open, verify, export or delete a case from 0.7.x, use the exact 0.7.x
-binary that created it. A case-format marker identifies a release series,
-and the producing patch may be required. Homebrew upgrades do not retain
-previous versions. If you have open 0.7.x cases, save a verified copy of
-their producing binary, its EVTX helper and the compatible data directory
-and keystore before upgrading.
+The current format is case 8 and export V12. Cases from v0.8.0-alpha.1
+use case 7 and export V11 and need the exact alpha binary. To open, verify,
+export or delete a case from 0.7.x, use the exact 0.7.x binary that created
+it. Homebrew upgrades can remove older binaries. Before upgrading an open
+case, save a verified copy of its creating binary and EVTX helper, along
+with the compatible data directory and keystore.
 
 ## Download and verify a specific tag
 

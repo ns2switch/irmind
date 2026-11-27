@@ -119,7 +119,7 @@ fn synthetic_export(path: &std::path::Path) -> String {
         actor: Actor::Analyst,
         origin: "analyst".into(),
         kind: irmind_domain::AuditEventKind::CaseCreated,
-        payload: json!({"version": 7, "title": "Synthetic", "severity": "medium", "scope": scope, "budget": irmind_app::CaseBudgetLimits::default(), "source_queries": irmind_app::source_queries::SourceQueryAllocationV1::default()})
+        payload: json!({"version": 8, "title": "Synthetic", "severity": "medium", "scope": scope, "budget": irmind_app::CaseBudgetLimits::default(), "source_queries": irmind_app::source_queries::SourceQueryAllocationV1::default()})
             .to_string(),
         evidence: None,
         prev: [0; 32],
@@ -190,21 +190,21 @@ fn write_synthetic_package(
     seal: CaseSeal,
 ) {
     let header = Header {
-        version: 11,
+        version: 12,
         case_id: &created.case_id,
         title: "Synthetic",
         severity: "medium",
         scope,
         seal,
     };
-    let mut output = b"IRMIND-EXPORT-V11\0".to_vec();
+    let mut output = b"IRMIND-EXPORT-V12\0".to_vec();
     append_frame(&mut output, &header);
     output.extend_from_slice(&2u64.to_be_bytes());
     append_frame(&mut output, created);
     append_frame(&mut output, sealed);
     // Evidence, originals, operations, mapping proofs, artifacts, skill admissions,
-    // catalog proofs, branches, query captures, Sigma and reports all have zero members.
-    output.extend_from_slice(&[0; 11 * 8]);
+    // catalog proofs, branches, query captures, Sigma, reports and runtime admission proofs are empty.
+    output.extend_from_slice(&[0; 12 * 8]);
     std::fs::write(path, output).unwrap();
 }
 

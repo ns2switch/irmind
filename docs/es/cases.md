@@ -15,8 +15,8 @@ abriendo una copia de evidencia guardada.
 
 ## Casos y exportaciones de una versión anterior
 
-La versión 0.8 usa el marcador de caso 7, artefactos Parquet V3 con mapeo y la
-exportación V11. Usa la versión que creó el caso para abrirlo, verificarlo o
+La versión 0.8 usa el marcador de caso 8, artefactos Parquet V3 con mapeo y la
+exportación V12. Usa la versión que creó el caso para abrirlo, verificarlo o
 exportarlo. Para usar la versión actual, verifica los originales con la versión
 que creó el caso e ingiérelos en un caso nuevo. El caso original conserva sus
 aprobaciones, hallazgos confirmados y sello.
@@ -26,7 +26,7 @@ aprobaciones, hallazgos confirmados y sello.
 Usa `/sigma inspect <directorio>` para revisar un pack local. Con
 `/sigma import --license <id> <directorio>`, confirma el hash del manifiesto
 mostrado para firmar la admisión. Si una ejecución usa el pack, la exportación
-V11 del caso incluye las reglas exactas admitidas.
+V12 del caso incluye las reglas exactas admitidas.
 
 Ejecuta `/sigma run <SHA-256 del pack> <inicio UTC> <fin UTC>` desde un caso
 abierto. La tabla de v0.7 cubre los canales revisados de Windows EVTX Security,
@@ -52,7 +52,7 @@ fuentes, los huecos de las skills y las consultas que alcanzaron su límite.
 
 Usa `/report save md en` o `/report save pdf es` para firmar y conservar
 el documento en el caso. El comando muestra su SHA-256. Tras sellar el caso, la
-exportación V11 incluye sus informes publicados. `/verify` comprueba la firma,
+exportación V12 incluye sus informes publicados. `/verify` comprueba la firma,
 las filas de origen, la cobertura y los bytes del documento. Para publicar otra
 revisión, usa un caso abierto.
 

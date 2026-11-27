@@ -142,7 +142,7 @@ fn run_scenario(binary: &Path, output: &Path, scenario: &Scenario) {
     ]);
     cli(&["seal", case]);
 
-    let export = output.join("sigma-report-v11.irmind");
+    let export = output.join("sigma-report-v12.irmind");
     cli(&["export", case, export.to_str().unwrap()]);
     let bytes = fs::read(&export).unwrap();
     assert!(bytes.len() < 16 * 1024 * 1024);
@@ -426,7 +426,7 @@ fn read_frame(reader: &mut impl Read) -> serde_json::Value {
 }
 
 fn assert_cloudtrail_originals(bytes: &[u8], delivery: &Path) {
-    let mut reader = Cursor::new(bytes.strip_prefix(b"IRMIND-EXPORT-V11\0").unwrap());
+    let mut reader = Cursor::new(bytes.strip_prefix(b"IRMIND-EXPORT-V12\0").unwrap());
     read_frame(&mut reader);
     let count = read_count(&mut reader);
     let entries = (0..count)
@@ -476,9 +476,9 @@ fn assert_cloudtrail_originals(bytes: &[u8], delivery: &Path) {
 }
 
 fn assert_package(bytes: &[u8], finding: &str, scenario: &Scenario) {
-    let magic = b"IRMIND-EXPORT-V11\0";
+    let magic = b"IRMIND-EXPORT-V12\0";
     let mut reader = Cursor::new(bytes.strip_prefix(magic).unwrap());
-    assert_eq!(read_frame(&mut reader)["version"], 11);
+    assert_eq!(read_frame(&mut reader)["version"], 12);
     let count = read_count(&mut reader);
     assert!((1..1024).contains(&count));
     let entries = (0..count)

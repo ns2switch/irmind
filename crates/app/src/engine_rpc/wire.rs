@@ -8,8 +8,6 @@ pub(super) const MAGIC: &[u8] = b"IRMIND-RPC-V1\0";
 pub(super) const MAGIC_V2: &[u8] = b"IRMIND-RPC-V2\0";
 const MAX_PASSPHRASE_BYTES: usize = 4096;
 const MAX_FRAME: usize = 64 * 1024;
-const MAX_DEPTH: usize = 16;
-const MAX_NODES: usize = 4096;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum Fault {
@@ -237,32 +235,7 @@ pub(super) fn frame(mut value: Value) -> io::Result<Vec<u8>> {
 }
 
 pub(super) fn canonical(value: &mut Value) -> io::Result<Vec<u8>> {
-    let mut nodes = 0;
-    sort(value, 1, &mut nodes)?;
-    serde_json::to_vec(value).map_err(|_| invalid())
-}
-
-fn sort(value: &mut Value, depth: usize, nodes: &mut usize) -> io::Result<()> {
-    *nodes += 1;
-    if depth > MAX_DEPTH || *nodes > MAX_NODES {
-        return Err(invalid());
-    }
-    match value {
-        Value::Array(array) => {
-            for item in array {
-                sort(item, depth + 1, nodes)?;
-            }
-        }
-        Value::Object(object) => {
-            object.sort_keys();
-            for item in object.values_mut() {
-                sort(item, depth + 1, nodes)?;
-            }
-        }
-        Value::Number(number) if number.as_u64().is_none() => return Err(invalid()),
-        _ => (),
-    }
-    Ok(())
+    crate::canonical_j::encode(value).map_err(|_| invalid())
 }
 
 pub(super) fn flush(writer: &mut impl Write, bytes: &[u8]) -> io::Result<()> {
@@ -278,6 +251,7 @@ fn invalid() -> io::Error {
 #[allow(clippy::expect_used)]
 mod tests {
     use super::*;
+    use crate::canonical_j::{MAX_DEPTH, MAX_NODES};
     use serde_json::json;
 
     #[test]

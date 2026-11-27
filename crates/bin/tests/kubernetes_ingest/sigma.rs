@@ -102,5 +102,5 @@ fn verify_signed_limitations(
     let verified = irmind_infra::LocalExportVerifier
         .verify_export_details(&target, Some(&key))
         .unwrap();
-    assert_eq!(verified.format_version, 11);
+    assert_eq!(verified.format_version, 12);
 }

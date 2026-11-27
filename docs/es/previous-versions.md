@@ -2,13 +2,13 @@
 
 [English](../previous-versions.md)
 
-El formato de caso 7 y la exportación V11 requieren una versión de IRMind
-0.8 que los admita. Para abrir, verificar, exportar o borrar un caso de
-0.7.x, usa exactamente el binario 0.7.x que lo creó. El marcador identifica
-la serie y puede hacer falta el parche productor. Homebrew no conserva
-versiones anteriores. Si tienes casos abiertos en 0.7.x, antes de actualizar
-guarda una copia verificada del binario productor y su auxiliar EVTX, además
-del directorio de datos y el llavero compatibles.
+El formato actual es caso 8 y exportación V12. Los casos de v0.8.0-alpha.1
+usan el caso 7 y la exportación V11 y necesitan el binario de la alpha.
+Para abrir, verificar, exportar o borrar un caso de 0.7.x, usa exactamente
+el binario 0.7.x que lo creó. Homebrew puede retirar binarios anteriores
+al actualizar. Si tienes un caso abierto, guarda antes una copia verificada
+del binario y su auxiliar EVTX, además del directorio de datos y el llavero
+compatibles.
 
 ## Descargar y verificar un tag concreto
 

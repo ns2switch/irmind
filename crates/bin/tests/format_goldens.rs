@@ -271,7 +271,7 @@ fn export_goldens(
         actor: Actor::Analyst,
         origin: "system".into(),
         kind: AuditEventKind::CaseCreated,
-        payload: r#"{"version":7,"title":"Synthetic","severity":"medium","scope":"local","budget":{"model_tokens":2000000,"tool_calls":1000,"cloud_bytes":536870912000},"source_queries":{"enabled":false,"analytics_allowed":false,"scan_bytes":null,"retained_rows":0,"retained_bytes":0}}"#.into(),
+        payload: r#"{"version":8,"title":"Synthetic","severity":"medium","scope":"local","budget":{"model_tokens":2000000,"tool_calls":1000,"cloud_bytes":536870912000},"source_queries":{"enabled":false,"analytics_allowed":false,"scan_bytes":null,"retained_rows":0,"retained_bytes":0}}"#.into(),
         evidence: None,
         prev: [0; 32],
         hash: [0; 32],
@@ -298,10 +298,10 @@ fn export_goldens(
     let seal_path = root.join("seals").join(format!("{}.json", id.as_str()));
     record(out, "seal/file", &fs::read(seal_path).unwrap());
     let cancel = CancellationToken::new();
-    let current = root.join("export-v11.bin");
+    let current = root.join("export-v12.bin");
     irmind_app::export_case_with_originals(engine, store, &id, &current, None, false, &cancel)
         .unwrap();
-    assert!(fs::read(current).unwrap().starts_with(b"IRMIND-EXPORT-V11"));
+    assert!(fs::read(current).unwrap().starts_with(b"IRMIND-EXPORT-V12"));
 }
 
 #[test]
@@ -323,10 +323,10 @@ fn signed_and_reconstructed_format_goldens_are_unchanged() {
     signed_configuration_goldens(&mut actual, &store, &engine, root.path());
     let mut case_goldens = Goldens::new();
     export_goldens(&mut case_goldens, &store, &engine, root.path());
-    if std::env::var_os("IRMIND_REFRESH_CASE_V7_GOLDENS").is_some() {
+    if std::env::var_os("IRMIND_REFRESH_CASE_V8_GOLDENS").is_some() {
         fs::write(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("tests/fixtures/formats-case-v7.json"),
+                .join("tests/fixtures/formats-case-v8.json"),
             serde_json::to_string_pretty(&case_goldens).unwrap() + "\n",
         )
         .unwrap();
@@ -334,7 +334,7 @@ fn signed_and_reconstructed_format_goldens_are_unchanged() {
     let mut expected: Goldens =
         serde_json::from_str(include_str!("fixtures/formats-readers-v3.json")).unwrap();
     expected.extend(
-        serde_json::from_str::<Goldens>(include_str!("fixtures/formats-case-v7.json")).unwrap(),
+        serde_json::from_str::<Goldens>(include_str!("fixtures/formats-case-v8.json")).unwrap(),
     );
     actual.extend(case_goldens);
     assert_eq!(

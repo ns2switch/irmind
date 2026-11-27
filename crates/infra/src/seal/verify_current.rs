@@ -676,20 +676,25 @@ mod tests {
     }
 
     #[test]
-    fn v11_empty_archive_and_old_format_rejections_match_reviewed_vectors() {
+    fn v12_empty_archive_and_old_format_rejections_match_reviewed_vectors() {
         let vectors: serde_json::Value = serde_json::from_str(include_str!(
             "../../../../docs/development/case-7-export-v11-vectors/wire.json"
         ))
         .unwrap();
         let archive = &vectors["case_and_export"];
+        let current: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../docs/development/v08-implementation-vectors/wire.json"
+        ))
+        .unwrap();
+        let current = &current["case_export"];
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("case.irmind");
         let verify = |sample: &serde_json::Value| {
             std::fs::write(&path, hex::decode(sample["hex"].as_str().unwrap()).unwrap()).unwrap();
             verify_current_export(&path, None)
         };
-        let valid = verify(&archive["v11_empty_signed_case"]).unwrap();
-        assert_eq!((valid.format_version, valid.entries), (11, 2));
+        let valid = verify(&current["empty_v12"]).unwrap();
+        assert_eq!((valid.format_version, valid.entries), (12, 2));
         for version in 1..=10 {
             let error =
                 verify(&archive["reject_legacy_magic_only"][version.to_string()]).unwrap_err();
@@ -705,21 +710,20 @@ mod tests {
                     .contains(irmind_app::case_format::FORMAT_GUIDE)
             );
         }
-        let mixed = verify(&archive["reject_signed_case_6_in_v11"]).unwrap_err();
+        let retired = verify(&archive["v11_empty_signed_case"]).unwrap_err();
         assert!(matches!(
-            mixed,
+            retired,
             AppError::Fixed(irmind_app::FixedAppError::CaseFormat(
-                irmind_app::case_format::CaseFormatError::Case(Some(6))
+                irmind_app::case_format::CaseFormatError::Export(11)
             ))
         ));
+        assert!(retired.to_string().contains("IRMind v0.8.0-alpha.1"));
         for key in [
-            "reject_header_version_mismatch",
-            "reject_missing_report_count",
-            "reject_trailing_byte",
-            "reject_noncanonical_magic",
-            "reject_truncated_magic",
+            "reject_missing_extension_count",
+            "reject_unreferenced_hook_admission",
+            "reject_unreferenced_mcp_admission",
         ] {
-            assert!(verify(&archive[key]).is_err(), "{key}");
+            assert!(verify(&current[key]).is_err(), "{key}");
         }
     }
 }

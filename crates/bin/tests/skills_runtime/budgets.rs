@@ -402,7 +402,7 @@ fn a_signed_case_budget_survives_sealing_and_public_export_verification() {
         Some(&key),
     )
     .unwrap();
-    assert_eq!(details.format_version, 11);
+    assert_eq!(details.format_version, 12);
     if std::env::var_os("IRMIND_REFRESH_SKILL_EXPORT_SEEDS").is_some() {
         std::fs::copy(
             destination,

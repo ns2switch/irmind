@@ -1,9 +1,8 @@
-//! The V10 export ends with mandatory Sigma and report object counts.
+//! The export ends with Sigma, report and runtime admission proof sections.
 use super::{AppError, CancellationToken, storage, storage_reason};
 use irmind_app::v10_proofs::{V10ProofFamily, write_v10_object_section};
-#[cfg(test)]
-use std::io::Write;
-use std::io::{Read, Seek};
+use std::io::{Read, Seek, Write};
+const EMPTY_RUNTIME_PROOFS: [u8; 8] = 0u64.to_be_bytes();
 
 #[cfg(test)]
 const FAMILIES: [V10ProofFamily; 2] = [V10ProofFamily::Sigma, V10ProofFamily::Report];
@@ -62,7 +61,8 @@ pub(super) fn write(
         &descriptors,
         |descriptor| store.open_v10_case_object(case, family, descriptor, cancel),
         cancel,
-    )
+    )?;
+    output.write_all(&EMPTY_RUNTIME_PROOFS).map_err(storage)
 }
 
 pub(super) struct ReportVerification<'a> {
@@ -81,6 +81,7 @@ pub(super) fn verify(
 ) -> Result<(), AppError> {
     let sigma = V10ObjectSection::scan(input, V10ProofFamily::Sigma, cancel)?;
     let section = V10ObjectSection::scan(input, V10ProofFamily::Report, cancel)?;
+    read_runtime_proof_count(input)?;
     if input.read(&mut [0]).map_err(storage)? != 0 {
         return Err(storage_reason("export has trailing bytes"));
     }
@@ -133,6 +134,16 @@ pub(super) fn verify(
         cancel,
     )?;
     section.check_union(&referenced)
+}
+
+fn read_runtime_proof_count(input: &mut impl Read) -> Result<(), AppError> {
+    let mut count = [0; 8];
+    input.read_exact(&mut count).map_err(storage)?;
+    // No runtime admission receipt can yet be referenced by a case.
+    if count != EMPTY_RUNTIME_PROOFS {
+        return Err(AppError::InvalidChain(0));
+    }
+    Ok(())
 }
 
 pub(super) type SigmaRowPredicate<'a> = dyn FnMut(
@@ -328,7 +339,7 @@ pub(super) fn write_empty(
             cancel,
         )?;
     }
-    Ok(())
+    output.write_all(&EMPTY_RUNTIME_PROOFS).map_err(storage)
 }
 
 #[cfg(test)]
@@ -340,6 +351,7 @@ pub(super) fn verify_empty(input: &mut impl Read) -> Result<(), AppError> {
             return Err(AppError::InvalidChain(0));
         }
     }
+    read_runtime_proof_count(input)?;
     if input.read(&mut [0]).map_err(storage)? != 0 {
         return Err(storage_reason("export has trailing bytes"));
     }
@@ -350,19 +362,21 @@ pub(super) fn verify_empty(input: &mut impl Read) -> Result<(), AppError> {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::super::export_current::{ExportHeader, write_header};
-    use super::super::{hex, sha256};
     use super::*;
     use std::io::SeekFrom;
 
     #[test]
-    fn export_v11_wire_matches_independent_header_and_count_vectors() {
+    fn export_v12_wire_matches_independent_header_and_count_vectors() {
         let vectors: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../docs/development/case-7-export-v11-vectors/wire.json"
+            "../../../../docs/development/v08-implementation-vectors/wire.json"
         ))
         .unwrap();
-        let vector = &vectors["case_and_export"]["v11_magic_and_header_frame"];
-        let expected = hex::decode(vector["hex"].as_str().unwrap()).unwrap();
+        let complete =
+            hex::decode(vectors["case_export"]["empty_v12"]["hex"].as_str().unwrap()).unwrap();
         let json_start = irmind_app::case_format::EXPORT_MAGIC.len() + 8;
+        let header_size =
+            u64::from_be_bytes(complete[json_start - 8..json_start].try_into().unwrap());
+        let expected = &complete[..json_start + usize::try_from(header_size).unwrap()];
         let header: ExportHeader = serde_json::from_slice(&expected[json_start..]).unwrap();
         let mut file = tempfile::tempfile().unwrap();
         write_header(&mut file, &header).unwrap();
@@ -370,21 +384,18 @@ mod tests {
         file.seek(SeekFrom::Start(0)).unwrap();
         file.read_to_end(&mut bytes).unwrap();
         assert_eq!(bytes, expected);
-        assert_eq!(hex(&sha256(&bytes)), vector["sha256"]);
 
         bytes.clear();
         let cancel = CancellationToken::new();
         write_empty(&mut bytes, &cancel).unwrap();
-        let complete = &vectors["case_and_export"]["v11_empty_signed_case"]["hex"];
-        let complete = hex::decode(complete.as_str().unwrap()).unwrap();
-        assert_eq!(bytes, complete[complete.len() - 16..]);
+        assert_eq!(bytes, complete[complete.len() - 24..]);
         verify_empty(&mut bytes.as_slice()).unwrap();
-        for index in [7, 15] {
+        for index in [7, 15, 23] {
             bytes[index] = 1;
             assert!(verify_empty(&mut bytes.as_slice()).is_err());
             bytes[index] = 0;
         }
-        assert!(verify_empty(&mut &bytes[..15]).is_err());
+        assert!(verify_empty(&mut &bytes[..23]).is_err());
         bytes.push(0);
         assert!(verify_empty(&mut bytes.as_slice()).is_err());
     }

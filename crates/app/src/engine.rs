@@ -455,22 +455,23 @@ impl Engine<'_> {
 mod format_tests {
     use super::*;
     #[test]
-    fn case_created_v7_matches_the_approved_contract_bytes() {
+    fn case_created_v8_matches_the_approved_contract_bytes() {
         let vectors: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../docs/development/case-7-export-v11-vectors/wire.json"
+            "../../../docs/development/v08-implementation-vectors/wire.json"
         ))
         .unwrap();
         let bytes = hex::decode(
-            vectors["case_and_export"]["case_created_payload"]["hex"]
+            vectors["case_export"]["case_8_signed_entry"]["hex"]
                 .as_str()
                 .unwrap(),
         )
         .unwrap();
-        let created: CaseCreatedEvent = serde_json::from_slice(&bytes).unwrap();
+        let root: SignedEntry = serde_json::from_slice(&bytes).unwrap();
+        let created = current_case_creation(&root).unwrap();
         assert_eq!(created.version, CASE_CREATION_VERSION);
         created.budget.validate().unwrap();
         created.source_queries.validate().unwrap();
-        assert_eq!(serde_json::to_vec(&created).unwrap(), bytes);
+        assert_eq!(serde_json::to_string(&created).unwrap(), root.payload);
     }
 
     #[test]
@@ -482,7 +483,7 @@ mod format_tests {
             actor: Actor::Analyst,
             origin: "analyst".into(),
             kind: AuditEventKind::CaseCreated,
-            payload: r#"{"version":7,"title":"Synthetic","severity":"medium","scope":"local","budget":{"model_tokens":2000000,"tool_calls":1000,"cloud_bytes":536870912000},"source_queries":{"enabled":false,"analytics_allowed":false,"scan_bytes":null,"retained_rows":0,"retained_bytes":0}}"#
+            payload: r#"{"version":8,"title":"Synthetic","severity":"medium","scope":"local","budget":{"model_tokens":2000000,"tool_calls":1000,"cloud_bytes":536870912000},"source_queries":{"enabled":false,"analytics_allowed":false,"scan_bytes":null,"retained_rows":0,"retained_bytes":0}}"#
                 .into(),
             evidence: None,
             prev: [0; 32],
@@ -494,6 +495,7 @@ mod format_tests {
             verify_case_metadata("Synthetic", Severity::Medium, "local", &[first.clone()]).is_ok()
         );
         for retired in [
+            r#"{"version":7}"#,
             include_str!(
                 "../../../docs/development/source-query-format-vectors/case-created-v5.json"
             ),

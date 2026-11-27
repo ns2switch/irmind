@@ -132,7 +132,7 @@ impl SubagentTaskSpec {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SubagentPlanV1 {
-    format_version: u8,
+    pub(super) format_version: u8,
     pub plan_id: SubagentDigest,
     pub case_id: String,
     pub turn_id: String,
@@ -241,6 +241,12 @@ impl SubagentRecord for SubagentPlanV1 {
     const KIND: AuditEventKind = AuditEventKind::SubagentPlanV1;
     const DOMAIN: &'static [u8] = b"irmind-subagent-plan-v1\0";
     fn validate(&self) -> Result<(), SubagentRecordError> {
+        self.validate_version(1)
+    }
+}
+
+impl SubagentPlanV1 {
+    pub(super) fn validate_version(&self, version: u8) -> Result<(), SubagentRecordError> {
         let limits = self.policy.limits()?;
         for value in [
             self.case_limits,
@@ -252,7 +258,7 @@ impl SubagentRecord for SubagentPlanV1 {
         ] {
             value.validate()?;
         }
-        if self.format_version != 1
+        if self.format_version != version
             || self.tasks.is_empty()
             || self.tasks.len() > 16
             || self.plan_id != Self::plan_id(&self.case_id, &self.turn_id, self.ordinal)?

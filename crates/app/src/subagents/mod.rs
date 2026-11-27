@@ -4,6 +4,7 @@ pub type PortFuture<'a, T> =
 mod branch;
 mod broker;
 pub use broker::{PreparedSubagentPlan, StartedSubagentPlan, SubagentTaskProposal};
+mod child_source_queries;
 mod chunk;
 mod codec;
 pub use branch::*;
@@ -50,6 +51,7 @@ pub use storage::{
     SubagentBranchStore,
 };
 mod types;
+pub use child_source_queries::{ChildQueryShare, ChildSourceQueryV1, SubagentPlanV2};
 pub use codec::{SubagentDigest, SubagentRecord, SubagentRecordError};
 pub use resources::SubagentResources;
 pub use sources::{SubagentSourcePageV1, SubagentSourceSetV1};

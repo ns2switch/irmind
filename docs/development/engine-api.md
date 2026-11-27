@@ -57,7 +57,7 @@ engine's own cancellation and budget controls.
 When V1 signals `review_in_tui`, open the case in IRMind's TUI and
 use `/approvals`. IRMind signs there under the existing policy and key
 controls. The client can observe a guarded state only. V1 has no approval, prompt-presentation, signing, credential or configuration
-operation. This implementation uses case format 7 and export V11.
+operation. This implementation uses case format 8 and export V12.
 
 ## Graphical approval sessions
 

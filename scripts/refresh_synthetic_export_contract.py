@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Refresh the synthetic V11 exports from the authenticated current seeds.
+"""Refresh the synthetic V12 exports from the authenticated current seeds.
 
 Development only; requires Python cryptography. Only the published synthetic
 signing keys are accepted. Original signatures and seed digests are checked
@@ -15,7 +15,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 ROOT = Path(__file__).resolve().parents[1]
-MAGIC = b'IRMIND-EXPORT-V11\0'
+MAGIC = b'IRMIND-EXPORT-V12\0'
 PROFILE = b'irmind-mapping-profile-v1\0'
 KEY = Ed25519PrivateKey.from_private_bytes(bytes([43]) * 32)
 PUBLIC = KEY.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
@@ -132,9 +132,9 @@ def refresh(path):
     source = Reader(original)
     assert source.take(len(MAGIC)) == MAGIC
     header = json.loads(source.field())
-    assert header['version'] == 11
+    assert header['version'] == 12
     entries = [json.loads(source.field()) for _ in range(source.number())]
-    assert entries[0]['kind'] == 'CaseCreated' and json.loads(entries[0]['payload'])['version'] == 7
+    assert entries[0]['kind'] == 'CaseCreated' and json.loads(entries[0]['payload'])['version'] == 8
 
     previous = bytes(32)
     for entry in entries:
@@ -183,7 +183,7 @@ def main():
     test_path = ROOT / 'crates/infra/src/tests/mapped_export/seed.rs'
     test = test_path.read_text()
     for suffix in ('mapped', 'installed'):
-        path = ROOT / f'fuzz/seeds/export/valid-v11-{suffix}.irmind'
+        path = ROOT / f'fuzz/seeds/export/valid-v12-{suffix}.irmind'
         body, old = refresh(path)
         digest = sha(body).hex()
         print(path.name, digest)

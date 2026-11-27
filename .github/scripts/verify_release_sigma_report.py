@@ -23,14 +23,14 @@ def expected_digest(path):
 
 
 def verify(executable, directory):
-    archive = directory / "sigma-report-v11.irmind"
+    archive = directory / "sigma-report-v12.irmind"
     expected = expected_digest(directory / "archive-sha256.txt")
     key = expected_digest(directory / "expected-key.txt")
     if sha256(archive) != expected:
         raise ValueError("the received archive differs from the Linux export")
     with archive.open("rb") as source:
-        if source.read(len(b"IRMIND-EXPORT-V11\0")) != b"IRMIND-EXPORT-V11\0":
-            raise ValueError("expected a V11 archive")
+        if source.read(len(b"IRMIND-EXPORT-V12\0")) != b"IRMIND-EXPORT-V12\0":
+            raise ValueError("expected a V12 archive")
 
     with tempfile.TemporaryDirectory() as scratch:
         home = Path(scratch) / "unused"

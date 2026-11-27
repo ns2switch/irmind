@@ -4,6 +4,9 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+- Case format 8 and export V12. Use the exact `v0.8.0-alpha.1` binary for
+  cases created by that alpha, which uses case 7 and export V11.
+
 ## 0.8.0-alpha.1 — Case format consolidation
 
 **Format impact:** Case marker 7 and export V11 supersede case marker 6 and

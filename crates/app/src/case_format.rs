@@ -4,9 +4,9 @@ use serde::Deserialize;
 use std::fmt;
 use std::io::Read;
 
-pub(crate) const CASE_VERSION: u8 = 7;
-pub const EXPORT_VERSION: u32 = 11;
-pub const EXPORT_MAGIC: &[u8] = b"IRMIND-EXPORT-V11\0";
+pub(crate) const CASE_VERSION: u8 = 8;
+pub const EXPORT_VERSION: u32 = 12;
+pub const EXPORT_MAGIC: &[u8] = b"IRMIND-EXPORT-V12\0";
 pub const FORMAT_GUIDE: &str =
     "https://github.com/ns2switch/irmind/blob/main/docs/previous-versions.md";
 pub const MAX_CASE_ROOT_BYTES: usize = 1024 * 1024;
@@ -32,6 +32,7 @@ impl fmt::Display for CaseFormatError {
                     f.write_str("This build cannot read this case layout. ")?;
                 }
                 match version {
+                    Some(7) => "IRMind v0.8.0-alpha.1",
                     Some(6) => "IRMind v0.7.x",
                     Some(5) => "IRMind v0.6.x",
                     Some(4) => "IRMind v0.5.x",
@@ -44,6 +45,7 @@ impl fmt::Display for CaseFormatError {
             Self::Export(version) => {
                 write!(f, "This build cannot read export V{version}. ")?;
                 match version {
+                    11 => "IRMind v0.8.0-alpha.1",
                     10 => "IRMind v0.7.x",
                     9 => "IRMind v0.6.x",
                     8 => "IRMind v0.5.x",

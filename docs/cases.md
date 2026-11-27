@@ -13,7 +13,7 @@ stored evidence blob.
 
 ## Cases and exports from an earlier version
 
-Version 0.8 uses case marker 7, mapped V3 Parquet artifacts and export V11. Use
+Version 0.8 uses case marker 8, mapped V3 Parquet artifacts and export V12. Use
 the creating version of IRMind to open, verify or export earlier cases. To use
 the current version, verify the originals with the creating version and ingest
 them into a new case. The original case retains its approvals, confirmed
@@ -23,7 +23,7 @@ findings and seal.
 
 Use `/sigma inspect <directory>` to review a local pack. Use
 `/sigma import --license <id> <directory>` and confirm the displayed manifest hash
-to sign its admission. The case keeps the exact admitted rules in its V11 export
+to sign its admission. The case keeps the exact admitted rules in its V12 export
 when a run references them.
 
 Run `/sigma run <pack SHA-256> <start UTC> <end UTC>` from an open case. The
@@ -49,7 +49,7 @@ reached their result limit.
 
 Use `/report save md en` or `/report save pdf es` to sign and retain the
 rendered document in the case. The command shows its SHA-256. Once sealed, the
-case includes its published reports in the V11 export. `/verify` checks the
+case includes its published reports in the V12 export. `/verify` checks the
 signature, source rows, coverage and rendered bytes. To publish another
 revision, use an open case.
 

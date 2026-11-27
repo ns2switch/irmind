@@ -154,7 +154,7 @@ fn ingest(
 
 #[test]
 #[allow(clippy::too_many_lines)]
-fn v11_export_authenticates_retained_parents_receipts_schema_and_public_key() {
+fn v12_export_authenticates_retained_parents_receipts_schema_and_public_key() {
     let root = tempfile::tempdir().unwrap();
     let (store, engine, signer) = setup(root.path());
     let case = engine
@@ -219,7 +219,7 @@ fn v11_export_authenticates_retained_parents_receipts_schema_and_public_key() {
     let details = crate::LocalExportVerifier
         .verify_export_details(&package, Some(&expected))
         .unwrap();
-    assert_eq!(details.format_version, 11);
+    assert_eq!(details.format_version, 12);
     assert_eq!(details.source_manifests, 2);
     assert!(
         crate::LocalExportVerifier
@@ -227,7 +227,7 @@ fn v11_export_authenticates_retained_parents_receipts_schema_and_public_key() {
             .is_err()
     );
     let mut bytes = fs::read(&package).unwrap();
-    assert!(bytes.starts_with(b"IRMIND-EXPORT-V11\0"));
+    assert!(bytes.starts_with(b"IRMIND-EXPORT-V12\0"));
     seed::verify_required_tail(&bytes, root.path());
     bytes[..b"IRMIND-EXPORT-V5\0".len()].copy_from_slice(b"IRMIND-EXPORT-V5\0");
     let downgrade = root.path().join("downgrade.irmind");
