@@ -24,9 +24,9 @@ if name=='uname':
  print(os.environ.get('IRMIND_INSTALL_TEST_SYSTEM','Linux') if args==['-s'] else os.environ.get('IRMIND_INSTALL_TEST_MACHINE','x86_64'))
 elif name=='curl':
  url=args[-1]
- if not url.startswith('https://github.com/ns2switch/irmind/releases/download/'):
+ if url!='https://api.github.com/repos/ns2switch/irmind/releases/latest' and not url.startswith('https://github.com/ns2switch/irmind/releases/download/'):
   sys.exit(22)
- file=Path(urlparse(url).path).name
+ file='latest.json' if url.endswith('/releases/latest') else Path(urlparse(url).path).name
  try:shutil.copyfile(Path(os.environ['IRMIND_INSTALL_TEST_ASSETS'])/file,args[args.index('--output')+1])
  except OSError:sys.exit(22)
 elif name=='cosign':
@@ -74,8 +74,13 @@ class Installers(unittest.TestCase):
         if os.name=='nt':
             source=(ROOT/'install.ps1').read_text(encoding='utf-8')
             replacement=r'''function Download-Https([string]$Url, [string]$Destination, [long]$MaximumBytes) {
-    if (-not $Url.StartsWith('https://github.com/ns2switch/irmind/releases/download/')) { throw 'unexpected test URL' }
-    $name = [System.IO.Path]::GetFileName(([System.Uri]$Url).LocalPath)
+    if ($Url -ceq 'https://api.github.com/repos/ns2switch/irmind/releases/latest') {
+        $name = 'latest.json'
+    } elseif ($Url.StartsWith('https://github.com/ns2switch/irmind/releases/download/')) {
+        $name = [System.IO.Path]::GetFileName(([System.Uri]$Url).LocalPath)
+    } else {
+        throw 'unexpected test URL'
+    }
     Copy-Item -LiteralPath (Join-Path $env:IRMIND_INSTALL_TEST_ASSETS $name) -Destination $Destination
 }'''
             source,count=re.subn(r'(?ms)^function Download-Https\(.*?^}',lambda _:replacement,source,count=1)
@@ -135,6 +140,38 @@ class Installers(unittest.TestCase):
         result=self.run_installer('v0.1.6')
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertEqual(len(list(self.install.iterdir())),1)
+
+    def test_automatic_installation_selects_only_the_published_stable_release(self):
+        (self.assets / 'latest.json').write_text(json.dumps({
+            'tag_name': 'v0.8.0', 'draft': False, 'prerelease': False,
+        }, indent=2), encoding='ascii')
+        result = self.run_installer('latest')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('Installed IRMind v0.8.0', result.stdout)
+        self.assertIn('refs/tags/v0.8.0', (self.root / 'calls.jsonl').read_text())
+
+    def test_automatic_installation_refuses_missing_or_preliminary_release(self):
+        for release in (
+            None,
+            {'tag_name': 'v0.8.0-alpha.1', 'draft': False, 'prerelease': False},
+            {'tag_name': 'v0.8.0', 'draft': False, 'prerelease': True},
+            {'tag_name': 'v0.8.0', 'draft': True, 'prerelease': False},
+        ):
+            with self.subTest(release=release):
+                if release is not None:
+                    (self.assets / 'latest.json').write_text(json.dumps(release), encoding='ascii')
+                result = self.run_installer('latest')
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('cannot select a stable release', result.stderr)
+                self.assertFalse(self.install.exists())
+
+    def test_explicit_preliminary_tag_still_verifies_both_binaries(self):
+        tag = 'v0.8.0-alpha.1'
+        result = self.run_installer(tag)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = [json.loads(line) for line in (self.root / 'calls.jsonl').read_text().splitlines()]
+        self.assertEqual(sum(call[:2] == ['cosign', 'verify-blob'] for call in calls), 3)
+        self.assertIn('refs/tags/' + tag, (self.root / 'calls.jsonl').read_text())
 
 
 if __name__=='__main__':unittest.main()

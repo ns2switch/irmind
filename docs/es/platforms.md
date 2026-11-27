@@ -28,7 +28,7 @@ Para recompilar una release y comparar el SHA-256 de ambos ejecutables, consulta
 
 ## Verificar una versión antes de instalar
 
-Descarga el binario de tu sistema y `SHA256SUMS` desde la [versión en GitHub](https://github.com/ns2switch/irmind/releases). Comprueba el nombre exacto del binario en el archivo de hashes antes de ejecutarlo. La primera versión preliminar, v0.1.0, solo incluye hashes. Desde v0.1.1 hay bundles Sigstore y procedencia de GitHub. Un hash comprueba los bytes frente a un archivo, pero no la identidad del editor.
+Descarga el binario de tu sistema y `SHA256SUMS` desde la [última versión estable de GitHub](https://github.com/ns2switch/irmind/releases/latest). Para probar una preliminar, elige su etiqueta exacta en el [archivo de versiones](https://github.com/ns2switch/irmind/releases). Comprueba el nombre exacto del binario en el archivo de hashes antes de ejecutarlo. La primera versión preliminar, v0.1.0, solo incluye hashes. Desde v0.1.1 hay bundles Sigstore y procedencia de GitHub. Un hash comprueba los bytes frente a un archivo, pero no la identidad del editor.
 
 | Sistema | Comprobación |
 | --- | --- |
@@ -65,15 +65,15 @@ El repositorio incluye [install.sh](../../install.sh) e [install.ps1](../../inst
 
 ```sh
 # Linux o macOS, después de comprobar install.sh con SHA256SUMS:
-sh ./install.sh v0.3.0
+sh ./install.sh
 ```
 
 ```powershell
 # Windows, después de comprobar install.ps1 con SHA256SUMS:
-& .\install.ps1 -Version v0.3.0
+& .\install.ps1
 ```
 
-Omite la versión para elegir la última publicada, incluida una preliminar. Un segundo argumento de POSIX o `-InstallDir` en PowerShell cambia el directorio del usuario. Por defecto se instala en `~/.local/bin` o `%LOCALAPPDATA%\IRMind\bin`. Si no está en `PATH`, el script indica cómo añadirlo manualmente.
+Omite la versión para elegir la última estable publicada. Si no hay ninguna disponible, el instalador se detiene. Para probar una preliminar, indica su etiqueta exacta en el primer argumento de POSIX o con `-Version` en PowerShell. Se aplican las mismas verificaciones. Un segundo argumento de POSIX o `-InstallDir` en PowerShell cambia el directorio del usuario. Por defecto se instala en `~/.local/bin` o `%LOCALAPPDATA%\IRMind\bin`. Si no está en `PATH`, el script indica cómo añadirlo manualmente.
 
 CI también genera artefactos de prueba en ejecuciones nocturnas relevantes; no son versiones publicadas. Las PR y los merges a `main` no publican binarios. Apple no notariza los binarios y Windows no usa Authenticode; ambos sistemas pueden mostrar avisos incluso después de verificar la descarga.
 
@@ -90,7 +90,7 @@ brew upgrade ns2switch/irmind/irmind
 brew uninstall ns2switch/irmind/irmind
 ```
 
-No compila IRMind. El actualizador autentica `SHA256SUMS` con la identidad Sigstore exacta del workflow y tag antes de fijar los hashes de los assets. Homebrew comprueba esos hashes al instalar. Revisa la fórmula antes de confiar en ella; las versiones recientes pueden pedir confianza explícita en la fórmula; sigue las [instrucciones del tap](https://github.com/ns2switch/homebrew-irmind/blob/main/README.es.md).
+Las actualizaciones automáticas de Homebrew requieren una versión estable publicada. El actualizador autentica `SHA256SUMS` con la identidad Sigstore exacta del workflow y tag antes de fijar los hashes de los assets. Homebrew comprueba esos hashes al instalar. Revisa la fórmula antes de confiar en ella; las versiones recientes pueden pedir confianza explícita en la fórmula; sigue las [instrucciones del tap](https://github.com/ns2switch/homebrew-irmind/blob/main/README.es.md).
 
 El tap ejecuta `brew audit` en modo estricto, `brew test`, inicio real de la demo en 80×24, comprobación de bytes y desinstalación en runners limpios macOS arm64, macOS Intel y Linux. En macOS comprueba cuarentena **sin retirarla** y registra la ejecución. No equivale a firma ni notarización de Apple ni certifica toda política local de Gatekeeper. Conserva fuera de Homebrew el ejecutable y auxiliar que crearon un caso antes de actualizar: la limpieza de Homebrew puede borrar versiones anteriores.
 
