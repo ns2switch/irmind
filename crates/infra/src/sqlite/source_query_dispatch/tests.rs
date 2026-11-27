@@ -10,7 +10,7 @@ const CRASH_ORDER: &str = "IRMIND_TEST_QUERY_DISPATCH_CRASH_ORDER";
 
 fn fixture() -> Vec<SignedEntry> {
     let mut chain: Vec<SignedEntry> = serde_json::from_slice(include_bytes!(
-        "../../../../testkit/fixtures/contracts/signed-record-chain-case-v7.json"
+        "../../../../testkit/fixtures/contracts/signed-record-chain-case-v8.json"
     ))
     .unwrap();
     chain.truncate(6);

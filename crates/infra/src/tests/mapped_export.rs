@@ -309,7 +309,7 @@ fn source_query_recovery_requires_a_signed_expired_analytics_observation() {
         "../../../../docs/development/source-query-format-vectors/signed-recovery-configuration.json"
     )).unwrap();
     let mut chain: Vec<SignedEntry> = serde_json::from_slice(include_bytes!(
-        "../../../testkit/fixtures/contracts/signed-recovery-chain-case-v7.json"
+        "../../../testkit/fixtures/contracts/signed-recovery-chain-case-v8.json"
     ))
     .unwrap();
     let record =
@@ -355,7 +355,7 @@ fn source_query_reservation_and_submit_intent_survive_reopen_as_one_batch() {
     use irmind_app::CaseMutation;
     let root = tempfile::tempdir().unwrap();
     let chain: Vec<SignedEntry> = serde_json::from_slice(include_bytes!(
-        "../../../testkit/fixtures/contracts/signed-record-chain-case-v7.json"
+        "../../../testkit/fixtures/contracts/signed-record-chain-case-v8.json"
     ))
     .unwrap();
     let first = &chain[0];
@@ -402,7 +402,7 @@ fn source_query_broker_requires_the_pinned_analyst_and_agent_proofs() {
     };
     use irmind_domain::{AgentId, CaseScope};
     let chain: Vec<SignedEntry> = serde_json::from_slice(include_bytes!(
-        "../../../testkit/fixtures/contracts/signed-record-chain-case-v7.json"
+        "../../../testkit/fixtures/contracts/signed-record-chain-case-v8.json"
     ))
     .unwrap();
     let principal = AgentId::parse("main").unwrap();

@@ -19,14 +19,14 @@ const CONFIGURATION: &[u8] = include_bytes!(
     "../../../../../../docs/development/source-query-format-vectors/signed-configuration.json"
 );
 const CHAIN: &[u8] = include_bytes!(
-    "../../../../../../crates/testkit/fixtures/contracts/signed-record-chain-case-v7.json"
+    "../../../../../../crates/testkit/fixtures/contracts/signed-record-chain-case-v8.json"
 );
 const IDS: &[u8] = include_bytes!(
     "../../../../../../docs/development/source-query-format-vectors/identities.json"
 );
 
 #[test]
-fn engine_query_capture_survives_reopen_reconstruction_seal_and_v11_export() {
+fn engine_query_capture_survives_reopen_reconstruction_seal_and_v12_export() {
     assert_eq!(query_capture_roundtrip(1), query_capture_roundtrip(4));
 }
 
