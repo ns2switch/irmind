@@ -1,5 +1,5 @@
 use super::{
-    AuditEventKind, CaseScope, PlanLedger, SubagentDigest, SubagentJournal, SubagentPlanV1,
+    AuditEventKind, CaseScope, PlanLedger, SubagentDigest, SubagentJournal, SubagentPlanV2,
     SubagentRecord, SubagentRecordError, SubagentResources,
 };
 use crate::subagents::{SubagentPlanContext, SubagentPolicySnapshot};
@@ -57,7 +57,7 @@ impl SubagentJournal {
     ) -> Result<
         (
             &crate::subagents::SubagentTaskSpec,
-            &SubagentPlanV1,
+            &SubagentPlanV2,
             SubagentDigest,
         ),
         SubagentRecordError,
@@ -291,7 +291,7 @@ impl SubagentJournal {
 
     pub(in crate::subagents) fn preview_is_current(
         &self,
-        plan: &SubagentPlanV1,
+        plan: &SubagentPlanV2,
         rules: &irmind_domain::PolicyRules,
     ) -> Result<(), SubagentRecordError> {
         let state = self

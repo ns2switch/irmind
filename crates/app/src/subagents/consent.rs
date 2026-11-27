@@ -8,14 +8,14 @@ use crate::{Actor, AuditEventKind, SignedEntry, Verifier, hex, sha256};
 /// the plan, policy, current consumption and other holds before admitting work.
 pub fn verify_subagent_plan_consent(
     entry: &SignedEntry,
-    plan: &SubagentPlanV1,
+    plan: &(impl SubagentRecord + AsRef<SubagentPlanV1>),
     verifier: &dyn Verifier,
 ) -> Result<(), SubagentRecordError> {
     if entry.actor != Actor::Analyst
-        || entry.case_id != plan.case_id
+        || entry.case_id != plan.as_ref().case_id
         || entry.evidence.is_some()
         || entry.kind != AuditEventKind::SubagentPlanApprovalV1
-        || entry.at > plan.deadline_at
+        || entry.at > plan.as_ref().deadline_at
         || entry.hash != sha256(&entry.canonical())
         || verifier
             .trusted_public_key(&Actor::Analyst)

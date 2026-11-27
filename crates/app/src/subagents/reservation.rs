@@ -62,7 +62,7 @@ pub struct SubagentReservationV1 {
 }
 impl SubagentReservationV1 {
     pub fn prepare(
-        plan: &SubagentPlanV1,
+        plan: &(impl SubagentRecord + AsRef<SubagentPlanV1>),
         task: Option<SubagentDigest>,
         ordinal: u64,
         action: ReservationAction,
@@ -71,7 +71,7 @@ impl SubagentReservationV1 {
     ) -> Result<Self, SubagentRecordError> {
         let value = Self {
             format_version: 1,
-            operation_id: Self::operation_id(plan.plan_id, task, action, purpose, ordinal),
+            operation_id: Self::operation_id(plan.as_ref().plan_id, task, action, purpose, ordinal),
             plan_sha256: plan.identity()?,
             task_id: task,
             request_ordinal: ordinal,
@@ -103,9 +103,14 @@ impl SubagentReservationV1 {
         bytes.extend_from_slice(&ordinal.to_be_bytes());
         SubagentDigest::from_bytes(crate::sha256(&bytes))
     }
-    pub fn validate_against(&self, plan: &SubagentPlanV1) -> Result<(), SubagentRecordError> {
+    pub fn validate_against(
+        &self,
+        plan: &(impl SubagentRecord + AsRef<SubagentPlanV1>),
+    ) -> Result<(), SubagentRecordError> {
         self.validate()?;
-        if self.plan_sha256 != plan.identity()?
+        let plan_sha256 = plan.identity()?;
+        let plan = plan.as_ref();
+        if self.plan_sha256 != plan_sha256
             || self.operation_id
                 != Self::operation_id(
                     plan.plan_id,

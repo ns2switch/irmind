@@ -74,7 +74,10 @@ impl History {
     fn record<T: SubagentRecord>(&mut self, value: &T, analyst: bool) -> SubagentDigest {
         self.append(T::KIND, value.audit_payload().unwrap(), analyst)
     }
-    fn plan(&mut self, tokens: u64) -> SubagentPlanV1 {
+    fn plan(&mut self, tokens: u64) -> SubagentPlanV2 {
+        SubagentPlanV2::new(self.plan_fields(tokens), vec![]).unwrap()
+    }
+    fn plan_fields(&mut self, tokens: u64) -> SubagentPlanV1 {
         let set = SubagentSourceSetV1::new(&self.case, 0, vec![]).unwrap();
         let kind = SubagentTypeSnapshotV1::new(&self.case, "triage").unwrap();
         self.record(&set, false);
@@ -126,8 +129,26 @@ impl History {
     }
 }
 
+#[test]
+fn case_eight_rejects_a_signed_legacy_plan_and_accepts_its_v2_equivalent() {
+    let mut history = History::new();
+    let legacy = history.plan_fields(100_000);
+    let plan = SubagentPlanV2::new(legacy.clone(), vec![]).unwrap();
+    let before = history.entries.len();
+    history.record(&legacy, false);
+    assert!(history.journal().is_err());
+    history.entries.truncate(before);
+
+    let hash = history.record(&plan, false);
+    let hold = transition(&plan, ReservationAction::HoldPreview, None, hash);
+    assert_eq!(hold.plan_sha256, plan.identity().unwrap());
+    assert_ne!(hold.plan_sha256, legacy.identity().unwrap());
+    history.record(&hold, false);
+    assert_eq!(history.replay().unwrap(), plan.reservation);
+}
+
 fn transition(
-    plan: &SubagentPlanV1,
+    plan: &SubagentPlanV2,
     action: ReservationAction,
     parent: Option<SubagentDigest>,
     cause: SubagentDigest,
@@ -227,7 +248,7 @@ fn a_failed_journal_is_poisoned_and_cannot_produce_a_verified_reservation_view()
 
 fn branch_entry(
     history: &History,
-    plan: &SubagentPlanV1,
+    plan: &SubagentPlanV2,
     seq: u64,
     payload: irmind_app::subagents::SubagentBranchPayload,
     prev: SubagentDigest,
@@ -252,7 +273,7 @@ fn branch_entry(
 
 fn model_request_prefix(
     history: &mut History,
-    plan: &SubagentPlanV1,
+    plan: &SubagentPlanV2,
     plan_hash: SubagentDigest,
     start: &SubagentReservationV1,
 ) -> (
@@ -307,7 +328,7 @@ fn model_request_prefix(
 
 fn model_terminal_prefix(
     history: &mut History,
-    plan: &SubagentPlanV1,
+    plan: &SubagentPlanV2,
     reserve: &SubagentReservationV1,
     request: &irmind_app::subagents::SubagentBranchEntry,
     first: &irmind_app::subagents::SubagentCheckpointV1,
@@ -338,7 +359,7 @@ fn model_terminal_prefix(
 
 fn model_terminal_prefix_with_usage(
     history: &mut History,
-    plan: &SubagentPlanV1,
+    plan: &SubagentPlanV2,
     reserve: &SubagentReservationV1,
     request: &irmind_app::subagents::SubagentBranchEntry,
     first: &irmind_app::subagents::SubagentCheckpointV1,
@@ -489,21 +510,21 @@ fn accounting_has_one_authoritative_charge_and_unknown_usage_stays_reserved() {
 
 fn completed_child_with_coordination() -> (
     History,
-    SubagentPlanV1,
+    SubagentPlanV2,
     SubagentReservationV1,
     irmind_app::subagents::SubagentCheckpointV1,
     irmind_app::subagents::BranchTerminal,
 ) {
     use irmind_app::subagents::SubagentResultV1;
     let mut history = History::new();
-    let mut plan = history.plan(100_000);
-    plan.coordination = SubagentResources {
+    let mut fields = history.plan_fields(100_000);
+    fields.coordination = SubagentResources {
         tokens: 100,
         rounds: 1,
         ..SubagentResources::default()
     };
-    plan.reservation = plan.reservation.checked_add(plan.coordination).unwrap();
-    plan.validate().unwrap();
+    fields.reservation = fields.reservation.checked_add(fields.coordination).unwrap();
+    let plan = SubagentPlanV2::new(fields, vec![]).unwrap();
     let plan_hash = history.record(&plan, false);
     let hold = transition(&plan, ReservationAction::HoldPreview, None, plan_hash);
     history.record(&hold, false);
@@ -613,7 +634,7 @@ fn coordination_summary_uses_its_own_slice_without_double_charging_parent_rounds
 
 fn check_next_coordination_turn(
     history: &mut History,
-    plan: &SubagentPlanV1,
+    plan: &SubagentPlanV2,
     spent: SubagentResources,
 ) {
     let mut task = plan.tasks[0].clone();
@@ -627,7 +648,7 @@ fn check_next_coordination_turn(
         prior_reserved: SubagentResources::default(),
     };
     context.usage.rounds = 2; // One parent request and one child request, counted once.
-    let next = SubagentPlanV1::prepare(
+    let next = SubagentPlanV2::prepare(
         &history.case,
         &plan.turn_id,
         2,
@@ -673,14 +694,15 @@ fn subagent_round_allowance_includes_parent_requests_and_compaction() {
         "conversation compaction".into(),
         true,
     );
-    let mut plan = history.plan(100_000);
+    let mut fields = history.plan_fields(100_000);
     let before = history.entries.len();
-    history.record(&plan, false);
+    let stale = SubagentPlanV2::new(fields.clone(), vec![]).unwrap();
+    history.record(&stale, false);
     assert!(history.replay().is_err());
     history.entries.truncate(before);
-    plan.usage.rounds = 2;
-    plan.remaining.rounds -= 2;
-    plan.validate().unwrap();
+    fields.usage.rounds = 2;
+    fields.remaining.rounds -= 2;
+    let plan = SubagentPlanV2::new(fields, vec![]).unwrap();
     let plan_hash = history.record(&plan, false);
     let hold = transition(&plan, ReservationAction::HoldPreview, None, plan_hash);
     history.record(&hold, false);
@@ -1102,7 +1124,7 @@ fn configured_history_engine_with_branches(
 }
 
 #[test]
-fn subagent_case_verification_seal_and_offline_v10_keep_every_committed_chunk() {
+fn subagent_case_verification_seal_and_offline_v12_keep_every_committed_chunk() {
     let (history, chunks, _, _, _) = completed_model_history();
     let root = tempfile::tempdir().unwrap();
     let (store, engine) = stored_history_engine(root.path(), &history, &chunks);

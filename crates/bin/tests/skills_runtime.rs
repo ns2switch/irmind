@@ -14,7 +14,7 @@ use irmind_domain::{Actor, AuditEventKind};
 use support::*;
 
 #[test]
-fn three_bundled_methods_complete_scripted_synthetic_investigations_and_v11_exports() {
+fn three_bundled_methods_complete_scripted_synthetic_investigations_and_v12_exports() {
     for (name, parser, fixture, term) in [
         (
             "windows-triage",

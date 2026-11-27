@@ -1,5 +1,7 @@
 use super::*;
-use irmind_app::subagents::{SubagentPlanV1, SubagentRecord, verify_subagent_plan_consent};
+use irmind_app::subagents::{
+    SubagentPlanV1, SubagentPlanV2, SubagentRecord, verify_subagent_plan_consent,
+};
 mod journal;
 
 #[test]

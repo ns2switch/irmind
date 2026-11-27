@@ -265,7 +265,7 @@ fn repeated_parent_delegation_reuses_its_result_and_children_share_the_parent_ro
         assert_eq!(
             entries
                 .iter()
-                .filter(|entry| entry.kind == AuditEventKind::SubagentPlanV1)
+                .filter(|entry| entry.kind == AuditEventKind::SubagentPlanV2)
                 .count(),
             1
         );
@@ -311,7 +311,7 @@ fn manufactured_confirmation_is_not_a_start_and_children_cannot_delegate() {
         assert_eq!(
             entries
                 .iter()
-                .filter(|entry| entry.kind == AuditEventKind::SubagentPlanV1)
+                .filter(|entry| entry.kind == AuditEventKind::SubagentPlanV2)
                 .count(),
             usize::from(!injected)
         );

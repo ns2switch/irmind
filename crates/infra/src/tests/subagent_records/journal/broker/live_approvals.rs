@@ -2,7 +2,7 @@ use super::*;
 use irmind_app::subagents::{
     BranchChunkRef, BranchToolResult, CheckedBranchChunk, ReservationAction, ReservationPurpose,
     ReservationTransition, SubagentBranchPayload, SubagentBranchStore, SubagentCheckpointV1,
-    SubagentPlanV1, SubagentReservationV1, TaskDispatchAttribution,
+    SubagentPlanV2, SubagentReservationV1, TaskDispatchAttribution,
 };
 use irmind_app::subagents::{
     TaskEvidenceQueries, TaskEvidenceQuery, TaskEvidenceResult, VerifiedTaskQueryView,
@@ -251,10 +251,10 @@ fn assert_denial_cannot_become_dispatch(store: &LocalStore, original: &History) 
         .unwrap();
     let mut fork = History::new();
     fork.entries = entries[..=stop].to_vec();
-    let plan: SubagentPlanV1 = decode(
+    let plan: SubagentPlanV2 = decode(
         fork.entries
             .iter()
-            .find(|entry| entry.kind == AuditEventKind::SubagentPlanV1)
+            .find(|entry| entry.kind == AuditEventKind::SubagentPlanV2)
             .unwrap(),
     );
     let pending = fork
@@ -308,7 +308,7 @@ fn assert_denial_cannot_become_dispatch(store: &LocalStore, original: &History) 
 }
 fn forged_dispatch(
     fork: &mut History,
-    plan: &irmind_app::subagents::SubagentPlanV1,
+    plan: &irmind_app::subagents::SubagentPlanV2,
     checkpoint: &irmind_app::subagents::SubagentCheckpointV1,
     proposed: &irmind_app::subagents::SubagentBranchEntry,
     proposal: &irmind_app::subagents::BranchToolProposal,

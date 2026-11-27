@@ -113,8 +113,36 @@ impl SubagentPlanV2 {
         Ok(value)
     }
 
-    pub const fn local_plan(&self) -> &super::SubagentPlanV1 {
+    pub fn prepare(
+        case: &crate::CaseId,
+        turn_id: &str,
+        ordinal: u64,
+        context: super::SubagentPlanContext,
+        tasks: Vec<super::SubagentTaskSpec>,
+        coordination: super::SubagentResources,
+        deadline_at: u64,
+    ) -> Result<Self, SubagentRecordError> {
+        Self::new(
+            super::SubagentPlanV1::prepare(
+                case,
+                turn_id,
+                ordinal,
+                context,
+                tasks,
+                coordination,
+                deadline_at,
+            )?,
+            vec![],
+        )
+    }
+
+    pub(super) const fn local_plan(&self) -> &super::SubagentPlanV1 {
         &self.plan
+    }
+
+    pub fn requires_signed_consent(&self) -> Result<bool, SubagentRecordError> {
+        self.validate()?;
+        self.reservation.requires_signed_consent(self.remaining)
     }
 
     pub fn requires_query_consent(
@@ -156,6 +184,20 @@ impl SubagentPlanV2 {
         Ok(dimensions
             .into_iter()
             .any(|(requested, available)| u128::from(requested) * 4 > u128::from(available)))
+    }
+}
+
+impl std::ops::Deref for SubagentPlanV2 {
+    type Target = super::SubagentPlanV1;
+
+    fn deref(&self) -> &Self::Target {
+        &self.plan
+    }
+}
+
+impl AsRef<super::SubagentPlanV1> for SubagentPlanV2 {
+    fn as_ref(&self) -> &super::SubagentPlanV1 {
+        &self.plan
     }
 }
 

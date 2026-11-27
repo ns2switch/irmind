@@ -168,8 +168,8 @@ impl SkillReceiptVerifier {
                 self.snapshot_sequences.insert(identity, entry.seq);
                 self.snapshots.insert(identity, snapshot);
             }
-            AuditEventKind::SubagentPlanV1 => {
-                use crate::subagents::{SubagentPlanV1, SubagentRecord};
+            AuditEventKind::SubagentPlanV2 => {
+                use crate::subagents::{SubagentPlanV2, SubagentRecord};
                 let (_, data) = entry.payload.split_once(':').ok_or_else(invalid)?;
                 if data.len() > 512 * 1024 {
                     return Err(invalid());
@@ -178,14 +178,14 @@ impl SkillReceiptVerifier {
                 if hex(&bytes) != data {
                     return Err(invalid());
                 }
-                let plan = SubagentPlanV1::decode(&bytes).map_err(|_| invalid())?;
-                for task in plan.tasks {
+                let plan = SubagentPlanV2::decode(&bytes).map_err(|_| invalid())?;
+                for task in &plan.tasks {
                     if self.task_parents.len() >= 256
                         || task.nonce == plan.turn_id
                         || self.task_parents.contains_key(&plan.turn_id)
                         || self
                             .task_parents
-                            .insert(task.nonce, plan.turn_id.clone())
+                            .insert(task.nonce.clone(), plan.turn_id.clone())
                             .is_some()
                     {
                         return Err(invalid());

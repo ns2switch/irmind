@@ -1,5 +1,5 @@
 use super::*;
-use crate::subagents::{SafePlanPreview, SubagentPlanV1, SubagentRecord};
+use crate::subagents::{SafePlanPreview, SubagentPlanV1, SubagentPlanV2, SubagentRecord};
 
 fn view() -> VerifiedTaskQueryView {
     VerifiedTaskQueryView {
@@ -85,6 +85,7 @@ fn automatic_plan_choice_never_substitutes_for_required_explicit_start() {
         "../../../../docs/development/subagent-format-vectors/plan.json"
     ))
     .unwrap();
+    let plan = SubagentPlanV2::new(plan, vec![]).unwrap();
     let mut preview = SafePlanPreview {
         plan: plan.clone(),
         confirmation_required: true,

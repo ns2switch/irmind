@@ -183,7 +183,7 @@ struct TaskPresentation {
 fn presentations(
     entries: &[SignedEntry],
 ) -> Result<std::collections::BTreeMap<super::SubagentDigest, TaskPresentation>, AppError> {
-    use crate::subagents::{SubagentPlanV1, SubagentTypeSnapshotV1};
+    use crate::subagents::{SubagentPlanV2, SubagentTypeSnapshotV1};
     let mut types = std::collections::BTreeMap::new();
     let mut tasks = std::collections::BTreeMap::new();
     for entry in entries {
@@ -193,9 +193,9 @@ fn presentations(
                 snapshot.identity().map_err(|_| invalid())?,
                 snapshot.definition().id().to_owned(),
             );
-        } else if entry.kind == AuditEventKind::SubagentPlanV1 {
-            let plan: SubagentPlanV1 = projection::decode(entry)?;
-            for task in plan.tasks {
+        } else if entry.kind == AuditEventKind::SubagentPlanV2 {
+            let plan: SubagentPlanV2 = projection::decode(entry)?;
+            for task in &plan.tasks {
                 let type_id = types
                     .get(&task.type_snapshot_sha256)
                     .ok_or_else(invalid)?
@@ -205,7 +205,7 @@ fn presentations(
                     TaskPresentation {
                         plan: plan.plan_id,
                         type_id,
-                        objective: task.objective,
+                        objective: task.objective.clone(),
                     },
                 );
             }

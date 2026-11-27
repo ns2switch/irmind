@@ -1,5 +1,5 @@
 use super::{
-    SubagentDigest, SubagentJournal, SubagentPlanV1, SubagentRecord, SubagentRecordError,
+    SubagentDigest, SubagentJournal, SubagentPlanV2, SubagentRecord, SubagentRecordError,
     SubagentResources, decode_entry,
 };
 use crate::subagents::{
@@ -25,7 +25,7 @@ enum Phase {
 }
 
 pub(super) struct PlanLedger {
-    pub plan: SubagentPlanV1,
+    pub plan: SubagentPlanV2,
     pub seq: u64,
     pub parent_skill: Option<crate::SkillSnapshotId>,
     pub case_scope: crate::CaseScope,
@@ -44,7 +44,7 @@ pub(super) struct PlanLedger {
 }
 impl PlanLedger {
     pub(super) fn new(
-        plan: SubagentPlanV1,
+        plan: SubagentPlanV2,
         entry_hash: SubagentDigest,
         seq: u64,
         parent_skill: Option<crate::SkillSnapshotId>,

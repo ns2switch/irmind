@@ -3,7 +3,7 @@ use crate::status_bar::StatusData;
 use irmind_app::{
     AuditEventKind, StatusSegment, budget_status,
     subagents::{
-        ReservationAction, SubagentPlanV1, SubagentRecord, SubagentReservationV1, SubagentResultV1,
+        ReservationAction, SubagentPlanV2, SubagentRecord, SubagentReservationV1, SubagentResultV1,
         decode_subagent_record,
     },
 };
@@ -188,8 +188,8 @@ fn active_children(entries: &[irmind_app::SignedEntry]) -> super::Result<usize> 
     let mut active = BTreeSet::new();
     for entry in entries {
         match entry.kind {
-            AuditEventKind::SubagentPlanV1 => {
-                let plan: SubagentPlanV1 = decode_subagent_record(entry)
+            AuditEventKind::SubagentPlanV2 => {
+                let plan: SubagentPlanV2 = decode_subagent_record(entry)
                     .map_err(|_| anyhow::anyhow!("invalid subagent status record"))?;
                 let identity = plan
                     .identity()
@@ -241,10 +241,12 @@ mod tests {
     fn active_children_decode_real_audit_payloads_and_remove_finished_tasks() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../docs/development/subagent-format-vectors");
-        let plan: SubagentPlanV1 =
+        let legacy =
             serde_json::from_slice(&std::fs::read(root.join("plan.json")).unwrap()).unwrap();
-        let reservation: SubagentReservationV1 =
+        let plan = SubagentPlanV2::new(legacy, vec![]).unwrap();
+        let mut reservation: SubagentReservationV1 =
             serde_json::from_slice(&std::fs::read(root.join("reservation.json")).unwrap()).unwrap();
+        reservation.plan_sha256 = plan.identity().unwrap();
         let result: SubagentResultV1 =
             serde_json::from_slice(&std::fs::read(root.join("result.json")).unwrap()).unwrap();
         let mut entries = vec![entry(&plan), entry(&reservation)];

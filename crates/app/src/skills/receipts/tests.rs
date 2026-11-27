@@ -292,11 +292,12 @@ fn bundled_snapshot_requires_exact_compiled_inventory_and_catalog_cannot_shadow_
 
 #[test]
 fn subagent_skill_reads_share_parent_limits_without_main_branch_substitution() {
-    use crate::subagents::{SubagentPlanV1, SubagentRecord};
+    use crate::subagents::{SubagentPlanV1, SubagentPlanV2, SubagentRecord};
     let plan = SubagentPlanV1::decode(include_bytes!(
         "../../../../../docs/development/subagent-format-vectors/plan.json"
     ))
     .unwrap();
+    let plan = SubagentPlanV2::new(plan, vec![]).unwrap();
     let snapshot = SkillSnapshotV2::decode(SNAPSHOT.trim_end()).unwrap();
     let agent = irmind_domain::Actor::Agent(irmind_domain::AgentId::parse("core").unwrap());
     let mut checked = SkillReceiptVerifier::default();
@@ -341,7 +342,7 @@ fn subagent_skill_reads_share_parent_limits_without_main_branch_substitution() {
     checked
         .accept(
             &entry(
-                AuditEventKind::SubagentPlanV1,
+                AuditEventKind::SubagentPlanV2,
                 agent.clone(),
                 plan.audit_payload().unwrap(),
             ),

@@ -1,7 +1,7 @@
 use super::{EngineEvent, EngineEventKind, EventCursor, invalid, position};
 use crate::subagents::{
     SubagentBranchEntry, SubagentBranchPayload, SubagentCheckpointV1, SubagentPlanApprovalV1,
-    SubagentPlanV1, SubagentRecord, SubagentReservationV1, SubagentResultV1,
+    SubagentPlanV2, SubagentRecord, SubagentReservationV1, SubagentResultV1,
 };
 use crate::{AppError, AuditEventKind, Engine, SignedEntry};
 
@@ -18,8 +18,8 @@ pub(super) fn main(
         return approval(engine, entry);
     }
     let (kind, text, task, turn, usage) = match entry.kind {
-        AuditEventKind::SubagentPlanV1 => {
-            let plan: SubagentPlanV1 = decode(entry)?;
+        AuditEventKind::SubagentPlanV2 => {
+            let plan: SubagentPlanV2 = decode(entry)?;
             let kind = if plan.requires_signed_consent().map_err(|_| invalid())?
                 || engine.confirm_all_subagent_plans()?
             {
@@ -37,7 +37,7 @@ pub(super) fn main(
                     plan.reservation.calls
                 ),
                 None,
-                Some(plan.turn_id),
+                Some(plan.turn_id.clone()),
                 Some(plan.reservation),
             )
         }
@@ -104,7 +104,7 @@ fn main_event(
         kind,
         EngineEventKind::PlanPreview | EngineEventKind::ConsentRequired
     ) {
-        event.plan_id = Some(decode::<SubagentPlanV1>(entry)?.plan_id);
+        event.plan_id = Some(decode::<SubagentPlanV2>(entry)?.plan_id);
     }
     event.turn_id = turn;
     event.usage = usage;

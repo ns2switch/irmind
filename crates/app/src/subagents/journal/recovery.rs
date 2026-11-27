@@ -14,7 +14,7 @@ pub(in crate::subagents) struct TaskRecovery {
 }
 
 pub(in crate::subagents) struct PlanRecovery {
-    pub plan: crate::subagents::SubagentPlanV1,
+    pub plan: crate::subagents::SubagentPlanV2,
     pub entry_hash: SubagentDigest,
     pub allocation: Option<SubagentReservationV1>,
     pub needs_hold: bool,

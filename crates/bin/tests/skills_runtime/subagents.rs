@@ -193,7 +193,7 @@ impl LlmPort for MixedEpisode {
 }
 
 #[test]
-fn subagents_mixed_windows_aws_kubernetes_episode_reads_real_sources_confirms_and_verifies_v10() {
+fn subagents_mixed_windows_aws_kubernetes_episode_reads_sources_confirms_and_verifies_v12() {
     let root = tempfile::tempdir().unwrap();
     let store = Arc::new(crate::current_sources::open(&root.path().join("data")));
     let (_, engine) =

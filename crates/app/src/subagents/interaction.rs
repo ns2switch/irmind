@@ -1,6 +1,6 @@
 mod mailbox;
 use super::PortFuture;
-use super::{SubagentDigest, SubagentPlanV1, SubagentRecord, SubagentResources, SubagentTaskSpec};
+use super::{SubagentDigest, SubagentPlanV2, SubagentRecord, SubagentResources, SubagentTaskSpec};
 use crate::{AppError, CancellationToken};
 pub use mailbox::{AnalystPlanMailbox, PlanReview};
 
@@ -8,7 +8,7 @@ pub use mailbox::{AnalystPlanMailbox, PlanReview};
 /// There is no deserializer and no model-facing confirmation field.
 #[derive(Clone)]
 pub struct SafePlanPreview {
-    pub(super) plan: SubagentPlanV1,
+    pub(super) plan: SubagentPlanV2,
     pub(super) confirmation_required: bool,
     pub(super) source_summaries: std::sync::Arc<std::collections::BTreeMap<SubagentDigest, String>>,
 }
@@ -27,10 +27,10 @@ impl SafePlanPreview {
         &self.plan.tasks
     }
     pub const fn reservation(&self) -> SubagentResources {
-        self.plan.reservation
+        self.plan.local_plan().reservation
     }
     pub const fn remaining(&self) -> SubagentResources {
-        self.plan.remaining
+        self.plan.local_plan().remaining
     }
     pub const fn confirmation_required(&self) -> bool {
         self.confirmation_required

@@ -2,7 +2,7 @@
 use super::{
     AnalystPlanChoice, ReservationAction, ReservationPurpose, ReservationTransition,
     SafePlanPreview, SubagentDigest, SubagentJournal, SubagentPlanApprovalV1, SubagentPlanDecision,
-    SubagentPlanV1, SubagentRecord, SubagentReservationV1, SubagentResources, SubagentSourcePageV1,
+    SubagentPlanV2, SubagentRecord, SubagentReservationV1, SubagentResources, SubagentSourcePageV1,
     SubagentSourceSetV1, SubagentTaskSpec, SubagentTypeSnapshotV1,
 };
 use crate::{AppError, AuditOrigin, CancellationToken, CaseId, Engine, SignedEntry};
@@ -37,7 +37,7 @@ impl PreparedSubagentPlan {
 /// still rechecks the durable allocation, policy and its request reservation.
 pub struct StartedSubagentPlan {
     pub(super) activity: Option<PlanActivity>,
-    pub(super) plan: SubagentPlanV1,
+    pub(super) plan: SubagentPlanV2,
     pub(super) entry_hash: SubagentDigest,
     pub(super) allocation: SubagentReservationV1,
     pub(super) skill_budget:
@@ -68,7 +68,7 @@ impl StartedSubagentPlan {
             .find(|task| task.task_id == id)
             .ok_or_else(invalid)
     }
-    pub const fn plan(&self) -> &SubagentPlanV1 {
+    pub const fn plan(&self) -> &SubagentPlanV2 {
         &self.plan
     }
     pub const fn allocation(&self) -> &SubagentReservationV1 {
@@ -175,7 +175,7 @@ impl<'a> AgentBatch<'a> {
     }
     fn decision(
         &mut self,
-        plan: &SubagentPlanV1,
+        plan: &SubagentPlanV2,
         signer: std::sync::Arc<dyn crate::Signer>,
         decision: SubagentPlanDecision,
     ) -> Result<SubagentDigest, AppError> {
@@ -352,7 +352,7 @@ impl Engine<'_> {
             .journal
             .preparation_context(&turn.to_string(), &self.policy)
             .map_err(|_| invalid())?;
-        let plan = SubagentPlanV1::prepare(
+        let plan = SubagentPlanV2::prepare(
             case,
             &turn.to_string(),
             ordinal,
@@ -528,7 +528,7 @@ impl Engine<'_> {
 }
 
 pub(super) fn plan_transition(
-    plan: &SubagentPlanV1,
+    plan: &SubagentPlanV2,
     action: ReservationAction,
     parent_operation: Option<SubagentDigest>,
     cause_sha256: SubagentDigest,

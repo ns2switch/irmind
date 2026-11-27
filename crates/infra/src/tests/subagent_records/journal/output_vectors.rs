@@ -30,7 +30,7 @@ fn reported_model_overrun_has_a_canonical_receipt_and_exact_material_binding() {
     assert_eq!(receipt.amount.tokens, 150_020);
     let vector = serde_json::json!({"reserved_request_tokens":100,"reported_input_tokens":20,"reported_output_tokens":150_000,"child_allocation_tokens":100_000,"released_token_capacity":0,"receipt":serde_json::from_slice::<serde_json::Value>(&bytes).unwrap(),"canonical_hex":hex(&bytes),"receipt_identity":hex(receipt.identity().unwrap().as_bytes())});
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../docs/development/model-output-vectors/overrun-case-v7.json");
+        .join("../../docs/development/model-output-vectors/overrun-case-v8.json");
     if std::env::var_os("IRMIND_UPDATE_MODEL_OUTPUT_VECTORS").is_some() {
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::write(
@@ -81,10 +81,10 @@ fn token_debt_rejects_a_new_request_before_the_terminal_result_is_merged() {
     let entry = history
         .entries
         .iter()
-        .find(|e| e.kind == AuditEventKind::SubagentPlanV1)
+        .find(|e| e.kind == AuditEventKind::SubagentPlanV2)
         .unwrap();
     let plan =
-        SubagentPlanV1::decode(&hex::decode(entry.payload.split_once(':').unwrap().1).unwrap())
+        SubagentPlanV2::decode(&hex::decode(entry.payload.split_once(':').unwrap().1).unwrap())
             .unwrap();
     let request = SubagentReservationV1::prepare(
         &plan,
@@ -140,7 +140,7 @@ fn cache_breakdown_binds_child_reply_receipt_and_settlement() {
         .unwrap();
     let vector = serde_json::json!({"reply_usage":usage,"accounting_payload":history.entries.iter().find(|e|e.kind==AuditEventKind::ModelUsage).unwrap().payload,"settlement_payload":settlement.payload,"settlement_entry_sha256":hex(&settlement.hash)});
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../docs/development/context-cost-data/child-cache-settlement-case-v7.json");
+        .join("../../docs/development/context-cost-data/child-cache-settlement-case-v8.json");
     if std::env::var_os("IRMIND_UPDATE_CACHE_VECTORS").is_some() {
         fs::write(
             &path,

@@ -1,6 +1,6 @@
 //! Streaming validation of authenticated plan metadata. Data is not a task lease.
 use super::{
-    SubagentDigest, SubagentPlanV1, SubagentRecord, SubagentRecordError, SubagentResources,
+    SubagentDigest, SubagentPlanV2, SubagentRecord, SubagentRecordError, SubagentResources,
     SubagentSourcePageV1, SubagentSourceSetV1, SubagentTypeSnapshotV1,
 };
 use crate::{Actor, AppError, AuditEventKind, CaseId, CaseScope, SignedEntry, Verifier};
@@ -265,7 +265,10 @@ impl SubagentJournal {
                     return Err(SubagentRecordError);
                 }
             }
-            AuditEventKind::SubagentPlanV1 => self.plan(decode_entry(entry)?, entry)?,
+            AuditEventKind::SubagentPlanV2 => self.plan(decode_entry(entry)?, entry)?,
+            AuditEventKind::SubagentPlanV1 | AuditEventKind::ChildSourceQueryV1 => {
+                return Err(SubagentRecordError);
+            }
             AuditEventKind::SubagentPlanApprovalV1
             | AuditEventKind::SubagentReservationV1
             | AuditEventKind::SubagentCheckpointV1
@@ -316,9 +319,14 @@ impl SubagentJournal {
 
     fn plan(
         &mut self,
-        plan: SubagentPlanV1,
+        plan: SubagentPlanV2,
         entry: &SignedEntry,
     ) -> Result<(), SubagentRecordError> {
+        // Local plans can use V2 while publication of a remote assignment
+        // still requires the atomic child-query admission path.
+        if !plan.query_resources.is_empty() {
+            return Err(SubagentRecordError);
+        }
         let rules = plan.policy.rules()?;
         let budget = self
             .budget
@@ -436,6 +444,8 @@ pub fn is_subagent_kind(kind: AuditEventKind) -> bool {
             | AuditEventKind::SubagentSourceSetV1
             | AuditEventKind::SubagentTypeSnapshotV1
             | AuditEventKind::SubagentPlanV1
+            | AuditEventKind::SubagentPlanV2
+            | AuditEventKind::ChildSourceQueryV1
             | AuditEventKind::SubagentPlanApprovalV1
             | AuditEventKind::SubagentReservationV1
             | AuditEventKind::SubagentCheckpointV1

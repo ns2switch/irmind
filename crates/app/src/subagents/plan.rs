@@ -237,6 +237,11 @@ impl SubagentPlanV1 {
         self.reservation.requires_signed_consent(self.remaining)
     }
 }
+impl AsRef<SubagentPlanV1> for SubagentPlanV1 {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
 impl SubagentRecord for SubagentPlanV1 {
     const KIND: AuditEventKind = AuditEventKind::SubagentPlanV1;
     const DOMAIN: &'static [u8] = b"irmind-subagent-plan-v1\0";
@@ -314,12 +319,14 @@ pub struct SubagentPlanApprovalV1 {
 }
 impl SubagentPlanApprovalV1 {
     pub fn new(
-        plan: &SubagentPlanV1,
+        plan: &(impl SubagentRecord + AsRef<SubagentPlanV1>),
         decision: SubagentPlanDecision,
     ) -> Result<Self, SubagentRecordError> {
+        let plan_sha256 = plan.identity()?;
+        let plan = plan.as_ref();
         let value = Self {
             format_version: 1,
-            plan_sha256: plan.identity()?,
+            plan_sha256,
             budget_checkpoint_sha256: plan.budget_checkpoint_sha256,
             remaining_tokens: plan.remaining.tokens,
             remaining_calls: plan.remaining.calls,
@@ -330,9 +337,14 @@ impl SubagentPlanApprovalV1 {
         value.validate()?;
         Ok(value)
     }
-    pub fn matches(&self, plan: &SubagentPlanV1) -> Result<bool, SubagentRecordError> {
+    pub fn matches(
+        &self,
+        plan: &(impl SubagentRecord + AsRef<SubagentPlanV1>),
+    ) -> Result<bool, SubagentRecordError> {
         self.validate()?;
-        Ok(self.plan_sha256 == plan.identity()?
+        let plan_sha256 = plan.identity()?;
+        let plan = plan.as_ref();
+        Ok(self.plan_sha256 == plan_sha256
             && self.budget_checkpoint_sha256 == plan.budget_checkpoint_sha256
             && self.remaining_tokens == plan.remaining.tokens
             && self.remaining_calls == plan.remaining.calls

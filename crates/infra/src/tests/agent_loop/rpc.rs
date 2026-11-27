@@ -559,7 +559,7 @@ fn no_delegation_in_engine_rpc_even_after_loading_a_skill() {
     assert!(
         !entries
             .iter()
-            .any(|entry| entry.kind == AuditEventKind::SubagentPlanV1)
+            .any(|entry| entry.kind == AuditEventKind::SubagentPlanV2)
     );
 }
 
