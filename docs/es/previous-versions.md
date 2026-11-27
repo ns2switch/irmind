@@ -38,7 +38,7 @@ Comprueba los tres elementos antes de ejecutar el binario.
 3. Para cada ejecutable, usa una versión actual de GitHub CLI.
 
    ```text
-   gh attestation verify <BINARIO> -R ns2switch/irmind --signer-workflow ns2switch/irmind/.github/workflows/ci.yml --source-ref refs/tags/<TAG>
+   gh attestation verify "<BINARIO>" -R "ns2switch/irmind" --signer-workflow ns2switch/irmind/.github/workflows/ci.yml --source-ref "refs/tags/<TAG>"
    ```
 
 Si alguna comprobación falla, detente. Consulta la

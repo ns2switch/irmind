@@ -20,6 +20,14 @@ class CommandOwnership(unittest.TestCase):
         text = 'gcloud logging read query --format=json\nirmind --made-up-flag'
         self.assertIn('--made-up-flag', check_docs.irmind_flag_citations(text))
 
+    def test_attestation_flags_belong_to_github_without_exempting_irmind(self):
+        line = ('gh attestation verify "$file" -R "ns2switch/irmind" '
+                '--signer-workflow ns2switch/irmind/.github/workflows/ci.yml '
+                '--source-ref "refs/tags/$tag"')
+        self.assertEqual(check_docs.irmind_flag_citations(line), set())
+        for suffix in [' && irmind --source-ref bad', '\nirmind --signer-workflow bad']:
+            self.assertIn(suffix.split()[-2], check_docs.irmind_flag_citations(line + suffix))
+
     def test_catalog_environment_secret_example_uses_github_flags(self):
         line = 'gh secret set CATALOG_ED25519_SEED_HEX --repo ns2switch/irmind-skills --env release < catalog-seed.hex'
         self.assertEqual(check_docs.irmind_flag_citations(line), set())

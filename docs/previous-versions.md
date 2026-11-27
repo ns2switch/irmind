@@ -48,8 +48,7 @@ done
 for file in "$binary" "$helper"; do
   line=$(awk -v name="$file" '$2 == name { match_line=$0; n++ } END { if (n != 1) exit 1; print match_line }' SHA256SUMS)
   printf '%s\n' "$line" | sha256sum -c - # On macOS use shasum -a 256 -c -
-  gh attestation verify "$file" -R "$repo" \
-    --signer-workflow "$repo/.github/workflows/ci.yml" --source-ref "refs/tags/$tag"
+  gh attestation verify "$file" -R "$repo" --signer-workflow "$repo/.github/workflows/ci.yml" --source-ref "refs/tags/$tag"
 done
 ```
 
