@@ -173,6 +173,8 @@ La fase 0 consolida el [formato de caso 7 y la exportación V11](development/cas
   de GCP y `targetResources` y `modifiedProperties` de Entra. La auditoría fijada
   estima una regla adicional para GCP y tres para Azure. [Auditoría y alcance](../development/sigma-azure-result-type-contract.md).
 - Ingerir salidas de Volatility 3. [#158](https://github.com/ns2switch/irmind/issues/158).
+- Acotar las entradas compartidas de mapeos nativos conservando la receta V2.
+  [Medición y propuesta](development/native-mapping-shared-inputs.md).
 - Decidir cuándo estabilizar los formatos firmados y cuánto tiempo mantener
   las versiones de parsers.
 - Al estabilizar los formatos, registrar la admisión de Sigma en el caso por separado de la versión del evaluador. Cada proyección nueva tendrá un solo identificador y reutilizará la verificación de la admisión.
