@@ -42,7 +42,6 @@ archivos para cada decisión. La GUI puede leer lo que tecleas. Usa un
 cliente de confianza para esa frase. Si la sesión tiene bloqueado el
 keystore de archivos, ciérrala antes de entrar en la TUI.
 
-En v0.8, aprobar desde la GUI requiere la frase de paso del keystore
-cifrado de archivos. Con el keystore del sistema, usa `/approvals` en la
-TUI de IRMind. La validación interactiva de Windows Hello y Touch ID
-queda para después de v0.8.
+Con el keystore del sistema, usa `/approvals` en la TUI de IRMind. La
+validación interactiva de Windows Hello y Touch ID queda para después
+de v0.8.

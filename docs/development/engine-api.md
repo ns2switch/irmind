@@ -73,7 +73,5 @@ each submitted decision. The GUI can see what you type. Use a graphical
 client you trust with that phrase. Close the session before switching to
 the TUI if the session owns the file-keystore lock.
 
-In v0.8, graphical approvals use a passphrase and require the encrypted
-file keystore. With the system keystore, use `/approvals` in the IRMind
-TUI. Interactive validation of Windows Hello and Touch ID is scheduled
-for after v0.8.
+With the system keystore, use `/approvals` in the IRMind TUI. Interactive
+validation of Windows Hello and Touch ID is scheduled for after v0.8.
