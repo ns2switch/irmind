@@ -1,7 +1,8 @@
 use super::*;
 use arrow_array::{ArrayRef, RecordBatch, StringArray};
 use irmind_app::{
-    IndexedTime, encode_common_event, indexed_rfc3339, v10_proofs::SigmaFieldTableV1,
+    IndexedTime, encode_common_event, indexed_rfc3339,
+    v10_proofs::{SIGMA_EVALUATOR_V5, SigmaFieldTableV1},
 };
 use irmind_domain::{
     BoundedObservations, EventContextV1, EventHeaderV1, EventOrigin, EvidenceHash,
@@ -293,7 +294,7 @@ fn lane(file: &std::path::Path, original: bool, count: u64) {
         usize::try_from(count.saturating_sub(950)).unwrap()
     );
     println!(
-        "evaluator=irmind-sigma-evaluator-v2 fields={name} rules={count} compiled={} evaluated={} skipped={} compile_s={:.3} scan_s={seconds:.3} read_bytes={} tp={true_positives} fp={false_positives} fn={false_negatives} units={}",
+        "evaluator={SIGMA_EVALUATOR_V5} fields={name} rules={count} compiled={} evaluated={} skipped={} compile_s={:.3} scan_s={seconds:.3} read_bytes={} tp={true_positives} fp={false_positives} fn={false_negatives} units={}",
         programs.eligible(),
         run.rules_evaluated(),
         programs.skipped().len(),
