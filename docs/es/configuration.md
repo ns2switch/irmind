@@ -265,6 +265,11 @@ analyst_key_fingerprint = "<huella mostrada por IRMind>"
 
 Elige `os` o `file` por separado para cada capacidad. `os` usa Keychain, Credential Manager o Secret Service. `file` guarda ambas capacidades en `keystore.enc`, pide una passphrase sin eco una vez por sesión y funciona por SSH. Emplea Argon2id y XChaCha20-Poly1305; sigue siendo necesaria una passphrase sólida y una máquina protegida. Si el backend elegido no se abre, IRMind falla cerrado y ofrece un cambio explícito en la TUI. Nunca cambia en silencio.
 
+En v0.8, un [cliente gráfico](development/engine-api.md#aprobaciones-gráficas)
+puede aprobar una solicitud con la frase de paso del analista cuando `signer`
+usa el llavero cifrado de archivos. Si `signer` usa el llavero del sistema,
+abre `/approvals` en la TUI de IRMind para decidir la solicitud.
+
 Escribe `/settings keystore` para ver los backends y comprobar qué credenciales existen. Con Tab, flechas y Enter puedes añadir o borrar credenciales, cambiar la passphrase, migrar un backend o reiniciar la sesión. La migración conserva la huella pública del analista y deja un evento operativo global firmado incluso antes del primer caso. Tras cambiar una credencial, los conectores activos pueden conservar el valor anterior; elige Reiniciar sesión en esta sección. No escribas secretos en el texto del caso.
 
 La CLI lee la passphrase del terminal sin eco o de un descriptor abierto explícitamente con `--passphrase-fd <FD>`; Windows admite actualmente solo el descriptor `0`. IRMind no acepta passphrases ni secretos por argumentos o variables de entorno. `verify-export` no necesita desbloquear ningún backend.

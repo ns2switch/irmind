@@ -262,6 +262,11 @@ analyst_key_fingerprint = "<fingerprint shown by IRMind>"
 
 Choose `os` or `file` independently for each capability. The OS backend uses Keychain, Credential Manager, or Secret Service. The encrypted-file backend keeps both capabilities in `keystore.enc`, prompts once per session without echo, and works over SSH. It uses Argon2id and XChaCha20-Poly1305; a strong passphrase and a protected host still matter. If a selected backend cannot be opened, IRMind fails closed and offers an explicit change in the TUI. It never falls back silently.
 
+In v0.8, a [graphical client](development/engine-api.md#graphical-approval-sessions)
+can approve a request by asking for the Analyst passphrase when `signer`
+uses the encrypted-file keystore. If `signer` uses the OS keystore, open
+`/approvals` inside IRMind's TUI to decide the request.
+
 Type `/settings keystore` to view active backends and credential presence. Select an action with Tab, arrows, and Enter to add or delete a credential, change the file passphrase, migrate a backend, or restart the session. Migration preserves the analyst public-key fingerprint and writes a signed global operational event even before the first case exists. After a credential change, active connectors may retain the previous value; choose Restart session in that section. Never type secrets into case text.
 
 The CLI reads a file-backend passphrase from the terminal without echo or from an explicitly opened descriptor with `--passphrase-fd <FD>`; Windows currently accepts descriptor `0` only. IRMind does not accept passphrases or module secrets through arguments or environment variables. `verify-export` needs no keystore.
