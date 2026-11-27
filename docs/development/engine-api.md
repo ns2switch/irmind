@@ -56,8 +56,7 @@ engine's own cancellation and budget controls.
 
 When V1 signals `review_in_tui`, open the case in IRMind's TUI and
 use `/approvals`. IRMind signs there under the existing policy and key
-controls. The client can observe a guarded state only. The stdio protocol
-has no approval, prompt-presentation, signing, credential or configuration
+controls. The client can observe a guarded state only. V1 has no approval, prompt-presentation, signing, credential or configuration
 operation. This implementation uses case format 7 and export V11.
 
 ## Graphical approval sessions
@@ -74,9 +73,7 @@ each submitted decision. The GUI can see what you type. Use a graphical
 client you trust with that phrase. Close the session before switching to
 the TUI if the session owns the file-keystore lock.
 
-Windows Hello and Touch ID are activated only after validation on native
-hardware. On macOS, the proposed system dialog identifies the action,
-case, decision and code. Full arguments and scope are displayed by the
-GUI. A compromised GUI could show different arguments from the ones IRMind
-signs. Open `/approvals` inside IRMind for strict review. The Windows
-path displays the full request in a window owned by IRMind.
+In v0.8, graphical approvals use a passphrase and require the encrypted
+file keystore. With the system keystore, use `/approvals` in the IRMind
+TUI. Interactive validation of Windows Hello and Touch ID is scheduled
+for after v0.8.

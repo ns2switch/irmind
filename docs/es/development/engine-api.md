@@ -23,7 +23,7 @@ consulta `case_status` y vuelve a suscribirte desde el cursor devuelto.
 Consultar `case_status` reemplaza el cursor y cierra su suscripción anterior.
 Un cliente desconectado cancela su turno por la ruta normal del motor.
 
-Si un evento indica `review_in_tui`, abre el caso en la TUI de IRMind y
+Si V1 indica `review_in_tui`, abre el caso en la TUI de IRMind y
 usa `/approvals`. Solo IRMind firma la decisión. La API transmite el estado
 con ContentGuard y carece de operaciones para aprobar, firmar o gestionar
 credenciales. Esta implementación usa el caso 7 y la exportación V11.
@@ -42,10 +42,7 @@ archivos para cada decisión. La GUI puede leer lo que tecleas. Usa un
 cliente de confianza para esa frase. Si la sesión tiene bloqueado el
 keystore de archivos, ciérrala antes de entrar en la TUI.
 
-Windows Hello y Touch ID requieren validación en equipos nativos antes
-de activarse. En macOS, el diálogo del sistema identifica la acción, el
-caso, la decisión y el código. Los argumentos completos y el alcance se
-leen en la GUI. Una GUI comprometida podría mostrar argumentos distintos
-de los que firma IRMind. Para una revisión estricta usa `/approvals`
-dentro de IRMind. La vía de Windows muestra la solicitud completa en
-una ventana propia de IRMind.
+En v0.8, aprobar desde la GUI requiere la frase de paso del keystore
+cifrado de archivos. Con el keystore del sistema, usa `/approvals` en la
+TUI de IRMind. La validación interactiva de Windows Hello y Touch ID
+queda para después de v0.8.
