@@ -1,5 +1,7 @@
 # Typed V10 proof objects for Sigma and reports
 
+> Historical v0.7 proof-object review. The case 7 implementation retains the current proof descriptors, V3 Sigma results and V2 report coverage. The standalone V1/V2 result bodies and V1 report coverage were retired. The original vectors are available from the v0.7.4 tag.
+
 This document specifies the object bodies referenced by the approved
 [V10 receipts and header vectors](https://github.com/ns2switch/irmind/pull/389).
 It uses the approved kinds, framing, domain-separated commitments and counts.

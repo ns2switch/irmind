@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independent proposed decimal projection and receipt vectors."""
+"""Independent decimal projection and V3 result vectors."""
 import json
 import re
 import runpy
@@ -25,7 +25,6 @@ assert start and toml.count(old) == 1
 model["TABLE"] = header[:-4] + module["text"]((start + toml).replace(old, new).decode())
 model["RULES"] = {"ip-range": module["make_rule"]("ip-range", "ResultType: 50053", "selection", "azure", "signinlogs")}
 wire = module["wire"]
-text = module["text"]
 
 
 def project(row):
@@ -42,13 +41,8 @@ def project(row):
 
 
 def make_case(gap):
-    item = scenario([0], {"ip-range": [1]}, {"ip-range": (0, None)},
+    return scenario([0], {"ip-range": [1]}, {"ip-range": (0, None)},
                     5 if gap else 0, hits=() if gap else [("ip-range", 0, 1)], row_gap=gap)
-    v3 = bytes.fromhex(item["receipt"]["bytes_hex"])
-    assert v3.count(text("irmind-sigma-evaluator-v3")) == 1
-    v4 = v3.replace(text("irmind-sigma-evaluator-v3"), text("irmind-sigma-evaluator-v4"))
-    item["receipt"] = wire(v4)
-    return item
 
 
 hit, gap = make_case(False), make_case(True)
@@ -63,7 +57,5 @@ print(json.dumps({
     "projections": [{"row": row, "expected": project(row).hex()} for row in cases],
     "hit": hit,
     "indeterminate": gap,
-    "invalid_evaluator_downgrade": wire(bytes.fromhex(gap["receipt"]["bytes_hex"]).replace(
-        text("irmind-sigma-evaluator-v4"), text("irmind-sigma-evaluator-v3"))),
-    "invalid_results_swap": {"receipt": gap["receipt"], "results": hit["results"]},
+    "invalid_results_swap": {"result_sha256": gap["results"]["sha256"], "results": hit["results"]},
 }, indent=2, ensure_ascii=False))

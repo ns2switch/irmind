@@ -3,9 +3,9 @@
 mod context;
 mod header;
 mod projection;
-mod roles;
 mod view;
 use irmind_domain::{COMMON_EVENT_V1, CommonEventV1, EvidenceHash};
+use irmind_mapping_contracts::source_mapping::{StructuredUserNamespace, structured_observations};
 use irmind_mapping_contracts::{
     IndexedGraphRecord, PartitionProfile, SourceMapper,
     modules::{MappingModule, ModuleManifest, ModulePort},
@@ -69,7 +69,8 @@ impl SourceMapper for OcsfMapping {
         let view = view::View(source.fields());
         let (header, mut diagnostics) = header::project(&view)?;
         let context = context::project(&view, header.categories().bits() != 0)?;
-        let observations = roles::project(source, &context)?;
+        let observations =
+            structured_observations(StructuredUserNamespace::Ocsf, source, &context)?;
         let common = CommonEventV1::try_new(
             source.origin().clone(),
             source.timestamp(),

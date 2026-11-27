@@ -1,5 +1,7 @@
 # Sigma V4 case admission for installed packages
 
+> Historical V4 case-admission evaluator label. The package and catalog records remain active. The [case 7 contract](case-7-export-v11-contract.md) carries the admission mode in the run receipt.
+
 **Status** Approved by the analyst, including the independent vectors.
 
 The approved package contract gives V3 runs that require case admission
@@ -22,7 +24,7 @@ missing admission, a V3 table under the new marker, an ungated marker in
 either of the two records or a changed checkpoint fails verification.
 
 There are no new statuses, frame fields, archive kinds or limits in this
-proposal. The [generator](sigma-package-vectors/generate-v4-gate.py) and
-[vectors](sigma-package-vectors/v4-gate.json) specify the new string in the
+proposal. The [generator](https://github.com/ns2switch/irmind/blob/v0.7.4/docs/development/sigma-package-vectors/generate-v4-gate.py) and
+[vectors](https://github.com/ns2switch/irmind/blob/v0.7.4/docs/development/sigma-package-vectors/v4-gate.json) specify the new string in the
 pair of receipt bodies, the exact signature challenge of the synthetic
 admission and the rejected downgrade. They use synthetic material.

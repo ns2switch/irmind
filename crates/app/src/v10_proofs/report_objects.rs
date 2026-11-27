@@ -337,7 +337,14 @@ pub(super) mod tests {
         assert_eq!(decoded.0[1], "");
         assert_eq!(decoded.encode().unwrap(), sections);
 
-        assert!(ReportCoverageV2::decode(&object("report_coverage")).is_err());
+        let coverage = object("report_coverage");
+        assert_eq!(
+            ReportCoverageV2::decode(&coverage)
+                .unwrap()
+                .encode()
+                .unwrap(),
+            coverage
+        );
     }
 
     pub(in crate::v10_proofs) fn coverage_vector(name: &str) -> Vec<u8> {

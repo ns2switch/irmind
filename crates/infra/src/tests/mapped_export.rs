@@ -154,7 +154,7 @@ fn ingest(
 
 #[test]
 #[allow(clippy::too_many_lines)]
-fn v10_export_authenticates_retained_parents_receipts_schema_and_public_key() {
+fn v11_export_authenticates_retained_parents_receipts_schema_and_public_key() {
     let root = tempfile::tempdir().unwrap();
     let (store, engine, signer) = setup(root.path());
     let case = engine

@@ -2,7 +2,7 @@ use super::*;
 use irmind_domain::{CommonEventFilter, EntityRole, EventCategory, EventOutcome};
 
 #[test]
-fn bundled_cloudtrail_tables_survive_signed_ingestion_rebuild_and_v10_export() {
+fn bundled_cloudtrail_tables_survive_signed_ingestion_rebuild_and_v11_export() {
     let root = tempfile::tempdir().unwrap();
     let catalog = Arc::new(
         MappingCatalog::freeze(

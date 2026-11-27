@@ -11,10 +11,11 @@ use irmind_app::{
     source_mapping::{MappingCatalog, MappingProvenance},
     v10_proofs::{
         PreparedSigmaExecution, SigmaCompiledRulesV1, SigmaCoverageV1, SigmaExecutionContext,
-        SigmaExecutionSummary, SigmaFieldTableV1, SigmaFindingDraft, SigmaMatchV1, SigmaRuleKeyV1,
-        SigmaRunResultsV1, SigmaRunResultsV2, SigmaRunResultsV3, SigmaRunV2, SigmaSourceScopeV1,
-        V10ArtifactReference, V10AuditReference, V10ProofDescriptor, V10ProofFamily,
-        V10RowReference, V10SourceReference, sigma_pack_operation, v10_proof_commitment,
+        SigmaExecutionSummary, SigmaFieldTableV1, SigmaFindingDraft, SigmaMatchV1,
+        SigmaMatchedRows, SigmaRuleKeyV1, SigmaRunResultsV3, SigmaRunV2, SigmaScanResults,
+        SigmaSourceScopeV1, V10ArtifactReference, V10AuditReference, V10ProofDescriptor,
+        V10ProofFamily, V10RowReference, V10SourceReference, sigma_pack_operation,
+        v10_proof_commitment,
     },
 };
 use irmind_domain::{
@@ -369,7 +370,7 @@ fn prepare(
     let findings = materialize_findings(scope.view.entries(), &rules, hit_rows, &mut results)?;
     let source_counts = work.signed_gap_counts(&unavailable_by_source)?;
     let indeterminate_by_rule = indeterminate_by_rule.into_iter().collect::<Vec<_>>();
-    let v2 = SigmaRunResultsV2 {
+    let v2 = SigmaScanResults {
         results,
         unavailable_by_source: source_counts,
         indeterminate_by_rule: indeterminate_by_rule.clone(),
@@ -419,7 +420,7 @@ fn materialize_findings(
     entries: &[irmind_app::SignedEntry],
     rules: &[(SigmaRuleKeyV1, &[u8])],
     hit_rows: Vec<Hit<'_>>,
-    results: &mut SigmaRunResultsV1,
+    results: &mut SigmaMatchedRows,
 ) -> Result<Vec<SigmaFindingDraft>, AppError> {
     let titles = hit_rows
         .iter()
@@ -838,7 +839,7 @@ pub(super) fn rule_objects(
     available: &BTreeSet<usize>,
     rules: &[(SigmaRuleKeyV1, &[u8])],
     cancel: &CancellationToken,
-) -> Result<(SigmaCompiledRulesV1, SigmaRunResultsV1), AppError> {
+) -> Result<(SigmaCompiledRulesV1, SigmaMatchedRows), AppError> {
     use super::evaluation::covers;
     use irmind_app::v10_proofs::{SigmaCompiledRuleV1, SigmaRuleCoverageV1};
 
@@ -915,7 +916,7 @@ pub(super) fn rule_objects(
     }
     Ok((
         SigmaCompiledRulesV1(compiled),
-        SigmaRunResultsV1 {
+        SigmaMatchedRows {
             coverage,
             matches: Vec::new(),
         },

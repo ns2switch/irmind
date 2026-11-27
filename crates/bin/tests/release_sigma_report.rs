@@ -75,7 +75,7 @@ const DIGEST: &str = "AWSLogs/111122223333/CloudTrail-Digest/us-east-2/2026/11/0
 
 #[test]
 #[ignore = "requires the staged distribution binary and an artifact output directory"]
-fn release_binary_sigma_report_v10() {
+fn release_binary_sigma_report_v11() {
     let binary = required_path("IRMIND_RELEASE_BINARY");
     let output = required_path("IRMIND_RELEASE_SIGMA_OUTPUT");
     assert!(binary.is_file());

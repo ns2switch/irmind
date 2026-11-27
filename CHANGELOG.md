@@ -4,6 +4,24 @@ This file records user-visible changes. IRMind remains a pre-release for evaluat
 
 ## Unreleased
 
+## 0.8.0-alpha.1 — Case format consolidation
+
+**Format impact:** Case marker 7 and export V11 supersede case marker 6 and
+V10. Keep the creating v0.7.x binary to open, verify, export or delete cases
+from that series. If you have open cases, [keep verified copies before
+upgrading](docs/previous-versions.md). Re-ingesting verified originals creates
+a new case.
+
+- Use one Sigma evaluator, V5. The signed run receipt carries its admission
+  mode separately and binds the authenticated case admission for installed
+  packages. Sigma result V3 and report coverage V2 keep their encodings.
+- Keep the twelve export sections, signed package and catalog operations,
+  the seal, and the native V2 mapping identity recipe. Implementation
+  identities change when a reachable source input changes.
+- Remove case and export compatibility paths for older formats and their
+  standalone Sigma result codecs. Keep rejection tests and current-format
+  proof, fuzz and distribution checks.
+
 ## 0.7.4 — Folder ingestion and local evidence status
 
 **Format impact:** Case marker 6 and export V10 stay in use. Older binaries may

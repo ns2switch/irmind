@@ -1,8 +1,8 @@
+use super::{MappingError, SourceRecordV1};
 use irmind_domain::{
     BoundedObservations, CommonField as F, CommonValue, EntityIdentityScope as S,
     EntityObservation, EntityRole as R, EventContextV1, ObservedEntity, ObservedEntityKind as K,
 };
-use irmind_mapping_contracts::source_mapping::{MappingError, SourceRecordV1};
 // At most 32 occurrence descriptors. Unlisted supported context remains available.
 const OBSERVATIONS: &[(F, K, R)] = &[
     (F::SourceIp, K::Ip, R::Source),
@@ -34,7 +34,16 @@ const OBSERVATIONS: &[(F, K, R)] = &[
     (F::DnsQuestionName, K::Domain, R::Related),
     (F::UrlDomain, K::Domain, R::Related),
 ];
-pub(super) fn project(
+/// Namespace recipes for structured event families that share the same fields.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StructuredUserNamespace {
+    Ecs,
+    Ocsf,
+}
+
+/// Project roles without changing the source-specific user namespace recipe.
+pub fn structured_observations(
+    namespace: StructuredUserNamespace,
     source: &SourceRecordV1,
     context: &EventContextV1,
 ) -> Result<BoundedObservations, MappingError> {
@@ -53,7 +62,7 @@ pub(super) fn project(
         let scope = if matches!(kind, K::Ip | K::Domain | K::Hash) {
             S::Global
         } else if kind == K::User {
-            user_scope(source, context, field)?
+            user_scope(namespace, source, context, field)?
         } else {
             S::SourceRecord {
                 source: source.origin().source().clone(),
@@ -71,6 +80,7 @@ fn invalid() -> MappingError {
 
 // Directory account namespaces are explicit source values; no PID or clock is involved.
 fn user_scope(
+    namespace: StructuredUserNamespace,
     source: &SourceRecordV1,
     context: &EventContextV1,
     field: F,
@@ -100,7 +110,11 @@ fn user_scope(
         } else {
             ""
         };
-    let mut material = b"irmind-ecs-user-namespace-v1\0".to_vec();
+    let (domain, label): (&[u8], &str) = match namespace {
+        StructuredUserNamespace::Ecs => (b"irmind-ecs-user-namespace-v1\0", "ecs-user-v1"),
+        StructuredUserNamespace::Ocsf => (b"irmind-ocsf-user-namespace-v1\0", "ocsf-user-v1"),
+    };
+    let mut material = domain.to_vec();
     let ordinal = source.origin().record().to_string();
     let record = if realm.is_empty() {
         ordinal.as_str()
@@ -129,10 +143,7 @@ fn user_scope(
         material.extend_from_slice(&(value.len() as u64).to_be_bytes());
         material.extend_from_slice(value.as_bytes());
     }
-    let name = format!(
-        "ecs-user-v1:sha256={}",
-        irmind_mapping_contracts::hex(&irmind_mapping_contracts::sha256(&material))
-    );
+    let name = format!("{label}:sha256={}", crate::hex(&crate::sha256(&material)));
     Ok(S::Account(
         irmind_domain::EventText::identifier(&name).map_err(|_| invalid())?,
     ))

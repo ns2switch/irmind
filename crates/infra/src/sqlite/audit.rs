@@ -196,7 +196,7 @@ impl AuditLog for LocalStore {
 }
 
 impl LocalStore {
-    pub(crate) fn check_stored_case_format(&self, id: &CaseId) -> Result<(), AppError> {
+    pub(crate) fn check_stored_case_format(&self, id: &CaseId) -> Result<Vec<u8>, AppError> {
         let first = self
             .conn()?
             .query_row(
@@ -213,7 +213,8 @@ impl LocalStore {
             .optional()
             .map_err(storage)?
             .ok_or(AppError::InvalidChain(1))?;
-        check_root(&first)
+        check_root(&first)?;
+        Ok(first.public_key)
     }
 
     pub(crate) fn for_each_audit_entry(

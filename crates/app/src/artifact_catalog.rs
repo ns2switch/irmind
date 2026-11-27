@@ -18,9 +18,6 @@ impl ArtifactCatalogBuilder {
     pub fn accept(&mut self, entry: &SignedEntry) -> Result<(), AppError> {
         use irmind_domain::{AuditEventKind, SourceManifestV2};
         let invalid = || AppError::InvalidChain(entry.seq);
-        if entry.kind.is_retired_case_format() {
-            return Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat));
-        }
         if self.mapped.has_pending()
             && !matches!(
                 entry.kind,
@@ -93,19 +90,16 @@ pub fn artifact_catalog(entries: &[SignedEntry]) -> Result<ArtifactCatalog, AppE
     catalog.finish()
 }
 
-pub fn seal_inventory(entries: &[SignedEntry], legacy: &[String]) -> Result<Vec<String>, AppError> {
+pub fn seal_inventory(
+    entries: &[SignedEntry],
+    evidence: &[String],
+) -> Result<Vec<String>, AppError> {
     use irmind_domain::AuditEventKind;
-    if entries
-        .iter()
-        .any(|entry| entry.kind.is_retired_case_format())
-    {
-        return Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat));
-    }
     if !entries
         .iter()
         .any(|entry| entry.kind == AuditEventKind::ParquetArtifactV3)
     {
-        return Ok(legacy.to_vec());
+        return Ok(evidence.to_vec());
     }
     let mut catalog = ArtifactCatalogBuilder::default();
     let mut inventory = SealInventoryBuilder::default();
@@ -114,7 +108,7 @@ pub fn seal_inventory(entries: &[SignedEntry], legacy: &[String]) -> Result<Vec<
         inventory.accept(entry)?;
     }
     catalog.validate()?;
-    for hash in legacy {
+    for hash in evidence {
         inventory.add_evidence(hash)?;
     }
     let payload = inventory

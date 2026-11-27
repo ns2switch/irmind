@@ -103,18 +103,6 @@ fn catalog_snapshot_v2_matches_the_approved_body_identity_and_origin_rules() {
 }
 
 #[test]
-fn retired_snapshot_label_is_rejected_without_interpreting_its_body() {
-    let retired = entry(
-        AuditEventKind::RetiredSkillSnapshot,
-        irmind_domain::Actor::Analyst,
-        "not JSON and not methodology".into(),
-    );
-    assert!(matches!(
-        SkillReceiptVerifier::default().accept(&retired, &Compiler),
-        Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat))
-    ));
-}
-#[test]
 fn skill_receipt_decoding_rejects_noncanonical_data_and_inconsistent_commitments() {
     let (prefix, value) = SNAPSHOT.trim_end().split_once(':').unwrap();
     let raw = String::from_utf8(hex::decode(value).unwrap()).unwrap();

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Refresh synthetic export vectors or derive V9–V11 from frozen synthetic seeds.
+"""Refresh the synthetic V11 exports from the authenticated current seeds.
 
 Development only; requires Python cryptography. Only the published synthetic
 signing keys are accepted. Original signatures and seed digests are checked
@@ -15,7 +15,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 ROOT = Path(__file__).resolve().parents[1]
-MAGIC = b'IRMIND-EXPORT-V8\0'
+MAGIC = b'IRMIND-EXPORT-V11\0'
 PROFILE = b'irmind-mapping-profile-v1\0'
 KEY = Ed25519PrivateKey.from_private_bytes(bytes([43]) * 32)
 PUBLIC = KEY.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
@@ -123,7 +123,7 @@ def frame(value):
     return field(json.dumps(value, ensure_ascii=False, separators=(',', ':'), sort_keys=True))
 
 
-def refresh(path, case_v5=False):
+def refresh(path):
     test = (ROOT / 'crates/infra/src/tests/mapped_export/seed.rs').read_text()
     match = re.search(re.escape(path.name) + r'"\),\s*"([0-9a-f]{64})"', test)
     assert match, 'fixture must have an explicit frozen digest'
@@ -132,33 +132,29 @@ def refresh(path, case_v5=False):
     source = Reader(original)
     assert source.take(len(MAGIC)) == MAGIC
     header = json.loads(source.field())
+    assert header['version'] == 11
     entries = [json.loads(source.field()) for _ in range(source.number())]
-    remainder = source.data[source.offset:]
+    assert entries[0]['kind'] == 'CaseCreated' and json.loads(entries[0]['payload'])['version'] == 7
+
+    previous = bytes(32)
     for entry in entries:
-        assert bytes(entry['public_key']) == PUBLIC
-        assert sha(canonical(entry)) == bytes(entry['hash'])
-        KEY.public_key().verify(bytes(entry['sig']), bytes(entry['hash']))
-    if case_v5:
-        assert header['version'] == 8 and entries[0]['kind'] == 'CaseCreated'
-        header['version'] = 9
-        created = json.loads(entries[0]['payload'])
-        assert created['version'] == 4
-        created['version'] = 5
-        created['source_queries'] = dict(
-            enabled=False, analytics_allowed=False, scan_bytes=None, retained_rows=0,
-            retained_bytes=0,
-        )
-        entries[0]['payload'] = json.dumps(created, ensure_ascii=False, separators=(',', ':'))
-        magic = b'IRMIND-EXPORT-V9\0'
-        remainder += number(0)
-    else:
-        rewrite_pipeline(entries)
-        entries[-1]['payload'] = inventory(entries[:-1])
-        magic = MAGIC
-    return resign(magic, header, entries, remainder), match[1]
+        assert bytes(entry['public_key']) == PUBLIC and bytes(entry['prev']) == previous
+        previous = sha(canonical(entry))
+        assert previous == bytes(entry['hash'])
+        KEY.public_key().verify(bytes(entry['sig']), previous)
+    last = entries[-1]
+    seal = header['seal']
+    assert last['kind'] == 'CaseSealed' and last['seq'] == seal['seq']
+    assert bytes(seal['public_key']) == PUBLIC and bytes(seal['hash']) == previous
+    challenge = b'irmind-seal-v1\0' + field(header['case_id']) + number(last['seq']) + previous + field(last['payload'])
+    KEY.public_key().verify(bytes(seal['sig']), challenge)
+
+    rewrite_pipeline(entries)
+    last['payload'] = inventory(entries[:-1])
+    return resign(header, entries, source.data[source.offset:]), match[1]
 
 
-def resign(magic, header, entries, remainder):
+def resign(header, entries, remainder):
     previous = bytes(32)
     for entry in entries:
         entry['prev'] = list(previous)
@@ -174,121 +170,28 @@ def resign(magic, header, entries, remainder):
     ordered_header['seal'] = {key: header['seal'][key] for key in (
         'seq', 'hash', 'sig', 'public_key', 'analyst_key_fingerprint',
     )}
-    prefix = frame(header) if magic not in (b'IRMIND-EXPORT-V10\0', b'IRMIND-EXPORT-V11\0') else field(
+    prefix = field(
         json.dumps(ordered_header, ensure_ascii=False, separators=(',', ':')),
     )
-    return magic + prefix + number(len(entries)) + b''.join(map(frame, entries)) + remainder
-
-
-def derive_archive(path, source_version, version, extra_counts):
-    test = (ROOT / 'crates/infra/src/tests/mapped_export/seed.rs').read_text()
-    expected = re.search(re.escape(path.name) + r'"\),\s*"([0-9a-f]{64})"', test)
-    original = path.read_bytes()
-    assert expected and sha(original).hex() == expected[1]
-    source = Reader(original)
-    source_magic = f'IRMIND-EXPORT-V{source_version}\0'.encode('ascii')
-    assert source.take(len(source_magic)) == source_magic
-    header = json.loads(source.field())
-    entries = [json.loads(source.field()) for _ in range(source.number())]
-    previous = bytes(32)
-    for entry in entries:
-        assert bytes(entry['public_key']) == PUBLIC and bytes(entry['prev']) == previous
-        previous = sha(canonical(entry))
-        assert previous == bytes(entry['hash'])
-        KEY.public_key().verify(bytes(entry['sig']), previous)
-    final = entries[-1]
-    old_seal = header['seal']
-    assert bytes(old_seal['public_key']) == PUBLIC and bytes(old_seal['hash']) == previous
-    challenge = (b'irmind-seal-v1\0' + field(header['case_id']) + number(final['seq'])
-                 + previous + field(final['payload']))
-    KEY.public_key().verify(bytes(old_seal['sig']), challenge)
-    assert header['version'] == source_version and entries[0]['kind'] == 'CaseCreated'
-    created = json.loads(entries[0]['payload'])
-    assert created['version'] == source_version - 4
-    created['version'] = version - 4
-    entries[0]['payload'] = json.dumps(created, ensure_ascii=False, separators=(',', ':'))
-    header['version'] = version
-    magic = f'IRMIND-EXPORT-V{version}\0'.encode('ascii')
-    return resign(magic, header, entries, source.data[source.offset:] + bytes(extra_counts * 8))
-
-
-
-def derive_query_chain(name, version):
-    directory = ROOT / 'docs/development/source-query-format-vectors'
-    original = (directory / f'{name}.json').read_bytes()
-    sums = (directory / 'SHA256SUMS').read_text()
-    expected = next(
-        line.split()[0] for line in sums.splitlines() if line.split()[-1] == f'{name}.json'
-    )
-    assert sha(original).hex() == expected
-    edge = bytes(32)
-    entries = json.loads(original)
-    assert entries[0]['kind'] == 'CaseCreated'
-    keys = {actor: Ed25519PrivateKey.from_private_bytes(bytes([seed]) * 32)
-            for actor, seed in [('analyst', 77), ('agent:main', 88)]}
-    for entry in entries:
-        public = keys[entry['actor']].public_key()
-        assert bytes(entry['public_key']) == public.public_bytes(Encoding.Raw, PublicFormat.Raw)
-        assert bytes(entry['prev']) == edge
-        edge = sha(canonical(entry))
-        assert edge == bytes(entry['hash'])
-        public.verify(bytes(entry['sig']), edge)
-    created = json.loads(entries[0]['payload'])
-    assert created['version'] == 5
-    created['version'] = version
-    entries[0]['payload'] = json.dumps(created, ensure_ascii=False, separators=(',', ':'))
-    edge = bytes(32)
-    for entry in entries:
-        entry['prev'] = list(edge)
-        edge = sha(canonical(entry))
-        entry['hash'] = list(edge)
-        entry['sig'] = list(keys[entry['actor']].sign(edge))
-    return (json.dumps(entries, separators=(',', ':'), sort_keys=True) + '\n').encode()
+    return MAGIC + prefix + number(len(entries)) + b''.join(map(frame, entries)) + remainder
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--write', action='store_true')
-    versions = parser.add_mutually_exclusive_group()
-    versions.add_argument('--case-v5', action='store_true')
-    versions.add_argument('--case-v6', action='store_true')
-    versions.add_argument('--case-v7', action='store_true')
     args = parser.parse_args()
-    if args.case_v6 or args.case_v7:
-        case_version = 7 if args.case_v7 else 6
-        version = case_version + 4
-        for suffix in ("mapped", "installed"):
-            directory = ROOT / 'fuzz/seeds/export'
-            source = directory / f'valid-v{version - 1}-{suffix}.irmind'
-            data = derive_archive(source, version - 1, version, 2 if case_version == 6 else 0)
-            path = directory / f'valid-v{version}-{suffix}.irmind'
-            print(path.name, sha(data).hex())
-            if args.write:
-                path.write_bytes(data)
-        for name in ('signed-record-chain', 'signed-recovery-chain'):
-            data = derive_query_chain(name, case_version)
-            path = ROOT / 'crates/testkit/fixtures/contracts' / f'{name}-case-v{case_version}.json'
-            print(path.name, sha(data).hex())
-            if args.write:
-                path.write_bytes(data)
-        return
-    updates = []
-    for name in ['valid-v8-mapped.irmind', 'valid-v8-installed.irmind']:
-        path = ROOT / 'fuzz/seeds/export' / name
-        data, old = refresh(path, case_v5=args.case_v5)
-        if args.case_v5:
-            path = path.with_name(name.replace('valid-v8-', 'valid-v9-'))
-        updates.append((path, data, old))
-        print(path.name, sha(data).hex())
+    test_path = ROOT / 'crates/infra/src/tests/mapped_export/seed.rs'
+    test = test_path.read_text()
+    for suffix in ('mapped', 'installed'):
+        path = ROOT / f'fuzz/seeds/export/valid-v11-{suffix}.irmind'
+        body, old = refresh(path)
+        digest = sha(body).hex()
+        print(path.name, digest)
+        if args.write:
+            path.write_bytes(body)
+            test = test.replace(old, digest)
     if args.write:
-        test_path = ROOT / 'crates/infra/src/tests/mapped_export/seed.rs'
-        test = test_path.read_text()
-        for path, data, old in updates:
-            path.write_bytes(data)
-            if not args.case_v5:
-                test = test.replace(old, sha(data).hex())
-        if not args.case_v5:
-            test_path.write_text(test)
+        test_path.write_text(test)
 
 
 if __name__ == '__main__':

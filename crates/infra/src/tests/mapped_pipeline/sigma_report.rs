@@ -371,10 +371,9 @@ fn sigma_case_row_proofs(
 ) -> (SigmaRunV2, V10SigmaRunObjects) {
     use irmind_app::v10_proofs::{
         SIGMA_EVALUATOR_V5, SigmaAdmissionMode, SigmaClassOutcome, SigmaClassPlan,
-        SigmaCompiledRuleV1, SigmaCompiledRulesV1, SigmaCoverageV1, SigmaMatchV1,
-        SigmaRuleCoverageV1, SigmaRunResultsV1, SigmaRunResultsV2, SigmaRunResultsV3,
-        SigmaRunStatusV1, SigmaSourceScopeV1, V10ProofDescriptor, V10ProofFamily,
-        v10_proof_commitment,
+        SigmaCompiledRuleV1, SigmaCompiledRulesV1, SigmaCoverageV1, SigmaMatchV1, SigmaMatchedRows,
+        SigmaRuleCoverageV1, SigmaRunResultsV3, SigmaRunStatusV1, SigmaScanResults,
+        SigmaSourceScopeV1, V10ProofDescriptor, V10ProofFamily, v10_proof_commitment,
     };
     let mut plan = SigmaClassPlan::new(vec![0], 1).unwrap();
     plan.set(0, 0, SigmaClassOutcome::Eligible).unwrap();
@@ -388,7 +387,7 @@ fn sigma_case_row_proofs(
         }]),
         unavailable_by_source: vec![],
         indeterminate_by_rule: vec![],
-        results: SigmaRunResultsV1 {
+        results: SigmaMatchedRows {
             coverage: vec![SigmaRuleCoverageV1 {
                 rule: rule.clone(),
                 status: SigmaCoverageV1::Eligible,
@@ -410,7 +409,7 @@ fn sigma_case_row_proofs(
             5,
             SigmaRunResultsV3 {
                 plan: objects.class_plan,
-                scan: SigmaRunResultsV2 {
+                scan: SigmaScanResults {
                     results: objects.results,
                     unavailable_by_source: objects.unavailable_by_source,
                     indeterminate_by_rule: objects.indeterminate_by_rule,
@@ -525,7 +524,7 @@ fn digest(value: &str) -> [u8; 32] {
 }
 
 #[test]
-fn signed_sigma_run_and_admitted_rules_verify_in_the_actual_sealed_v10_export() {
+fn signed_sigma_run_and_admitted_rules_verify_in_the_actual_sealed_v11_export() {
     let root = tempfile::tempdir().unwrap();
     let catalog = Arc::new(
         MappingCatalog::freeze(

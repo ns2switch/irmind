@@ -51,7 +51,9 @@ impl ArtifactCatalogBuilder {
 
 fn decode_error(error: &irmind_domain::DomainError, seq: u64) -> AppError {
     if error == &irmind_domain::DomainError::UnsupportedContract {
-        AppError::Fixed(crate::FixedAppError::RetiredCaseFormat)
+        AppError::Fixed(crate::FixedAppError::CaseFormat(
+            crate::case_format::CaseFormatError::Case(None),
+        ))
     } else {
         AppError::InvalidChain(seq)
     }

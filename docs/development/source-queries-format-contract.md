@@ -1,5 +1,7 @@
 # Source-query ports, signed acquisition and export V9
 
+> Historical V9 outer format. Source-query receipts and capture framing remain active in [case 7 and V11](case-7-export-v11-contract.md).
+
 [Español](../es/source-queries-format-contract.md)
 
 **Status: approved v0.6 contract with reduced scope; implementation follows separately.**

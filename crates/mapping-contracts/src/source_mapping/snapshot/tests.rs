@@ -59,11 +59,11 @@ fn snapshots_round_trip_all_closed_selector_types_and_provenances_without_execut
         },
         MappingProvenance::BundledDefinition {
             canonical: b"synthetic definition".to_vec(),
-            interpreter: "irmind-mapping-tables-v1".into(),
+            interpreter: "irmind-mapping-tables-v2".into(),
         },
         MappingProvenance::InstalledDefinition {
             canonical: b"synthetic definition".to_vec(),
-            interpreter: "irmind-mapping-tables-v1".into(),
+            interpreter: "irmind-mapping-tables-v2".into(),
             operation: EvidenceHash::from_bytes([8; 32]),
         },
     ] {

@@ -1,8 +1,8 @@
 //! Bind the decoded proof bodies to their signed receipt before resolving material.
 use super::{
     ReportAnalystSectionsV1, ReportCitationsV1, ReportCoverageV2, ReportPublishedV1,
-    SigmaClassPlan, SigmaCompiledRulesV1, SigmaCoverageV1, SigmaFieldTableV1, SigmaPackAdmissionV1,
-    SigmaPackManifestV1, SigmaRuleKeyV1, SigmaRunResultsV1, SigmaRunResultsV3, SigmaRunV2,
+    SigmaClassPlan, SigmaCompiledRulesV1, SigmaCoverageV1, SigmaFieldTableV1, SigmaMatchedRows,
+    SigmaPackAdmissionV1, SigmaPackManifestV1, SigmaRuleKeyV1, SigmaRunResultsV3, SigmaRunV2,
     SigmaSourceScopeV1, V10ArtifactReference, V10CheckpointView, V10ObjectSection, V10RowReference,
     V10SourceReference,
 };
@@ -20,7 +20,7 @@ pub struct V10SigmaRunObjects {
     pub class_plan: SigmaClassPlan,
     pub selected_sources: SigmaSourceScopeV1,
     pub compiled_rules: SigmaCompiledRulesV1,
-    pub results: SigmaRunResultsV1,
+    pub results: SigmaMatchedRows,
     pub unavailable_by_source: Vec<(V10SourceReference, u64)>,
     pub indeterminate_by_rule: Vec<(SigmaRuleKeyV1, u64)>,
 }

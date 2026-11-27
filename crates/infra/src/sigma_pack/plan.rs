@@ -7,7 +7,7 @@ use irmind_app::{
     AppError, CancellationToken,
     v10_proofs::{
         SigmaClassOutcome, SigmaClassPlan, SigmaCompiledRuleV1, SigmaCompiledRulesV1,
-        SigmaCoverageV1, SigmaRuleCoverageV1, SigmaRuleKeyV1, SigmaRunResultsV1,
+        SigmaCoverageV1, SigmaMatchedRows, SigmaRuleCoverageV1, SigmaRuleKeyV1,
     },
 };
 use irmind_sigma::{SigmaProgram, admit_rule};
@@ -22,7 +22,7 @@ pub(super) fn compile(
     rules: &[(SigmaRuleKeyV1, &[u8])],
     deadline: Instant,
     cancel: &CancellationToken,
-) -> Result<(SigmaClassPlan, SigmaCompiledRulesV1, SigmaRunResultsV1), AppError> {
+) -> Result<(SigmaClassPlan, SigmaCompiledRulesV1, SigmaMatchedRows), AppError> {
     use SigmaClassOutcome::{Eligible, IncompatibleType, MissingBinding, Outside};
     let mut plan = SigmaClassPlan::new(
         available.iter().map(|&index| index as u64).collect(),
@@ -95,7 +95,7 @@ pub(super) fn compile(
     Ok((
         plan,
         SigmaCompiledRulesV1(compiled),
-        SigmaRunResultsV1 {
+        SigmaMatchedRows {
             coverage,
             matches: Vec::new(),
         },

@@ -1,5 +1,7 @@
 # Subagent skill coverage in V10 reports
 
+> The V2 coverage body remains active. The [case 7 and V11 contract](case-7-export-v11-contract.md) supersedes the V10 outer archive.
+
 **Status.** Approved for the v0.7 report proof objects.
 
 [ReportCoverageV1](sigma-report-proof-objects.md#report-objects) references a

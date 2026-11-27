@@ -1,6 +1,6 @@
 use super::{
     MAX_RULES, MAX_VARIANTS, SigmaCompiledRulesV1, SigmaCoverageV1, SigmaRuleCoverageV1,
-    SigmaRunResultsV2, check_size, increasing, put_count,
+    SigmaScanResults, check_size, increasing, put_count,
 };
 use crate::v10_proofs::{INVALID, Result, SigmaRunStatusV1, Wire};
 
@@ -172,14 +172,14 @@ impl SigmaClassPlan {
 }
 
 pub struct SigmaRunResultsV3 {
-    pub scan: SigmaRunResultsV2,
+    pub scan: SigmaScanResults,
     pub plan: SigmaClassPlan,
 }
 
 impl SigmaRunResultsV3 {
     pub fn decode(body: &[u8]) -> Result<Self> {
         let mut wire = Wire::object(body, DOMAIN)?;
-        let scan = SigmaRunResultsV2::read_lists(&mut wire)?;
+        let scan = SigmaScanResults::read_lists(&mut wire)?;
         let plan = SigmaClassPlan::read(&mut wire, scan.results.coverage.len())?;
         wire.finish()?;
         Ok(Self { scan, plan })
@@ -233,14 +233,11 @@ mod tests {
         for (name, vector) in vectors["valid"].as_object().unwrap() {
             let body = bytes(&vector["results"]);
             let result = SigmaRunResultsV3::decode(&body).unwrap();
-            let receipt_hex = vector["receipt"]["bytes_hex"].as_str().unwrap();
-            let status = match name.as_str() {
-                "cancelled_with_both_gaps" => SigmaRunStatusV1::Cancelled,
-                "complete" => SigmaRunStatusV1::Complete,
-                "exact_rows_only" => SigmaRunStatusV1::ExactFieldsUnavailable,
-                _ => SigmaRunStatusV1::CoverageLimited,
-            };
-            assert!(SigmaRunV2::decode(receipt_hex).is_err(), "{name}");
+            let status = SigmaRunStatusV1::read(&mut Wire(&[u8::try_from(
+                vector["status_code"].as_u64().unwrap(),
+            )
+            .unwrap()]))
+            .unwrap();
             assert_eq!(result.encode().unwrap(), body, "{name}");
             assert_eq!(result.status(status), status, "{name}");
             let compiled = SigmaCompiledRulesV1::decode(&bytes(&vector["compiled_rules"])).unwrap();
@@ -260,10 +257,50 @@ mod tests {
                 V10ProofDescriptor::from_body(V10ProofFamily::Sigma, kind, &bytes(value)).unwrap()
             })
             .collect::<Vec<_>>();
-            let retired = hex::decode(receipt_hex).unwrap();
             assert_eq!(
-                v10_proof_commitment(V10ProofFamily::Sigma, &proofs).unwrap(),
-                &retired[retired.len() - 32..],
+                crate::hex(&v10_proof_commitment(V10ProofFamily::Sigma, &proofs).unwrap()),
+                vector["proof_set_sha256"],
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn exact_field_gap_counts_survive_the_current_result_codec() {
+        let vectors: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../testkit/fixtures/contracts/sigma_exact_source_fields.json"
+        ))
+        .unwrap();
+        let vector = &vectors["partial_run_wire"];
+        let body = bytes(&vector["results"]);
+        let result = SigmaRunResultsV3::decode(&body).unwrap();
+        assert_eq!(result.encode().unwrap(), body);
+        assert_eq!(
+            result.status(SigmaRunStatusV1::Complete),
+            SigmaRunStatusV1::ExactFieldsUnavailable
+        );
+        assert_eq!(result.scan.results.matches.len(), 1);
+        assert_eq!(
+            result
+                .scan
+                .unavailable_by_source
+                .iter()
+                .map(|entry| entry.1)
+                .collect::<Vec<_>>(),
+            [2, 1]
+        );
+        assert_eq!(
+            result
+                .scan
+                .indeterminate_by_rule
+                .iter()
+                .map(|entry| entry.1)
+                .collect::<Vec<_>>(),
+            [2, 1]
+        );
+        for name in ["duplicate_source", "zero_source_rows"] {
+            assert!(
+                SigmaRunResultsV3::decode(&bytes(&vector["invalid_results"][name])).is_err(),
                 "{name}"
             );
         }

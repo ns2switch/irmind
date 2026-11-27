@@ -23,3 +23,6 @@ pub trait SourceMapper: Send + Sync {
     fn manifest(&self) -> &MappingManifest;
     fn map(&self, source: &SourceRecordV1) -> Result<MappingOutput, MappingError>;
 }
+
+mod structured_roles;
+pub use structured_roles::{StructuredUserNamespace, structured_observations};

@@ -1,4 +1,4 @@
-//! V6 carries only global signatures referenced by mapping snapshots.
+//! Export only the global signatures referenced by mapping snapshots.
 use super::{AppError, AuditLog, CancellationToken, CaseId, LocalStore, LocalVerifier};
 use irmind_app::{
     SignedEntry, SignedOperation,

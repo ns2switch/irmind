@@ -61,6 +61,12 @@ fn explicit_ocsf_roles_preserve_both_occurrences_and_precise_time() {
     assert_eq!(at(F::SourceIp).role(), EntityRole::Source);
     assert_eq!(at(F::DestinationIp).role(), EntityRole::Destination);
     assert_eq!(at(F::UserName).role(), EntityRole::Actor);
+    assert_eq!(
+        at(F::UserName).entity().scope(),
+        &EntityIdentityScope::Account(irmind_domain::EventText::identifier(
+            "ocsf-user-v1:sha256=0d52e3495be2d29538f67658e981a5f68f5c3b6db12f3426a632ce6a3e5c8695",
+        ).unwrap()),
+    );
     assert_eq!(at(F::UserTargetName).role(), EntityRole::Target);
     assert_ne!(at(F::UserName).entity(), at(F::UserTargetName).entity());
     assert!(

@@ -1,5 +1,7 @@
 # Sigma and reports V10 wire contract
 
+> Historical v0.7 outer format. Case marker 6, the V10 header and the V1 Sigma run receipt were retired by the [case 7 and V11 contract](case-7-export-v11-contract.md). The original vectors are available from the v0.7.4 tag.
+
 **Status.** Approved wire layout and vectors. Case marker 6 and export V10
 share this contract.
 
@@ -69,8 +71,8 @@ The archive holds the union, each object once per section. Scope, matches
 and cites bind the source/artifact hashes and logical row indices in the
 authenticated ledger. Neither section contains live service keys or paths.
 
-The [independent generator](../../crates/testkit/fixtures/contracts/sigma_report_v10.py)
-and [vectors](../../crates/testkit/fixtures/contracts/sigma_report_v10.json) cover
+The [independent generator](https://github.com/ns2switch/irmind/blob/v0.7.4/crates/testkit/fixtures/contracts/sigma_report_v10.py)
+and [vectors](https://github.com/ns2switch/irmind/blob/v0.7.4/crates/testkit/fixtures/contracts/sigma_report_v10.json) cover
 admission, complete and work-limited runs, the signed analyst-text binding,
 the V10 header frame and both empty section counts. The header sample fixes
 framing and JSON key order using a synthetic seal-shaped value. It does not

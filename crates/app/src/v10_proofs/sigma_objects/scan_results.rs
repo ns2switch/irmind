@@ -1,26 +1,17 @@
-use super::{MAX_RULES, SigmaCoverageV1, SigmaRuleKeyV1, SigmaRunResultsV1, check_size, put_count};
+use super::{MAX_RULES, SigmaCoverageV1, SigmaMatchedRows, SigmaRuleKeyV1, check_size, put_count};
 use crate::v10_proofs::{INVALID, Result, V10SourceReference, Wire};
 use std::collections::BTreeSet;
 
-const RESULTS: &[u8] = b"irmind-sigma-run-results-v2\0";
-
 #[derive(Clone, Eq, PartialEq)]
-pub struct SigmaRunResultsV2 {
-    pub results: SigmaRunResultsV1,
+pub struct SigmaScanResults {
+    pub results: SigmaMatchedRows,
     pub unavailable_by_source: Vec<(V10SourceReference, u64)>,
     pub indeterminate_by_rule: Vec<(SigmaRuleKeyV1, u64)>,
 }
 
-impl SigmaRunResultsV2 {
-    pub fn decode(body: &[u8]) -> Result<Self> {
-        let mut wire = Wire::object(body, RESULTS)?;
-        let result = Self::read_lists(&mut wire)?;
-        wire.finish()?;
-        Ok(result)
-    }
-
+impl SigmaScanResults {
     pub(super) fn read_lists(wire: &mut Wire<'_>) -> Result<Self> {
-        let results = SigmaRunResultsV1::read_lists(wire)?;
+        let results = SigmaMatchedRows::read_lists(wire)?;
         let unavailable_by_source = wire.list(80, |wire| {
             Ok((V10SourceReference::read(wire)?, wire.u64()?))
         })?;
@@ -34,12 +25,6 @@ impl SigmaRunResultsV2 {
         };
         result.validate()?;
         Ok(result)
-    }
-
-    pub fn encode(&self) -> Result<Vec<u8>> {
-        let mut out = RESULTS.to_vec();
-        self.write_lists(&mut out)?;
-        Ok(out)
     }
 
     pub(super) fn write_lists(&self, out: &mut Vec<u8>) -> Result<()> {
@@ -95,48 +80,5 @@ impl SigmaRunResultsV2 {
             return Err(INVALID);
         }
         Ok(())
-    }
-}
-
-#[cfg(test)]
-#[allow(clippy::unwrap_used)]
-mod tests {
-    use super::*;
-    use crate::v10_proofs::SigmaRunV2;
-
-    #[test]
-    fn canonical_partial_result_matches_the_approved_vector() {
-        let bundle: serde_json::Value = serde_json::from_str(include_str!(
-            "../../../../testkit/fixtures/contracts/sigma_exact_source_fields.json"
-        ))
-        .unwrap();
-        let vector = &bundle["partial_run_wire"];
-        let bytes =
-            |item: &serde_json::Value| hex::decode(item["bytes_hex"].as_str().unwrap()).unwrap();
-        let body = bytes(&vector["results"]);
-        let result = SigmaRunResultsV2::decode(&body).unwrap();
-        assert_eq!(result.encode().unwrap(), body);
-        assert_eq!(result.results.matches.len(), 1);
-        assert_eq!(
-            result
-                .unavailable_by_source
-                .iter()
-                .map(|(_, count)| *count)
-                .collect::<Vec<_>>(),
-            [2, 1]
-        );
-        assert_eq!(
-            result
-                .indeterminate_by_rule
-                .iter()
-                .map(|(_, count)| *count)
-                .collect::<Vec<_>>(),
-            [2, 1]
-        );
-        for name in ["duplicate_source", "zero_source_rows"] {
-            assert!(SigmaRunResultsV2::decode(&bytes(&vector["invalid_results"][name])).is_err());
-        }
-        let receipt = vector["receipt"]["bytes_hex"].as_str().unwrap();
-        assert!(SigmaRunV2::decode(receipt).is_err());
     }
 }

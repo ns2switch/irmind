@@ -26,7 +26,6 @@ pub enum AuditEventKind {
     FindingConfirmed,
     FindingDismissed,
     FindingProposed,
-    GraphIndexed,
     GuardActivated,
     InjectionDetected,
     ModelError,
@@ -41,11 +40,7 @@ pub enum AuditEventKind {
     PolicyActivated,
     Prompt,
     Proposal,
-    SourceManifestV1,
     SourceManifestV2,
-    ParquetArtifactV1,
-    ParquetArtifactV2,
-    ParquetArtifactsMigrated,
     ParserSelectionRequired,
     TaintDeclassified,
     ToolDispatch,
@@ -58,8 +53,6 @@ pub enum AuditEventKind {
     ParquetLayoutV1,
     SkillSnapshotV2,
     SkillLoadV1,
-    /// Recognized only to reject a retired case without interpreting its body.
-    RetiredSkillSnapshot,
     SubagentSourcePageV1,
     SubagentSourceSetV1,
     SubagentTypeSnapshotV1,
@@ -75,7 +68,7 @@ pub enum AuditEventKind {
 }
 
 impl AuditEventKind {
-    pub const ALL: [Self; 68] = [
+    pub const ALL: [Self; 62] = [
         Self::Allowed,
         Self::ApprovalDenied,
         Self::ApprovalGranted,
@@ -99,7 +92,6 @@ impl AuditEventKind {
         Self::FindingConfirmed,
         Self::FindingDismissed,
         Self::FindingProposed,
-        Self::GraphIndexed,
         Self::GuardActivated,
         Self::InjectionDetected,
         Self::ModelError,
@@ -114,11 +106,7 @@ impl AuditEventKind {
         Self::PolicyActivated,
         Self::Prompt,
         Self::Proposal,
-        Self::SourceManifestV1,
         Self::SourceManifestV2,
-        Self::ParquetArtifactV1,
-        Self::ParquetArtifactV2,
-        Self::ParquetArtifactsMigrated,
         Self::ParserSelectionRequired,
         Self::TaintDeclassified,
         Self::ToolDispatch,
@@ -131,7 +119,6 @@ impl AuditEventKind {
         Self::ParquetLayoutV1,
         Self::SkillSnapshotV2,
         Self::SkillLoadV1,
-        Self::RetiredSkillSnapshot,
         Self::SubagentSourcePageV1,
         Self::SubagentSourceSetV1,
         Self::SubagentTypeSnapshotV1,
@@ -171,7 +158,6 @@ impl AuditEventKind {
             Self::FindingConfirmed => "FindingConfirmed",
             Self::FindingDismissed => "FindingDismissed",
             Self::FindingProposed => "FindingProposed",
-            Self::GraphIndexed => "GraphIndexed",
             Self::GuardActivated => "GuardActivated",
             Self::InjectionDetected => "InjectionDetected",
             Self::ModelError => "ModelError",
@@ -186,11 +172,7 @@ impl AuditEventKind {
             Self::PolicyActivated => "PolicyActivated",
             Self::Prompt => "Prompt",
             Self::Proposal => "Proposal",
-            Self::SourceManifestV1 => "SourceManifestV1",
             Self::SourceManifestV2 => "SourceManifestV2",
-            Self::ParquetArtifactV1 => "ParquetArtifactV1",
-            Self::ParquetArtifactV2 => "ParquetArtifactV2",
-            Self::ParquetArtifactsMigrated => "ParquetArtifactsMigrated",
             Self::ParserSelectionRequired => "ParserSelectionRequired",
             Self::TaintDeclassified => "TaintDeclassified",
             Self::ToolDispatch => "ToolDispatch",
@@ -202,7 +184,6 @@ impl AuditEventKind {
             Self::ParquetArtifactV3 => "ParquetArtifactV3",
             Self::ParquetLayoutV1 => "ParquetLayoutV1",
             Self::SkillSnapshotV2 => "skill-snapshot-v2",
-            Self::RetiredSkillSnapshot => "skill-snapshot-v1",
             Self::SkillLoadV1 => "skill-load-v1",
             Self::SubagentSourcePageV1 => "subagent-source-page-v1",
             Self::SubagentSourceSetV1 => "subagent-source-set-v1",
@@ -217,18 +198,6 @@ impl AuditEventKind {
             Self::ReportPublishedV1 => "report-published-v1",
             Self::IngestFileOutcomeV1 => "ingest-file-outcome-v1",
         }
-    }
-
-    /// Recognize obsolete layouts for a fail-closed, actionable format message.
-    pub const fn is_retired_case_format(self) -> bool {
-        matches!(
-            self,
-            Self::SourceManifestV1
-                | Self::ParquetArtifactV1
-                | Self::ParquetArtifactV2
-                | Self::ParquetArtifactsMigrated
-                | Self::GraphIndexed
-        )
     }
 
     pub const fn is_mapped_custody(self) -> bool {
@@ -276,7 +245,7 @@ mod tests {
 
     #[test]
     fn wire_names_are_stable_and_unknown_names_fail() {
-        const EXPECTED: [&str; 68] = [
+        const EXPECTED: [&str; 62] = [
             "Allowed",
             "ApprovalDenied",
             "ApprovalGranted",
@@ -300,7 +269,6 @@ mod tests {
             "FindingConfirmed",
             "FindingDismissed",
             "FindingProposed",
-            "GraphIndexed",
             "GuardActivated",
             "InjectionDetected",
             "ModelError",
@@ -315,11 +283,7 @@ mod tests {
             "PolicyActivated",
             "Prompt",
             "Proposal",
-            "SourceManifestV1",
             "SourceManifestV2",
-            "ParquetArtifactV1",
-            "ParquetArtifactV2",
-            "ParquetArtifactsMigrated",
             "ParserSelectionRequired",
             "TaintDeclassified",
             "ToolDispatch",
@@ -332,7 +296,6 @@ mod tests {
             "ParquetLayoutV1",
             "skill-snapshot-v2",
             "skill-load-v1",
-            "skill-snapshot-v1",
             "subagent-source-page-v1",
             "subagent-source-set-v1",
             "subagent-type-v1",
@@ -352,5 +315,19 @@ mod tests {
             assert_eq!(AuditEventKind::parse(expected), Ok(kind));
         }
         assert!(AuditEventKind::parse("UnknownEvent").is_err());
+    }
+    #[test]
+    fn retired_audit_labels_are_not_deserialized_as_case_7_events() {
+        for name in [
+            "GraphIndexed",
+            "SourceManifestV1",
+            "ParquetArtifactV1",
+            "ParquetArtifactV2",
+            "ParquetArtifactsMigrated",
+            "skill-snapshot-v1",
+            "sigma-run-v1",
+        ] {
+            assert!(AuditEventKind::parse(name).is_err(), "{name}");
+        }
     }
 }

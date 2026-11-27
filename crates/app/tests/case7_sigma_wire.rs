@@ -2,7 +2,7 @@
 
 use irmind_app::{
     SignedOperation,
-    v10_proofs::{SigmaCompiledRulesV1, SigmaPackAdmissionV1, SigmaRunResultsV3},
+    v10_proofs::{ReportCoverageV2, SigmaCompiledRulesV1, SigmaPackAdmissionV1, SigmaRunResultsV3},
 };
 
 #[test]
@@ -26,6 +26,14 @@ fn retained_sigma_objects_decode_and_reproduce_the_case_7_vectors() {
     ] {
         assert!(SigmaRunResultsV3::decode(&body(name)).is_err());
     }
+
+    let retired_coverage = hex::decode(
+        vectors["report"]["reject_coverage_v1_empty"]["hex"]
+            .as_str()
+            .unwrap(),
+    )
+    .unwrap();
+    assert!(ReportCoverageV2::decode(&retired_coverage).is_err());
 
     let compiled = body("compiled_rules");
     let rules = SigmaCompiledRulesV1::decode(&compiled).unwrap();

@@ -214,7 +214,7 @@ async fn usage_and_workgroup_cutoff_use_billed_units() {
     assert_eq!(protocol::billable_bytes(u64::MAX), None);
 }
 
-#[path = "../../../testkit/provider_tests/source_query_v10.rs"]
+#[path = "../../../testkit/provider_tests/source_query_export.rs"]
 mod case_contract;
 
 #[test]
