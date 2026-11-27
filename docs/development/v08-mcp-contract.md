@@ -1,7 +1,9 @@
 # Local MCP tool admission and protocol contract
 
-**Status.** Proposed implementation. The first version is read-only,
-case-scoped and disabled by default. See the
+**Status.** Record and wire bodies approved. The first version is read-only,
+case-scoped and disabled by default. Keep it unavailable on any target that
+has yet to prove denial of network, unrelated files, child processes and
+external IPC. See the
 [shared runtime and custody rules](v08-implementation-contracts.md).
 
 ## Transport and descriptor

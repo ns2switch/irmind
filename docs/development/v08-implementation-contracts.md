@@ -2,8 +2,13 @@
 
 [Español](../es/development/v08-implementation-contracts.md)
 
-**Status.** Proposed. Port, custody and runtime changes require explicit
-maintainer approval before implementation. This draft follows the
+**Status.** The shared J encoding, record bodies, case marker 8, export V12
+and the independent vectors are approved. The initial stdio API ships with
+case 7/V11 and leaves decisions in the existing TUI. Its proposed local
+presentation flow remains open for review. Source queries from children
+follow the API. Enable MCP only on targets where native containment proves
+all required denials. Hook implementation waits for review of the measured
+native-versus-Wasm comparison on all five distribution targets. This follows the
 [extensibility designs](https://github.com/ns2switch/irmind/pull/391) and the
 [deferred source-query contract](source-queries-deferred.md).
 
@@ -48,9 +53,10 @@ Identifiers commit `SHA-256(ASCII(domain) || 00 || J(body))`. A new operation
 or entry payload is `domain:hex(J(body))`. Its existing envelope signature
 covers the exact payload. A digest is a commitment, not a permission.
 
-For the blocks that add signed records, propose **case marker 8 and export
-V12** as one format boundary. This is an explicit choice for review and
-requires updated signed vectors before implementation. V12 starts with
+The blocks that add signed records share **case marker 8 and export V12**.
+Cases created by v0.8.0-alpha.1 use case 7 and V11. Keep the alpha binary to
+open, verify or export those cases, or re-ingest the verified originals.
+V12 starts with
 `IRMIND-EXPORT-V12` and NUL, uses version 12 in the existing header layout
 and carries the V11 sections in their established order, followed by a new
 mandatory u64 big-endian count. That last section contains the reachable
@@ -77,12 +83,11 @@ use the existing audit, branch and capture sections of the proposed V12.
 
 ## Order and acceptance
 
-The next implementation step is review of the wire and formalization of
-the proposed ports. The transport can proceed independently with synthetic
-clients. Hooks and MCP share the runtime launch boundary and each needs a
-platform-specific isolation decision. The subagent query work can be tested
-independently with the existing three simulated providers. Integrate any
-signed changes at the single accepted case/export boundary.
+Integrate the engine API, source queries from subagents, MCP and hooks in
+that order, each with its own matrix. Hooks and MCP share the runtime launch
+boundary and each needs native isolation evidence on every enabled target.
+Test the subagent query work with the existing three simulated providers.
+Integrate signed changes at the single accepted case/export boundary.
 
 Each block requires normal configuration and user documentation in English
 and Spanish, cancellation and crash tests, and negative tests with the

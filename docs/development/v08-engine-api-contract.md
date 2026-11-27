@@ -1,8 +1,9 @@
 # Local engine API and trusted approval contract
 
-**Status.** Proposed implementation. The first transport is stdio by explicit
-launch. Unix sockets and Windows named pipes can follow after their native
-identity tests. TCP is outside this contract.
+**Status.** Approved stdio transport, handshake and five case methods. The
+local approval presentation described below still requires review. Unix
+sockets and Windows named pipes can follow after their native identity tests.
+TCP is outside this contract.
 
 ## Protocol
 
@@ -32,8 +33,6 @@ Initial methods and exact params:
 | `subscribe` | `{case_id,after}` | `{cursor}`; stream committed engine projections after that sequence. |
 | `start_turn` | `{case_id,text}` | `{operation}`; existing attended case turn validation, limit 8 KiB input. |
 | `cancel` | `{case_id,operation}` | `{accepted}`; only the operation's admitted case and session. |
-| `request_approval_prompt` | `{case_id,proposal}` | `{request,code,expires_in_ms}`; request the trusted prompt for a pending authenticated audit digest. |
-| `approval_status` | `{case_id,request}` | `{state}`; pending, approved, denied or expired from the engine. |
 
 Case IDs are canonical UUIDs. Operation and request are random UUIDs emitted by
 the engine. Proposal is an authenticated case digest. After, cursor and anchor
@@ -51,19 +50,45 @@ refresh plus new subscription. A slow or disconnected client cannot hold
 case locks or retain a reservation indefinitely. Use existing cancellation
 and settlement for any in-flight operation.
 
-## Local trust path
+## Local approval surface for review
 
-Proposed application port `LocalApprovalPresenter` opens a trusted local
-IRMind surface for a pending request and exposes only its presentation
-status to the engine adapter. Default unavailable leaves decisions pending
-until expiry. The IPC interface contains no approve, sign, unlock or import
-credentials method. A local UI handles confirmation and creates the existing
-signed Analyst decision in-process. It displays the exact action, case,
-arguments, effective scope, expiry and a human-comparable code. The GUI
-displays the same waiting code; a click may request the prompt. The analyst
-enters the passphrase directly in IRMind. A future native Touch ID/Windows
-Hello path requires platform decisions and explicit dependency approval.
-Peer credentials and a matching code alone are insufficient for approval.
+The first stdio implementation accepts only `hello` and the five methods
+above. A tool requiring approval remains pending under the usual custody
+rules. The client tells the analyst to open the matching case in the IRMind
+TUI and review the request there. The client cannot request a prompt, see
+approval arguments or submit a decision over the protocol.
+
+For the follow-up, use a separate IRMind TUI in a terminal launched by the
+analyst. The graphical client opens a local instructions panel. It shows the
+case UUID and confirmation code and offers to copy `irmind tui <case_uuid>`.
+Only the canonical UUID is substituted. The terminal and installed IRMind
+executable are selected by the analyst. The client never runs a shell command,
+types into a terminal or forwards the copied code as confirmation.
+
+| Platform | Trusted surface and opening sequence |
+| --- | --- |
+| Linux | The analyst opens their usual desktop terminal or an existing local TTY, runs `irmind tui <case_uuid>` and opens `/approvals`. No dependency on a desktop portal or terminal emulator API. |
+| macOS | The analyst opens Terminal.app from Applications or Spotlight, runs `irmind tui <case_uuid>` and opens `/approvals`. No AppleScript, terminal injection, or native plug-in. |
+| Windows | The analyst opens Windows Terminal from Start, runs `irmind tui <case_uuid>` in PowerShell and opens `/approvals`. No Windows Hello, console injection or client-controlled credential dialog. |
+
+The TUI verifies the case and acquires the existing case and operation
+locks. A client-started turn commits the pending request and yields before
+an approval is reviewed. The approval is signed by the local IRMind process
+using the existing Analyst key and audit records. If the client is slow,
+closed or no longer owns the presentation lease, the TUI still uses its
+normal approval workflow and the pending signed record. The GUI receives
+only a guarded state change. Deliberate denial or disconnect cannot be
+turned into approval by the client.
+
+In a separately approved revision, `request_approval_prompt` can register
+one pending presentation and `approval_status` can read its guarded state.
+The proposed `LocalApprovalPresenter` exposes presentation status only.
+Default unavailable leaves decisions pending until expiry. The IPC interface
+contains no approve, sign, unlock or import-credentials method. The IRMind
+TUI shows the exact action, case, arguments, effective scope, expiry and
+matching code before local confirmation. Passphrase entry happens inside
+IRMind. A native Touch ID or Windows Hello path needs a separate decision.
+Peer credentials and a matching code alone grant no authority.
 
 Each request is single-use, tied to one authenticated pending proposal,
 case, local session and fresh 32-byte random engine nonce. The displayed

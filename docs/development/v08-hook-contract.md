@@ -1,6 +1,7 @@
 # Local hook admission and execution contract
 
-**Status.** Proposed implementation. See the
+**Status.** Format approved. Implementation awaits review of the measured
+native-interpreter and Wasm comparison. See the
 [shared runtime and custody rules](v08-implementation-contracts.md).
 
 ## Admission and ports
@@ -76,7 +77,7 @@ helper. For Wasm, expose only bounded guest input/output, with no WASI and
 no filesystem, clock, network or process imports. Set memory, table, fuel
 and wall-clock limits. Keep outer process containment on both paths. No Wasm
 dependency is included in this contract. Measure stripped helper size, lockfile
-closure, latency and RSS on five targets before selecting a runtime. If
+closure, latency, RSS and native containment on five targets before selecting a runtime. If
 native isolation, including interpreter startup files and libraries, cannot
 be demonstrated on a platform, hooks stay unavailable there.
 [Wasmtime security model](https://docs.wasmtime.dev/security.html).
