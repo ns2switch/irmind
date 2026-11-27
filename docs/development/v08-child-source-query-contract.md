@@ -6,6 +6,9 @@ remote-original verification remains a separate contract. Use the existing
 three read-only adapters and their admission and billing proofs. Tests use
 simulated providers.
 
+The [admission order amendment](v08-child-query-admission-order.md) is open for
+review. It addresses the attribution gap before query-specific approval.
+
 ## Plan and admission
 
 Write `SubagentPlanV2` for every new case-8 plan. Keep every
