@@ -268,3 +268,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
+
+## Windows Hello native approval adapter
+
+The Windows-only adapter uses the
+[Microsoft Rust for Windows projection](https://github.com/microsoft/windows-rs)
+at `windows` 0.62.2. The projection and its `windows-*` support crates retain
+their MIT OR Apache-2.0 licenses. See the upstream
+[MIT license](https://github.com/microsoft/windows-rs/blob/master/license-mit)
+and [Apache-2.0 license](https://github.com/microsoft/windows-rs/blob/master/license-apache-2.0).
+Windows Hello and WinRT are operating-system services supplied by Windows.

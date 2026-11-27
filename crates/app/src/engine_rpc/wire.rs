@@ -145,7 +145,12 @@ pub(super) struct Submission {
     pub(super) case_id: String,
     pub(super) presentation: String,
     pub(super) view_sha256: String,
-    pub(super) passphrase: SecretString,
+    pub(super) credential: Credential,
+}
+
+pub(super) enum Credential {
+    Passphrase(SecretString),
+    WindowsHello,
 }
 
 fn approval_submission(bytes: &[u8], allowed: bool) -> io::Result<Option<Request>> {
@@ -177,12 +182,13 @@ fn approval_submission(bytes: &[u8], allowed: bool) -> io::Result<Option<Request
     }
     let (case_id, rest) = params
         .strip_prefix("{\"case_id\":\"")
-        .and_then(|params| {
-            params.split_once("\",\"method\":\"keystore_passphrase\",\"passphrase_hex\":\"")
-        })
+        .and_then(|params| params.split_once("\",\"method\":\""))
+        .ok_or_else(invalid)?;
+    let (method, rest) = rest
+        .split_once("\",\"passphrase_hex\":")
         .ok_or_else(invalid)?;
     let (secret, rest) = rest
-        .split_once("\",\"presentation\":\"")
+        .split_once(",\"presentation\":\"")
         .ok_or_else(invalid)?;
     let (presentation, digest) = rest
         .split_once("\",\"view_sha256\":\"")
@@ -192,7 +198,33 @@ fn approval_submission(bytes: &[u8], allowed: bool) -> io::Result<Option<Request
         || !canonical_uuid(presentation)
         || digest.len() != 64
         || !lowercase_hex(digest)
-        || secret.is_empty()
+    {
+        return Err(invalid());
+    }
+    let credential = match (method, secret) {
+        ("windows_hello", "null") => Credential::WindowsHello,
+        ("keystore_passphrase", encoded) => Credential::Passphrase(decode_secret(encoded)?),
+        _ => return Err(invalid()),
+    };
+    Ok(Some(Request {
+        id: request_id,
+        method: Method::ApprovalSubmit,
+        params: Value::Null,
+        submission: Some(Submission {
+            case_id: case_id.to_owned(),
+            presentation: presentation.to_owned(),
+            view_sha256: digest.to_owned(),
+            credential,
+        }),
+    }))
+}
+
+fn decode_secret(encoded: &str) -> io::Result<SecretString> {
+    let secret = encoded
+        .strip_prefix('"')
+        .and_then(|v| v.strip_suffix('"'))
+        .ok_or_else(invalid)?;
+    if secret.is_empty()
         || secret.len() > 2 * MAX_PASSPHRASE_BYTES
         || !secret.len().is_multiple_of(2)
         || !lowercase_hex(secret)
@@ -202,17 +234,7 @@ fn approval_submission(bytes: &[u8], allowed: bool) -> io::Result<Option<Request
     let mut decoded = Zeroizing::new(vec![0; secret.len() / 2]);
     hex::decode_to_slice(secret, decoded.as_mut_slice()).map_err(|_| invalid())?;
     let passphrase = std::str::from_utf8(&decoded).map_err(|_| invalid())?;
-    Ok(Some(Request {
-        id: request_id,
-        method: Method::ApprovalSubmit,
-        params: Value::Null,
-        submission: Some(Submission {
-            case_id: case_id.to_owned(),
-            presentation: presentation.to_owned(),
-            view_sha256: digest.to_owned(),
-            passphrase: SecretString::new(Box::<str>::from(passphrase)),
-        }),
-    }))
+    Ok(SecretString::new(Box::<str>::from(passphrase)))
 }
 
 pub(super) fn lowercase_hex(text: &str) -> bool {
@@ -275,7 +297,7 @@ fn invalid() -> io::Error {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
+#[allow(clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
     use serde_json::json;
@@ -315,10 +337,10 @@ mod tests {
             .expect("frame")
             .expect("submitted");
         assert!(req.params.is_null());
-        assert_eq!(
-            req.submission.expect("phrase").passphrase.expose_secret(),
-            "synthetic café"
-        );
+        let Credential::Passphrase(phrase) = req.submission.expect("phrase").credential else {
+            panic!("wrong synthetic credential");
+        };
+        assert_eq!(phrase.expose_secret(), "synthetic café");
         for invalid_secret in [
             "AA".to_owned(),
             "ff".to_owned(),
@@ -331,9 +353,13 @@ mod tests {
         }
         body["params"]["passphrase_hex"] = json!(null);
         body["params"]["method"] = json!("windows_hello");
-        assert!(
-            approval_submission(&canonical(&mut body).expect("canonical frame"), true).is_err()
-        );
+        let req = approval_submission(&canonical(&mut body).expect("canonical frame"), true)
+            .expect("native submission")
+            .expect("submission");
+        assert!(matches!(
+            req.submission.expect("credential").credential,
+            Credential::WindowsHello
+        ));
     }
 
     #[test]

@@ -1,5 +1,5 @@
 use super::*;
-use irmind_app::engine_rpc::PassphraseVerifier;
+use irmind_app::engine_rpc::{ApprovalAuthenticators, PassphraseVerifier};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 const MAGIC_V2: &[u8] = b"IRMIND-RPC-V2\0";
@@ -80,7 +80,11 @@ fn submit(client: &mut Client, case: &CaseId, view: &Value, phrase: &str) -> Val
 }
 
 fn wait_state(client: &mut Client, case: &CaseId, view: &Value) -> Value {
-    let end = std::time::Instant::now() + WAIT;
+    wait_state_for(client, case, view, WAIT)
+}
+
+fn wait_state_for(client: &mut Client, case: &CaseId, view: &Value, timeout: Duration) -> Value {
+    let end = std::time::Instant::now() + timeout;
     loop {
         let reply = client.call(
             "approval_status",
@@ -91,6 +95,7 @@ fn wait_state(client: &mut Client, case: &CaseId, view: &Value) -> Value {
         if state != "authenticating" || std::time::Instant::now() >= end {
             return state.clone();
         }
+        thread::sleep(Duration::from_millis(20));
     }
 }
 
@@ -117,7 +122,10 @@ fn engine_rpc_v2_requires_reauthentication_then_commits_once() {
                 id.clone(),
                 Some(&model),
                 &CancellationToken::new(),
-                Some(verify),
+                ApprovalAuthenticators {
+                    passphrase: Some(verify),
+                    windows_hello: None,
+                },
                 input,
                 output,
             )
@@ -195,7 +203,10 @@ fn engine_rpc_v2_discards_a_late_authentication_after_cancellation() {
                 id.clone(),
                 Some(&model),
                 &CancellationToken::new(),
-                Some(verify),
+                ApprovalAuthenticators {
+                    passphrase: Some(verify),
+                    windows_hello: None,
+                },
                 input,
                 output,
             )
@@ -256,7 +267,10 @@ fn engine_rpc_v2_rechecks_the_deadline_and_competing_decisions_under_lock() {
                     id.clone(),
                     Some(&model),
                     &CancellationToken::new(),
-                    Some(verify),
+                    ApprovalAuthenticators {
+                        passphrase: Some(verify),
+                        windows_hello: None,
+                    },
                     input,
                     output,
                 )
@@ -302,5 +316,106 @@ fn engine_rpc_v2_rechecks_the_deadline_and_competing_decisions_under_lock() {
             usize::from(competing_tui)
         );
         assert_eq!(port.calls.load(Ordering::SeqCst), 0);
+    }
+}
+
+fn run_windows_hello_case(
+    verify: &irmind_app::engine_rpc::WindowsHelloVerifier<'_>,
+    approve: bool,
+) {
+    let (decision, state, kind) = if approve {
+        ("approve", "approved", AuditEventKind::ApprovalGranted)
+    } else {
+        ("deny", "denied", AuditEventKind::ApprovalDenied)
+    };
+    let (_root, store, engine, id) = engine_fixture();
+    let port = ApprovalIntel::new(&store, &id);
+    let model = ObedientModel {
+        seen: Mutex::new(Vec::new()),
+    };
+    let engine = engine
+        .with_threat_intel(&port)
+        .with_case_lifecycle(store.clone());
+    let (mut client, input, output) = connection();
+    thread::scope(|scope| {
+        let server = scope.spawn(|| {
+            irmind_app::engine_rpc::serve_v2(
+                &engine,
+                id.clone(),
+                Some(&model),
+                &CancellationToken::new(),
+                ApprovalAuthenticators {
+                    passphrase: None,
+                    windows_hello: Some(verify),
+                },
+                input,
+                output,
+            )
+        });
+        open_pending(&mut client, &id);
+        let view = prepare(&mut client, &id, decision);
+        assert_eq!(view["methods"], json!(["windows_hello"]));
+        let result = client.call(
+            "approval_submit",
+            json!({"case_id":id.as_str(), "presentation":view["presentation"],
+                "view_sha256":view["view_sha256"], "method":"windows_hello", "passphrase_hex":null}),
+        );
+        assert_eq!(result["result"]["state"], "authenticating");
+        assert_eq!(
+            wait_state_for(&mut client, &id, &view, Duration::from_mins(1) + WAIT),
+            state,
+        );
+        let end = std::time::Instant::now() + WAIT;
+        loop {
+            let reply = client.call("case_status", json!({"case_id":id.as_str()}));
+            if reply["error"]["code"] != 4 || std::time::Instant::now() >= end {
+                assert!(reply["error"].is_null(), "{reply}");
+                break;
+            }
+        }
+        drop(client);
+        server.join().expect("RPC thread").expect("RPC result");
+    });
+    engine.verify(&id).expect("authenticated case");
+    assert_eq!(port.calls.load(Ordering::SeqCst), usize::from(approve));
+    assert_eq!(
+        store
+            .entries(&id)
+            .expect("entries")
+            .iter()
+            .filter(|entry| entry.kind == kind)
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn engine_rpc_windows_hello_adapter_uses_the_authenticated_review() {
+    run_windows_hello_case(
+        &|exact, prompt, deadline, cancel| {
+            assert!(exact.contains("ti_lookup_external"));
+            assert!(exact.contains("attacker.example"));
+            assert!(exact.contains("effective_scope:"));
+            assert!(exact.contains("expires_at (UTC)"));
+            let code = exact.rsplit_once("Verification code: ").expect("code").1;
+            assert_eq!(code.len(), 19);
+            assert!(prompt.contains(code));
+            assert!(std::time::Instant::now() < deadline);
+            assert!(!cancel.is_cancelled());
+            true
+        },
+        false,
+    );
+}
+
+#[cfg(windows)]
+#[test]
+#[ignore = "requires Windows 11 build 22000+ with Hello configured and an interactive desktop"]
+fn engine_rpc_native_windows_hello_signed_decision() {
+    let verify = |exact: &str, message: &str, deadline, cancel: &CancellationToken| {
+        irmind_native_approval::verify(exact, message, deadline, || cancel.is_cancelled())
+    };
+    for approve in [true, false] {
+        run_windows_hello_case(&verify, approve);
     }
 }

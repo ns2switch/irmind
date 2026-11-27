@@ -53,3 +53,6 @@ futures-util = "0.3"
 
 [lints]
 workspace = true
+
+[target.'cfg(windows)'.dev-dependencies]
+irmind-native-approval = { path = "../native-approval", version = "0.1.0" }
