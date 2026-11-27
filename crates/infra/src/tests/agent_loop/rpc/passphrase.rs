@@ -319,7 +319,15 @@ fn engine_rpc_v2_rechecks_the_deadline_and_competing_decisions_under_lock() {
     }
 }
 
-fn run_windows_hello_case(verify: &irmind_app::engine_rpc::WindowsHelloVerifier<'_>) {
+fn run_windows_hello_case(
+    verify: &irmind_app::engine_rpc::WindowsHelloVerifier<'_>,
+    approve: bool,
+) {
+    let (decision, state, kind) = if approve {
+        ("approve", "approved", AuditEventKind::ApprovalGranted)
+    } else {
+        ("deny", "denied", AuditEventKind::ApprovalDenied)
+    };
     let (_root, store, engine, id) = engine_fixture();
     let port = ApprovalIntel::new(&store, &id);
     let model = ObedientModel {
@@ -345,7 +353,7 @@ fn run_windows_hello_case(verify: &irmind_app::engine_rpc::WindowsHelloVerifier<
             )
         });
         open_pending(&mut client, &id);
-        let view = prepare(&mut client, &id, "deny");
+        let view = prepare(&mut client, &id, decision);
         assert_eq!(view["methods"], json!(["windows_hello"]));
         let result = client.call(
             "approval_submit",
@@ -355,19 +363,27 @@ fn run_windows_hello_case(verify: &irmind_app::engine_rpc::WindowsHelloVerifier<
         assert_eq!(result["result"]["state"], "authenticating");
         assert_eq!(
             wait_state_for(&mut client, &id, &view, Duration::from_mins(1) + WAIT),
-            "denied",
+            state,
         );
+        let end = std::time::Instant::now() + WAIT;
+        loop {
+            let reply = client.call("case_status", json!({"case_id":id.as_str()}));
+            if reply["error"]["code"] != 4 || std::time::Instant::now() >= end {
+                assert!(reply["error"].is_null(), "{reply}");
+                break;
+            }
+        }
         drop(client);
         server.join().expect("RPC thread").expect("RPC result");
     });
     engine.verify(&id).expect("authenticated case");
-    assert_eq!(port.calls.load(Ordering::SeqCst), 0);
+    assert_eq!(port.calls.load(Ordering::SeqCst), usize::from(approve));
     assert_eq!(
         store
             .entries(&id)
             .expect("entries")
             .iter()
-            .filter(|entry| entry.kind == AuditEventKind::ApprovalDenied)
+            .filter(|entry| entry.kind == kind)
             .count(),
         1
     );
@@ -375,25 +391,31 @@ fn run_windows_hello_case(verify: &irmind_app::engine_rpc::WindowsHelloVerifier<
 
 #[test]
 fn engine_rpc_windows_hello_adapter_uses_the_authenticated_review() {
-    run_windows_hello_case(&|exact, prompt, deadline, cancel| {
-        assert!(exact.contains("ti_lookup_external"));
-        assert!(exact.contains("attacker.example"));
-        assert!(exact.contains("effective_scope:"));
-        assert!(exact.contains("expires_at (UTC)"));
-        let code = exact.rsplit_once("Verification code: ").expect("code").1;
-        assert_eq!(code.len(), 19);
-        assert!(prompt.contains(code));
-        assert!(std::time::Instant::now() < deadline);
-        assert!(!cancel.is_cancelled());
-        true
-    });
+    run_windows_hello_case(
+        &|exact, prompt, deadline, cancel| {
+            assert!(exact.contains("ti_lookup_external"));
+            assert!(exact.contains("attacker.example"));
+            assert!(exact.contains("effective_scope:"));
+            assert!(exact.contains("expires_at (UTC)"));
+            let code = exact.rsplit_once("Verification code: ").expect("code").1;
+            assert_eq!(code.len(), 19);
+            assert!(prompt.contains(code));
+            assert!(std::time::Instant::now() < deadline);
+            assert!(!cancel.is_cancelled());
+            true
+        },
+        false,
+    );
 }
 
 #[cfg(windows)]
 #[test]
 #[ignore = "requires Windows 11 build 22000+ with Hello configured and an interactive desktop"]
 fn engine_rpc_native_windows_hello_signed_decision() {
-    run_windows_hello_case(&|exact, message, deadline, cancel| {
+    let verify = |exact: &str, message: &str, deadline, cancel: &CancellationToken| {
         irmind_native_approval::verify(exact, message, deadline, || cancel.is_cancelled())
-    });
+    };
+    for approve in [true, false] {
+        run_windows_hello_case(&verify, approve);
+    }
 }
