@@ -63,11 +63,18 @@ $temporary = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), 'irmind-
 [System.IO.Directory]::CreateDirectory($temporary) | Out-Null
 try {
     if ($Version -eq 'latest') {
-        $releasesFile = Join-Path $temporary 'releases.json'
-        Download-Https "https://api.github.com/repos/$repo/releases?per_page=10" $releasesFile 1048576
-        $releases = ConvertFrom-Json ([System.IO.File]::ReadAllText($releasesFile))
-        $Version = @($releases | Where-Object { -not $_.draft } | Select-Object -First 1)[0].tag_name
-        if ($Version -cnotmatch '^v[0-9][A-Za-z0-9._-]*$') { Fail 'GitHub returned no valid release tag' }
+        $stableError = 'cannot select a stable release from GitHub; check connectivity or pass an exact verified release tag'
+        $latestFile = Join-Path $temporary 'latest.json'
+        try {
+            Download-Https "https://api.github.com/repos/$repo/releases/latest" $latestFile 1048576
+            $latest = ConvertFrom-Json ([System.IO.File]::ReadAllText($latestFile))
+        } catch {
+            Fail $stableError
+        }
+        $Version = $latest.tag_name
+        if ($Version -isnot [string] -or $Version -cnotmatch '\Av(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\z' -or
+            $latest.draft -isnot [bool] -or $latest.draft -or
+            $latest.prerelease -isnot [bool] -or $latest.prerelease) { Fail $stableError }
     }
     $asset = 'irmind-windows-x86_64.exe'
     $base = "https://github.com/$repo/releases/download/$Version"

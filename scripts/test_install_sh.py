@@ -37,7 +37,9 @@ class InstallerTests(unittest.TestCase):
                 f"{hashlib.sha256(binary).hexdigest()}  irmind-linux-x86_64\n",
                 encoding="ascii",
             )
-            (fixture / "releases.json").write_text('[{"tag_name":"v0.1.1"}]', encoding="ascii")
+            (fixture / "latest.json").write_text(
+                '{"tag_name":"v0.1.1","draft":false,"prerelease":false}', encoding="ascii",
+            )
             (fixture / "bundle").write_text("{}", encoding="ascii")
             mock_curl = tools / "curl"
             mock_curl.write_text(
@@ -46,7 +48,7 @@ class InstallerTests(unittest.TestCase):
                 "  case $1 in --output) destination=$2; shift 2;; *) url=$1; shift;; esac\n"
                 "done\n"
                 "case $url in\n"
-                "  *releases\\?*) source=releases.json;;\n"
+                "  https://api.github.com/repos/ns2switch/irmind/releases/latest) source=latest.json;;\n"
                 "  */SHA256SUMS) source=SHA256SUMS;;\n"
                 "  *.sigstore.json) source=bundle;;\n"
                 "  */irmind-linux-x86_64) source=${BINARY_FIXTURE:-binary};;\n"

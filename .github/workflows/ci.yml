@@ -607,6 +607,8 @@ jobs:
     if: ${{ !cancelled() && (needs.native_macos.result == 'success' || needs.native_macos.result == 'skipped') && needs.linux.result == 'success' && needs.json_formats.result == 'success' && needs.release_binaries.result == 'success' && needs.release_binaries.outputs.portable_sigma_verified == 'true' && needs.windows.result == 'success' && needs.macos.result == 'success' && needs.linux_verify_windows.result == 'success' && needs.macos_verify_windows.result == 'success' && needs.evtx_linux_compatibility.result == 'success' && (startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_dry_run == true)) }}
     runs-on: ubuntu-26.04
     timeout-minutes: 30
+    outputs:
+      homebrew_eligible: ${{ steps.homebrew.outputs.eligible }}
     permissions:
       actions: read
       contents: write
@@ -777,6 +779,18 @@ jobs:
       - name: Clean release staging
         if: always()
         run: python3 -c "from pathlib import Path; from shutil import rmtree; [rmtree(p) for p in map(Path, ('release', 'artifacts')) if p.is_dir()]"
+      - name: Select published stable releases for Homebrew
+        id: homebrew
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if release=$(gh release view "$GITHUB_REF_NAME" --json tagName,isDraft,isPrerelease) &&
+             eligible=$(printf '%s\n' "$release" | python3 -B .github/scripts/select_homebrew_release.py "$GITHUB_REF_NAME"); then
+            printf '%s\n' "$eligible" >> "$GITHUB_OUTPUT"
+          else
+            echo '::warning::Homebrew eligibility could not be verified. The deployment will be skipped.'
+          fi
 
   post_release:
     needs: release
@@ -790,15 +804,25 @@ jobs:
 
   # Keep the protected deployment and its environment secret in the caller.
   update_homebrew:
-    needs: post_release
-    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push' && needs.post_release.result == 'success' }}
+    needs: [release, post_release]
+    if: ${{ !cancelled() && startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push' && needs.release.outputs.homebrew_eligible == 'true' && needs.post_release.result == 'success' }}
     runs-on: ubuntu-26.04
     timeout-minutes: 5
     environment: release
     permissions:
       contents: read
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with: {persist-credentials: false}
+      - name: Recheck release eligibility after deployment approval
+        id: homebrew
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" --json tagName,isDraft,isPrerelease |
+            python3 -B .github/scripts/select_homebrew_release.py "$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
       - name: Ask the tap to verify and test this published release before updating
+        if: steps.homebrew.outputs.eligible == 'true'
         env:
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: gh workflow run update.yml --repo ns2switch/homebrew-irmind --ref main -f tag="$GITHUB_REF_NAME"

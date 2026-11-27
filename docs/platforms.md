@@ -25,7 +25,7 @@ To rebuild a release and compare the SHA-256 of both executables, see [Reproduci
 
 ## Verify a release before installing
 
-Download the binary for your system and `SHA256SUMS` from the [GitHub release](https://github.com/ns2switch/irmind/releases). Check the exact binary name in the checksum file before executing it. The first pre-release, v0.1.0, has only checksums. Releases from v0.1.1 include Sigstore bundles and GitHub provenance. A checksum alone checks bytes against that file, not the publisher's identity.
+Download the binary for your system and `SHA256SUMS` from the [latest stable GitHub release](https://github.com/ns2switch/irmind/releases/latest). For a specific prerelease, choose its exact tag from the [release archive](https://github.com/ns2switch/irmind/releases). Check the exact binary name in the checksum file before executing it. The first pre-release, v0.1.0, has only checksums. Releases from v0.1.1 include Sigstore bundles and GitHub provenance. A checksum alone checks bytes against that file, not the publisher's identity.
 
 | System | Check |
 | --- | --- |
@@ -62,15 +62,15 @@ The source tree contains [install.sh](../install.sh) and [install.ps1](../instal
 
 ```sh
 # Linux or macOS, after checking install.sh against the release SHA256SUMS:
-sh ./install.sh v0.3.0
+sh ./install.sh
 ```
 
 ```powershell
 # Windows, after checking install.ps1 against the release SHA256SUMS:
-& .\install.ps1 -Version v0.3.0
+& .\install.ps1
 ```
 
-Omit the version to select the newest published release, including a pre-release. An optional second POSIX argument or `-InstallDir` PowerShell argument chooses another user-owned directory. By default the binary goes to `~/.local/bin` on Linux and macOS or `%LOCALAPPDATA%\IRMind\bin` on Windows. If it is outside `PATH`, the script prints the path to add manually.
+Omit the version to select the latest published stable release. If none is available, the installer stops. To opt in to a prerelease, pass its exact tag as the first POSIX argument or with PowerShell’s `-Version`. The same verification applies. An optional second POSIX argument or `-InstallDir` PowerShell argument chooses another user-owned directory. By default the binary goes to `~/.local/bin` on Linux and macOS or `%LOCALAPPDATA%\IRMind\bin` on Windows. If it is outside `PATH`, the script prints the path to add manually.
 
 CI also produces test artifacts on relevant nightly runs; these are not GitHub Releases. Pull requests and merges to `main` do not publish binaries. Apple notarization and Windows Authenticode are not available yet, so those systems may still warn after verification.
 
@@ -87,7 +87,7 @@ brew upgrade ns2switch/irmind/irmind
 brew uninstall ns2switch/irmind/irmind
 ```
 
-No source build is needed. The updater authenticates the release's `SHA256SUMS` with its exact Sigstore tag/workflow identity before fixing each asset hash in the formula. Homebrew verifies those hashes during installation. Inspect the formula before granting trust; recent Homebrew may request explicit formula trust as described in the [tap instructions](https://github.com/ns2switch/homebrew-irmind#trust-and-native-checks).
+Automatic Homebrew updates require a published stable release. The updater authenticates the release's `SHA256SUMS` with its exact Sigstore tag/workflow identity before fixing each asset hash in the formula. Homebrew verifies those hashes during installation. Inspect the formula before granting trust; recent Homebrew may request explicit formula trust as described in the [tap instructions](https://github.com/ns2switch/homebrew-irmind#trust-and-native-checks).
 
 The tap checks `brew audit` in strict mode, `brew test`, real demo startup at 80×24, installed bytes and uninstall on clean macOS arm64, macOS Intel and Linux runners. Its macOS test checks quarantine **without removing it** and records command execution. This is not Apple signing or notarization and does not certify every local Gatekeeper policy. Keep the exact creating executable and helper outside Homebrew before upgrading a case; old kegs may be removed by Homebrew cleanup.
 

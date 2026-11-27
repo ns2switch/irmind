@@ -14,7 +14,7 @@ case $HOME in /*) ;; *) fail 'HOME must be an absolute path' ;; esac
 case $version in
   latest) ;;
   v[0-9]* ) case $version in *[!A-Za-z0-9._-]*) fail 'invalid version' ;; esac ;;
-  *) fail 'pass a release tag such as v0.1.1 or omit it for the latest release' ;;
+  *) fail 'pass an exact release tag or omit it for the latest stable release' ;;
 esac
 case $install_dir in "$HOME"/*) ;; *) fail 'install inside the current user directory' ;; esac
 
@@ -38,13 +38,24 @@ trap 'exit 1' 1 2 3 15
 download() {
   curl --fail --silent --show-error --location --max-redirs 5 --max-time 90 \
     --proto '=https' --proto-redir '=https' --output "$2" "$1" \
-    || fail "cannot download $(basename "$2") over HTTPS"
+    || fail "${3:-cannot download $(basename "$2") over HTTPS}"
 }
 
 if [ "$version" = latest ]; then
-  download "https://api.github.com/repos/$repo/releases?per_page=10" "$temporary/releases.json"
-  version=$(awk -F '"' '/"tag_name"[[:space:]]*:/ { print $4; exit }' "$temporary/releases.json")
-  case $version in v[0-9]* ) case $version in *[!A-Za-z0-9._-]*) fail 'invalid release tag from GitHub' ;; esac ;; *) fail 'GitHub returned no release tag' ;; esac
+  stable_error='cannot select a stable release from GitHub; check connectivity or pass an exact verified release tag'
+  download "https://api.github.com/repos/$repo/releases/latest" "$temporary/latest.json" "$stable_error"
+  version=$(awk '
+    match($0, /"tag_name"[[:space:]]*:[[:space:]]*"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"/) {
+      tag = substr($0, RSTART, RLENGTH)
+      sub(/^.*:[[:space:]]*"/, "", tag)
+      sub(/"$/, "", tag)
+      count++
+    }
+    /"draft"[[:space:]]*:[[:space:]]*false([[:space:],}]|$)/ { published = 1 }
+    /"prerelease"[[:space:]]*:[[:space:]]*false([[:space:],}]|$)/ { stable = 1 }
+    END { if (count == 1 && published && stable) print tag }
+  ' "$temporary/latest.json")
+  [ -n "$version" ] || fail "$stable_error"
 fi
 
 base="https://github.com/$repo/releases/download/$version"
