@@ -83,6 +83,7 @@ impl AutomationContext<'_, '_> {
                 ApprovalAuthenticators {
                     passphrase: verifier,
                     windows_hello: None,
+                    touch_id: None,
                 },
                 unbuffered_rpc_input()?,
                 std::io::stdout(),

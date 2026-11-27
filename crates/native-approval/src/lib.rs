@@ -8,3 +8,8 @@
 mod windows_hello;
 #[cfg(windows)]
 pub use windows_hello::verify;
+
+#[cfg(target_os = "macos")]
+mod touch_id;
+#[cfg(target_os = "macos")]
+pub use touch_id::verify_touch_id;

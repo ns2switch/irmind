@@ -57,7 +57,17 @@ pub type PassphraseVerifier<'a> = dyn Fn(&secrecy::SecretString, &[u8]) -> bool 
 pub struct ApprovalAuthenticators<'a> {
     pub passphrase: Option<&'a PassphraseVerifier<'a>>,
     pub windows_hello: Option<&'a WindowsHelloVerifier<'a>>,
+    pub touch_id: Option<TouchIdAuthenticator<'a>>,
 }
+
+#[derive(Clone, Copy)]
+pub struct TouchIdAuthenticator<'a> {
+    /// Capacity proven for the current native display configuration.
+    pub title_limit_utf16: u16,
+    pub verify: &'a TouchIdVerifier<'a>,
+}
+
+pub type TouchIdVerifier<'a> = dyn Fn(&str, Instant, &CancellationToken) -> bool + Sync + 'a;
 
 pub type WindowsHelloVerifier<'a> =
     dyn Fn(&str, &str, Instant, &CancellationToken) -> bool + Sync + 'a;

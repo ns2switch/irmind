@@ -17,6 +17,11 @@ class Boundary(unittest.TestCase):
         self.assertTrue(inspect(path,'#![cfg(unix)]\nunsafe { call() }'))
         self.assertFalse(inspect(path,'#![cfg(windows)]\n// SAFETY: reviewed\nunsafe { call() }'))
 
+    def test_touch_id_requires_the_exact_approved_file_and_macos_cfg(self):
+        path=Path('crates/native-approval/src/touch_id.rs')
+        self.assertTrue(inspect(path,'#![cfg(windows)]\nunsafe { call() }'))
+        self.assertFalse(inspect(path,'#![cfg(target_os = "macos")]\n// SAFETY: reviewed\nunsafe { call() }'))
+
     def test_comments_strings_and_lifetimes_do_not_hide_real_code(self):
         source='''/* outer unsafe /* nested unsafe */ */
         let x = r###"unsafe { no() }"###;

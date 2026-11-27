@@ -151,6 +151,7 @@ pub(super) struct Submission {
 pub(super) enum Credential {
     Passphrase(SecretString),
     WindowsHello,
+    TouchId,
 }
 
 fn approval_submission(bytes: &[u8], allowed: bool) -> io::Result<Option<Request>> {
@@ -203,6 +204,7 @@ fn approval_submission(bytes: &[u8], allowed: bool) -> io::Result<Option<Request
     }
     let credential = match (method, secret) {
         ("windows_hello", "null") => Credential::WindowsHello,
+        ("touch_id", "null") => Credential::TouchId,
         ("keystore_passphrase", encoded) => Credential::Passphrase(decode_secret(encoded)?),
         _ => return Err(invalid()),
     };

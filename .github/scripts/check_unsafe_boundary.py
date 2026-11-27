@@ -48,9 +48,14 @@ def inspect(path, text):
     offsets=unsafe_offsets(text)
     if not offsets:return []
     relative=path.as_posix()
-    allowed=relative.startswith('crates/process-containment/src/windows/') or relative=='crates/process-containment/src/windows.rs' or relative=='crates/native-approval/src/windows_hello.rs'
-    cfg=bool(re.search(r'^\s*#!\s*\[\s*cfg\s*\(\s*windows\s*\)\s*\]',text,re.M))
-    if allowed and cfg:return []
+    windows=relative.startswith('crates/process-containment/src/windows/') or relative in {
+        'crates/process-containment/src/windows.rs', 'crates/native-approval/src/windows_hello.rs',
+    }
+    mac=relative=='crates/native-approval/src/touch_id.rs'
+    windows_cfg=r'^\s*#!\s*\[\s*cfg\s*\(\s*windows\s*\)\s*\]'
+    mac_cfg=r'^\s*#!\s*\[\s*cfg\s*\(\s*target_os\s*=\s*"macos"\s*\)\s*\]'
+    if (windows and re.search(windows_cfg,text,re.M)) or (mac and re.search(mac_cfg,text,re.M)):
+        return []
     return [f'{relative}:{text.count(chr(10),0,offset)+1}: unsafe outside the approved native platform boundary' for offset in offsets]
 
 
