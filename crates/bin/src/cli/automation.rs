@@ -13,6 +13,17 @@ impl AutomationContext<'_, '_> {
             Command::SourceQuery { command } => self.handle_source_query(command),
             cmd @ Command::Ingest { .. } => self.handle_ingest(cmd),
             cmd @ Command::Ask { .. } => self.handle_ask(cmd),
+            Command::Serve { case_id } => {
+                irmind_app::engine_rpc::serve(
+                    self.engine,
+                    irmind_app::engine_rpc::canonical_case_id(&case_id)?,
+                    self.selected_model,
+                    self.cancel,
+                    std::io::stdin(),
+                    std::io::stdout(),
+                )?;
+                Ok(false)
+            }
             cmd @ (Command::Approvals { .. }
             | Command::Approve { .. }
             | Command::Deny { .. }

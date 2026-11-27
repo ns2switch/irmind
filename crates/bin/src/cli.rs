@@ -83,6 +83,10 @@ pub(super) enum Command {
         case_id: String,
         alert: String,
     },
+    /// Serve an admitted case over local stdio with terminal confirmation.
+    Serve {
+        case_id: String,
+    },
     Approvals {
         case_id: String,
     },

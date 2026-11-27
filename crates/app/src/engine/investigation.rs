@@ -24,6 +24,7 @@ struct PreparedInvestigation {
 }
 
 struct TurnContext {
+    allow_delegation: bool,
     cloud_limit_reached: bool,
     delegated_rounds: usize,
     case_lock: std::sync::Mutex<Option<Box<dyn crate::CaseLock>>>,
@@ -114,7 +115,28 @@ impl Engine<'_> {
         cancel: &CancellationToken,
         on_text: &(dyn Fn(ModelProgress) + Send + Sync),
     ) -> Result<String, AppError> {
-        run_async(self.investigate_cancelable_with_progress(id, alert, model, cancel, on_text))
+        run_async(
+            self.investigate_cancelable_with_progress(id, alert, model, cancel, on_text, true),
+        )
+    }
+
+    pub(crate) fn investigate_from_stdio(
+        &self,
+        id: &CaseId,
+        alert: &str,
+        model: &dyn LlmPort,
+        cancel: &CancellationToken,
+    ) -> Result<String, AppError> {
+        // Existing subagent branches are verified when opening the case. A
+        // stdio turn cannot present or start a new subagent plan.
+        run_async(self.investigate_cancelable_with_progress(
+            id,
+            alert,
+            model,
+            cancel,
+            &|_| {},
+            false,
+        ))
     }
 
     pub async fn investigate_cancelable(
@@ -124,7 +146,7 @@ impl Engine<'_> {
         model: &dyn LlmPort,
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
-        self.investigate_cancelable_with_progress(id, alert, model, cancel, &|_| {})
+        self.investigate_cancelable_with_progress(id, alert, model, cancel, &|_| {}, true)
             .await
     }
 
@@ -135,6 +157,7 @@ impl Engine<'_> {
         model: &dyn LlmPort,
         cancel: &CancellationToken,
         on_text: &(dyn Fn(ModelProgress) + Send + Sync),
+        allow_delegation: bool,
     ) -> Result<String, AppError> {
         let _tainted_alert = Tainted::from_external(
             alert,
@@ -152,6 +175,9 @@ impl Engine<'_> {
         let case_lock = self
             .blocking_local(move |local| local.repo.lock_case(&id_owned))
             .await?;
+        if cancel.is_cancelled() {
+            return Err(AppError::Cancelled);
+        }
         let id_owned = id.clone();
         let alert_owned = alert.to_owned();
         let descriptor = model.descriptor();
@@ -160,7 +186,7 @@ impl Engine<'_> {
                 local.prepare_investigation_local(&id_owned, &alert_owned, &descriptor)
             })
             .await?;
-        let (case, mut turn) = self.make_turn(prepared);
+        let (case, mut turn) = self.make_turn(prepared, allow_delegation);
         *turn
             .case_lock
             .lock()
@@ -197,7 +223,11 @@ impl Engine<'_> {
         .await
     }
 
-    fn make_turn(&self, prepared: PreparedInvestigation) -> (Case, TurnContext) {
+    fn make_turn(
+        &self,
+        prepared: PreparedInvestigation,
+        allow_delegation: bool,
+    ) -> (Case, TurnContext) {
         let PreparedInvestigation {
             case,
             screened,
@@ -234,12 +264,16 @@ impl Engine<'_> {
         }));
         let greeting_only = is_greeting_only(&screened.text);
         messages.push(CompletionMessage::text(MessageRole::User, screened.text));
-        let catalog = if greeting_only {
+        let mut catalog = if greeting_only {
             Vec::new()
         } else {
             self.available_tools()
         };
+        if !allow_delegation {
+            catalog.retain(|tool| tool.name != "delegate_task");
+        }
         let turn = TurnContext {
+            allow_delegation,
             cloud_limit_reached: false,
             delegated_rounds: 0,
             case_lock: std::sync::Mutex::new(None),
