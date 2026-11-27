@@ -128,11 +128,12 @@ checkout and synthetic cases only.
    dispatches on denial.
 
    ```sh
-   ./<infra-executable> engine_rpc_native_touch_id_signed_decision --ignored --test-threads 1
+   ./<infra-executable> engine_rpc_native_touch_id_signed_decision --ignored --test-threads 1 --nocapture
    ```
 
-4. Check that the system dialog shows the complete action, case UUID,
-   decision and verification code. Record whether it truncates any field,
+4. Compare the system dialog with the expected synthetic title printed by
+   the executable. Check the complete action, case UUID, decision and code.
+   Record whether it truncates any field,
    including the final digits of the code. The full arguments and scope
    belong in the GUI. The standalone witness has no separate GUI, so use
    the synthetic arguments in the tests for comparison. The title length

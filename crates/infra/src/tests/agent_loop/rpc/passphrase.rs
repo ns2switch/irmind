@@ -471,6 +471,7 @@ fn engine_rpc_native_touch_id_signed_decision() {
                 touch_id: Some(irmind_app::engine_rpc::TouchIdAuthenticator {
                     title_limit_utf16: 128,
                     verify: &|title, deadline, cancel| {
+                        eprintln!("Expected synthetic Touch ID title: {title}");
                         irmind_native_approval::verify_touch_id(title, 128, deadline, || {
                             cancel.is_cancelled()
                         })
