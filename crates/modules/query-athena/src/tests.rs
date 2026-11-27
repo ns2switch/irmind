@@ -218,7 +218,7 @@ async fn usage_and_workgroup_cutoff_use_billed_units() {
 mod case_contract;
 
 #[test]
-fn real_clock_preflight_and_exact_v9_citation() {
+fn real_clock_preflight_and_exact_v12_citation() {
     let mut page: Value = serde_json::from_slice(include_bytes!(
         "../../../../fuzz/seeds/query_page_athena/page.json"
     ))

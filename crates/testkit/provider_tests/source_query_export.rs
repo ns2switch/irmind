@@ -300,11 +300,10 @@ fn assert_exported_citation(
     assert_eq!(finding.evidence_hash, hash);
     assert_eq!(source, receipt.capture_path());
     assert_eq!(index, 1);
-    // This fixture exports one capture smaller than one export chunk. The package
-    // verifier already authenticated section framing; select the capture chunk before the empty extension sections.
+    // This fixture has one capture chunk and empty Sigma, report and runtime
+    // proof sections. The package verifier authenticated the section framing.
     assert!((1..=512 * 1024).contains(&size));
-    let (package, extension_counts) = bytes.split_at(bytes.len() - 16);
-    assert_eq!(extension_counts, [0; 16]);
+    let package = bytes.strip_suffix(&[0; 24]).unwrap();
     let start = package.len() - usize::try_from(size).unwrap();
     assert_eq!(bytes[start - 8..start], size.to_be_bytes());
     let capture = &package[start..];

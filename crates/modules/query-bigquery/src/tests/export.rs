@@ -9,7 +9,7 @@ const KEY: &str =
 const PAGE: &[u8] = include_bytes!("../../../../../fuzz/seeds/query_page_bigquery/page.json");
 
 #[test]
-fn real_clock_preflight_and_exact_v9_citation_with_oauth_without_exported_credentials() {
+fn real_clock_preflight_and_exact_v12_citation_with_oauth_without_exported_credentials() {
     let (source, limits, mut query) = compiled_fixture();
     query["filters"] = json!([]);
     let fixture = case_contract::Fixture {

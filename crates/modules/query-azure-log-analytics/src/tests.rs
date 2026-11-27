@@ -117,7 +117,7 @@ async fn lost_synchronous_query_is_not_replayed_and_cancel_prevents_a_new_reques
 mod case_contract;
 
 #[test]
-fn real_clock_preflight_and_exact_v9_citation() {
+fn real_clock_preflight_and_exact_v12_citation() {
     use irmind_app::SourceDecoder as _;
     let page = json!({"tables":[{"name":"PrimaryResult","columns":[
         {"name":"TimeGenerated","type":"datetime"}, {"name":"UserPrincipalName","type":"string"}
