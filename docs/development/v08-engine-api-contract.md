@@ -2,7 +2,7 @@
 
 **Status.** Approved stdio transport, handshake and five case methods. The graphical
 approval design has been selected by the analyst, and its implementation
-contract is for review. Unix sockets and Windows named pipes require a
+contract is approved with platform-specific activation gates. Unix sockets and Windows named pipes require a
 separate contract and native identity tests.
 
 ## Protocol
@@ -58,7 +58,7 @@ inside IRMind through the existing TUI at `/approvals`. The client receives
 a guarded status notification.
 
 The analyst chose approval from the GUI that launched IRMind over private
-stdio. Review the [graphical approval contract](v08-graphical-approvals-contract.md)
-for the proposed V2 methods, per-decision reauthentication, native
-dependency review and threat model. Enable the extension only after
-approval and native validation.
+stdio. Read the [graphical approval contract](v08-graphical-approvals-contract.md)
+for the V2 methods, per-decision reauthentication, native
+dependency review and threat model. Deliver the file-keystore route first and enable the native routes only
+after native validation.

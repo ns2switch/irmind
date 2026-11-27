@@ -6,7 +6,7 @@
 and the independent vectors are approved. The initial stdio API ships with
 case 7/V11 and leaves decisions in the existing TUI. The
 [graphical approval contract](v08-graphical-approvals-contract.md) replaces
-the separate-TUI proposal and remains open for review. Source queries
+the separate-TUI proposal and is approved with native activation gates. Source queries
 from children follow the API. Enable MCP only on targets where native containment proves
 all required denials. Hook implementation waits for review of the measured
 native-versus-Wasm comparison on all five distribution targets. This follows the

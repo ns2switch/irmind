@@ -22,8 +22,7 @@ MCP y hooks. La superficie de aprobación de la API sigue en revisión.
   externa antes de habilitar MCP.
   [Contrato MCP](../../development/v08-mcp-contract.md).
 - **API local.** Primero stdio con `open_case`, `case_status`, `subscribe`,
-  `start_turn` y `cancel`. Mientras se revisa el nuevo contrato, las
-  decisiones se toman en `/approvals` de la TUI. El analista ha elegido
+  `start_turn` y `cancel`. Hasta que llegue V2, las decisiones se toman en `/approvals` de la TUI. El analista ha elegido
   que la GUI que lance IRMind por stdio muestre la solicitud y que IRMind
   verifique una reautenticación por decisión. Socket Unix y named pipe
   quedan para otro contrato.

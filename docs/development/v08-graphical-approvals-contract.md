@@ -2,9 +2,10 @@
 
 [Español](../es/development/v08-graphical-approvals-contract.md)
 
-**Status.** The analyst selected approval in the launching GUI on 2026-11-27.
-This wire protocol, threat model and dependency proposal are for review.
-Today, decisions remain in the IRMind TUI under `/approvals`.
+**Status.** Approved by the analyst with the platform conditions below.
+Delivery order is RPC V2 with the file-keystore passphrase, Windows Hello,
+then Touch ID. Native routes stay disabled until native acceptance passes.
+The TUI remains the strict review path in `/approvals`.
 
 ## Scope and trust boundary
 
@@ -120,7 +121,7 @@ compare on the two surfaces. Neither value confers signing authority.
 
 | Platform | IRMind action and prerequisites |
 | --- | --- |
-| macOS | IRMind creates a fresh `LAContext`, verifies `biometryType == touchID`, uses the biometric-only policy, sets Touch ID reuse duration to zero, and disables the system fallback button. The localized reason in the system dialog is generated from the request by IRMind and includes its decision, action, case, arguments, effective scope, expiry and code. Apple places this reason in the macOS dialog title and recommends short text. Enable Touch ID only for views and native configurations where the full escaped reason fits without elision and is readable. Require Intel and Apple Silicon verification of the standalone distribution binary, including the supported display settings and locales. For a view outside that verified limit or a machine without enrolled Touch ID, offer the explicit file-keystore option when available, or the TUI. Invalidate the context on cancellation and make late callbacks inert. |
+| macOS | IRMind creates a fresh `LAContext` and verifies `biometryType == touchID`. Use the biometric-only policy, zero reuse duration and no system fallback button. The system dialog shows the action, case UUID, decision and verification code. The GUI shows the exact arguments and effective scope. Offer Touch ID only when the full system text fits the validated configuration without elision. Verify on macOS Intel and Apple Silicon with the standalone distribution binary. Invalidate the context on cancellation and discard late callbacks. The analyst can use the IRMind TUI for strict review of all fields. |
 | Windows | IRMind creates its own foreground request window and shows the exact escaped view there. On its UI thread, pass only that IRMind-owned HWND to `IUserConsentVerifierInterop::RequestVerificationForWindowAsync` with the IRMind-generated action and verification code. Require `Verified` for that invocation. Windows Hello can use its enrolled methods, including PIN. The desktop API requires Windows build 22000 or later. Enable it only when IRMind can own and show the window and the prompt binds to it in the active desktop session. Refuse an HWND from the external GUI. |
 | Linux and fallback on macOS/Windows | The analyst explicitly selects the phrase route and enters the active encrypted file-keystore passphrase in a masked native input. Send it only over the admitted stdin pipe. IRMind verifies it anew using the active file vault's existing bounded Argon2id and authenticated decryption, holding its existing vault lock. Check that the vault still owns the same Analyst key. No new unlock, secret or verifier is issued. The OS keystore backend has no IRMind file-vault passphrase. On that backend, the method is unavailable, so the choices are native reauthentication where supported or the TUI. |
 
@@ -149,7 +150,7 @@ the handling requirements. Checked-in fixtures use synthetic phrases only.
 
 | Attacker and input | Required control | Remaining boundary |
 | --- | --- | --- |
-| Compromised GUI that rewrites the view, sends a choice or sends a fake OS result | IRMind generates arguments, digest and native display from the authenticated case. It accepts success only from the OS callback for its own live instance. Check the action and matching code on the native surface. The GUI sends no authorization result. | A compromised GUI can record a phrase typed into it and lie about what the analyst reviewed. Stdio, code matching and zeroization cannot prevent capture at that endpoint. The phrase route requires a trusted GUI. A trusted OS prompt protects the native path from the GUI alone, subject to the verified display and session constraints. |
+| Compromised GUI that rewrites the view, sends a choice or sends a fake OS result | IRMind generates arguments, digest and native display from the authenticated case. It accepts success only from the OS callback for its own live instance. Check the action and matching code on the native surface. The GUI sends no authorization result. | A compromised GUI can record a phrase typed into it and lie about what the analyst reviewed. Stdio, code matching and zeroization cannot prevent capture at that endpoint. The phrase route requires a trusted GUI. On macOS the analyst accepts trusting the GUI for arguments and effective scope. A compromised GUI could display values different from the ones IRMind signs. The Touch ID dialog authenticates the visible action, case, decision and code. Use the TUI for strict review. The Windows path displays the complete request in an IRMind-owned window. |
 | Another local process attempting to read or write the transport | Inherit only the two private pipe ends into the authorized process, bind per session and case and require one timely reauthentication. No listening address, out-of-band signer, or trust in client-provided PID, token or HWND. | Protection assumes OS process/handle isolation. An attacker already able to inject into IRMind, read its memory or control the desktop or OS authentication is outside this boundary. Same-user process isolation must be tested, with no claims beyond what each OS enforces. |
 | Hostile evidence embedded in a literal argument | Validate against the exact signed request and typed policy. Compare full canonical values. Reversibly escape and render inert strings. Keep evidence views and HTML outside the approval UI. | A plausible looking text value can still mislead a human. Keep argument labels, source and effective scope explicit when reviewing. |
 | Replay, substitution, race or restart | Bind the request, view, GUI session, case, decision, expiry and OS result. Check current state and existing signed decisions under the case lock. Consume the attempt once. Reject a stale callback, changed effective scope, or duplicate commit. | A committed decision remains in the case if the client loses the response. Refresh authenticated state. Do not retry the approval or execution automatically. |
@@ -191,9 +192,10 @@ Primary package and SDK sources.
 · [Windows Rust Cargo manifest](https://docs.rs/crate/windows/0.62.2/source/Cargo.toml)
 · [Microsoft Windows SDK C++/WinRT headers](https://learn.microsoft.com/en-us/windows/apps/develop/cpp-winrt/get-started)
 
-Recommend the typed, target-only Rust bindings for review. They keep the
-platform FFI and callback lifetime within a small adapter and avoid
-adding a different native compilation path. Linked size is **unmeasured**
+The analyst approved the target-only Rust bindings above. Put all native
+code in the small `irmind-native-approval` crate. Justify each unsafe call
+and review the boundary as for process containment. Linux gains no new
+production dependency. Linked size is **unmeasured**
 at this design stage. The implementation PR must measure stripped binary
 size and section deltas with each backend off/on in the same release job,
 with the pinned SDK and toolchain, on Intel and Apple Silicon macOS and
@@ -205,8 +207,10 @@ bridge or widen the set of dependencies without review.
 
 ## Acceptance before enabling
 
-- Native sessions show the exact fields and code with leading, trailing,
-  Unicode and maximum-size values. Test that a truncated Touch ID prompt,
+- Native sessions show every field assigned to the platform dialog and the
+  complete code with leading, trailing, Unicode and maximum-size values.
+  On macOS the GUI shows the full arguments and scope and the dialog
+  identifies the action, case and decision. Test that a truncated Touch ID prompt,
   unavailable hardware, Windows foreground failure, non-verified OS result,
   wrong keystore backend or wrong phrase causes no signature.
 - With synthetic cases, run approve and deny, verify the existing signed

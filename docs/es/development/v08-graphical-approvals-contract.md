@@ -2,10 +2,10 @@
 
 [English](../../development/v08-graphical-approvals-contract.md)
 
-**Estado.** El analista eligió la aprobación en la GUI que inicia IRMind el
-27 de noviembre de 2026. El protocolo, el modelo de amenazas y las
-dependencias propuestos quedan para revisión. Por ahora, las decisiones
-siguen en `/approvals` de la TUI.
+**Estado.** Aprobado por el analista con las condiciones por plataforma
+de este documento. El orden de entrega es V2 con frase del keystore de
+archivos, Windows Hello y Touch ID. Cada ruta nativa espera su validación
+antes de activarse. La vía estricta sigue en `/approvals` de la TUI.
 
 ## Alcance y confianza
 
@@ -88,7 +88,7 @@ fija sus dominios.
 
 | Plataforma | Reautenticación |
 | --- | --- |
-| macOS | IRMind crea un `LAContext` nuevo con política biométrica, comprueba que el tipo es Touch ID, desactiva la reutilización y el botón de alternativa del sistema. El diálogo de Apple muestra el texto exacto generado por IRMind, incluido el código. Apple usa la razón como título del diálogo. La ruta se habilita solo si todo el texto cabe y es legible en las configuraciones nativas verificadas en Intel y Apple Silicon. Si no cabe, ofrece frase explícita cuando proceda o TUI. |
+| macOS | IRMind crea un `LAContext` nuevo con política biométrica, verifica Touch ID y desactiva la reutilización y la alternativa del sistema. El diálogo muestra la acción, el UUID del caso, la decisión y el código. La GUI muestra los argumentos completos y el alcance. Si el texto del diálogo no cabe entero en una configuración validada en Intel y Apple Silicon, Touch ID no se ofrece para esa solicitud. La TUI permite revisar todos los campos en IRMind. |
 | Windows | IRMind muestra la vista exacta en una ventana propia y solicita Windows Hello usando el HWND de esa ventana con `RequestVerificationForWindowAsync`. Solo acepta `Verified` de esa llamada. Hello puede usar un PIN configurado. Requiere Windows 11, compilación 22000 o posterior, y una sesión de escritorio activa en la que se compruebe la ventana. |
 | Linux y alternativa en macOS y Windows | La frase del keystore cifrado de archivos se teclea en un campo enmascarado y llega solo al proceso admitido por stdin. IRMind verifica de nuevo con Argon2id y el descifrado autenticado actuales y comprueba la clave Analyst del mismo almacén. El backend de almacén del sistema no tiene esa frase. En ese caso se usa el diálogo nativo cuando está disponible o la TUI. |
 
@@ -109,7 +109,7 @@ Fuentes de las plataformas.
 
 | Amenaza | Control y límite |
 | --- | --- |
-| GUI comprometida | IRMind usa la solicitud autenticada para construir el texto nativo y acepta solo el resultado del sistema de su propio intento. El analista coteja acción y código en la superficie nativa. Una GUI comprometida puede falsear su vista y capturar una frase tecleada en ella. Stdio y la limpieza de memoria no evitan la captura en ese extremo. La ruta de frase exige confiar en la GUI. |
+| GUI comprometida | IRMind usa la solicitud autenticada para construir el texto nativo y acepta solo el resultado del sistema de su propio intento. El analista coteja acción y código en la superficie nativa. En macOS, una GUI comprometida puede mostrar argumentos y alcance distintos de los firmados. La TUI sigue disponible para una revisión estricta. Una GUI comprometida también puede capturar una frase tecleada en ella. Stdio y la limpieza de memoria no evitan la captura en ese extremo. La ruta de frase exige confiar en la GUI. |
 | Otro proceso local | Los extremos de las tuberías son privados, la sesión se liga a un solo caso y cada intento requiere reautenticación. No se aceptan handles, tokens del sistema ni resultados de autenticación enviados por la GUI. La protección depende del aislamiento local del sistema operativo. Un proceso capaz de leer memoria de IRMind, inyectar código o controlar el escritorio queda fuera de esa garantía. |
 | Evidencia hostil | Los argumentos se muestran como texto literal escapado. Los datos no se interpretan como autoridad ni como código. IRMind aplica ContentGuard y coteja los valores exactos con la solicitud firmada antes de actuar. |
 | Repetición o sustitución | Vínculo a sesión, caso, vista, decisión y caducidad. Un intento y un commit por solicitud firmada. Si se pierde la respuesta tras el commit, se consulta el estado autenticado del caso. La GUI nunca reintenta la aprobación ni el envío automáticamente. |
@@ -129,7 +129,9 @@ caché y de fuentes descomprimidas.
 
 La [revisión completa](../../development/v08-graphical-approvals-contract.md#native-dependency-review)
 enumera versiones, features, paquetes, fuentes y cifras totales. Se
-proponen bindings Rust tipados y limitados a cada plataforma. El aumento
+han aprobado bindings Rust tipados y limitados a cada plataforma. Todo
+el código nativo va en `irmind-native-approval`, con revisión y justificación
+llamada a llamada del unsafe. Linux no añade dependencias. El aumento
 del binario enlazado sigue sin medir. La PR de implementación deberá medir
 antes y después en release en los tres destinos nativos, comprobar que
 Linux no adquiere dependencias y validar SBOM, licencias, imports y
