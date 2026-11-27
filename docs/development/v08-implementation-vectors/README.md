@@ -18,3 +18,9 @@ fail if supplied without its authenticated plan, hold, checkpoint and
 query projection. A native release test must resolve these references
 against actual case state. The illustrative approval presentation digest
 is not authorization.
+
+The approved V1 framing and rejection vectors still apply. The
+`engine_api.approval_presentation_binding` vector records the superseded
+separate-TUI proposal. The forthcoming
+[graphical approval protocol](../v08-graphical-approvals-contract.md)
+uses its own unsigned V2 presentation domains.

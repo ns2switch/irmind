@@ -77,8 +77,10 @@ The presentation digest is
 `SHA-256("irmind-gui-approval-view-v1" || 00 || J(view))`.
 The code is the first 16 lowercase hex characters of
 `SHA-256("irmind-gui-approval-code-v1" || 00 || J({nonce,presentation,session,view_sha256}))`,
-displayed in groups of four. The 32-byte random nonce stays in IRMind.
-The GUI echoes the full view digest. The short code is for the analyst to
+where `nonce` is 32 random bytes encoded as 64 lowercase hex characters
+and stays in IRMind. The reply carries the ungrouped code. Both surfaces
+display it as four groups of four characters separated by hyphens. The
+GUI echoes the full view digest. The short code is for the analyst to
 compare on the two surfaces. Neither value confers signing authority.
 
 ### Lifetime and commit
