@@ -1,6 +1,7 @@
 //! Resolve a signed execution against the existing case and global custody.
 use super::{
-    SigmaRunV1, V10AuditReference, V10CheckpointView, V10SigmaRunObjects, sigma_pack_operation,
+    SigmaAdmissionMode, SigmaRunV2, V10AuditReference, V10CheckpointView, V10SigmaRunObjects,
+    sigma_pack_operation,
 };
 use crate::{
     Actor, AppError, AuditEventKind, SignedEntry, SignedOperation,
@@ -9,10 +10,10 @@ use crate::{
 use irmind_domain::EvidenceHash;
 use std::collections::BTreeMap;
 
-pub fn sigma_execution(entry: &SignedEntry) -> Result<SigmaRunV1, AppError> {
+pub fn sigma_execution(entry: &SignedEntry) -> Result<SigmaRunV2, AppError> {
     let invalid = || AppError::InvalidChain(entry.seq);
-    let run = SigmaRunV1::decode(&entry.payload).map_err(|_| invalid())?;
-    if entry.kind != AuditEventKind::SigmaRunV1
+    let run = SigmaRunV2::decode(&entry.payload).map_err(|_| invalid())?;
+    if entry.kind != AuditEventKind::SigmaRunV2
         || entry.actor != Actor::Analyst
         || entry.origin != "analyst"
         || entry.evidence.is_some()
@@ -29,12 +30,16 @@ impl V10SigmaRunObjects {
     /// The caller authenticates the case prefix and admission signature first.
     pub fn verify_execution_scope(
         &self,
-        run: &SigmaRunV1,
+        run: &SigmaRunV2,
         admission: &SignedOperation,
         entries: &[SignedEntry],
     ) -> Result<(), AppError> {
         let invalid = || AppError::InvalidChain(run.checkpoint.sequence);
-        if run.pack_admission != admission.hash || sigma_pack_operation(admission)?.is_none() {
+        let pack = sigma_pack_operation(admission)?.ok_or_else(invalid)?;
+        if run.pack_admission != admission.hash
+            || (run.admission_mode == SigmaAdmissionMode::DirectLocal
+                && pack.origin != super::SigmaPackOriginV1::LocalDirectory)
+        {
             return Err(invalid());
         }
         let view = V10CheckpointView::resolve(entries, &run.checkpoint)?;
@@ -96,7 +101,7 @@ pub struct SigmaFindingDraft {
 }
 
 pub struct PreparedSigmaExecution<T> {
-    pub receipt: SigmaRunV1,
+    pub receipt: SigmaRunV2,
     pub findings: Vec<SigmaFindingDraft>,
     pub material: T,
     pub skipped_rules: usize,
@@ -107,7 +112,7 @@ pub struct PreparedSigmaExecution<T> {
 }
 
 pub struct SigmaExecutionSummary {
-    pub receipt: SigmaRunV1,
+    pub receipt: SigmaRunV2,
     pub skipped_rules: usize,
     pub class_coverage: super::SigmaClassCoverage,
     pub skipped_classes: Vec<(String, usize, usize)>,
@@ -216,6 +221,10 @@ impl crate::Engine<'_> {
         let reserved = reserve_sigma_work(&entries)?;
         let view = V10CheckpointView::resolve(&entries, &checkpoint)?;
         let expected_inventory = view.active_artifact_inventory()?;
+        let pack = sigma_pack_operation(&operation)?.ok_or(AppError::InvalidChain(edge.seq))?;
+        if selected.is_none() && pack.origin != super::SigmaPackOriginV1::LocalDirectory {
+            return Err(AppError::InvalidChain(edge.seq));
+        }
         let candidate = evaluate(
             SigmaExecutionContext {
                 view,
@@ -243,7 +252,7 @@ impl crate::Engine<'_> {
                 &mut receipt,
             )?;
             signed.push(admission);
-        } else if super::requires_sigma_case_admission(&receipt.evaluator) {
+        } else if receipt.admission_mode != SigmaAdmissionMode::DirectLocal {
             return Err(AppError::InvalidChain(edge.seq));
         }
         let payload = receipt
@@ -253,7 +262,7 @@ impl crate::Engine<'_> {
             case,
             signed.last().or(Some(edge)),
             crate::AuditOrigin::Analyst,
-            AuditEventKind::SigmaRunV1,
+            AuditEventKind::SigmaRunV2,
             &payload,
             None,
         )?;
@@ -295,17 +304,9 @@ impl crate::Engine<'_> {
         edge: &SignedEntry,
         manifest: [u8; 32],
         install: [u8; 32],
-        receipt: &mut SigmaRunV1,
+        receipt: &mut SigmaRunV2,
     ) -> Result<SignedEntry, AppError> {
-        use super::{
-            SIGMA_EVALUATOR_V3, SIGMA_EVALUATOR_V3_CASE_ADMISSION, SIGMA_EVALUATOR_V4,
-            SIGMA_EVALUATOR_V4_CASE_ADMISSION, SigmaCaseRunAdmissionV1,
-        };
-        let evaluator = match receipt.evaluator.as_str() {
-            SIGMA_EVALUATOR_V3 => SIGMA_EVALUATOR_V3_CASE_ADMISSION,
-            SIGMA_EVALUATOR_V4 => SIGMA_EVALUATOR_V4_CASE_ADMISSION,
-            _ => return Err(AppError::InvalidChain(edge.seq)),
-        };
+        use super::SigmaCaseRunAdmissionV1;
         let claim = SigmaCaseRunAdmissionV1 {
             checkpoint: receipt.checkpoint.clone(),
             installation: Some(install),
@@ -317,7 +318,7 @@ impl crate::Engine<'_> {
             end_us: receipt.end_utc_micros,
             field_table: receipt.field_table,
             compiled_rules: receipt.compiled_rules,
-            evaluator: evaluator.into(),
+            evaluator: receipt.evaluator.clone(),
             reserved_work: receipt.reserved_units,
         };
         let payload = crate::hex(
@@ -333,7 +334,7 @@ impl crate::Engine<'_> {
             &payload,
             None,
         )?;
-        receipt.evaluator = evaluator.into();
+        receipt.admission_mode = SigmaAdmissionMode::InstalledPackage;
         receipt.checkpoint.sequence = signed.seq;
         receipt.checkpoint.entry_hash = signed.hash;
         Ok(signed)
@@ -388,7 +389,7 @@ pub fn sigma_remaining_work(entries: &[SignedEntry]) -> Result<u64, AppError> {
     let mut available = SIGMA_CASE_WORK;
     for entry in entries
         .iter()
-        .filter(|entry| entry.kind == AuditEventKind::SigmaRunV1)
+        .filter(|entry| entry.kind == AuditEventKind::SigmaRunV2)
     {
         let run = sigma_execution(entry)?;
         if run.reserved_units == 0 || run.reserved_units > available.min(SIGMA_RUN_WORK) {

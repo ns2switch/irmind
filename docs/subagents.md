@@ -91,7 +91,7 @@ requires exclusive interprocess ownership: live previews and workers in another
 session block it; there is no force option. Completed work and uncertain usage
 remain intact, and no provider request or tool effect is replayed.
 
-Version 0.5 uses case marker 4 and export V8. Keep the creating executable for
+Version 0.8 uses case marker 7 and export V11. Keep the creating executable for
 older cases or re-ingest verified originals into a new case; opening a case does
 not migrate it. See [configuration](configuration.md), the
 [format contract](development/subagents-format-contract.md) and

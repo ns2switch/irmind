@@ -99,6 +99,6 @@ fn verify(
             .verify_export_details(path, Some(&key))
             .unwrap()
             .format_version,
-        10
+        11
     );
 }

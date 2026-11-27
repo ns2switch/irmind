@@ -2,16 +2,6 @@ use super::{CaseCheckpointV1, Digest, INVALID, Result, Wire, put_optional_hash, 
 
 const INSTALLATION: &[u8] = b"irmind-sigma-package-installation-v1\0";
 const CASE_ADMISSION: &[u8] = b"irmind-sigma-case-run-admission-v1\0";
-pub const SIGMA_EVALUATOR_V3_CASE_ADMISSION: &str = "irmind-sigma-evaluator-v3-case-admission-v1";
-pub const SIGMA_EVALUATOR_V4_CASE_ADMISSION: &str = "irmind-sigma-evaluator-v4-case-admission-v1";
-
-pub fn requires_sigma_case_admission(evaluator: &str) -> bool {
-    matches!(
-        evaluator,
-        SIGMA_EVALUATOR_V3_CASE_ADMISSION | SIGMA_EVALUATOR_V4_CASE_ADMISSION
-    )
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SigmaPackageOriginV1 {
     Local,
@@ -319,11 +309,12 @@ impl SigmaCaseRunAdmissionV1 {
     /// selection, field table, evaluator and reservation.
     pub fn verify_following_run(
         admission: &crate::SignedEntry,
-        run: &super::SigmaRunV1,
+        run: &super::SigmaRunV2,
         pack_manifest: Digest,
     ) -> std::result::Result<Self, crate::AppError> {
         let claim = Self::from_case_entry(admission)?;
-        if run.checkpoint.case_id != claim.checkpoint.case_id
+        if run.admission_mode != super::SigmaAdmissionMode::InstalledPackage
+            || run.checkpoint.case_id != claim.checkpoint.case_id
             || run.checkpoint.sequence != admission.seq
             || run.checkpoint.entry_hash != admission.hash
             || run.pack_admission != claim.pack_admission
@@ -344,7 +335,8 @@ impl SigmaCaseRunAdmissionV1 {
 
     fn validate(&self) -> Result<()> {
         if self.start_us >= self.end_us
-            || !requires_sigma_case_admission(&self.evaluator)
+            || self.installation.is_none()
+            || self.evaluator != super::SIGMA_EVALUATOR_V5
             || self.reserved_work == 0
         {
             return Err(INVALID);
@@ -416,9 +408,9 @@ pub fn verify_sigma_case_admission_pairs(
                 .ok_or(AppError::InvalidChain(entry.seq))?;
             let run = super::sigma_execution(following)?;
             SigmaCaseRunAdmissionV1::verify_following_run(entry, &run, admission.manifest)?;
-        } else if entry.kind == AuditEventKind::SigmaRunV1 {
+        } else if entry.kind == AuditEventKind::SigmaRunV2 {
             let run = super::sigma_execution(entry)?;
-            if requires_sigma_case_admission(&run.evaluator)
+            if run.admission_mode == super::SigmaAdmissionMode::InstalledPackage
                 && index
                     .checked_sub(1)
                     .and_then(|before| entries.get(before))
@@ -701,10 +693,22 @@ mod tests {
             let receipt = SigmaPackageInstallationV1::decode(&body).unwrap();
             assert_eq!(receipt.encode().unwrap(), body);
         }
-        let body = bytes("case_admission");
-        let mut receipt = SigmaCaseRunAdmissionV1::decode(&body).unwrap();
+        assert!(SigmaCaseRunAdmissionV1::decode(&bytes("case_admission")).is_err());
+        let vectors: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../docs/development/case-7-export-v11-vectors/wire.json"
+        ))
+        .unwrap();
+        let raw = hex::decode(
+            vectors["sigma"]["installed_case_admission"]["hex"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap();
+        let entry: crate::SignedEntry = serde_json::from_slice(&raw).unwrap();
+        let body = hex::decode(&entry.payload).unwrap();
+        let mut receipt = SigmaCaseRunAdmissionV1::from_case_entry(&entry).unwrap();
         assert_eq!(receipt.encode().unwrap(), body);
-        receipt.evaluator = super::super::SIGMA_EVALUATOR_V3.to_owned();
+        receipt.evaluator = "irmind-sigma-evaluator-v3".into();
         assert!(receipt.encode().is_err());
         let mut trailing = body;
         trailing.push(0);

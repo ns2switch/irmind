@@ -74,9 +74,9 @@ pub(super) fn validate_existing(db: &Connection) -> Result<(), AppError> {
                 .iter()
                 .any(|name| !fields.iter().any(|field| field == name))
     }) {
-        return Err(AppError::Fixed(
-            irmind_app::FixedAppError::RetiredCaseFormat,
-        ));
+        return Err(AppError::Fixed(irmind_app::FixedAppError::CaseFormat(
+            irmind_app::case_format::CaseFormatError::Case(None),
+        )));
     }
     validate_deletion_table(db)
 }
@@ -97,9 +97,9 @@ fn validate_deletion_table(db: &Connection) -> Result<(), AppError> {
                 .iter()
                 .any(|name| !fields.iter().any(|f| f == name)))
     {
-        return Err(AppError::Fixed(
-            irmind_app::FixedAppError::RetiredCaseFormat,
-        ));
+        return Err(AppError::Fixed(irmind_app::FixedAppError::CaseFormat(
+            irmind_app::case_format::CaseFormatError::Case(None),
+        )));
     }
     Ok(())
 }

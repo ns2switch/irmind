@@ -102,7 +102,7 @@ impl SigmaRunResultsV2 {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use crate::v10_proofs::{SigmaRunStatusV1, SigmaRunV1};
+    use crate::v10_proofs::SigmaRunV2;
 
     #[test]
     fn canonical_partial_result_matches_the_approved_vector() {
@@ -137,9 +137,6 @@ mod tests {
             assert!(SigmaRunResultsV2::decode(&bytes(&vector["invalid_results"][name])).is_err());
         }
         let receipt = vector["receipt"]["bytes_hex"].as_str().unwrap();
-        let run = SigmaRunV1::decode(receipt).unwrap();
-        assert_eq!(run.status, SigmaRunStatusV1::ExactFieldsUnavailable);
-        assert_eq!(run.result_manifest, crate::sha256(&body));
-        assert_eq!(run.encode().unwrap(), receipt);
+        assert!(SigmaRunV2::decode(receipt).is_err());
     }
 }

@@ -443,7 +443,7 @@ pub trait ExportVerifier: Send + Sync {
         Ok(ExportVerification {
             analyst_key_fingerprint,
             entries,
-            format_version: 10,
+            format_version: crate::case_format::EXPORT_VERSION,
             source_manifests: 0,
             source_bytes_verified: 0,
             source_bytes_unavailable: 0,

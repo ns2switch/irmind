@@ -23,9 +23,10 @@ impl SigmaArchive {
         analyst_key: &[u8],
         cancel: &CancellationToken,
     ) -> Result<Self, AppError> {
+        irmind_app::v10_proofs::verify_sigma_case_admission_pairs(entries)?;
         let mut runs = entries
             .iter()
-            .filter(|entry| entry.kind == AuditEventKind::SigmaRunV1)
+            .filter(|entry| entry.kind == AuditEventKind::SigmaRunV2)
             .peekable();
         if runs.peek().is_none() {
             return Ok(Self::default());
@@ -55,28 +56,31 @@ impl SigmaArchive {
                 let operation = signed
                     .get(&run.pack_admission)
                     .ok_or(AppError::InvalidChain(entry.seq))?;
-                let install =
-                    if irmind_app::v10_proofs::requires_sigma_case_admission(&run.evaluator) {
-                        use irmind_app::v10_proofs::SigmaCaseRunAdmissionV1;
-                        let index = entries
-                            .binary_search_by_key(&run.checkpoint.sequence, |entry| entry.seq)
-                            .map_err(|_| AppError::InvalidChain(entry.seq))?;
-                        let pack = irmind_app::v10_proofs::sigma_pack_operation(operation)?
-                            .ok_or(AppError::InvalidChain(entry.seq))?;
-                        let claim = SigmaCaseRunAdmissionV1::verify_following_run(
-                            &entries[index],
-                            &run,
-                            pack.pack_manifest,
-                        )?;
-                        claim
-                            .installation
-                            .map(|digest| {
-                                signed.get(&digest).ok_or(AppError::InvalidChain(entry.seq))
-                            })
-                            .transpose()?
-                    } else {
-                        None
-                    };
+                let install = if run.admission_mode
+                    == irmind_app::v10_proofs::SigmaAdmissionMode::InstalledPackage
+                {
+                    use irmind_app::v10_proofs::SigmaCaseRunAdmissionV1;
+                    let index = entries
+                        .binary_search_by_key(&run.checkpoint.sequence, |entry| entry.seq)
+                        .map_err(|_| AppError::InvalidChain(entry.seq))?;
+                    let pack = irmind_app::v10_proofs::sigma_pack_operation(operation)?
+                        .ok_or(AppError::InvalidChain(entry.seq))?;
+                    let claim = SigmaCaseRunAdmissionV1::verify_following_run(
+                        &entries[index],
+                        &run,
+                        pack.pack_manifest,
+                    )?;
+                    let digest = claim
+                        .installation
+                        .ok_or(AppError::InvalidChain(entry.seq))?;
+                    Some(
+                        signed
+                            .get(&digest)
+                            .ok_or(AppError::InvalidChain(entry.seq))?,
+                    )
+                } else {
+                    None
+                };
                 archive.add_run(store, case, &run, operation, install, &verifier, cancel)?;
             }
             Ok(archive)
@@ -109,7 +113,7 @@ impl SigmaArchive {
         &mut self,
         store: &LocalStore,
         case: &CaseId,
-        run: &irmind_app::v10_proofs::SigmaRunV1,
+        run: &irmind_app::v10_proofs::SigmaRunV2,
         operation: &SignedOperation,
         install: Option<&SignedOperation>,
         verifier: &crate::LocalVerifier,
@@ -288,7 +292,7 @@ impl LocalStore {
 pub(crate) fn check_sigma_append(
     store: &LocalStore,
     case: &CaseId,
-    run: &irmind_app::v10_proofs::SigmaRunV1,
+    run: &irmind_app::v10_proofs::SigmaRunV2,
     key: &[u8],
     objects: &[(V10ProofDescriptor, Vec<u8>)],
     cancel: &CancellationToken,

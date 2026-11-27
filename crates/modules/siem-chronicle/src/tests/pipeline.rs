@@ -147,7 +147,7 @@ fn authorized_response_becomes_signed_mapped_evidence_and_queryable_roles() {
         )
         .unwrap()
         .format_version,
-        10
+        11
     );
     let exported = std::fs::read(export).unwrap();
     let account: serde_json::Value = serde_json::from_str(&account()).unwrap();

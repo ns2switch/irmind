@@ -218,14 +218,14 @@ impl SigmaRunResultsV3 {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use crate::v10_proofs::{SigmaRunV1, V10ProofDescriptor, V10ProofFamily, v10_proof_commitment};
+    use crate::v10_proofs::{SigmaRunV2, V10ProofDescriptor, V10ProofFamily, v10_proof_commitment};
 
     fn bytes(value: &serde_json::Value) -> Vec<u8> {
         hex::decode(value["bytes_hex"].as_str().unwrap()).unwrap()
     }
 
     #[test]
-    fn approved_v3_results_and_receipts_reproduce_wire_bytes() {
+    fn approved_v3_results_reproduce_wire_bytes() {
         let vectors: serde_json::Value = serde_json::from_str(include_str!(
             "../../../../testkit/fixtures/contracts/sigma_source_class_compilation.json"
         ))
@@ -234,10 +234,15 @@ mod tests {
             let body = bytes(&vector["results"]);
             let result = SigmaRunResultsV3::decode(&body).unwrap();
             let receipt_hex = vector["receipt"]["bytes_hex"].as_str().unwrap();
-            let receipt = SigmaRunV1::decode(receipt_hex).unwrap();
-            assert_eq!(receipt.encode().unwrap(), receipt_hex, "{name}");
+            let status = match name.as_str() {
+                "cancelled_with_both_gaps" => SigmaRunStatusV1::Cancelled,
+                "complete" => SigmaRunStatusV1::Complete,
+                "exact_rows_only" => SigmaRunStatusV1::ExactFieldsUnavailable,
+                _ => SigmaRunStatusV1::CoverageLimited,
+            };
+            assert!(SigmaRunV2::decode(receipt_hex).is_err(), "{name}");
             assert_eq!(result.encode().unwrap(), body, "{name}");
-            assert_eq!(result.status(receipt.status), receipt.status, "{name}");
+            assert_eq!(result.status(status), status, "{name}");
             let compiled = SigmaCompiledRulesV1::decode(&bytes(&vector["compiled_rules"])).unwrap();
             result
                 .plan
@@ -255,9 +260,10 @@ mod tests {
                 V10ProofDescriptor::from_body(V10ProofFamily::Sigma, kind, &bytes(value)).unwrap()
             })
             .collect::<Vec<_>>();
+            let retired = hex::decode(receipt_hex).unwrap();
             assert_eq!(
                 v10_proof_commitment(V10ProofFamily::Sigma, &proofs).unwrap(),
-                receipt.proof_set,
+                &retired[retired.len() - 32..],
                 "{name}"
             );
         }
@@ -303,13 +309,8 @@ mod tests {
             result.status(SigmaRunStatusV1::Complete),
             SigmaRunStatusV1::CoverageLimited
         );
-        let mut receipt = SigmaRunV1::decode(
-            vectors["valid"]["coverage_limited"]["receipt"]["bytes_hex"]
-                .as_str()
-                .unwrap(),
-        )
-        .unwrap();
-        receipt.evaluator = crate::v10_proofs::SIGMA_EVALUATOR_V2.into();
+        let mut receipt = SigmaRunV2::decode(&crate::v10_proofs::tests::new_run()).unwrap();
+        receipt.evaluator = "irmind-sigma-evaluator-v2".into();
         assert!(receipt.encode().is_err());
     }
 }

@@ -98,7 +98,7 @@ fn verify_custody(
             .verify_export_details(path, Some(&key))
             .unwrap()
             .format_version,
-        10
+        11
     );
 }
 
@@ -110,7 +110,7 @@ fn verify_custody(
 #[test]
 fn azure_decimal_projection_is_exact_in_signed_case_and_v10() {
     use irmind_app::{
-        ReportDocumentFormat, ReportDocumentLanguage, v10_proofs::SIGMA_EVALUATOR_V4_CASE_ADMISSION,
+        ReportDocumentFormat, ReportDocumentLanguage, v10_proofs::SIGMA_EVALUATOR_V5,
     };
     use serde_json::{Value, json};
 
@@ -202,7 +202,7 @@ fn azure_decimal_projection_is_exact_in_signed_case_and_v10() {
             &cancel,
         )
         .unwrap();
-    assert_eq!(run.receipt.evaluator, SIGMA_EVALUATOR_V4_CASE_ADMISSION);
+    assert_eq!(run.receipt.evaluator, SIGMA_EVALUATOR_V5);
     assert_eq!(run.receipt.matched_rows, 4);
     assert_eq!(run.unavailable_by_source, [("signin.ndjson".into(), 1)]);
     assert_eq!(

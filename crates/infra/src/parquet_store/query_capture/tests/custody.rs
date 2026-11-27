@@ -19,7 +19,7 @@ const CONFIGURATION: &[u8] = include_bytes!(
     "../../../../../../docs/development/source-query-format-vectors/signed-configuration.json"
 );
 const CHAIN: &[u8] = include_bytes!(
-    "../../../../../../crates/testkit/fixtures/contracts/signed-record-chain-case-v6.json"
+    "../../../../../../crates/testkit/fixtures/contracts/signed-record-chain-case-v7.json"
 );
 const IDS: &[u8] = include_bytes!(
     "../../../../../../docs/development/source-query-format-vectors/identities.json"

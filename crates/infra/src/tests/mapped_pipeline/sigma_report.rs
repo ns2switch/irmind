@@ -3,7 +3,7 @@ use crate::sigma_pack::{evaluation::SigmaVariantPrograms, field_table::ReviewedS
 use irmind_app::{
     EntityDetails, FindingKind, ReportDocumentFormat, ReportDocumentLanguage,
     v10_proofs::{
-        CaseCheckpointV1, ReportCitationsV1, SigmaFieldTableV1, SigmaRuleKeyV1, SigmaRunV1,
+        CaseCheckpointV1, ReportCitationsV1, SigmaFieldTableV1, SigmaRuleKeyV1, SigmaRunV2,
         V10ArtifactReference, V10AuditReference, V10CheckpointView, V10Citation,
         V10FindingCitations, V10RowReference, V10SigmaRunObjects, V10SourceReference,
     },
@@ -150,7 +150,7 @@ fn verify_signed_reports(
             .verify_export_details(&path, Some(&key))
             .unwrap()
             .format_version,
-        10
+        11
     );
     let mut tampered = fs::read(&path).unwrap();
     *tampered.last_mut().unwrap() ^= 1;
@@ -307,13 +307,9 @@ fn verify_sigma_v3_binding(
     cancel: &CancellationToken,
 ) {
     use crate::sigma_pack::{SigmaMatchCheck, verify_class_plan};
-    use irmind_app::v10_proofs::{SigmaClassOutcome, SigmaClassPlan};
 
     let (receipt, mut materials) = sigma_case_row_proofs(checkpoint, row, rule.clone(), cancel);
     let table = ReviewedSigmaFieldTable::parse(&materials.field_table).unwrap();
-    let mut plan = SigmaClassPlan::new(vec![0], 1).unwrap();
-    plan.set(0, 0, SigmaClassOutcome::Eligible).unwrap();
-    materials.class_plan = Some(plan);
     let rules = [(rule, SIGMA_RULE)];
     let deadline = Instant::now() + Duration::from_secs(5);
     verify_class_plan(
@@ -347,7 +343,7 @@ fn verify_sigma_case_references(
     cancel: &CancellationToken,
 ) {
     let (mut receipt, mut objects) = sigma_case_row_proofs(checkpoint, row, rule, cancel);
-    let verify = |objects: &V10SigmaRunObjects, receipt: &SigmaRunV1| {
+    let verify = |objects: &V10SigmaRunObjects, receipt: &SigmaRunV2| {
         objects.verify_case_rows(
             entries,
             receipt,
@@ -372,14 +368,18 @@ fn sigma_case_row_proofs(
     row: V10RowReference,
     rule: SigmaRuleKeyV1,
     cancel: &CancellationToken,
-) -> (SigmaRunV1, V10SigmaRunObjects) {
+) -> (SigmaRunV2, V10SigmaRunObjects) {
     use irmind_app::v10_proofs::{
+        SIGMA_EVALUATOR_V5, SigmaAdmissionMode, SigmaClassOutcome, SigmaClassPlan,
         SigmaCompiledRuleV1, SigmaCompiledRulesV1, SigmaCoverageV1, SigmaMatchV1,
-        SigmaRuleCoverageV1, SigmaRunResultsV1, SigmaRunStatusV1, SigmaSourceScopeV1,
-        V10ProofDescriptor, V10ProofFamily, v10_proof_commitment,
+        SigmaRuleCoverageV1, SigmaRunResultsV1, SigmaRunResultsV2, SigmaRunResultsV3,
+        SigmaRunStatusV1, SigmaSourceScopeV1, V10ProofDescriptor, V10ProofFamily,
+        v10_proof_commitment,
     };
+    let mut plan = SigmaClassPlan::new(vec![0], 1).unwrap();
+    plan.set(0, 0, SigmaClassOutcome::Eligible).unwrap();
     let objects = V10SigmaRunObjects {
-        class_plan: None,
+        class_plan: plan,
         field_table: cloudtrail_definition(),
         selected_sources: SigmaSourceScopeV1(vec![row.source]),
         compiled_rules: SigmaCompiledRulesV1(vec![SigmaCompiledRuleV1 {
@@ -406,13 +406,25 @@ fn sigma_case_row_proofs(
         (2, objects.field_table.encode().unwrap()),
         (3, objects.selected_sources.encode().unwrap()),
         (4, objects.compiled_rules.encode().unwrap()),
-        (5, objects.results.encode().unwrap()),
+        (
+            5,
+            SigmaRunResultsV3 {
+                plan: objects.class_plan,
+                scan: SigmaRunResultsV2 {
+                    results: objects.results,
+                    unavailable_by_source: objects.unavailable_by_source,
+                    indeterminate_by_rule: objects.indeterminate_by_rule,
+                },
+            }
+            .encode()
+            .unwrap(),
+        ),
     ];
     let descriptors = std::array::from_fn::<_, 4, _>(|index| {
         let (kind, bytes) = &bodies[index];
         V10ProofDescriptor::from_body(family, *kind, bytes).unwrap()
     });
-    let receipt = SigmaRunV1 {
+    let receipt = SigmaRunV2 {
         checkpoint: checkpoint.clone(),
         pack_admission: [0; 32],
         artifact_inventory: [0; 32],
@@ -421,7 +433,8 @@ fn sigma_case_row_proofs(
         end_utc_micros: i64::MAX,
         compiled_rules: descriptors[2].hash(),
         field_table: descriptors[0].hash(),
-        evaluator: "irmind-sigma-evaluator-v1".into(),
+        evaluator: SIGMA_EVALUATOR_V5.into(),
+        admission_mode: SigmaAdmissionMode::DirectLocal,
         reserved_units: 1024,
         used_units: 8,
         status: SigmaRunStatusV1::Complete,
@@ -434,7 +447,7 @@ fn sigma_case_row_proofs(
 }
 
 fn load_sigma_case_row_proofs(
-    receipt: &SigmaRunV1,
+    receipt: &SigmaRunV2,
     bodies: &[(u8, Vec<u8>); 4],
     descriptors: &[irmind_app::v10_proofs::V10ProofDescriptor; 4],
     rule: SigmaRuleKeyV1,
@@ -580,7 +593,7 @@ fn signed_sigma_run_and_admitted_rules_verify_in_the_actual_sealed_v10_export() 
     let result = LocalExportVerifier
         .verify_export_details(&package, Some(&key))
         .unwrap();
-    assert_eq!(result.format_version, 10);
+    assert_eq!(result.format_version, 11);
     let mut bytes = fs::read(&package).unwrap();
     let rule = bytes
         .windows(SIGMA_RULE.len())
@@ -713,7 +726,7 @@ fn sigma_v3_signed_proofs_are_identical_across_ingest_worker_caps() {
         let entries = store.entries(&case.id).unwrap();
         let execution = entries
             .iter()
-            .position(|entry| entry.kind == AuditEventKind::SigmaRunV1)
+            .position(|entry| entry.kind == AuditEventKind::SigmaRunV2)
             .unwrap();
         // Finding drafts have independent UUIDs. Compare the entire signed
         // prefix through the run, which commits the exact rows and class plan.

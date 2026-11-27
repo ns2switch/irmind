@@ -4,9 +4,9 @@
 
 use irmind_app::ingest_outcome::{FileReason, IngestFileOutcome};
 use irmind_app::v10_proofs::{
-    ReportCitationsV1, ReportCoverageV2, ReportMediaV1, ReportPublishedV1, SIGMA_EVALUATOR_V4,
-    SIGMA_EVALUATOR_V4_CASE_ADMISSION, SigmaCaseRunAdmissionV1, SigmaPackManifestV1,
-    SigmaPackRuleV1, SigmaRuleKeyV1, SigmaRunResultsV3, SigmaRunV1, V10Citation,
+    ReportCitationsV1, ReportCoverageV2, ReportMediaV1, ReportPublishedV1, SIGMA_EVALUATOR_V5,
+    SigmaAdmissionMode, SigmaCaseRunAdmissionV1, SigmaPackManifestV1, SigmaPackRuleV1,
+    SigmaRuleKeyV1, SigmaRunResultsV3, SigmaRunV2, V10Citation,
 };
 use irmind_app::{SignerBackend, hex, sha256};
 use irmind_domain::{Actor, AuditEventKind, CaseId, SourceManifestV2};
@@ -142,7 +142,7 @@ fn run_scenario(binary: &Path, output: &Path, scenario: &Scenario) {
     ]);
     cli(&["seal", case]);
 
-    let export = output.join("sigma-report-v10.irmind");
+    let export = output.join("sigma-report-v11.irmind");
     cli(&["export", case, export.to_str().unwrap()]);
     let bytes = fs::read(&export).unwrap();
     assert!(bytes.len() < 16 * 1024 * 1024);
@@ -426,7 +426,7 @@ fn read_frame(reader: &mut impl Read) -> serde_json::Value {
 }
 
 fn assert_cloudtrail_originals(bytes: &[u8], delivery: &Path) {
-    let mut reader = Cursor::new(bytes.strip_prefix(b"IRMIND-EXPORT-V10\0").unwrap());
+    let mut reader = Cursor::new(bytes.strip_prefix(b"IRMIND-EXPORT-V11\0").unwrap());
     read_frame(&mut reader);
     let count = read_count(&mut reader);
     let entries = (0..count)
@@ -476,9 +476,9 @@ fn assert_cloudtrail_originals(bytes: &[u8], delivery: &Path) {
 }
 
 fn assert_package(bytes: &[u8], finding: &str, scenario: &Scenario) {
-    let magic = b"IRMIND-EXPORT-V10\0";
+    let magic = b"IRMIND-EXPORT-V11\0";
     let mut reader = Cursor::new(bytes.strip_prefix(magic).unwrap());
-    assert_eq!(read_frame(&mut reader)["version"], 10);
+    assert_eq!(read_frame(&mut reader)["version"], 11);
     let count = read_count(&mut reader);
     assert!((1..1024).contains(&count));
     let entries = (0..count)
@@ -490,9 +490,9 @@ fn assert_package(bytes: &[u8], finding: &str, scenario: &Scenario) {
             .filter(move |entry| entry["kind"] == kind)
             .map(|entry| entry["payload"].as_str().unwrap())
     };
-    let runs = payloads("sigma-run-v1").collect::<Vec<_>>();
+    let runs = payloads("sigma-run-v2").collect::<Vec<_>>();
     assert_eq!(runs.len(), 1);
-    let run = SigmaRunV1::decode(runs[0]).unwrap();
+    let run = SigmaRunV2::decode(runs[0]).unwrap();
     assert_evaluator(
         &run,
         scenario,
@@ -580,18 +580,17 @@ fn assert_report_objects(
     }
 }
 
-fn assert_evaluator(run: &SigmaRunV1, scenario: &Scenario, case_admissions: &[&str]) {
-    // The harness builds with minimal features. The staged release executable
-    // supplies Entra's field table and therefore uses the V4 evaluator.
+fn assert_evaluator(run: &SigmaRunV2, scenario: &Scenario, case_admissions: &[&str]) {
+    assert_eq!(run.evaluator, SIGMA_EVALUATOR_V5);
     if scenario.name == "cloudtrail" {
-        assert_eq!(run.evaluator, SIGMA_EVALUATOR_V4_CASE_ADMISSION);
+        assert_eq!(run.admission_mode, SigmaAdmissionMode::InstalledPackage);
         assert_eq!(case_admissions.len(), 1);
         let admission = SigmaCaseRunAdmissionV1::decode(&decode_hex(case_admissions[0])).unwrap();
         assert_eq!(admission.evaluator, run.evaluator);
         assert!(admission.installation.is_some());
         assert_eq!(admission.manifest, sha256(&pack_manifest(scenario)));
     } else {
-        assert_eq!(run.evaluator, SIGMA_EVALUATOR_V4);
+        assert_eq!(run.admission_mode, SigmaAdmissionMode::DirectLocal);
         assert!(case_admissions.is_empty());
     }
 }

@@ -69,7 +69,7 @@ pub enum AuditEventKind {
     SubagentCheckpointV1,
     SubagentResultV1,
     SigmaCaseRunAdmissionV1,
-    SigmaRunV1,
+    SigmaRunV2,
     ReportPublishedV1,
     IngestFileOutcomeV1,
 }
@@ -141,7 +141,7 @@ impl AuditEventKind {
         Self::SubagentCheckpointV1,
         Self::SubagentResultV1,
         Self::SigmaCaseRunAdmissionV1,
-        Self::SigmaRunV1,
+        Self::SigmaRunV2,
         Self::ReportPublishedV1,
         Self::IngestFileOutcomeV1,
     ];
@@ -213,7 +213,7 @@ impl AuditEventKind {
             Self::SubagentCheckpointV1 => "subagent-checkpoint-v1",
             Self::SubagentResultV1 => "subagent-result-v1",
             Self::SigmaCaseRunAdmissionV1 => "sigma-case-run-admission-v1",
-            Self::SigmaRunV1 => "sigma-run-v1",
+            Self::SigmaRunV2 => "sigma-run-v2",
             Self::ReportPublishedV1 => "report-published-v1",
             Self::IngestFileOutcomeV1 => "ingest-file-outcome-v1",
         }
@@ -342,7 +342,7 @@ mod tests {
             "subagent-checkpoint-v1",
             "subagent-result-v1",
             "sigma-case-run-admission-v1",
-            "sigma-run-v1",
+            "sigma-run-v2",
             "report-published-v1",
             "ingest-file-outcome-v1",
         ];

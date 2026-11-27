@@ -282,7 +282,7 @@ fn identity_failures_keep_roles_originals_and_signed_export() {
             .verify_export_details(&target, Some(&key))
             .unwrap()
             .format_version,
-        10
+        11
     );
 }
 #[test]

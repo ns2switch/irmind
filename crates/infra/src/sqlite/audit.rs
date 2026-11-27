@@ -114,12 +114,12 @@ impl AuditLog for LocalStore {
     }
 
     fn entries(&self, id: &CaseId) -> Result<Vec<SignedEntry>, AppError> {
-        let conn = self.conn()?;
-        let mut stmt = conn.prepare("SELECT case_id,seq,at,actor,origin,kind,payload,evidence,prev,hash,sig,public_key FROM audit WHERE case_id=?1 ORDER BY seq").map_err(storage)?;
-        stmt.query_map([id.as_str()], map_entry)
-            .map_err(storage)?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(storage)
+        let mut entries = Vec::new();
+        self.for_each_audit_entry(id, |entry| {
+            entries.push(entry);
+            Ok(())
+        })?;
+        Ok(entries)
     }
 
     fn last_operation(&self, id: &CaseId) -> Result<Option<SignedOperation>, AppError> {
@@ -196,6 +196,26 @@ impl AuditLog for LocalStore {
 }
 
 impl LocalStore {
+    pub(crate) fn check_stored_case_format(&self, id: &CaseId) -> Result<(), AppError> {
+        let first = self
+            .conn()?
+            .query_row(
+                "SELECT case_id,seq,at,actor,origin,kind,payload,evidence,prev,hash,sig,public_key
+             FROM audit WHERE case_id=?1 AND seq=1
+             AND length(CAST(payload AS BLOB)) <= ?2 AND length(origin) <= 32
+             AND evidence IS NULL AND length(public_key)=32 AND length(sig)=64",
+                params![
+                    id.as_str(),
+                    irmind_app::case_format::MAX_CASE_ROOT_BYTES as u64
+                ],
+                map_entry,
+            )
+            .optional()
+            .map_err(storage)?
+            .ok_or(AppError::InvalidChain(1))?;
+        check_root(&first)
+    }
+
     pub(crate) fn for_each_audit_entry(
         &self,
         id: &CaseId,
@@ -204,15 +224,40 @@ impl LocalStore {
         let conn = self.conn()?;
         let mut statement = conn.prepare("SELECT case_id,seq,at,actor,origin,kind,payload,evidence,prev,hash,sig,public_key FROM audit WHERE case_id=?1 ORDER BY seq").map_err(storage)?;
         let mut count = 0usize;
-        for row in statement
-            .query_map([id.as_str()], map_entry)
-            .map_err(storage)?
-        {
-            visitor(row.map_err(storage)?)?;
+        let mut rows = statement.query([id.as_str()]).map_err(storage)?;
+        while let Some(row) = rows.next().map_err(storage)? {
+            if count == 0 {
+                let payload = row.get_ref(6).map_err(storage)?;
+                if !matches!(payload, rusqlite::types::ValueRef::Text(text)
+                    if text.len() <= irmind_app::case_format::MAX_CASE_ROOT_BYTES)
+                {
+                    return Err(AppError::InvalidChain(1));
+                }
+            }
+            let entry = map_entry(row).map_err(storage)?;
+            if count == 0 {
+                check_root(&entry)?;
+            }
+            visitor(entry)?;
             count = count
                 .checked_add(1)
                 .ok_or_else(|| storage_reason("too many audit entries"))?;
         }
         Ok(count)
     }
+}
+
+fn check_root(entry: &SignedEntry) -> Result<(), AppError> {
+    if entry.payload.len() > irmind_app::case_format::MAX_CASE_ROOT_BYTES
+        || entry.origin.len() > 32
+        || entry.evidence.is_some()
+        || entry.public_key.len() != 32
+        || entry.sig.len() != 64
+        || sha256(&entry.canonical()) != entry.hash
+    {
+        return Err(AppError::InvalidChain(entry.seq));
+    }
+    verify_signature(&entry.public_key, &entry.hash, &entry.sig)
+        .map_err(|_| AppError::InvalidChain(entry.seq))?;
+    irmind_app::case_format::admit_case_root(entry)
 }

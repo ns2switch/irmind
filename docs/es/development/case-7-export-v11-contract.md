@@ -1,6 +1,6 @@
 # Caso 7 y exportación V11 · Contrato de la fase 0
 
-El diseño se aprobó en `74c25388`. Esta revisión deja pendiente la aprobación explícita de una corrección de los vectores Sigma. Los textos Sigma llevan longitud u32, como en los codecs Rust vigentes. El generador inicial usó la longitud u64 de la cadena de auditoría en ambos sitios. Referencia [v0.7.4](https://github.com/ns2switch/irmind/releases/tag/v0.7.4), commit `04f4b5dc`. La [especificación en inglés](../../development/case-7-export-v11-contract.md) fija el orden, los tipos, los límites y los dominios de los registros.
+Diseño aprobado, incluida la corrección de los vectores Sigma en `6375a5ca`. Los textos Sigma llevan longitud u32, como en los codecs Rust vigentes. El generador inicial usó la longitud u64 de la cadena de auditoría en ambos sitios. Referencia [v0.7.4](https://github.com/ns2switch/irmind/releases/tag/v0.7.4), commit `04f4b5dc`. La [especificación en inglés](../../development/case-7-export-v11-contract.md) fija el orden, los tipos, los límites y los dominios de los registros.
 
 ## Inventario
 

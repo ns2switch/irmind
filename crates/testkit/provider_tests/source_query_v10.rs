@@ -143,7 +143,7 @@ pub(super) fn acquire_and_export<D: SourceQueryPageDecoder + 'static>(
     let verified =
         irmind_app::verify_export_details(&LocalExportVerifier, &export, Some(&expected_key))
             .unwrap();
-    assert_eq!(verified.format_version, 10);
+    assert_eq!(verified.format_version, 11);
     assert_eq!(verified.source_bytes_verified, 1);
     let bytes = fs::read(export).unwrap();
     assert_exported_citation(
@@ -267,7 +267,7 @@ fn assert_exported_citation(
     citation_field: &'static str,
     cancel: &CancellationToken,
 ) {
-    let mut export = Cursor::new(bytes.strip_prefix(b"IRMIND-EXPORT-V10\0").unwrap());
+    let mut export = Cursor::new(bytes.strip_prefix(b"IRMIND-EXPORT-V11\0").unwrap());
     frame(&mut export);
     let count = length(&mut export);
     let mut entries =

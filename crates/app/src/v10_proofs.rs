@@ -25,16 +25,8 @@ mod sigma_objects;
 pub use sigma_objects::*;
 
 const ADMISSION: &[u8] = b"irmind-sigma-pack-admission-v1\0";
-pub const SIGMA_EVALUATOR_V2: &str = "irmind-sigma-evaluator-v2";
-pub const SIGMA_EVALUATOR_V3: &str = "irmind-sigma-evaluator-v3";
-pub const SIGMA_EVALUATOR_V4: &str = "irmind-sigma-evaluator-v4";
-
-pub(crate) fn uses_sigma_class_plan(evaluator: &str) -> bool {
-    matches!(evaluator, SIGMA_EVALUATOR_V3 | SIGMA_EVALUATOR_V4)
-        || requires_sigma_case_admission(evaluator)
-}
-
-const RUN: &[u8] = b"irmind-sigma-run-v1\0";
+pub const SIGMA_EVALUATOR_V5: &str = "irmind-sigma-evaluator-v5";
+const RUN: &[u8] = b"irmind-sigma-run-v2\0";
 const REPORT: &[u8] = b"irmind-report-published-v1\0";
 const MAX_LABEL: usize = 256;
 const MAX_IDENTIFIER: usize = 128;
@@ -193,8 +185,25 @@ impl SigmaRunStatusV1 {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(u8)]
+pub enum SigmaAdmissionMode {
+    DirectLocal = 0,
+    InstalledPackage = 1,
+}
+
+impl SigmaAdmissionMode {
+    fn read(input: &mut Wire<'_>) -> Result<Self> {
+        match input.byte()? {
+            0 => Ok(Self::DirectLocal),
+            1 => Ok(Self::InstalledPackage),
+            _ => Err(INVALID),
+        }
+    }
+}
+
 #[derive(Clone, Eq, PartialEq)]
-pub struct SigmaRunV1 {
+pub struct SigmaRunV2 {
     pub checkpoint: CaseCheckpointV1,
     pub pack_admission: Digest,
     pub artifact_inventory: Digest,
@@ -204,6 +213,7 @@ pub struct SigmaRunV1 {
     pub compiled_rules: Digest,
     pub field_table: Digest,
     pub evaluator: String,
+    pub admission_mode: SigmaAdmissionMode,
     pub reserved_units: u64,
     pub used_units: u64,
     pub status: SigmaRunStatusV1,
@@ -212,7 +222,7 @@ pub struct SigmaRunV1 {
     pub proof_set: Digest,
 }
 
-impl SigmaRunV1 {
+impl SigmaRunV2 {
     pub fn encode(&self) -> Result<String> {
         self.validate()?;
         let mut out = RUN.to_vec();
@@ -229,6 +239,7 @@ impl SigmaRunV1 {
         out.extend_from_slice(&self.compiled_rules);
         out.extend_from_slice(&self.field_table);
         put_text(&mut out, &self.evaluator, MAX_IDENTIFIER)?;
+        out.push(self.admission_mode as u8);
         out.extend_from_slice(&self.reserved_units.to_be_bytes());
         out.extend_from_slice(&self.used_units.to_be_bytes());
         out.push(self.status as u8);
@@ -251,6 +262,7 @@ impl SigmaRunV1 {
             compiled_rules: input.fixed()?,
             field_table: input.fixed()?,
             evaluator: input.text(MAX_IDENTIFIER)?,
+            admission_mode: SigmaAdmissionMode::read(&mut input)?,
             reserved_units: input.u64()?,
             used_units: input.u64()?,
             status: SigmaRunStatusV1::read(&mut input)?,
@@ -266,8 +278,7 @@ impl SigmaRunV1 {
     fn validate(&self) -> Result<()> {
         if self.start_utc_micros >= self.end_utc_micros
             || self.used_units > self.reserved_units
-            || (self.status == SigmaRunStatusV1::CoverageLimited
-                && !uses_sigma_class_plan(&self.evaluator))
+            || self.evaluator != SIGMA_EVALUATOR_V5
         {
             return Err(INVALID);
         }
@@ -467,6 +478,17 @@ mod tests {
         all[name]["bytes_hex"].as_str().unwrap().to_owned()
     }
 
+    pub(super) fn new_run() -> String {
+        let all: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../docs/development/case-7-export-v11-vectors/wire.json"
+        ))
+        .unwrap();
+        all["sigma"]["direct_run_v2_body"]["hex"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    }
+
     #[test]
     fn approved_receipt_vectors_round_trip() {
         let bytes = vector("sigma_pack_admission_v1");
@@ -476,15 +498,10 @@ mod tests {
             SigmaPackOriginV1::PinnedReleaseArchive(_)
         ));
         assert_eq!(admission.encode().unwrap(), bytes);
-        for (name, expected) in [
-            ("sigma_run_v1_complete", SigmaRunStatusV1::Complete),
-            ("sigma_run_v1_work_limit", SigmaRunStatusV1::WorkLimit),
-        ] {
-            let bytes = vector(name);
-            let run = SigmaRunV1::decode(&bytes).unwrap();
-            assert_eq!(run.status, expected);
-            assert_eq!(run.encode().unwrap(), bytes);
-        }
+        let bytes = new_run();
+        let run = SigmaRunV2::decode(&bytes).unwrap();
+        assert_eq!(run.status, SigmaRunStatusV1::CoverageLimited);
+        assert_eq!(run.encode().unwrap(), bytes);
         let bytes = vector("report_published_v1");
         let report = ReportPublishedV1::decode(&bytes).unwrap();
         assert!(report.language == ReportLanguageV1::Spanish);
@@ -494,16 +511,16 @@ mod tests {
 
     #[test]
     fn receipts_reject_malformed_or_noncanonical_bytes() {
-        let bytes = vector("sigma_run_v1_complete");
-        assert!(SigmaRunV1::decode(&bytes[..bytes.len() - 1]).is_err());
-        assert!(SigmaRunV1::decode(&bytes.to_ascii_uppercase()).is_err());
-        assert!(SigmaRunV1::decode(&format!("{bytes}00")).is_err());
+        let bytes = new_run();
+        assert!(SigmaRunV2::decode(&bytes[..bytes.len() - 1]).is_err());
+        assert!(SigmaRunV2::decode(&bytes.to_ascii_uppercase()).is_err());
+        assert!(SigmaRunV2::decode(&format!("{bytes}00")).is_err());
         assert!(ReportPublishedV1::decode(&bytes).is_err());
         let mut raw = decode_payload(&bytes, RUN).unwrap();
         let time = RUN.len() + 4 + 36 + 8 + 32 + 3 * 32;
         raw[time..time + 16].fill(0);
-        assert!(SigmaRunV1::decode(&encode_payload(&raw).unwrap()).is_err());
-        let mut run = SigmaRunV1::decode(&bytes).unwrap();
+        assert!(SigmaRunV2::decode(&encode_payload(&raw).unwrap()).is_err());
+        let mut run = SigmaRunV2::decode(&bytes).unwrap();
         run.used_units = run.reserved_units + 1;
         assert!(run.encode().is_err());
 

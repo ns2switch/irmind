@@ -1,10 +1,10 @@
 //! Bind the decoded proof bodies to their signed receipt before resolving material.
 use super::{
     ReportAnalystSectionsV1, ReportCitationsV1, ReportCoverageV2, ReportPublishedV1,
-    SIGMA_EVALUATOR_V2, SigmaClassPlan, SigmaCompiledRulesV1, SigmaCoverageV1, SigmaFieldTableV1,
-    SigmaPackAdmissionV1, SigmaPackManifestV1, SigmaRuleKeyV1, SigmaRunResultsV1,
-    SigmaRunResultsV2, SigmaRunResultsV3, SigmaRunStatusV1, SigmaRunV1, SigmaSourceScopeV1,
-    V10ArtifactReference, V10CheckpointView, V10ObjectSection, V10RowReference, V10SourceReference,
+    SigmaClassPlan, SigmaCompiledRulesV1, SigmaCoverageV1, SigmaFieldTableV1, SigmaPackAdmissionV1,
+    SigmaPackManifestV1, SigmaRuleKeyV1, SigmaRunResultsV1, SigmaRunResultsV3, SigmaRunV2,
+    SigmaSourceScopeV1, V10ArtifactReference, V10CheckpointView, V10ObjectSection, V10RowReference,
+    V10SourceReference,
 };
 use crate::{AppError, CancellationToken, SignedEntry};
 use irmind_domain::ParquetArtifact;
@@ -17,7 +17,7 @@ type ProofKey = (u8, [u8; 32]);
 
 pub struct V10SigmaRunObjects {
     pub field_table: SigmaFieldTableV1,
-    pub class_plan: Option<SigmaClassPlan>,
+    pub class_plan: SigmaClassPlan,
     pub selected_sources: SigmaSourceScopeV1,
     pub compiled_rules: SigmaCompiledRulesV1,
     pub results: SigmaRunResultsV1,
@@ -31,7 +31,7 @@ impl V10SigmaRunObjects {
     pub fn verify_case_rows(
         &self,
         entries: &[SignedEntry],
-        receipt: &SigmaRunV1,
+        receipt: &SigmaRunV2,
         mut verify_rows: impl FnMut(&ParquetArtifact, &[V10RowReference]) -> Result<(), AppError>,
         cancel: &CancellationToken,
     ) -> Result<(), AppError> {
@@ -96,7 +96,7 @@ pub fn read_v10_sigma_admission(
 pub fn read_v10_sigma_run(
     section: &V10ObjectSection,
     reader: &mut (impl Read + Seek),
-    receipt: &SigmaRunV1,
+    receipt: &SigmaRunV2,
     admission: &SigmaPackManifestV1,
     referenced: &mut BTreeSet<ProofKey>,
     cancel: &CancellationToken,
@@ -109,9 +109,12 @@ pub fn read_v10_sigma_run(
     ]);
     section.check_commitment(&keys, &receipt.proof_set)?;
     let body = section.body(reader, (5, receipt.result_manifest), cancel)?;
-    let (results, class_plan) = read_sigma_results(receipt, &body)?;
+    let results = SigmaRunResultsV3::decode(&body).map_err(|_| invalid())?;
+    if results.status(receipt.status) != receipt.status {
+        return Err(invalid());
+    }
     let objects = V10SigmaRunObjects {
-        class_plan,
+        class_plan: results.plan,
         field_table: SigmaFieldTableV1::decode(&section.body(
             reader,
             (2, receipt.field_table),
@@ -130,9 +133,9 @@ pub fn read_v10_sigma_run(
             cancel,
         )?)
         .map_err(|_| invalid())?,
-        results: results.results,
-        unavailable_by_source: results.unavailable_by_source,
-        indeterminate_by_rule: results.indeterminate_by_rule,
+        results: results.scan.results,
+        unavailable_by_source: results.scan.unavailable_by_source,
+        indeterminate_by_rule: results.scan.indeterminate_by_rule,
     };
     let admitted = admission
         .0
@@ -166,52 +169,15 @@ pub fn read_v10_sigma_run(
     {
         return Err(invalid());
     }
-    if let Some(plan) = &objects.class_plan {
-        if covered.len() != admitted.len() {
-            return Err(invalid());
-        }
-        plan.validate_compiled(&objects.compiled_rules, &objects.results.coverage, 1024)
-            .map_err(|_| invalid())?;
+    if covered.len() != admitted.len() {
+        return Err(invalid());
     }
+    objects
+        .class_plan
+        .validate_compiled(&objects.compiled_rules, &objects.results.coverage, 1024)
+        .map_err(|_| invalid())?;
     referenced.extend(keys);
     Ok(objects)
-}
-
-fn read_sigma_results(
-    receipt: &SigmaRunV1,
-    body: &[u8],
-) -> Result<(SigmaRunResultsV2, Option<SigmaClassPlan>), AppError> {
-    if super::uses_sigma_class_plan(&receipt.evaluator) {
-        let result = SigmaRunResultsV3::decode(body).map_err(|_| invalid())?;
-        if result.status(receipt.status) != receipt.status {
-            return Err(invalid());
-        }
-        return Ok((result.scan, Some(result.plan)));
-    }
-    let result = match receipt.evaluator.as_str() {
-        "irmind-sigma-evaluator-v1"
-            if receipt.status != SigmaRunStatusV1::ExactFieldsUnavailable =>
-        {
-            SigmaRunResultsV2 {
-                results: SigmaRunResultsV1::decode(body).map_err(|_| invalid())?,
-                unavailable_by_source: vec![],
-                indeterminate_by_rule: vec![],
-            }
-        }
-        SIGMA_EVALUATOR_V2 => {
-            let result = SigmaRunResultsV2::decode(body).map_err(|_| invalid())?;
-            if (receipt.status == SigmaRunStatusV1::ExactFieldsUnavailable
-                && result.indeterminate_by_rule.is_empty())
-                || (receipt.status == SigmaRunStatusV1::Complete
-                    && !result.indeterminate_by_rule.is_empty())
-            {
-                return Err(invalid());
-            }
-            result
-        }
-        _ => return Err(invalid()),
-    };
-    Ok((result, None))
 }
 
 pub struct V10ReportObjects {

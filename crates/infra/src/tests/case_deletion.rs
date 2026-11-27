@@ -102,6 +102,92 @@ fn case_deletion_rejects_wrong_confirmation_sealed_case_and_active_session() {
 }
 
 #[test]
+fn case_6_rejects_open_verify_and_deletion_before_reading_later_records() {
+    use irmind_app::case_format::{CaseFormatError, FORMAT_GUIDE};
+
+    let root = tempfile::tempdir().unwrap();
+    let (store, engine) = source_fixture(root.path(), 171);
+    let engine = engine.with_case_lifecycle(store.clone());
+    let id = CaseId::parse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa").unwrap();
+    let key = SigningKey::from_bytes(&[171; 32]);
+    let first = SignedEntry {
+        seq: 1,
+        case_id: id.as_str().to_owned(),
+        at: 17,
+        actor: Actor::Analyst,
+        origin: "system".into(),
+        kind: irmind_domain::AuditEventKind::CaseCreated,
+        payload: r#"{"version":6,"title":"Synthetic","severity":"medium","scope":"local"}"#.into(),
+        evidence: None,
+        prev: [0; 32],
+        hash: [0; 32],
+        sig: Vec::new(),
+        public_key: key.verifying_key().to_bytes().to_vec(),
+    };
+    let hash = sha256(&first.canonical());
+    let first = SignedEntry {
+        hash,
+        sig: key.sign(&hash).to_bytes().to_vec(),
+        ..first
+    };
+    store
+        .transact(
+            &first,
+            irmind_app::CaseMutation::Create(Case {
+                id: id.clone(),
+                title: "Synthetic".into(),
+                severity: Severity::Medium,
+                scope: "local".into(),
+                sealed: false,
+            }),
+        )
+        .unwrap();
+    let owned = store.parquet.case_dir(&id).unwrap();
+    let bytes = b"synthetic case-owned evidence";
+    let source = owned.join("original.json");
+    fs::write(&source, bytes).unwrap();
+    store.conn().unwrap().execute(
+        "INSERT INTO audit (case_id,seq,at,actor,origin,kind,payload,evidence,prev,hash,sig,public_key)
+         VALUES (?1,2,17,'analyst','system','intentionally unreadable','',NULL,?2,?2,?3,?4)",
+        rusqlite::params![id.as_str(), hash.as_slice(), first.sig, first.public_key],
+    ).unwrap();
+
+    let retired = |error: AppError| match error {
+        AppError::Fixed(irmind_app::FixedAppError::CaseFormat(CaseFormatError::Case(Some(6)))) => {
+            let message = error.to_string();
+            assert!(message.contains("v0.7.x"));
+            assert!(message.contains("refuses to delete sealed cases"));
+            assert!(message.contains(FORMAT_GUIDE));
+            true
+        }
+        _ => false,
+    };
+    let cancel = CancellationToken::new();
+    assert!(engine.open_case_verified(&id, &cancel).is_err_and(retired));
+    assert!(engine.verify(&id).is_err_and(retired));
+    let export = root.path().join("old.irmind");
+    assert!(
+        irmind_app::LargeCaseExporter::export_case(
+            store.as_ref(),
+            &id,
+            &export,
+            None,
+            false,
+            &cancel
+        )
+        .is_err_and(retired)
+    );
+    assert!(!export.exists());
+    assert!(
+        engine
+            .prepare_case_deletion(&id, &cancel)
+            .is_err_and(retired)
+    );
+    assert_eq!(fs::read(source).unwrap(), bytes);
+    assert!(store.global_operations().unwrap().is_empty());
+}
+
+#[test]
 fn case_deletion_cancelled_before_commit_keeps_case_and_journals() {
     let root = tempfile::tempdir().unwrap();
     let (store, engine, id) = fixture(root.path());

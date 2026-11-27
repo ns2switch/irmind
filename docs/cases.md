@@ -13,7 +13,7 @@ stored evidence blob.
 
 ## Cases and exports from an earlier version
 
-Version 0.7 uses case marker 6, mapped V3 Parquet artifacts and export V10. Use
+Version 0.8 uses case marker 7, mapped V3 Parquet artifacts and export V11. Use
 the creating version of IRMind to open, verify or export earlier cases. To use
 the current version, verify the originals with the creating version and ingest
 them into a new case. The original case retains its approvals, confirmed
@@ -23,7 +23,7 @@ findings and seal.
 
 Use `/sigma inspect <directory>` to review a local pack. Use
 `/sigma import --license <id> <directory>` and confirm the displayed manifest hash
-to sign its admission. The case keeps the exact admitted rules in its V10 export
+to sign its admission. The case keeps the exact admitted rules in its V11 export
 when a run references them.
 
 Run `/sigma run <pack SHA-256> <start UTC> <end UTC>` from an open case. The
@@ -49,11 +49,13 @@ reached their result limit.
 
 Use `/report save md en` or `/report save pdf es` to sign and retain the
 rendered document in the case. The command shows its SHA-256. Once sealed, the
-case includes its published reports in the V10 export. `/verify` checks the
+case includes its published reports in the V11 export. `/verify` checks the
 signature, source rows, coverage and rendered bytes. To publish another
 revision, use an open case.
 
 ## Delete an unsealed case
+
+For a case from v0.7.x, follow the [previous-version deletion guide](previous-versions.md#delete-a-case-from-07x).
 
 From an open case, run `/case delete`. From `/home`, select a case with the arrows
 and run `/case delete`, or use `/case delete <title or ID>`. The case list shows

@@ -15,7 +15,7 @@ mod evidence_status;
 mod investigation;
 mod model_request;
 
-pub(crate) const CASE_CREATION_VERSION: u8 = 6;
+pub(crate) use crate::case_format::CASE_VERSION as CASE_CREATION_VERSION;
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -30,18 +30,7 @@ pub(crate) struct CaseCreatedEvent {
 }
 
 pub(crate) fn current_case_creation(first: &SignedEntry) -> Result<CaseCreatedEvent, AppError> {
-    #[derive(Deserialize)]
-    struct VersionMarker {
-        version: u8,
-    }
-    if !first.payload.starts_with('{') {
-        return Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat));
-    }
-    let marker: VersionMarker =
-        serde_json::from_str(&first.payload).map_err(|_| AppError::InvalidChain(first.seq))?;
-    if marker.version != CASE_CREATION_VERSION {
-        return Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat));
-    }
+    crate::case_format::admit_case_root(first)?;
     let created: CaseCreatedEvent =
         serde_json::from_str(&first.payload).map_err(|_| AppError::InvalidChain(first.seq))?;
     created
@@ -466,18 +455,22 @@ impl Engine<'_> {
 mod format_tests {
     use super::*;
     #[test]
-    fn case_created_v6_matches_the_approved_contract_bytes() {
-        for bytes in [
-            include_bytes!("../../testkit/fixtures/contracts/case-created-v6.json").as_slice(),
-            include_bytes!("../../testkit/fixtures/contracts/case-created-v6-disabled.json")
-                .as_slice(),
-        ] {
-            let created: CaseCreatedEvent = serde_json::from_slice(bytes).unwrap();
-            assert_eq!(created.version, CASE_CREATION_VERSION);
-            created.budget.validate().unwrap();
-            created.source_queries.validate().unwrap();
-            assert_eq!(serde_json::to_vec(&created).unwrap(), bytes);
-        }
+    fn case_created_v7_matches_the_approved_contract_bytes() {
+        let vectors: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../docs/development/case-7-export-v11-vectors/wire.json"
+        ))
+        .unwrap();
+        let bytes = hex::decode(
+            vectors["case_and_export"]["case_created_payload"]["hex"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap();
+        let created: CaseCreatedEvent = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(created.version, CASE_CREATION_VERSION);
+        created.budget.validate().unwrap();
+        created.source_queries.validate().unwrap();
+        assert_eq!(serde_json::to_vec(&created).unwrap(), bytes);
     }
 
     #[test]
@@ -489,7 +482,7 @@ mod format_tests {
             actor: Actor::Analyst,
             origin: "analyst".into(),
             kind: AuditEventKind::CaseCreated,
-            payload: r#"{"version":6,"title":"Synthetic","severity":"medium","scope":"local","budget":{"model_tokens":2000000,"tool_calls":1000,"cloud_bytes":536870912000},"source_queries":{"enabled":false,"analytics_allowed":false,"scan_bytes":null,"retained_rows":0,"retained_bytes":0}}"#
+            payload: r#"{"version":7,"title":"Synthetic","severity":"medium","scope":"local","budget":{"model_tokens":2000000,"tool_calls":1000,"cloud_bytes":536870912000},"source_queries":{"enabled":false,"analytics_allowed":false,"scan_bytes":null,"retained_rows":0,"retained_bytes":0}}"#
                 .into(),
             evidence: None,
             prev: [0; 32],
@@ -512,7 +505,9 @@ mod format_tests {
             first.payload = retired.into();
             assert!(matches!(
                 verify_case_metadata("Synthetic", Severity::Medium, "local", &[first.clone()]),
-                Err(AppError::Fixed(crate::FixedAppError::RetiredCaseFormat))
+                Err(AppError::Fixed(crate::FixedAppError::CaseFormat(
+                    crate::case_format::CaseFormatError::Case(_)
+                )))
             ));
         }
     }

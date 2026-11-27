@@ -160,15 +160,12 @@ impl Engine<'_> {
         let mut sigma_runs = Vec::new();
         for entry in entries
             .iter()
-            .filter(|entry| entry.kind == crate::AuditEventKind::SigmaRunV1)
+            .filter(|entry| entry.kind == crate::AuditEventKind::SigmaRunV2)
         {
-            if let Some(notice) =
-                crate::v10_proofs::SigmaV3Notice::resolve(entry, |kind, digest| {
-                    self.read_sigma_notice_proof(id, kind, digest, cancel)
-                })?
-            {
-                sigma_runs.push(notice);
-            }
+            sigma_runs.push(crate::v10_proofs::SigmaV3Notice::resolve(
+                entry,
+                |kind, digest| self.read_sigma_notice_proof(id, kind, digest, cancel),
+            )?);
         }
         Ok(VerifiedCaseNotices {
             count,
@@ -267,7 +264,7 @@ impl Engine<'_> {
         crate::v10_proofs::verify_sigma_case_admission_pairs(&entries)?;
         if entries
             .iter()
-            .any(|entry| entry.kind == crate::AuditEventKind::SigmaRunV1)
+            .any(|entry| entry.kind == crate::AuditEventKind::SigmaRunV2)
         {
             let store = self
                 .large_case_store

@@ -60,7 +60,7 @@ fn bundled_cloudtrail_tables_survive_signed_ingestion_rebuild_and_v10_export() {
             .verify_export_details(&target, Some(&key))
             .unwrap()
             .format_version,
-        10
+        11
     );
 }
 

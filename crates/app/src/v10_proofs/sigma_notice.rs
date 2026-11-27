@@ -42,11 +42,8 @@ impl SigmaV3Notice {
     pub fn resolve(
         entry: &SignedEntry,
         mut read: impl FnMut(u8, [u8; 32]) -> Result<SigmaProofRead, AppError>,
-    ) -> Result<Option<Self>, AppError> {
+    ) -> Result<Self, AppError> {
         let run = sigma_execution(entry)?;
-        if !super::uses_sigma_class_plan(&run.evaluator) {
-            return Ok(None);
-        }
         let invalid = || AppError::InvalidChain(entry.seq);
         let mut checked = |kind, digest| {
             let object = read(kind, digest)?;
@@ -85,7 +82,7 @@ impl SigmaV3Notice {
                 Ok((label.clone(), missing, incompatible))
             })
             .collect::<Result<_, AppError>>()?;
-        Ok(Some(Self {
+        Ok(Self {
             receipt: EvidenceHash::from_bytes(entry.hash),
             coverage: results.plan.coverage(),
             skipped_classes,
@@ -103,6 +100,6 @@ impl SigmaV3Notice {
                     | SigmaRunStatusV1::TimeLimit
                     | SigmaRunStatusV1::WorkLimit
             ),
-        }))
+        })
     }
 }

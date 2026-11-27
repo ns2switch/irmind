@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Refresh synthetic export vectors or derive V9 and V10 from frozen synthetic seeds.
+"""Refresh synthetic export vectors or derive V9–V11 from frozen synthetic seeds.
 
 Development only; requires Python cryptography. Only the published synthetic
 signing keys are accepted. Original signatures and seed digests are checked
@@ -174,19 +174,20 @@ def resign(magic, header, entries, remainder):
     ordered_header['seal'] = {key: header['seal'][key] for key in (
         'seq', 'hash', 'sig', 'public_key', 'analyst_key_fingerprint',
     )}
-    prefix = frame(header) if magic != b'IRMIND-EXPORT-V10\0' else field(
+    prefix = frame(header) if magic not in (b'IRMIND-EXPORT-V10\0', b'IRMIND-EXPORT-V11\0') else field(
         json.dumps(ordered_header, ensure_ascii=False, separators=(',', ':')),
     )
     return magic + prefix + number(len(entries)) + b''.join(map(frame, entries)) + remainder
 
 
-def derive_v10(path):
+def derive_archive(path, source_version, version, extra_counts):
     test = (ROOT / 'crates/infra/src/tests/mapped_export/seed.rs').read_text()
     expected = re.search(re.escape(path.name) + r'"\),\s*"([0-9a-f]{64})"', test)
     original = path.read_bytes()
     assert expected and sha(original).hex() == expected[1]
     source = Reader(original)
-    assert source.take(len(MAGIC)) == b'IRMIND-EXPORT-V9\0'
+    source_magic = f'IRMIND-EXPORT-V{source_version}\0'.encode('ascii')
+    assert source.take(len(source_magic)) == source_magic
     header = json.loads(source.field())
     entries = [json.loads(source.field()) for _ in range(source.number())]
     previous = bytes(32)
@@ -201,17 +202,18 @@ def derive_v10(path):
     challenge = (b'irmind-seal-v1\0' + field(header['case_id']) + number(final['seq'])
                  + previous + field(final['payload']))
     KEY.public_key().verify(bytes(old_seal['sig']), challenge)
-    assert header['version'] == 9 and entries[0]['kind'] == 'CaseCreated'
+    assert header['version'] == source_version and entries[0]['kind'] == 'CaseCreated'
     created = json.loads(entries[0]['payload'])
-    assert created['version'] == 5
-    created['version'] = 6
+    assert created['version'] == source_version - 4
+    created['version'] = version - 4
     entries[0]['payload'] = json.dumps(created, ensure_ascii=False, separators=(',', ':'))
-    header['version'] = 10
-    return resign(b'IRMIND-EXPORT-V10\0', header, entries, source.data[source.offset:] + bytes(16))
+    header['version'] = version
+    magic = f'IRMIND-EXPORT-V{version}\0'.encode('ascii')
+    return resign(magic, header, entries, source.data[source.offset:] + bytes(extra_counts * 8))
 
 
 
-def derive_v6_query_chain(name):
+def derive_query_chain(name, version):
     directory = ROOT / 'docs/development/source-query-format-vectors'
     original = (directory / f'{name}.json').read_bytes()
     sums = (directory / 'SHA256SUMS').read_text()
@@ -233,7 +235,7 @@ def derive_v6_query_chain(name):
         public.verify(bytes(entry['sig']), edge)
     created = json.loads(entries[0]['payload'])
     assert created['version'] == 5
-    created['version'] = 6
+    created['version'] = version
     entries[0]['payload'] = json.dumps(created, ensure_ascii=False, separators=(',', ':'))
     edge = bytes(32)
     for entry in entries:
@@ -250,18 +252,22 @@ def main():
     versions = parser.add_mutually_exclusive_group()
     versions.add_argument('--case-v5', action='store_true')
     versions.add_argument('--case-v6', action='store_true')
+    versions.add_argument('--case-v7', action='store_true')
     args = parser.parse_args()
-    if args.case_v6:
+    if args.case_v6 or args.case_v7:
+        case_version = 7 if args.case_v7 else 6
+        version = case_version + 4
         for suffix in ("mapped", "installed"):
             directory = ROOT / 'fuzz/seeds/export'
-            data = derive_v10(directory / f'valid-v9-{suffix}.irmind')
-            path = directory / f'valid-v10-{suffix}.irmind'
+            source = directory / f'valid-v{version - 1}-{suffix}.irmind'
+            data = derive_archive(source, version - 1, version, 2 if case_version == 6 else 0)
+            path = directory / f'valid-v{version}-{suffix}.irmind'
             print(path.name, sha(data).hex())
             if args.write:
                 path.write_bytes(data)
         for name in ('signed-record-chain', 'signed-recovery-chain'):
-            data = derive_v6_query_chain(name)
-            path = ROOT / 'crates/testkit/fixtures/contracts' / f'{name}-case-v6.json'
+            data = derive_query_chain(name, case_version)
+            path = ROOT / 'crates/testkit/fixtures/contracts' / f'{name}-case-v{case_version}.json'
             print(path.name, sha(data).hex())
             if args.write:
                 path.write_bytes(data)

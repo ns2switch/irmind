@@ -8,11 +8,16 @@ fn missing_initial_allocation_cannot_open_verify_or_export() {
         let root = tempfile::tempdir().unwrap();
         let (store, engine) = setup(root.path());
         let case = create_unallocated_case(&engine, store.as_ref(), current);
-        let before = store.entries(&case.id).unwrap();
+        let before = store.last_entry(&case.id).unwrap().unwrap();
         let cancel = irmind_app::CancellationToken::new();
         let error = engine.open_case_verified(&case.id, &cancel).unwrap_err();
         if !current {
-            assert!(error.to_string().contains("version that created it"));
+            assert!(matches!(
+                error,
+                irmind_app::AppError::Fixed(irmind_app::FixedAppError::CaseFormat(
+                    irmind_app::case_format::CaseFormatError::Case(Some(6)),
+                ))
+            ));
         }
         assert!(engine.verify(&case.id).is_err());
         assert!(
@@ -34,7 +39,8 @@ fn missing_initial_allocation_cannot_open_verify_or_export() {
             .is_err()
         );
         assert!(!destination.exists());
-        assert_eq!(store.entries(&case.id).unwrap().len(), before.len());
+        let after = store.last_entry(&case.id).unwrap().unwrap();
+        assert_eq!((after.seq, after.hash), (before.seq, before.hash));
         let model = BudgetModel {
             requests: std::sync::Mutex::default(),
             output: Some("Synthetic reply."),
@@ -59,7 +65,7 @@ fn create_unallocated_case(
     };
     let created = format!(
         r#"{{"version":{},"title":"Synthetic unallocated case","severity":"medium","scope":"local"}}"#,
-        if current { 4 } else { 3 }
+        if current { 7 } else { 6 }
     );
     let mut previous = None;
     for (kind, payload) in [
@@ -77,7 +83,7 @@ fn create_unallocated_case(
             case_id: case.id.as_str().into(),
             at: 0,
             actor: Actor::Analyst,
-            origin: "System".into(),
+            origin: "system".into(),
             kind,
             payload: payload.into(),
             evidence: None,
