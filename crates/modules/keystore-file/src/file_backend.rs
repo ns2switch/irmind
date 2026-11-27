@@ -2,6 +2,39 @@ use crate::crypto::{decrypt, derive, persist};
 use crate::*;
 
 impl FileKeystore {
+    /// Authenticate a fresh phrase against the active vault and Analyst key.
+    /// This operation grants no new signing or storage capability.
+    pub fn verify_analyst_passphrase(
+        &self,
+        passphrase: &SecretString,
+        analyst_key: &[u8],
+    ) -> Result<(), AppError> {
+        self.with_state(|active| {
+            let mut bytes = Zeroizing::new(Vec::new());
+            let file = open_private(&self.vault.path, false)?;
+            if !file.metadata().map_err(|_| failure())?.is_file() {
+                return Err(failure());
+            }
+            file.take((MAX_FILE_BYTES + 1) as u64)
+                .read_to_end(&mut bytes)
+                .map_err(|_| failure())?;
+            let fresh = decrypt(&bytes, passphrase)?;
+            if fresh.salt != active.salt {
+                return Err(failure());
+            }
+            let name = record_name(&Actor::Analyst);
+            for state in [&*active, &fresh] {
+                let bytes = state.records.get(&name).ok_or_else(failure)?;
+                let seed =
+                    Zeroizing::new(<[u8; 32]>::try_from(bytes.as_slice()).map_err(|_| failure())?);
+                if SigningKey::from_bytes(&seed).verifying_key().as_bytes() != analyst_key {
+                    return Err(failure());
+                }
+            }
+            Ok(())
+        })
+    }
+
     /// Create a one-session vault without exposing its random passphrase to the caller.
     pub fn ephemeral(home: &Path) -> Result<Self, AppError> {
         let mut bytes = zeroize::Zeroizing::new([0_u8; 32]);

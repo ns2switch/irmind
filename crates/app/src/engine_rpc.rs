@@ -1,6 +1,7 @@
 //! The local engine protocol transports bounded projections and turn requests.
 //! The caller has already admitted a case on the analyst's local terminal.
 use crate::{AppError, CancellationToken, CancelledOperation, CaseId, Engine, LlmPort};
+use approvals::{Approvals, Protocol};
 use serde_json::{Value, json};
 use std::{
     io::{self, Read, Write},
@@ -10,6 +11,7 @@ use std::{
 };
 use uuid::Uuid;
 
+mod approvals;
 mod case;
 mod wire;
 use wire::{Fault, Method, Request, params};
@@ -33,21 +35,71 @@ pub fn serve(
     admitted: CaseId,
     model: Option<&dyn LlmPort>,
     shutdown: &CancellationToken,
+    input: impl Read + Send + 'static,
+    output: impl Write + Send + 'static,
+) -> io::Result<()> {
+    serve_protocol(
+        engine,
+        admitted,
+        model,
+        shutdown,
+        Protocol::V1,
+        input,
+        output,
+    )
+}
+
+/// The host binds this verifier to the active encrypted file keystore.
+pub type PassphraseVerifier<'a> = dyn Fn(&secrecy::SecretString, &[u8]) -> bool + Sync + 'a;
+
+/// RPC V2 is selected before either peer writes the protocol magic. The
+/// caller must give this transport unbuffered private inherited pipes.
+pub fn serve_v2(
+    engine: &Engine<'_>,
+    admitted: CaseId,
+    model: Option<&dyn LlmPort>,
+    shutdown: &CancellationToken,
+    verify: Option<&PassphraseVerifier<'_>>,
+    input: impl Read + Send + 'static,
+    output: impl Write + Send + 'static,
+) -> io::Result<()> {
+    serve_protocol(
+        engine,
+        admitted,
+        model,
+        shutdown,
+        Protocol::V2(verify),
+        input,
+        output,
+    )
+}
+
+fn serve_protocol(
+    engine: &Engine<'_>,
+    admitted: CaseId,
+    model: Option<&dyn LlmPort>,
+    shutdown: &CancellationToken,
+    protocol: Protocol<'_>,
     mut input: impl Read + Send + 'static,
     mut output: impl Write + Send + 'static,
 ) -> io::Result<()> {
+    let session_shutdown = shutdown.child_token();
+    let peer_shutdown = session_shutdown.clone();
+    let v2 = protocol.v2();
+    let magic = protocol.magic();
     let (requests, incoming) = sync_channel(4);
     // A blocking pipe read must not keep a cancelled case or a turn alive.
     // The CLI process owns these two I/O threads. They hold no engine state.
     thread::Builder::new()
         .name("irmind-rpc-read".into())
         .spawn(move || {
-            if wire::read_magic(&mut input).is_err() {
+            let _disconnect = v2.then(|| peer_shutdown.drop_guard());
+            if wire::read_magic(&mut input, magic).is_err() {
                 let _ = requests.send(Err(()));
                 return;
             }
             loop {
-                match wire::request(&mut input) {
+                match wire::request(&mut input, v2) {
                     Ok(Some(request)) => {
                         if requests.send(Ok(request)).is_err() {
                             return;
@@ -74,7 +126,7 @@ pub fn serve(
             }
         })?;
     let output = Output(outgoing);
-    output.write(wire::MAGIC.to_vec())?;
+    output.write(magic.to_vec())?;
     thread::scope(|scope| {
         let mut session = Session {
             engine,
@@ -84,7 +136,9 @@ pub fn serve(
             active: None,
             id: Uuid::new_v4(),
             last_request: 0,
-            shutdown: shutdown.child_token(),
+            shutdown: session_shutdown,
+            protocol,
+            approvals: Approvals::default(),
         };
         let outcome = session.run(scope, &incoming, &output);
         session.shutdown.cancel();
@@ -93,6 +147,7 @@ pub fn serve(
         if let Some(turn) = session.active.take() {
             let _ = turn.worker.join();
         }
+        session.approvals.finish();
         outcome
     })
 }
@@ -140,6 +195,8 @@ struct Session<'scope, 'env, 'ports> {
     id: Uuid,
     last_request: u32,
     shutdown: CancellationToken,
+    protocol: Protocol<'env>,
+    approvals: Approvals<'scope>,
 }
 
 impl<'scope, 'env: 'scope> Session<'scope, 'env, '_> {
@@ -156,6 +213,7 @@ impl<'scope, 'env: 'scope> Session<'scope, 'env, '_> {
             match incoming.recv_timeout(POLL) {
                 Ok(Ok(request)) => {
                     self.reap();
+                    self.approvals.reap();
                     let id = request.id;
                     let reply = self.request(scope, request);
                     let close = matches!(reply, Err(Fault::Invalid | Fault::Version));
@@ -175,6 +233,7 @@ impl<'scope, 'env: 'scope> Session<'scope, 'env, '_> {
                 Err(RecvTimeoutError::Timeout) => (),
             }
             self.reap();
+            self.approvals.reap();
             self.emit(output)?;
         }
         Ok(())
@@ -191,9 +250,13 @@ impl<'scope, 'env: 'scope> Session<'scope, 'env, '_> {
         }
         self.last_request = request.id;
         match request.method {
+            Method::ApprovalPrepare
+            | Method::ApprovalSubmit
+            | Method::ApprovalStatus
+            | Method::ApprovalCancel => self.approval_request(scope, request),
             Method::Hello => {
                 let hello = params::<wire::Hello>(request.params)?;
-                if hello.version != 1 {
+                if hello.version != self.protocol.version() {
                     return Err(Fault::Version);
                 }
                 if !(1..=64).contains(&hello.client.len())
@@ -201,7 +264,7 @@ impl<'scope, 'env: 'scope> Session<'scope, 'env, '_> {
                 {
                     return Err(Fault::Invalid);
                 }
-                Ok(json!({"version":1, "session":self.id.to_string()}))
+                Ok(json!({"version":self.protocol.version(), "session":self.id.to_string()}))
             }
             Method::OpenCase => {
                 let input = params::<wire::Case>(request.params)?;
@@ -215,7 +278,7 @@ impl<'scope, 'env: 'scope> Session<'scope, 'env, '_> {
             Method::CaseStatus => {
                 let input = params::<wire::Case>(request.params)?;
                 self.require_open(&input.case_id)?;
-                if self.active.is_some() {
+                if self.active.is_some() || self.approvals.busy() {
                     return Err(Fault::Busy);
                 }
                 let (cursor, status) = case::status(self.engine, &self.admitted, &self.shutdown)
@@ -266,7 +329,7 @@ impl<'scope, 'env: 'scope> Session<'scope, 'env, '_> {
         if text.is_empty() || text.len() > MAX_CLIENT_TEXT {
             return Err(Fault::Invalid);
         }
-        if self.active.is_some() {
+        if self.active.is_some() || self.approvals.busy() {
             return Err(Fault::Busy);
         }
         let model = self.model.ok_or(Fault::Scope)?;

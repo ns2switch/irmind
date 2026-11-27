@@ -161,6 +161,18 @@ impl Engine<'_> {
         request: &ApprovalRequest,
         denial: Option<&str>,
     ) -> Result<Option<AuthorizedCall>, AppError> {
+        self.record_gated_resolution_unlocked(id, case, request, denial, &|| Ok(()))
+    }
+
+    pub(super) fn record_gated_resolution_unlocked(
+        &self,
+        id: &CaseId,
+        case: &Case,
+        request: &ApprovalRequest,
+        denial: Option<&str>,
+        check: &dyn Fn() -> Result<(), AppError>,
+    ) -> Result<Option<AuthorizedCall>, AppError> {
+        check()?;
         if denial.is_none() {
             self.policy_for_case_unlocked(id)?
                 .permits(&request.tool, self.completed_calls_unlocked(id)?)
@@ -197,8 +209,10 @@ impl Engine<'_> {
         .map_err(|_| {
             AppError::Fixed(crate::FixedAppError::PolicyStoredApprovalChallengeIsInvalid)
         })?;
+        check()?;
         let (kind, signature, reason, authorized) =
             self.sign_pending_resolution(pending, denial)?;
+        check()?;
         let event = ApprovalEvent {
             version: 1,
             id: request.id.clone(),

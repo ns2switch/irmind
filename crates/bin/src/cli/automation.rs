@@ -13,17 +13,10 @@ impl AutomationContext<'_, '_> {
             Command::SourceQuery { command } => self.handle_source_query(command),
             cmd @ Command::Ingest { .. } => self.handle_ingest(cmd),
             cmd @ Command::Ask { .. } => self.handle_ask(cmd),
-            Command::Serve { case_id } => {
-                irmind_app::engine_rpc::serve(
-                    self.engine,
-                    irmind_app::engine_rpc::canonical_case_id(&case_id)?,
-                    self.selected_model,
-                    self.cancel,
-                    std::io::stdin(),
-                    std::io::stdout(),
-                )?;
-                Ok(false)
-            }
+            Command::Serve {
+                case_id,
+                protocol_version,
+            } => self.handle_serve(&case_id, protocol_version),
             cmd @ (Command::Approvals { .. }
             | Command::Approve { .. }
             | Command::Deny { .. }
@@ -50,6 +43,49 @@ impl AutomationContext<'_, '_> {
                 self.handle_export_and_tui(cmd)
             }
         }
+    }
+
+    fn handle_serve(self, case_id: &str, protocol_version: u8) -> Result<bool> {
+        use irmind_app::engine_rpc::{canonical_case_id, serve, serve_v2};
+        let admitted = canonical_case_id(case_id)?;
+        if protocol_version == 1 {
+            serve(
+                self.engine,
+                admitted,
+                self.selected_model,
+                self.cancel,
+                std::io::stdin(),
+                std::io::stdout(),
+            )?;
+        } else {
+            #[cfg(feature = "keystore-file")]
+            let verify = self
+                .workspace_io
+                .file_backend
+                .as_deref()
+                .filter(|_| self.workspace_io.signer_id == "file")
+                .map(|backend| {
+                    move |phrase: &secrecy::SecretString, key: &[u8]| {
+                        backend.verify_analyst_passphrase(phrase, key).is_ok()
+                    }
+                });
+            #[cfg(feature = "keystore-file")]
+            let verifier = verify
+                .as_ref()
+                .map(|verify| verify as &irmind_app::engine_rpc::PassphraseVerifier<'_>);
+            #[cfg(not(feature = "keystore-file"))]
+            let verifier = None;
+            serve_v2(
+                self.engine,
+                admitted,
+                self.selected_model,
+                self.cancel,
+                verifier,
+                unbuffered_rpc_input()?,
+                std::io::stdout(),
+            )?;
+        }
+        Ok(false)
     }
 
     fn handle_case(self, command: Command) -> Result<bool> {
@@ -224,5 +260,31 @@ impl AutomationContext<'_, '_> {
             _ => return Err(anyhow!("invalid command dispatch")),
         }
         Ok(false)
+    }
+}
+
+// Rust's global Stdin has a BufReader. Secret-bearing bytes must be read
+// directly into the bounded, zeroizing buffers of the RPC decoder.
+fn unbuffered_rpc_input() -> std::io::Result<std::fs::File> {
+    #[cfg(unix)]
+    {
+        use std::os::{fd::AsFd as _, unix::fs::FileTypeExt as _};
+        let input = std::fs::File::from(std::io::stdin().as_fd().try_clone_to_owned()?);
+        let output = std::fs::File::from(std::io::stdout().as_fd().try_clone_to_owned()?);
+        if !input.metadata()?.file_type().is_fifo() || !output.metadata()?.file_type().is_fifo() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "RPC V2 needs private pipes",
+            ));
+        }
+        Ok(input)
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::io::AsHandle as _;
+        std::io::stdin()
+            .as_handle()
+            .try_clone_to_owned()
+            .map(std::fs::File::from)
     }
 }

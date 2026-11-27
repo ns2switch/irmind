@@ -54,8 +54,29 @@ engine's own cancellation and budget controls.
 
 ## Approvals
 
-When the stream signals `review_in_tui`, open the case in IRMind's TUI and
+When V1 signals `review_in_tui`, open the case in IRMind's TUI and
 use `/approvals`. IRMind signs there under the existing policy and key
 controls. The client can observe a guarded state only. The stdio protocol
 has no approval, prompt-presentation, signing, credential or configuration
 operation. This implementation uses case format 7 and export V11.
+
+## Graphical approval sessions
+
+A trusted graphical client can choose RPC V2 with
+`irmind serve <case_uuid> --protocol-version 2`. Use private inherited
+pipes, the `IRMIND-RPC-V2` magic and a V2 hello. IRMind still asks for
+local case admission at startup. V1 is the default.
+
+The GUI shows the full request from IRMind as escaped plain text. Review
+the action, case, arguments, effective scope, decision, expiry and code.
+V2 with an encrypted file keystore verifies the Analyst passphrase for
+each submitted decision. The GUI can see what you type. Use a graphical
+client you trust with that phrase. Close the session before switching to
+the TUI if the session owns the file-keystore lock.
+
+Windows Hello and Touch ID are activated only after validation on native
+hardware. On macOS, the proposed system dialog identifies the action,
+case, decision and code. Full arguments and scope are displayed by the
+GUI. A compromised GUI could show different arguments from the ones IRMind
+signs. Open `/approvals` inside IRMind for strict review. The Windows
+path displays the full request in a window owned by IRMind.

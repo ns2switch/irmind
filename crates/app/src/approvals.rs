@@ -71,6 +71,7 @@ impl AnalystApprovalVerifier for AnalystVerifierAdapter<'_> {
     }
 }
 
+pub(crate) mod gui;
 mod request;
 mod resolution;
 mod scope;

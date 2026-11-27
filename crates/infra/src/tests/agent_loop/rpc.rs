@@ -75,14 +75,18 @@ impl Client {
         }
     }
     fn open(&mut self, id: &CaseId) {
-        self.send.send(MAGIC.to_vec()).expect("magic");
+        self.open_with(id, MAGIC, 1);
+    }
+
+    fn open_with(&mut self, id: &CaseId, magic: &[u8], version: u8) {
+        self.send.send(magic.to_vec()).expect("magic");
         assert_eq!(
             self.responses.recv_timeout(WAIT).expect("magic reply"),
-            MAGIC
+            magic
         );
         assert_eq!(
-            self.call("hello", json!({"client":"fixture", "version":1}))["result"]["version"],
-            1
+            self.call("hello", json!({"client":"fixture", "version":version}))["result"]["version"],
+            version
         );
         let denied = self.call(
             "open_case",
@@ -558,3 +562,5 @@ fn no_delegation_in_engine_rpc_even_after_loading_a_skill() {
             .any(|entry| entry.kind == AuditEventKind::SubagentPlanV1)
     );
 }
+
+mod passphrase;

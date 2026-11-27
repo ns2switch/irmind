@@ -157,3 +157,28 @@ fn signing_identity_moves_in_encrypted_one_use_packet() {
     assert!(target.import_wrapped(Actor::Analyst, &packet).is_err());
     assert!(target.migration_recipient(&Actor::Analyst).is_err());
 }
+
+#[test]
+fn graphical_approval_reauthenticates_the_current_analyst_vault() {
+    let home = tempfile::tempdir().unwrap();
+    let vault = FileKeystore::open(home.path(), &phrase(), true).unwrap();
+    let analyst = vault.create(Actor::Analyst).unwrap().public_key();
+    let wrong = SecretString::from("different synthetic passphrase".to_owned());
+    assert!(vault.verify_analyst_passphrase(&phrase(), &analyst).is_ok());
+    assert!(vault.verify_analyst_passphrase(&wrong, &analyst).is_err());
+    assert!(
+        vault
+            .verify_analyst_passphrase(&phrase(), &[0; 32])
+            .is_err()
+    );
+    let path = home.path().join("keystore.enc");
+    let previous = fs::read(&path).unwrap();
+    vault.change_passphrase(&wrong).unwrap();
+    assert!(vault.verify_analyst_passphrase(&wrong, &analyst).is_ok());
+    fs::write(&path, previous).unwrap();
+    assert!(
+        vault
+            .verify_analyst_passphrase(&phrase(), &analyst)
+            .is_err()
+    );
+}

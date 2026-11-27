@@ -92,28 +92,40 @@ impl Engine<'_> {
         request: &str,
         task: SubagentDigest,
     ) -> Result<bool, AppError> {
+        self.live_task_approval_identity(case, request, task)
+            .map(|identity| identity.is_some())
+    }
+
+    pub(crate) fn live_task_approval_identity(
+        &self,
+        case: &CaseId,
+        request: &str,
+        task: SubagentDigest,
+    ) -> Result<Option<(uuid::Uuid, uuid::Uuid)>, AppError> {
         let tasks = self
             .subagent_runtime
             .tasks
             .lock()
             .map_err(|_| unavailable())?;
         let Some(live) = tasks.get(&(case.as_str().into(), task)) else {
-            return Ok(false);
+            return Ok(None);
         };
+        if live.token.is_cancelled() {
+            return Ok(None);
+        }
         let approvals = self
             .subagent_runtime
             .approvals
             .lock()
             .map_err(|_| unavailable())?;
-        Ok(!live.token.is_cancelled()
-            && approvals
-                .get(&(case.as_str().into(), request.into()))
-                .is_some_and(|pending| {
-                    pending.task == task
-                        && pending.owner == live.owner
-                        && !pending.reply.is_closed()
-                }))
+        Ok(approvals
+            .get(&(case.as_str().into(), request.into()))
+            .filter(|pending| {
+                pending.task == task && pending.owner == live.owner && !pending.reply.is_closed()
+            })
+            .map(|pending| (pending.owner, pending.registration)))
     }
+
     pub(crate) fn deliver_task_approval(
         &self,
         case: &CaseId,
