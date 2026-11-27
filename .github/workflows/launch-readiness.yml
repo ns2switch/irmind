@@ -3,10 +3,14 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Exact signed release tag to install and exercise
+        description: Exact signed release tag or latest for the current installer's stable default
         required: true
-        default: v0.5.7
+        default: latest
         type: string
+      installer_only:
+        description: Verify the clean installation without building the demo test harness
+        type: boolean
+        default: false
 permissions:
   contents: read
   attestations: read
@@ -24,11 +28,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with: {persist-credentials: false}
       - uses: dtolnay/rust-toolchain@766a42937d994bd78bb4591385445c188ccb3f09 # 1.97.1
+        if: ${{ !inputs.installer_only }}
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        if: ${{ !inputs.installer_only }}
         with:
           shared-key: ci
           save-if: false
       - uses: taiki-e/install-action@1e29709c0ec63babbe8f266397a465f29a825f91 # v2
+        if: ${{ !inputs.installer_only }}
         with: {tool: 'cargo-nextest', fallback: none}
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         with: {cosign-release: 'v3.1.4'}
@@ -39,5 +46,6 @@ jobs:
         shell: bash
         run: python3 .github/scripts/audit_release_install.py --tag "$RELEASE_TAG"
       - name: Exercise installed binary at 80x24 and 100x40 plus slash-command exploration
+        if: ${{ !inputs.installer_only }}
         shell: bash
         run: cargo nextest run -p irmind --test demo_pty --all-features --cargo-profile ci --locked -E 'test(eighty_by_twenty_four) + test(hundred_by_forty) + test(release_exploration)'

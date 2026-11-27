@@ -57,6 +57,11 @@ struct PreparedStartup {
 
 pub(super) fn run_once(cancel: &CancellationToken) -> Result<bool> {
     let cli = Cli::parse();
+    if let Some(Command::Serve { case_id }) = &cli.command {
+        admit_stdio_case(case_id, cli.passphrase_fd)?;
+        return run_configured(cli, false, cancel)
+            .map_err(|_| anyhow!("Local engine session ended with an error. Check the case and configuration in IRMind."));
+    }
     if let Some(Command::Demo {
         scripted,
         presentation_speed,
@@ -69,6 +74,10 @@ pub(super) fn run_once(cancel: &CancellationToken) -> Result<bool> {
     if let Some(Command::VerifyExport { path, expected_key }) = &cli.command {
         return run_verify_export(path, expected_key.as_deref());
     }
+    run_configured(cli, interactive, cancel)
+}
+
+fn run_configured(cli: Cli, interactive: bool, cancel: &CancellationToken) -> Result<bool> {
     let prepared = match PreparedStartup::new(cli, interactive) {
         Err(error) if error.downcast_ref::<keystore::SetupCancelled>().is_some() => {
             return Ok(false);
@@ -79,6 +88,24 @@ pub(super) fn run_once(cancel: &CancellationToken) -> Result<bool> {
         return Ok(false);
     };
     prepared.run(cancel)
+}
+
+fn admit_stdio_case(case_id: &str, passphrase_fd: Option<u32>) -> Result<()> {
+    use std::io::IsTerminal as _;
+    irmind_app::engine_rpc::canonical_case_id(case_id)?;
+    if passphrase_fd.is_some() || std::io::stdin().is_terminal() || std::io::stdout().is_terminal()
+    {
+        return Err(anyhow!(
+            "serve needs separate protocol pipes and the analyst's local terminal; omit --passphrase-fd"
+        ));
+    }
+    let answer = rpassword::prompt_password(format!(
+        "IRMind local client requests access to case {case_id}. Type the case ID to admit this session, or press Enter to decline: "
+    )).context("confirm the local engine session in a trusted IRMind terminal")?;
+    if answer != case_id {
+        return Err(anyhow!("local engine session declined"));
+    }
+    Ok(())
 }
 
 impl PreparedStartup {
@@ -333,7 +360,7 @@ impl PreparedStartup {
             self.guard.clone(),
         )
         .with_source_evidence_reader(self.store.source_evidence_reader());
-        if self.interactive {
+        if self.interactive || matches!(self.cli.command, Some(Command::Serve { .. })) {
             ports = ports.with_subagents(irmind_app::subagents::SubagentPorts {
                 branches: Arc::new(irmind_infra::ParquetStore::open(&self.home)?),
                 queries: self

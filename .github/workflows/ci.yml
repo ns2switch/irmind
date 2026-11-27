@@ -319,7 +319,7 @@ jobs:
           IRMIND_EXPECT_PRESERVE_ORDER: '1'
         run: |
           cargo nextest run -p irmind --test format_goldens --test kubernetes_ingest --test identity_ingest --test folder_ingest --test parser_detection_matrix --all-features --features serde_json/preserve_order --cargo-profile ci --locked
-          cargo nextest run -p irmind-domain -p irmind-app -p irmind-infra --lib --features serde_json/preserve_order --cargo-profile ci --locked -E 'test(skill) | test(subagent) | test(/^catalog::/) | test(case_budget) | test(case_deletion) | test(ingest_outcome) | test(cluster) | test(source_record) | test(provider_process) | test(fdr) | test(original_read) | test(source_mapping::stream::tests::replay) | test(source_queries) | test(source_query_dispatch) | test(query_capture) | test(case_created_v7) | test(export_v11_wire) | test(v11_empty_archive) | test(case_7_admission_vectors) | test(v10_proofs) | test(report_coverage) | test(mapped_export) | test(mapped_pipeline::expanded_catalog) | test(partitioning::sorting) | test(disordered_azure_wide_merge)'
+          cargo nextest run -p irmind-domain -p irmind-app -p irmind-infra --lib --features serde_json/preserve_order --cargo-profile ci --locked -E 'test(skill) | test(subagent) | test(/^catalog::/) | test(case_budget) | test(case_deletion) | test(ingest_outcome) | test(engine_rpc) | test(cluster) | test(source_record) | test(provider_process) | test(fdr) | test(original_read) | test(source_mapping::stream::tests::replay) | test(source_queries) | test(source_query_dispatch) | test(query_capture) | test(case_created_v7) | test(export_v11_wire) | test(v11_empty_archive) | test(case_7_admission_vectors) | test(v10_proofs) | test(report_coverage) | test(mapped_export) | test(mapped_pipeline::expanded_catalog) | test(partitioning::sorting) | test(disordered_azure_wide_merge)'
           cargo nextest run -p irmind-infra --lib --features sigma,serde_json/preserve_order --cargo-profile ci --locked -E 'test(sigma)'
           cargo nextest run -p irmind-sigma --lib --cargo-profile ci --locked
           cargo nextest run -p irmind-mapping-contracts -p irmind-mapping-tables -p irmind-mod-mapping-kubernetes -p irmind-mod-mapping-falco -p irmind-mod-mapping-network -p irmind-mod-parser-fdr -p irmind-mod-mapping-fdr -p irmind-mod-parser-macos -p irmind-mod-mapping-macos -p irmind-mod-parser-google-workspace -p irmind-mod-mapping-google-workspace -p irmind-mod-parser-s3-access -p irmind-mod-mapping-s3-access -p irmind-mod-parser-elb -p irmind-mod-mapping-elb -p irmind-mod-parser-iis-w3c -p irmind-mod-mapping-iis-w3c -p irmind-mod-parser-windows-dns -p irmind-mod-mapping-windows-dns -p irmind-mod-parser-route53 -p irmind-mod-mapping-route53 -p irmind-mod-parser-github-audit -p irmind-mod-mapping-github-audit -p irmind-mod-parser-defender -p irmind-mod-mapping-defender -p irmind-mod-parser-email -p irmind-mod-mapping-email -p irmind-mod-parser-vpc-flow -p irmind-mod-parser-azure-flow -p irmind-mod-parser-gcp-flow -p irmind-mod-mapping-cloud-flow -p irmind-mod-parser-guardduty -p irmind-mod-mapping-guardduty -p irmind-mod-parser-m365 -p irmind-mod-parser-okta -p irmind-mod-mapping-identity -p irmind-mod-parser-entra -p irmind-mod-mapping-entra -p irmind-mod-parser-gcp-audit -p irmind-mod-mapping-gcp-audit -p irmind-mod-mapping-cloudtrail -p irmind-mod-parser-evtx -p irmind-mod-mapping-evtx --lib --features serde_json/preserve_order --cargo-profile ci --locked
@@ -753,11 +753,16 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: github.event_name == 'workflow_dispatch' && inputs.release_dry_run == true
         with: {name: signed-release-dry-run, path: release/, if-no-files-found: error, retention-days: 30}
-      - name: Publish the signed prerelease only for an existing tag
+      - name: Publish the signed release only for an existing tag
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          release_kind=$(python3 -B .github/scripts/release_version.py "$GITHUB_REF_NAME")
+          release_flags=()
+          if [ "$release_kind" = prerelease ]; then
+            release_flags=(--prerelease --latest=false)
+          fi
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" release/* --clobber
           else
@@ -766,7 +771,7 @@ jobs:
             if test -f "$notes_file"; then
               notes=(--notes-file "$notes_file")
             fi
-            gh release create "$GITHUB_REF_NAME" release/* --verify-tag --prerelease "${notes[@]}" --title "IRMind $GITHUB_REF_NAME"
+            gh release create "$GITHUB_REF_NAME" release/* --verify-tag "${release_flags[@]}" "${notes[@]}" --title "IRMind $GITHUB_REF_NAME"
           fi
       - name: Add the public code signing policy to release notes
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')

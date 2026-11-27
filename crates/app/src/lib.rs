@@ -51,6 +51,7 @@ mod diagnostics;
 mod dispatch;
 pub use dispatch::AnalystToolOutcome;
 mod engine;
+pub mod engine_rpc;
 pub use adapter_storage_errors::AdapterStorageError;
 mod adapter_signature_errors;
 pub use adapter_signature_errors::AdapterSignatureError;

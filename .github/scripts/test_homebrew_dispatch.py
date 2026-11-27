@@ -1,10 +1,28 @@
 from pathlib import Path
 import unittest
 
+from release_version import release_kind
 from select_homebrew_release import eligible
 
 
 class HomebrewDispatchTests(unittest.TestCase):
+    def test_publication_classifies_stable_and_preview_tags(self):
+        self.assertEqual(release_kind("v0.7.4"), "stable")
+        for tag in ("v0.8.0-alpha.1", "v0.8.0-beta", "v0.8.0-rc.2"):
+            with self.subTest(tag=tag):
+                self.assertEqual(release_kind(tag), "prerelease")
+        for tag in ("v0.8.0-preview", "v0.8.0-rcx", "v00.8.0", "v0.8.0\n", "main"):
+            with self.subTest(tag=tag), self.assertRaises(ValueError):
+                release_kind(tag)
+
+    def test_publication_excludes_prereleases_from_latest(self):
+        workflow = (Path(__file__).parents[1] / "workflows/ci.yml").read_text()
+        publish = workflow.split("- name: Publish the signed release", 1)[1].split("- name:", 1)[0]
+        self.assertIn('python3 -B .github/scripts/release_version.py "$GITHUB_REF_NAME"', publish)
+        self.assertIn('if [ "$release_kind" = prerelease ]; then', publish)
+        self.assertIn('release_flags=(--prerelease --latest=false)', publish)
+        self.assertIn('--verify-tag "${release_flags[@]}"', publish)
+
     def test_only_an_exact_published_stable_tag_is_eligible(self):
         self.assertTrue(eligible("v0.8.0", {
             "tagName": "v0.8.0", "isDraft": False, "isPrerelease": False,

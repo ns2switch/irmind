@@ -1,6 +1,7 @@
 use super::*;
 #[allow(clippy::unwrap_used)]
 mod output;
+mod rpc;
 
 #[derive(Default)]
 struct ProtocolModel {

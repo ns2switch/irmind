@@ -52,7 +52,7 @@ impl Engine<'_> {
         calls: &[ModelToolCall],
         cancel: &CancellationToken,
     ) -> Result<String, AppError> {
-        if !turn.catalog.iter().any(|tool| tool.name == "delegate_task") {
+        if !turn.allow_delegation || !turn.catalog.iter().any(|tool| tool.name == "delegate_task") {
             return Ok("Delegation is unavailable in this turn.".into());
         }
         let key = delegation_key(calls)?;

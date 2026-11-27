@@ -51,6 +51,27 @@ fn run(root: &Path, args: &[&str]) -> String {
 }
 
 #[test]
+fn serve_cannot_take_a_keystore_passphrase_from_protocol_input() {
+    let root = tempfile::tempdir().unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_irmind"))
+        .arg("--home")
+        .arg(root.path())
+        .args([
+            "--passphrase-fd",
+            "0",
+            "serve",
+            "10000000-0000-4000-8000-000000000001",
+        ])
+        .stdin(Stdio::null())
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("omit --passphrase-fd"));
+    assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 0);
+}
+
+#[test]
 fn automation_ingests_mapped_artifacts_and_reopens_without_writing() {
     let root = tempfile::tempdir().unwrap();
     let home = root.path().join("data");

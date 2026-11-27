@@ -61,19 +61,19 @@ gh attestation verify "<BINARY>" -R ns2switch/irmind
 
 En Windows PowerShell, usa los mismos comandos de `cosign verify-blob` y `gh attestation verify` con rutas de Windows. La identidad del certificado debe corresponder al **tag que querías instalar**; comprobar solo que existe una firma no basta. La atestación vincula el hash del binario con el workflow de este repositorio. Consulta las guías de [Sigstore](https://docs.sigstore.dev/cosign/verifying/verify/) y [GitHub](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations).
 
-El repositorio incluye [install.sh](../../install.sh) e [install.ps1](../../install.ps1). Descarga el script y `SHA256SUMS`. Primero verifica el bundle Sigstore de `SHA256SUMS` contra el tag y la identidad exacta del workflow con el comando anterior; después comprueba **la línea exacta del hash del script** antes de ejecutarlo. En Linux o macOS usa `binary=install.sh` en el ejemplo anterior. En Windows compara `Get-FileHash .\install.ps1 -Algorithm SHA256` con su única línea en `SHA256SUMS`. El instalador detecta el sistema y verifica el hash del binario; si están disponibles, `cosign` y una versión actual de `gh` comprueban la firma y la procedencia. Cualquier fallo impide instalar. Nunca solicita permisos de administrador ni cambia `PATH`.
+El repositorio incluye los scripts actuales [install.sh](../../install.sh) e [install.ps1](../../install.ps1). Ejecútalos desde un clon de confianza o revisa el código guardado antes de ejecutarlo. Si usas un instalador incluido en una release de GitHub, descarga `SHA256SUMS` de esa release y verifica el bundle Sigstore contra su etiqueta y la identidad exacta del workflow. Después comprueba **la línea exacta del hash del script**. En Linux o macOS usa `binary=install.sh` en el ejemplo anterior. En Windows compara `Get-FileHash .\install.ps1 -Algorithm SHA256` con su única línea en `SHA256SUMS`. El instalador detecta el sistema y verifica el hash del binario. Si están disponibles, `cosign` y una versión actual de `gh` comprueban la firma y la procedencia. Cualquier fallo impide instalar. Nunca solicita permisos de administrador ni cambia `PATH`.
 
 ```sh
-# Linux o macOS, después de comprobar install.sh con SHA256SUMS:
+# Linux o macOS, con el instalador actual:
 sh ./install.sh
 ```
 
 ```powershell
-# Windows, después de comprobar install.ps1 con SHA256SUMS:
+# Windows, con el instalador actual:
 & .\install.ps1
 ```
 
-Omite la versión para elegir la última estable publicada. Si no hay ninguna disponible, el instalador se detiene. Para probar una preliminar, indica su etiqueta exacta en el primer argumento de POSIX o con `-Version` en PowerShell. Se aplican las mismas verificaciones. Un segundo argumento de POSIX o `-InstallDir` en PowerShell cambia el directorio del usuario. Por defecto se instala en `~/.local/bin` o `%LOCALAPPDATA%\IRMind\bin`. Si no está en `PATH`, el script indica cómo añadirlo manualmente.
+Los scripts actuales eligen la última estable publicada si omites la versión. Si no hay ninguna disponible, el instalador se detiene. Los scripts firmados incluidos en v0.8.0-alpha.1, v0.7.4 y anteriores son previos a este cambio. Con uno de esos scripts, usa `sh ./install.sh v0.7.4` o `& .\install.ps1 -Version v0.7.4` para instalar v0.7.4. Para probar una preliminar, indica su etiqueta exacta de la misma forma. Se aplican las mismas verificaciones al binario. Un segundo argumento de POSIX o `-InstallDir` en PowerShell cambia el directorio del usuario. Por defecto se instala en `~/.local/bin` o `%LOCALAPPDATA%\IRMind\bin`. Si no está en `PATH`, el script indica cómo añadirlo manualmente.
 
 CI también genera artefactos de prueba en ejecuciones nocturnas relevantes; no son versiones publicadas. Las PR y los merges a `main` no publican binarios. Apple no notariza los binarios y Windows no usa Authenticode; ambos sistemas pueden mostrar avisos incluso después de verificar la descarga.
 
