@@ -25,15 +25,7 @@ impl Engine<'_> {
         let Some(task) = self.task_pending_binding_unlocked(id, &request)? else {
             return Ok(None);
         };
-        self.require_live_task_request(id, &request, task)?;
-        let mut journal =
-            SubagentJournal::for_verification(id.clone()).map_err(|_| unavailable())?;
-        for entry in self.audit_log.entries(id)? {
-            journal.accept(&entry, self.verifier.as_ref())?;
-        }
-        let scope = journal
-            .pending_task_scope(task, &request.tool, &self.policy, self.clock.now()?)
-            .map_err(|_| unavailable())?;
+        let scope = self.live_task_scope_unlocked(id, &request, task)?;
         let mut narrowed = case;
         narrowed.scope = scope;
         let authorized = self
@@ -51,6 +43,23 @@ impl Engine<'_> {
             "Approval recorded, but the subagent session ended; no tool was executed."
         }.into()))
     }
+    pub(super) fn live_task_scope_unlocked(
+        &self,
+        id: &CaseId,
+        request: &ApprovalRequest,
+        task: SubagentDigest,
+    ) -> Result<String, AppError> {
+        self.require_live_task_request(id, request, task)?;
+        let mut journal =
+            SubagentJournal::for_verification(id.clone()).map_err(|_| unavailable())?;
+        for entry in self.audit_log.entries(id)? {
+            journal.accept(&entry, self.verifier.as_ref())?;
+        }
+        journal
+            .pending_task_scope(task, &request.tool, &self.policy, self.clock.now()?)
+            .map_err(|_| unavailable())
+    }
+
     pub(super) fn edit_live_task_approval_unlocked(
         &self,
         id: &CaseId,

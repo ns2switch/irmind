@@ -86,6 +86,8 @@ pub(super) enum Command {
     /// Serve an admitted case over local stdio with terminal confirmation.
     Serve {
         case_id: String,
+        #[arg(long, default_value_t = 1, value_parser = clap::value_parser!(u8).range(1..=2))]
+        protocol_version: u8,
     },
     Approvals {
         case_id: String,

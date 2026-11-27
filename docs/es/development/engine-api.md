@@ -27,3 +27,25 @@ Si un evento indica `review_in_tui`, abre el caso en la TUI de IRMind y
 usa `/approvals`. Solo IRMind firma la decisión. La API transmite el estado
 con ContentGuard y carece de operaciones para aprobar, firmar o gestionar
 credenciales. Esta implementación usa el caso 7 y la exportación V11.
+
+## Aprobaciones gráficas
+
+Un cliente gráfico de confianza puede elegir RPC V2 con
+`irmind serve <case_uuid> --protocol-version 2`. Usa tuberías privadas
+heredadas, el magic `IRMIND-RPC-V2` y un saludo V2. IRMind sigue pidiendo
+la admisión local al iniciar. El protocolo por defecto es V1.
+
+La GUI muestra en texto plano escapado la solicitud que devuelve IRMind.
+Revisa la acción, el caso, los argumentos, el alcance efectivo, la decisión,
+la caducidad y el código. V2 comprueba la frase del keystore cifrado de
+archivos para cada decisión. La GUI puede leer lo que tecleas. Usa un
+cliente de confianza para esa frase. Si la sesión tiene bloqueado el
+keystore de archivos, ciérrala antes de entrar en la TUI.
+
+Windows Hello y Touch ID requieren validación en equipos nativos antes
+de activarse. En macOS, el diálogo del sistema identifica la acción, el
+caso, la decisión y el código. Los argumentos completos y el alcance se
+leen en la GUI. Una GUI comprometida podría mostrar argumentos distintos
+de los que firma IRMind. Para una revisión estricta usa `/approvals`
+dentro de IRMind. La vía de Windows muestra la solicitud completa en
+una ventana propia de IRMind.

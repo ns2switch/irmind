@@ -57,7 +57,7 @@ struct PreparedStartup {
 
 pub(super) fn run_once(cancel: &CancellationToken) -> Result<bool> {
     let cli = Cli::parse();
-    if let Some(Command::Serve { case_id }) = &cli.command {
+    if let Some(Command::Serve { case_id, .. }) = &cli.command {
         admit_stdio_case(case_id, cli.passphrase_fd)?;
         return run_configured(cli, false, cancel)
             .map_err(|_| anyhow!("Local engine session ended with an error. Check the case and configuration in IRMind."));

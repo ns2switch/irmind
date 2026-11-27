@@ -49,6 +49,12 @@ impl LlmPort for ProtocolModel {
 }
 
 fn engine_fixture() -> (tempfile::TempDir, Arc<LocalStore>, Engine<'static>, CaseId) {
+    engine_fixture_with_clock(Arc::new(SystemClock))
+}
+
+fn engine_fixture_with_clock(
+    clock: Arc<dyn irmind_app::Clock>,
+) -> (tempfile::TempDir, Arc<LocalStore>, Engine<'static>, CaseId) {
     let root = tempfile::tempdir().expect("temporary case root");
     let store = Arc::new(open_source_store(root.path()).expect("local store"));
     let signer = Arc::new(LocalSigner {
@@ -68,7 +74,7 @@ fn engine_fixture() -> (tempfile::TempDir, Arc<LocalStore>, Engine<'static>, Cas
             Arc::new(MandatoryGuard::new().expect("guard")),
         ),
         ExecutionMode::Attended,
-        Arc::new(SystemClock),
+        clock,
     )
     .expect("engine");
     let case = engine.create_case("Synthetic", "local").expect("case");
